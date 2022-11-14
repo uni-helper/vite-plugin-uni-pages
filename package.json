@@ -1,0 +1,59 @@
+{
+  "name": "@uni-helper/vite-plugin-uni-pages",
+  "type": "module",
+  "version": "0.0.0",
+  "packageManager": "pnpm@7.14.0",
+  "description": "File system based routing for uni-app applications using Vite",
+  "author": "KeJun",
+  "license": "MIT",
+  "homepage": "https://github.com/uni-helper/vite-plugin-uni-pages#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uni-helper/vite-plugin-uni-pages.git"
+  },
+  "bugs": "https://github.com/uni-helper/vite-plugin-uni-pages/issues",
+  "keywords": [],
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "*": [
+        "./dist/*",
+        "./dist/index.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "unbuild",
+    "dev": "unbuild --stub",
+    "play": "nr -C playground dev:h5",
+    "prepublishOnly": "pnpm build",
+    "release": "bumpp && npm publish",
+    "start": "esno src/index.ts",
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "^18.11.9",
+    "bumpp": "^8.2.1",
+    "esno": "^0.16.3",
+    "typescript": "^4.8.4",
+    "unbuild": "^0.9.4",
+    "vite": "^3.2.3",
+    "vitest": "^0.24.5"
+  },
+  "dependencies": {
+    "unconfig": "^0.3.7"
+  }
+}
