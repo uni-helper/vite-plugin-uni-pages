@@ -54,6 +54,10 @@
     "vitest": "^0.24.5"
   },
   "dependencies": {
+    "@vue/compiler-dom": "^3.2.45",
+    "defu": "^6.1.0",
+    "fast-glob": "^3.2.12",
+    "jsonc-parser": "^3.2.0",
     "unconfig": "^0.3.7"
   }
 }
