@@ -40,7 +40,7 @@
     "dev": "unbuild --stub",
     "play": "nr -C playground dev:h5",
     "prepublishOnly": "pnpm build",
-    "release": "bumpp && npm publish",
+    "release": "bumpp && npm publish --access public",
     "start": "esno src/index.ts",
     "test": "vitest"
   },
