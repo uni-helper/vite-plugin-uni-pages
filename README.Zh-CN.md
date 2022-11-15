@@ -1,16 +1,16 @@
 # @uni-helper/vite-plugin-uni-pages
 
-File system-based routing for uni-app applications using Vite
+在 Vite 驱动的 uni-app 上使用基于文件的路由系统
 
-English | [简体中文](./README.Zh-CN.md)
+[English](./README.md) | 简体中文
 
-## Installation
+## 安装
 
 ```bash
 pnpm i -D @uni-helper/vite-plugin-uni-pages
 ```
 
-## Usage
+## 使用
 
 ```ts
 // vite.config.ts
@@ -23,7 +23,7 @@ export default defineConfig({
 });
 ```
 
-Define global properties in `pages.config.ts`
+在 `pages.config.ts` 定义全局属性
 
 ```ts
 // pages.config.ts
@@ -41,9 +41,9 @@ export default definePages({
 });
 ```
 
-Now all pages will be found automatically!
+现在所有的 page 都会被自动发现！
 
-You can use route-block in the page to specify metadata
+你可以在页面中使用 route-block 来指定元数据
 
 ```vue
 <!-- index.vue -->
@@ -63,7 +63,7 @@ You can use route-block in the page to specify metadata
 </route>
 ```
 
-Import the virtual module to access the metadata of all pages
+导入虚拟模块即可访问所有页面的元数据
 
 ```ts
 /// <reference types="@uni-helper/vite-plugin-uni-pages/client" />
@@ -71,13 +71,6 @@ import { pages } from "virtual:uni-pages";
 console.log(pages);
 ```
 
-## Configuration
+## 配置
 
-see [types.ts](./src/types.ts)
-
-## TODO
-
-- [ ] only update the changed page
-- [ ] ~~middleware~~
-  - vite-plugin-uni-middleware
-- [ ] pages [type](./src/config/types.ts)
+查看 [types.ts](./src/types.ts)
