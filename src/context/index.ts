@@ -8,6 +8,7 @@ import { parse as JSONParse } from "jsonc-parser";
 import { parse } from "@vue/compiler-dom";
 import fs from "fs";
 import { defu } from "defu";
+import { logger } from "../utils";
 
 export class Context {
   options: ResolvedOptions;
@@ -29,6 +30,7 @@ export class Context {
       ],
       merge: false,
     });
+    logger.debug("Loaded user pages config", config);
     this.pagesConfig = config as PagesConfig;
   }
 
@@ -50,6 +52,7 @@ export class Context {
         ),
       };
     });
+    logger.debug("Scanned pages dir", this.pagesPathInfo);
   }
 
   async parsePage({ relative, absolute }: PagePathInfo): Promise<PageMeta> {
@@ -95,6 +98,7 @@ export class Context {
     pages.sort((a) => (a.type === "home" ? -1 : 0));
     // @ts-ignore
     this.pagesMeta = pages;
+    logger.debug("merged pages", this.pagesMeta);
   }
 
   async createOrUpdatePagesJSON() {

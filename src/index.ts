@@ -1,8 +1,9 @@
 import { ModuleNode, normalizePath, Plugin } from "vite";
 import { ResolvedOptions, UserOptions } from "./types";
-import { isPagePath } from "./utils";
+import { isPagePath, logger } from "./utils";
 import { virtualModuleId, resolvedVirtualModuleId } from "./constant";
 import { Context } from "./context";
+import { existsSync } from "fs";
 
 export * from "./config";
 
@@ -21,12 +22,16 @@ export const VitePluginUniPages = async (
   userOptions: UserOptions = {}
 ): Promise<Plugin> => {
   const options = resolveOptions(userOptions);
+  logger.debug("Create uni-pages context with", options);
   const ctx = new Context(options);
-
+  if (!existsSync(ctx.pagesConfigSourcePath)) {
+    logger.error(`Can't found ${options.entry}.${options.extension}`);
+  }
   return {
     name: "vite-plugin-uni-pages",
     enforce: "pre",
     configureServer({ watcher, moduleGraph, ws }) {
+      logger.debug("Add watcher", ctx.pagesConfigSourcePath);
       watcher.add(ctx.pagesConfigSourcePath);
 
       const reloadModule = (module: ModuleNode | undefined, path = "*") => {
@@ -41,6 +46,7 @@ export const VitePluginUniPages = async (
         }
       };
       const updateVirtualModule = () => {
+        logger.debug("Update virtualModule");
         const module = moduleGraph.getModuleById(resolvedVirtualModuleId);
         reloadModule(module);
       };

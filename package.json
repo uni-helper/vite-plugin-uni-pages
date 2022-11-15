@@ -53,6 +53,8 @@
   },
   "dependencies": {
     "@vue/compiler-dom": "^3.2.45",
+    "colorette": "^2.0.19",
+    "consola": "^2.15.3",
     "defu": "^6.1.0",
     "fast-glob": "^3.2.12",
     "jsonc-parser": "^3.2.0",
