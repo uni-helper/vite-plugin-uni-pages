@@ -1,4 +1,4 @@
-import { normalizePath, Plugin } from "vite";
+import { ModuleNode, normalizePath, Plugin } from "vite";
 import { ResolvedOptions, UserOptions } from "./types";
 import { isPagePath } from "./utils";
 import { virtualModuleId, resolvedVirtualModuleId } from "./constant";
@@ -26,24 +26,44 @@ export const VitePluginUniPages = async (
   return {
     name: "vite-plugin-uni-pages",
     enforce: "pre",
-    configureServer({ watcher }) {
+    configureServer({ watcher, moduleGraph, ws }) {
       watcher.add(ctx.pagesConfigSourcePath);
+
+      const reloadModule = (module: ModuleNode | undefined, path = "*") => {
+        if (module) {
+          moduleGraph.invalidateModule(module);
+          if (ws) {
+            ws.send({
+              path,
+              type: "full-reload",
+            });
+          }
+        }
+      };
+      const updateVirtualModule = () => {
+        const module = moduleGraph.getModuleById(resolvedVirtualModuleId);
+        reloadModule(module);
+      };
+
       watcher.on("change", async (path) => {
         if (
           normalizePath(path) === ctx.pagesConfigSourcePath ||
           isPagePath(path, options)
         ) {
           await ctx.createOrUpdatePagesJSON();
+          updateVirtualModule();
         }
       });
       watcher.on("add", async (path) => {
         if (isPagePath(path, options)) {
           await ctx.createOrUpdatePagesJSON();
+          updateVirtualModule();
         }
       });
       watcher.on("unlink", async (path) => {
         if (isPagePath(path, options)) {
           await ctx.createOrUpdatePagesJSON();
+          updateVirtualModule();
         }
       });
     },
