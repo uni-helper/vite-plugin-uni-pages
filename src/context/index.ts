@@ -114,20 +114,23 @@ export class Context {
       });
     }
 
+    this.options.onBeforeLoadUserConfig(this);
     await this.loadUserPagesConfig();
-    await this.scanPages();
-    await this.mergePagesMeta();
+    this.options.onAfterLoadUserConfig(this);
 
-    fs.writeFileSync(
-      resolvedOutput,
-      JSON.stringify({
-        ...this.pagesConfig,
-        pages: this.pagesMeta,
-      }),
-      {
-        encoding: "utf-8",
-      }
-    );
+    this.options.onBeforeScanPages(this);
+    await this.scanPages();
+    this.options.onAfterScanPages(this);
+
+    this.options.onBeforeMergePagesMeta(this);
+    await this.mergePagesMeta();
+    this.options.onAfterMergePagesMeta(this);
+
+    this.options.onBeforeWriteFile(this);
+    fs.writeFileSync(resolvedOutput, this.pagesJson, {
+      encoding: "utf-8",
+    });
+    this.options.onAfterWriteFile(this);
   }
 
   async virtualModule() {
@@ -138,5 +141,12 @@ export class Context {
     return normalizePath(
       resolve(process.cwd(), `${this.options.entry}.${this.options.extension}`)
     );
+  }
+
+  get pagesJson() {
+    return JSON.stringify({
+      ...this.pagesConfig,
+      pages: this.pagesMeta,
+    });
   }
 }

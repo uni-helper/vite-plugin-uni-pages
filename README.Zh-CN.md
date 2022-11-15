@@ -74,3 +74,21 @@ console.log(pages);
 ## 配置
 
 查看 [types.ts](./src/types.ts)
+
+## 钩子
+
+你不能在 `pages.json` 中使用类似 `#ifdef H5`, 但是使用 [hooks](./src/types.ts) 可以改变 pagesMeta.
+
+```ts
+// vite.config.ts
+UniPages({
+  onBeforeWriteFile(ctx) {
+    ctx.pagesMeta = ctx.pagesMeta?.filter((v) => !v.path.includes("test"));
+  },
+});
+...
+```
+
+这是条件编译的一个很好的替代方案
+
+怎么做? 打印 `process.env` 然后找到 `UNI_*`, 我相信你已经会了

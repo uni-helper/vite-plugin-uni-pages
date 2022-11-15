@@ -13,7 +13,14 @@ function resolveOptions(userOptions: UserOptions): ResolvedOptions {
     outDir: "src",
     entry: "pages.config",
     extension: "ts",
-    middlewaresDir: "src/middlewares",
+    onBeforeLoadUserConfig: () => {},
+    onAfterLoadUserConfig: () => {},
+    onBeforeScanPages: () => {},
+    onAfterScanPages: () => {},
+    onBeforeMergePagesMeta: () => {},
+    onAfterMergePagesMeta: () => {},
+    onBeforeWriteFile: () => {},
+    onAfterWriteFile: () => {},
     ...userOptions,
   };
 }

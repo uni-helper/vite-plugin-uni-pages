@@ -1,3 +1,4 @@
+import type { Context } from "./context";
 export interface Options {
   /**
    * pages dir
@@ -23,11 +24,14 @@ export interface Options {
    */
   extension: string;
 
-  /**
-   * middlewares dir
-   * @default "src/middlewares"
-   */
-  middlewaresDir: string;
+  onBeforeLoadUserConfig: (ctx: Context) => void;
+  onAfterLoadUserConfig: (ctx: Context) => void;
+  onBeforeScanPages: (ctx: Context) => void;
+  onAfterScanPages: (ctx: Context) => void;
+  onBeforeMergePagesMeta: (ctx: Context) => void;
+  onAfterMergePagesMeta: (ctx: Context) => void;
+  onBeforeWriteFile: (ctx: Context) => void;
+  onAfterWriteFile: (ctx: Context) => void;
 }
 
 export interface UserOptions extends Partial<Options> {}

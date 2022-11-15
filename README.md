@@ -75,6 +75,24 @@ console.log(pages);
 
 see [types.ts](./src/types.ts)
 
+## Hooks
+
+You can not use like `#ifdef H5` in `pages.json`, but use [hooks](./src/types.ts) to change pagesMeta.
+
+```ts
+// vite.config.ts
+UniPages({
+  onBeforeWriteFile(ctx) {
+    ctx.pagesMeta = ctx.pagesMeta?.filter((v) => !v.path.includes("test"));
+  },
+});
+...
+```
+
+This is a good alternative to conditional compilation
+
+How? console the `process.env` and found `UNI_*`, you can do this!
+
 ## TODO
 
 - [ ] only update the changed page
