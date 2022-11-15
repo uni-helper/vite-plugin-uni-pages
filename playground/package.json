@@ -56,7 +56,7 @@
     "@dcloudio/types": "^3.0.19",
     "@dcloudio/uni-automator": "3.0.0-alpha-3060720221018006",
     "@dcloudio/uni-cli-shared": "3.0.0-alpha-3060720221018006",
-    "@dcloudio/uni-stacktracey": "3.0.0-alpha-3060720221018006",
+    "@dcloudio/uni-stacktracey": "3.0.0-alpha-3060920221114001",
     "@dcloudio/vite-plugin-uni": "3.0.0-alpha-3060720221018006",
     "typescript": "^4.8.4",
     "vite": "^3.2.3"
