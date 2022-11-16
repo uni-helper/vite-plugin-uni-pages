@@ -9,7 +9,6 @@ import { parse } from "@vue/compiler-dom";
 import fs from "fs";
 import { defu } from "defu";
 import { logger } from "../utils";
-
 export class Context {
   options: ResolvedOptions;
   pagesConfig!: PagesConfig;
@@ -24,12 +23,17 @@ export class Context {
     const { config } = await loadConfig({
       sources: [
         {
-          files: this.options.entry,
-          extensions: [this.options.extension],
+          files: "pages.config",
         },
       ],
       merge: false,
     });
+    if (!config) {
+      logger.error(
+        "Can't found pages.config, please create pages.config.(ts|mts|cts|js|cjs|mjs|json)"
+      );
+      process.exit(-1);
+    }
     logger.debug("Loaded user pages config", config);
     this.pagesConfig = config as PagesConfig;
   }
@@ -137,10 +141,12 @@ export class Context {
     return `export const pages = ${JSON.stringify(this.pagesMeta)};`;
   }
 
-  get pagesConfigSourcePath() {
-    return normalizePath(
-      resolve(process.cwd(), `${this.options.entry}.${this.options.extension}`)
-    );
+  async pagesConfigSourcePaths() {
+    return await fg("pages.config.(ts|mts|cts|js|cjs|mjs|json)", {
+      deep: 0,
+      onlyFiles: true,
+      absolute: true,
+    });
   }
 
   get pagesJson() {

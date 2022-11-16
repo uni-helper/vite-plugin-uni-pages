@@ -23,7 +23,7 @@ export default defineConfig({
 });
 ```
 
-Define global properties in `pages.config.ts`
+Define global properties in `pages.config.(ts|mts|cts|js|cjs|mjs|json)`
 
 ```ts
 // pages.config.ts

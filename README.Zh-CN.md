@@ -23,7 +23,7 @@ export default defineConfig({
 });
 ```
 
-在 `pages.config.ts` 定义全局属性
+在 `pages.config.(ts|mts|cts|js|cjs|mjs|json)` 定义全局属性
 
 ```ts
 // pages.config.ts

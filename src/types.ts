@@ -12,18 +12,6 @@ export interface Options {
    */
   outDir: string;
 
-  /**
-   * pages config entry
-   * @default "pages.config"
-   */
-  entry: string;
-
-  /**
-   * pages config extension
-   * @default "ts"
-   */
-  extension: string;
-
   onBeforeLoadUserConfig: (ctx: Context) => void;
   onAfterLoadUserConfig: (ctx: Context) => void;
   onBeforeScanPages: (ctx: Context) => void;

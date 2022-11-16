@@ -3,7 +3,6 @@ import { ResolvedOptions, UserOptions } from "./types";
 import { isPagePath, logger } from "./utils";
 import { virtualModuleId, resolvedVirtualModuleId } from "./constant";
 import { Context } from "./context";
-import { existsSync } from "fs";
 
 export * from "./config";
 
@@ -11,8 +10,6 @@ function resolveOptions(userOptions: UserOptions): ResolvedOptions {
   return {
     pagesDir: "src/pages",
     outDir: "src",
-    entry: "pages.config",
-    extension: "ts",
     onBeforeLoadUserConfig: () => {},
     onAfterLoadUserConfig: () => {},
     onBeforeScanPages: () => {},
@@ -31,15 +28,13 @@ export const VitePluginUniPages = async (
   const options = resolveOptions(userOptions);
   logger.debug("Create uni-pages context with", options);
   const ctx = new Context(options);
-  if (!existsSync(ctx.pagesConfigSourcePath)) {
-    logger.error(`Can't found ${options.entry}.${options.extension}`);
-  }
   return {
     name: "vite-plugin-uni-pages",
     enforce: "pre",
-    configureServer({ watcher, moduleGraph, ws }) {
-      logger.debug("Add watcher", ctx.pagesConfigSourcePath);
-      watcher.add(ctx.pagesConfigSourcePath);
+    async configureServer({ watcher, moduleGraph, ws }) {
+      const pagesConfigSourcePaths = await ctx.pagesConfigSourcePaths();
+      logger.debug("Add watcher", pagesConfigSourcePaths);
+      watcher.add(pagesConfigSourcePaths);
 
       const reloadModule = (module: ModuleNode | undefined, path = "*") => {
         if (module) {
@@ -60,7 +55,7 @@ export const VitePluginUniPages = async (
 
       watcher.on("change", async (path) => {
         if (
-          normalizePath(path) === ctx.pagesConfigSourcePath ||
+          pagesConfigSourcePaths.includes(normalizePath(path)) ||
           isPagePath(path, options)
         ) {
           await ctx.createOrUpdatePagesJSON();
