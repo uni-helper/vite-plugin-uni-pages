@@ -32,6 +32,16 @@
   "main": "./dist/index.mjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "*": [
+        "./dist/index.d.ts"
+      ],
+      "config": [
+        "./dist/config/index.d.ts"
+      ]
+    }
+  },
   "files": [
     "dist",
     "client.d.ts"
