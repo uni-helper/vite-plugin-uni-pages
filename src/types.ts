@@ -11,6 +11,11 @@ export interface Options {
    * @default "src"
    */
   outDir: string;
+  /**
+   * exclude page
+   * @default []
+   */
+  exclude: string[];
 
   onBeforeLoadUserConfig: (ctx: Context) => void;
   onAfterLoadUserConfig: (ctx: Context) => void;

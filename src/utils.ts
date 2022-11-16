@@ -5,7 +5,7 @@ import consola from "consola";
 
 export const isPagePath = (path: string, options: ResolvedOptions) => {
   const dirPath = resolve(process.cwd(), options.pagesDir);
-  const filter = createFilter(dirPath + "/**/*.(vue|nvue)");
+  const filter = createFilter(dirPath + "/**/*.(vue|nvue)", options.exclude);
   return filter(path);
 };
 

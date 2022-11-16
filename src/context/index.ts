@@ -40,7 +40,7 @@ export class Context {
 
   async scanPages() {
     const files = await fg("**/*.(vue|nvue)", {
-      ignore: ["node_modules", ".git", "**/__*__/*"],
+      ignore: ["node_modules", ".git", "**/__*__/*", ...this.options.exclude],
       onlyFiles: true,
       cwd: resolve(process.cwd(), this.options.pagesDir),
     });

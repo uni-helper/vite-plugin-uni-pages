@@ -10,6 +10,7 @@ function resolveOptions(userOptions: UserOptions): ResolvedOptions {
   return {
     pagesDir: "src/pages",
     outDir: "src",
+    exclude: [],
     onBeforeLoadUserConfig: () => {},
     onAfterLoadUserConfig: () => {},
     onBeforeScanPages: () => {},

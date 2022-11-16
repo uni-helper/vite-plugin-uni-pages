@@ -89,7 +89,7 @@ UniPages({
 ...
 ```
 
-This is a good alternative to conditional compilation
+This is a good alternative to conditional compilation, you can also use `exclude` in `vite.config.ts`
 
 How? console the `process.env` and found `UNI_*`, you can do this!
 
