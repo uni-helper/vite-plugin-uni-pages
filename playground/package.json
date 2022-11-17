@@ -54,7 +54,7 @@
   },
   "devDependencies": {
     "@dcloudio/types": "^3.0.16",
-    "@dcloudio/uni-automator": "3.0.0-alpha-3060920221114001",
+    "@dcloudio/uni-automator": "3.0.0-alpha-3060920221117002",
     "@dcloudio/uni-cli-shared": "3.0.0-alpha-3060920221117002",
     "@dcloudio/uni-stacktracey": "3.0.0-alpha-3060920221114001",
     "@dcloudio/vite-plugin-uni": "3.0.0-alpha-3060920221114001",
