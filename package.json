@@ -32,6 +32,9 @@
       "*": [
         "./dist/*",
         "./dist/index.d.ts"
+      ],
+      "client": [
+        "./client.d.ts"
       ]
     }
   },
