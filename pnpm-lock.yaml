@@ -38,7 +38,7 @@ importers:
       '@dcloudio/uni-app-plus': 3.0.0-alpha-3060920221114001
       '@dcloudio/uni-automator': 3.0.0-alpha-3060920221114001
       '@dcloudio/uni-cli-shared': 3.0.0-alpha-3060920221114001
-      '@dcloudio/uni-components': 3.0.0-alpha-3060920221114001
+      '@dcloudio/uni-components': 3.0.0-alpha-3060920221117001
       '@dcloudio/uni-h5': 3.0.0-alpha-3060920221114001
       '@dcloudio/uni-mp-alipay': 3.0.0-alpha-3060920221114001
       '@dcloudio/uni-mp-baidu': 3.0.0-alpha-3060920221114001
@@ -58,7 +58,7 @@ importers:
     dependencies:
       '@dcloudio/uni-app': 3.0.0-alpha-3060920221114001_3bz7gvgemyffbkrpwxrx6xlp4a
       '@dcloudio/uni-app-plus': 3.0.0-alpha-3060920221114001_vite@3.2.4+vue@3.2.45
-      '@dcloudio/uni-components': 3.0.0-alpha-3060920221114001
+      '@dcloudio/uni-components': 3.0.0-alpha-3060920221117001
       '@dcloudio/uni-h5': 3.0.0-alpha-3060920221114001_vue@3.2.45
       '@dcloudio/uni-mp-alipay': 3.0.0-alpha-3060920221114001_vue@3.2.45
       '@dcloudio/uni-mp-baidu': 3.0.0-alpha-3060920221114001_vue@3.2.45
@@ -523,6 +523,10 @@ packages:
 
   /@dcloudio/uni-components/3.0.0-alpha-3060920221114001:
     resolution: {integrity: sha512-pL7hB8EK2Hs3WdzxUDWGSXYJh8eLkhuBIW9YZnCuGd409YW5X1ZM2CNLtBiGMa1QK8iSAxkUkM5q52lTNFMaNQ==}
+    dev: false
+
+  /@dcloudio/uni-components/3.0.0-alpha-3060920221117001:
+    resolution: {integrity: sha512-/iV+d9PKxAaPIgNs8yluzUSEPbPxCbmQEv4M24B5q7qCl/70d88GQgpnadHmX7a9EKqogtogGMUQilhzuURb/w==}
     dev: false
 
   /@dcloudio/uni-h5-vite/3.0.0-alpha-3060920221114001_vue@3.2.45:
