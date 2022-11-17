@@ -20,11 +20,6 @@
       "require": "./dist/index.cjs",
       "import": "./dist/index.js"
     },
-    "./config": {
-      "types": "./dist/config/index.d.ts",
-      "require": "./dist/config/index.cjs",
-      "import": "./dist/config/index.js"
-    },
     "./client": {
       "types": "./client.d.ts"
     }
@@ -35,10 +30,8 @@
   "typesVersions": {
     "*": {
       "*": [
+        "./dist/*",
         "./dist/index.d.ts"
-      ],
-      "config": [
-        "./dist/config/index.d.ts"
       ]
     }
   },

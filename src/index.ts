@@ -4,6 +4,8 @@ import { isPagePath, logger } from "./utils";
 import { virtualModuleId, resolvedVirtualModuleId } from "./constant";
 import { Context } from "./context";
 
+export * from "./config";
+
 function resolveOptions(userOptions: UserOptions): ResolvedOptions {
   return {
     pagesDir: "src/pages",

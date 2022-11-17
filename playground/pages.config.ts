@@ -1,4 +1,4 @@
-import { definePages } from "@uni-helper/vite-plugin-uni-pages/config";
+import { definePages } from "@uni-helper/vite-plugin-uni-pages";
 
 export default definePages({
   globalStyle: {
