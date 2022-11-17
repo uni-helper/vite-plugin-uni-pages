@@ -96,6 +96,5 @@ How? console the `process.env` and found `UNI_*`, you can do this!
 ## TODO
 
 - [ ] only update the changed page
-- [ ] ~~middleware~~
-  - vite-plugin-uni-middleware
+- [x] [vite-plugin-uni-middleware](https://github.com/uni-helper/vite-plugin-uni-middleware)
 - [ ] pages [type](./src/config/types.ts)
