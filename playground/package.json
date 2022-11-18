@@ -46,7 +46,7 @@
     "@dcloudio/uni-mp-lark": "3.0.0-alpha-3060920221114001",
     "@dcloudio/uni-mp-qq": "3.0.0-alpha-3060920221114001",
     "@dcloudio/uni-mp-toutiao": "3.0.0-alpha-3060920221114001",
-    "@dcloudio/uni-mp-weixin": "3.0.0-alpha-3060920221114001",
+    "@dcloudio/uni-mp-weixin": "3.0.0-alpha-3060920221117002",
     "@dcloudio/uni-quickapp-webview": "3.0.0-alpha-3060920221114001",
     "@uni-helper/vite-plugin-uni-pages": "workspace:*",
     "vue": "^3.2.41",
