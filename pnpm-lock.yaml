@@ -13,6 +13,7 @@ importers:
       fast-glob: ^3.2.12
       jsonc-parser: ^3.2.0
       tsup: ^6.5.0
+      type-fest: ^3.2.0
       typescript: ^4.9.3
       unconfig: ^0.3.7
       vite: ^3.2.4
@@ -23,6 +24,7 @@ importers:
       defu: 6.1.1
       fast-glob: 3.2.12
       jsonc-parser: 3.2.0
+      type-fest: 3.2.0
       unconfig: 0.3.7
     devDependencies:
       '@types/node': 18.11.9
@@ -2859,6 +2861,11 @@ packages:
     resolution: {integrity: sha512-0fr/mIH1dlO+x7TlcMy+bIDqKPsw/70tVyeHW787goQjhmqaZe10uwLujubK9q9Lg6Fiho1KUKDYz0Z7k7g5/g==}
     engines: {node: '>=4'}
     dev: true
+
+  /type-fest/3.2.0:
+    resolution: {integrity: sha512-Il3wdLRzWvbAEtocgxGQA9YOoRVeVUGOMBtel5LdEpNeEAol6GJTLw8GbX6Z8EIMfvfhoOXs2bwOijtAZdK5og==}
+    engines: {node: '>=14.16'}
+    dev: false
 
   /type-is/1.6.18:
     resolution: {integrity: sha512-TkRKr9sUTxEH8MdfuCSP7VizJyzRNMjj2J2do2Jr3Kym598JVdEksuzPQCnlFPW4ky9Q+iA+ma9BGm06XQBy8g==}

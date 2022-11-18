@@ -64,6 +64,7 @@
     "defu": "^6.1.1",
     "fast-glob": "^3.2.12",
     "jsonc-parser": "^3.2.0",
+    "type-fest": "^3.2.0",
     "unconfig": "^0.3.7"
   }
 }
