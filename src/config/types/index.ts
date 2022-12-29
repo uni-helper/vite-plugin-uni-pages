@@ -1,5 +1,5 @@
 import type { PartialDeep } from 'type-fest'
-import type { Easycom } from './easycom'
+import type { EasyCom } from './easycom'
 import type { GlobalStyle } from './globalStyle'
 import type { TabBar } from './tabBar'
 
@@ -12,10 +12,12 @@ export interface Page {
    * 配置页面路径
    */
   path: string
+
   /**
    * 配置页面窗口表现，配置项参考下方 pageStyle
    */
   style: GlobalStyle
+
   [x: string]: any
 }
 
@@ -24,17 +26,18 @@ export interface TheWindow {
    * 配置页面路径
    */
   path: string
+
   /**
    * 配置页面窗口表现，配置项参考下方 pageStyle
    */
   style: GlobalStyle
+
   /**
    * 配置显示该窗口的规则，配置项参考下方 matchMedia
    */
   matchMedia: {
     /**
      * 当设备可见区域宽度 >= minWidth 时，显示该 window
-     * @type number
      * @default "768"
      */
     minWidth: number
@@ -46,6 +49,7 @@ export interface PreloadRule {
    * 进入页面后预下载分包的 root 或 name。__APP__ 表示主包。
    */
   packages: string[]
+
   /**
    * 在指定网络下预下载，可选值为：all（不限网络）、wifi（仅wifi下预下载）
    * @default "wifi"
@@ -58,6 +62,7 @@ export interface SubPackage {
    * 子包的根目录
    */
   root: string
+
   /**
    * 子包由哪些页面组成，参数同 pages
    */
@@ -69,10 +74,12 @@ export interface ConditionItem {
    * 启动模式名称
    */
   name: string
+
   /**
    * 启动页面路径
    */
   path: string
+
   /**
    * 启动参数，可在页面的 onLoad 函数里获得
    */
@@ -84,6 +91,7 @@ export interface Condition {
    * 当前激活的模式，list节点的索引值
    */
   current: number
+
   /**
    * 启动模式列表
    */
@@ -95,56 +103,68 @@ export interface PagesConfig {
    * 设置页面路径及窗口表现
    */
   pages: PartialDeep<Page>[]
+
   /**
    * 设置默认页面的窗口表现
    */
   globalStyle: GlobalStyle
+
   /**
    * 组件自动引入规则
    * @desc 2.5.5+
    */
-  easycom: Easycom
+  easycom: EasyCom
+
   /**
    * 设置底部 tab 的表现
    */
   tabBar: TabBar
+
   /**
    * 启动模式配置
    */
   condition: Condition
+
   /**
    * 分包加载配置
    */
   subPackages: PartialDeep<SubPackage>[]
+
   /**
    * 分包预下载规则
    * @desc 微信小程序
    */
   preloadRule: PreloadRule
+
   /**
    * `Worker` 代码放置的目录
    * @desc 微信小程序
    */
   workers: any
+
   /**
    * 大屏左侧窗口
    * @desc H5
    */
   leftWindow: TheWindow
+
   /**
    * 大屏顶部窗口
    * @desc H5
    */
   topWindow: TheWindow
+
   /**
    * 大屏右侧窗口
    * @desc H5
    */
   rightWindow: TheWindow
+
   /**
    * 自动跳转相关配置，新增于HBuilderX 3.5.0
    */
   uniIdRouter: any
+
   [x: string]: any
 }
 

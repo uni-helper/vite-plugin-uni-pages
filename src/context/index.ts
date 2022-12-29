@@ -9,11 +9,13 @@ import { defu } from 'defu'
 import type { PageMeta, PagePathInfo, ResolvedOptions } from '../types'
 import type { PagesConfig } from '../config/types'
 import { logger } from '../utils'
+
 export class Context {
   options: ResolvedOptions
   pagesConfig!: PagesConfig
   pagesPathInfo: PagePathInfo[] = []
   pagesMeta: PageMeta[] = []
+
   constructor(options: ResolvedOptions) {
     this.options = options
     this.createOrUpdatePagesJSON()

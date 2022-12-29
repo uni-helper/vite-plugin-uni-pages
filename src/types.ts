@@ -1,4 +1,5 @@
 import type { Context } from './context'
+
 export interface Options {
   /**
    * pages dir
@@ -11,6 +12,7 @@ export interface Options {
    * @default "src"
    */
   outDir: string
+
   /**
    * exclude page
    * @default []
@@ -30,7 +32,6 @@ export interface Options {
 export interface UserOptions extends Partial<Options> {}
 
 export interface ResolvedOptions extends Options {}
-
 export interface PagePathInfo {
   relative: string
   absolute: string
