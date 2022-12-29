@@ -1,1 +1,1 @@
-export type hexcolor = string;
+export type hexcolor = string

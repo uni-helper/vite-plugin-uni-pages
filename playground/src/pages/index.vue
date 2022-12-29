@@ -1,22 +1,26 @@
-<template>
-  <view class="content">
-    <image class="logo" src="/static/logo.png" />
-    <view class="text-area">
-      <text class="title">{{ title }}</text>
-    </view>
-    <button @click="nav">nav</button>
-  </view>
-</template>
-
 <script setup lang="ts">
 import { ref } from 'vue'
 const title = ref('Hello')
 const nav = () => {
   uni.navigateTo({
-    url: '/pages/test'
+    url: '/pages/test',
   })
 }
 </script>
+
+<template>
+  <view class="content">
+    <image class="logo" src="/static/logo.png" />
+    <view class="text-area">
+      <text class="title">
+        {{ title }}
+      </text>
+    </view>
+    <button @click="nav">
+      nav
+    </button>
+  </view>
+</template>
 
 <style>
 .content {

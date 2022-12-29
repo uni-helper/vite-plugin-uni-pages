@@ -1,12 +1,13 @@
-import { createSSRApp } from "vue";
-import App from "./App.vue";
-import { pages } from "virtual:uni-pages";
+import { createSSRApp } from 'vue'
+import { pages } from 'virtual:uni-pages'
+import App from './App.vue'
 
-console.log(pages);
+// eslint-disable-next-line no-console
+console.log(pages)
 
 export function createApp() {
-  const app = createSSRApp(App);
+  const app = createSSRApp(App)
   return {
     app,
-  };
+  }
 }
