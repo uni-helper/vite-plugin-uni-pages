@@ -15,7 +15,7 @@ export interface Page {
   /**
    * 配置页面窗口表现，配置项参考下方 pageStyle
    */
-  style: GlobalStyle
+  style?: GlobalStyle
 
   [x: string]: any
 }
@@ -29,17 +29,17 @@ export interface TheWindow {
   /**
    * 配置页面窗口表现，配置项参考下方 pageStyle
    */
-  style: GlobalStyle
+  style?: GlobalStyle
 
   /**
    * 配置显示该窗口的规则，配置项参考下方 matchMedia
    */
-  matchMedia: {
+  matchMedia?: {
     /**
      * 当设备可见区域宽度 >= minWidth 时，显示该 window
      * @default "768"
      */
-    minWidth: number
+    minWidth?: number
   }
 }
 
@@ -47,32 +47,32 @@ export interface PreloadRule {
   /**
    * 进入页面后预下载分包的 root 或 name。__APP__ 表示主包。
    */
-  packages: string[]
+  packages?: string[]
 
   /**
    * 在指定网络下预下载，可选值为：all（不限网络）、wifi（仅wifi下预下载）
    * @default "wifi"
    */
-  network: string
+  network?: string
 }
 
 export interface SubPackage {
   /**
    * 子包的根目录
    */
-  root: string
+  root?: string
 
   /**
    * 子包由哪些页面组成，参数同 pages
    */
-  pages: any[]
+  pages?: any[]
 }
 
 export interface ConditionItem {
   /**
    * 启动模式名称
    */
-  name: string
+  name?: string
 
   /**
    * 启动页面路径
@@ -82,19 +82,19 @@ export interface ConditionItem {
   /**
    * 启动参数，可在页面的 onLoad 函数里获得
    */
-  query: string
+  query?: string
 }
 
 export interface Condition {
   /**
    * 当前激活的模式，list节点的索引值
    */
-  current: number
+  current?: number
 
   /**
    * 启动模式列表
    */
-  list: Partial<ConditionItem>[]
+  list?: Partial<ConditionItem>[]
 }
 
 export interface PagesConfig {
