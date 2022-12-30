@@ -4,7 +4,7 @@
   <div>test</div>
 </template>
 
-<route lang="json" type="home">
+<route type="home">
 {
   "style": { "navigationBarTitleText": "test json page" },
   "middlewares": ["auth"]

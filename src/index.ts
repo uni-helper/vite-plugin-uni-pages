@@ -14,6 +14,7 @@ export const VitePluginUniPages = (userOptions: UserOptions = {}): Plugin => {
     async configResolved(config) {
       ctx = new PageContext(userOptions, config.root)
       ctx.setLogger(config.logger)
+      ctx.updatePagesJSON()
     },
     configureServer(server) {
       ctx.setupViteServer(server)

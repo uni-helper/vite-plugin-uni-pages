@@ -1,8 +1,7 @@
-import { extname, join, relative, resolve } from 'path'
+import path from 'path'
 import type { FSWatcher } from 'fs'
 import fs from 'fs'
 import type { Logger, ViteDevServer } from 'vite'
-import { normalizePath } from 'vite'
 import fg from 'fast-glob'
 import { loadConfig } from 'unconfig'
 import { slash } from '@antfu/utils'
@@ -12,6 +11,7 @@ import { debug, invalidatePagesModule, isPagesDir } from './utils'
 import { resolveOptions } from './options'
 import { getPageFiles } from './files'
 import { getRouteBlock } from './customBlock'
+import { OUTPUT_NAME } from './constant'
 
 export class PageContext {
   private _server: ViteDevServer | undefined
@@ -20,6 +20,7 @@ export class PageContext {
   pagesGlobConfig: PagesConfig | undefined
   pagePaths: PagePath[] = []
   pagesMetaData: PageMetaDatum[] = []
+  resolvedPageJSONPath = ''
 
   rawOptions: UserOptions
   root: string
@@ -31,8 +32,8 @@ export class PageContext {
     this.root = slash(viteRoot)
     debug.env('root', this.root)
     this.options = resolveOptions(userOptions, this.root)
+    this.resolvedPageJSONPath = path.join(this.root, this.options.outDir, OUTPUT_NAME)
     debug.options(this.options)
-    this.updatePagesJSON()
   }
 
   setLogger(logger: Logger) {
@@ -56,14 +57,14 @@ export class PageContext {
 
   async scanPages() {
     const pageDirFiles = this.options.dirs.map((dir) => {
-      const pagesDirPath = slash(resolve(this.options.root, dir))
-      const basePath = slash(join(this.options.root, this.options.outDir))
+      const pagesDirPath = slash(path.resolve(this.options.root, dir))
+      const basePath = slash(path.join(this.options.root, this.options.outDir))
       const files = getPageFiles(pagesDirPath, this.options)
       debug.search(dir, files)
       const pagePaths = files.map(file => slash(file))
         .map(file => ({
-          relativePath: relative(basePath, slash(resolve(pagesDirPath, file))),
-          absolutePath: slash(resolve(pagesDirPath, file)),
+          relativePath: path.relative(basePath, slash(path.resolve(pagesDirPath, file))),
+          absolutePath: slash(path.resolve(pagesDirPath, file)),
         }))
 
       return {
@@ -89,6 +90,24 @@ export class PageContext {
       path = slash(path)
       if (!isPagesDir(path, this.options))
         return
+      this.updatePagesJSON()
+      this.onUpdate()
+    })
+
+    watcher.on('unlink', async (path) => {
+      path = slash(path)
+      if (!isPagesDir(path, this.options))
+        return
+      this.updatePagesJSON()
+      this.onUpdate()
+    })
+
+    watcher.on('add', async (path) => {
+      path = slash(path)
+      if (!isPagesDir(path, this.options))
+        return
+      this.updatePagesJSON()
+      this.onUpdate()
     })
   }
 
@@ -122,9 +141,9 @@ export class PageContext {
   async parsePage(page: PagePath): Promise<PageMetaDatum> {
     const { relativePath, absolutePath } = page
     const routeBlock = await getRouteBlock(absolutePath, this.options)
-    const path = relativePath.replace(extname(relativePath), '')
+    const relativePathWithFileName = relativePath.replace(path.extname(relativePath), '')
     const pageMetaDatum: PageMetaDatum = {
-      path,
+      path: relativePathWithFileName,
       type: 'page',
     }
     if (routeBlock)
@@ -157,16 +176,7 @@ export class PageContext {
   }
 
   async updatePagesJSON() {
-    const outputName = 'pages.json'
-    const resolvedOutput = normalizePath(resolve(this.root, this.options.outDir, outputName))
-
-    // 如果不存在，先输出一个占位文件
-    if (!fs.existsSync(resolvedOutput)) {
-      fs.writeFileSync(resolvedOutput,
-        JSON.stringify({ pages: [] }, null, 2), { encoding: 'utf-8' },
-      )
-    }
-
+    this.checkPagesFile(this.resolvedPageJSONPath)
     this.options.onBeforeLoadUserConfig(this)
     await this.loadUserPagesConfig()
     this.options.onAfterLoadUserConfig(this)
@@ -180,11 +190,19 @@ export class PageContext {
     this.options.onAfterMergePagesMeta(this)
 
     this.options.onBeforeWriteFile(this)
-    fs.writeFileSync(resolvedOutput, this.pagesJson, { encoding: 'utf-8' })
+    fs.writeFileSync(this.resolvedPageJSONPath, this.pagesJson(), { encoding: 'utf-8' })
     this.options.onAfterWriteFile(this)
   }
 
-  get pagesJson() {
+  pagesJson() {
     return JSON.stringify({ ...this.pagesGlobConfig, pages: this.pagesMetaData }, null, 2)
+  }
+
+  checkPagesFile(path: string) {
+    if (!fs.existsSync(path)) {
+      fs.writeFileSync(path,
+        JSON.stringify({ pages: [{ path: '' }] }, null, 2), { encoding: 'utf-8' },
+      )
+    }
   }
 }

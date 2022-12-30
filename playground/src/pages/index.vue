@@ -49,3 +49,8 @@ const nav = () => {
   color: #8f8f94;
 }
 </style>
+
+<route lang="yaml">
+middlewares:
+  - auth
+</route>

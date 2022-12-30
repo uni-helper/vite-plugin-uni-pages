@@ -101,68 +101,68 @@ export interface PagesConfig {
   /**
    * 设置页面路径及窗口表现
    */
-  pages: Page[]
+  pages?: Page[]
 
   /**
    * 设置默认页面的窗口表现
    */
-  globalStyle: GlobalStyle
+  globalStyle?: GlobalStyle
 
   /**
    * 组件自动引入规则
    * @desc 2.5.5+
    */
-  easycom: EasyCom
+  easycom?: EasyCom
 
   /**
    * 设置底部 tab 的表现
    */
-  tabBar: TabBar
+  tabBar?: TabBar
 
   /**
    * 启动模式配置
    */
-  condition: Condition
+  condition?: Condition
 
   /**
    * 分包加载配置
    */
-  subPackages: SubPackage[]
+  subPackages?: SubPackage[]
 
   /**
    * 分包预下载规则
    * @desc 微信小程序
    */
-  preloadRule: PreloadRule
+  preloadRule?: PreloadRule
 
   /**
    * `Worker` 代码放置的目录
    * @desc 微信小程序
    */
-  workers: any
+  workers?: any
 
   /**
    * 大屏左侧窗口
    * @desc H5
    */
-  leftWindow: TheWindow
+  leftWindow?: TheWindow
 
   /**
    * 大屏顶部窗口
    * @desc H5
    */
-  topWindow: TheWindow
+  topWindow?: TheWindow
 
   /**
    * 大屏右侧窗口
    * @desc H5
    */
-  rightWindow: TheWindow
+  rightWindow?: TheWindow
 
   /**
    * 自动跳转相关配置，新增于HBuilderX 3.5.0
    */
-  uniIdRouter: any
+  uniIdRouter?: any
 
   [x: string]: any
 }
