@@ -43,10 +43,12 @@
     "client.d.ts"
   ],
   "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
+    "build": "unbuild",
+    "dev": "unbuild --tsup --watch",
     "play:h5": "nr -C playground dev:h5",
     "play:mp-weixin": "nr -C playground dev:mp-weixin",
+    "build:h5": "nr -C playground build:h5",
+    "build:mp-weixin": "nr -C playground build:mp-weixin",
     "prepublishOnly": "pnpm build",
     "release": "bumpp && npm publish --access public",
     "lint": "eslint .",
@@ -54,22 +56,25 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@vue/compiler-dom": "^3.2.45",
-    "colorette": "^2.0.19",
-    "consola": "^2.15.3",
-    "defu": "^6.1.1",
+    "debug": "^4.3.4",
     "fast-glob": "^3.2.12",
-    "jsonc-parser": "^3.2.0",
+    "json5": "^2.2.2",
+    "lodash-es": "^4.17.21",
     "type-fest": "^3.5.0",
-    "unconfig": "^0.3.7"
+    "unconfig": "^0.3.7",
+    "yaml": "^2.2.0"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^0.34.0",
+    "@antfu/utils": "^0.7.2",
+    "@types/debug": "^4.1.7",
+    "@types/lodash-es": "^4.17.6",
     "@types/node": "^18.11.18",
+    "@vue/compiler-sfc": "^3.2.45",
     "bumpp": "^8.2.1",
     "eslint": "^8.30.0",
-    "tsup": "^6.5.0",
     "typescript": "^4.9.4",
-    "vite": "^3.2.4"
+    "unbuild": "^1.0.2",
+    "vite": "^4.0.3"
   }
 }

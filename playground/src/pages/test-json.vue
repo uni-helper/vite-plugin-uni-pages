@@ -6,7 +6,7 @@
 
 <route lang="json" type="home">
 {
-  "style": { "navigationBarTitleText": "test page" },
+  "style": { "navigationBarTitleText": "test json page" },
   "middlewares": ["auth"]
 }
 </route>

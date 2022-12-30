@@ -1,4 +1,3 @@
-import type { PartialDeep } from 'type-fest'
 import type { EasyCom } from './easycom'
 import type { GlobalStyle } from './globalStyle'
 import type { TabBar } from './tabBar'
@@ -102,7 +101,7 @@ export interface PagesConfig {
   /**
    * 设置页面路径及窗口表现
    */
-  pages: PartialDeep<Page>[]
+  pages: Page[]
 
   /**
    * 设置默认页面的窗口表现
@@ -128,7 +127,7 @@ export interface PagesConfig {
   /**
    * 分包加载配置
    */
-  subPackages: PartialDeep<SubPackage>[]
+  subPackages: SubPackage[]
 
   /**
    * 分包预下载规则
@@ -168,4 +167,4 @@ export interface PagesConfig {
   [x: string]: any
 }
 
-export interface UserPagesConfig extends PartialDeep<PagesConfig> {}
+export interface UserPagesConfig extends PagesConfig {}
