@@ -30,14 +30,17 @@ importers:
       debug: ^4.3.4
       fast-glob: ^3.2.12
       json5: ^2.2.2
+      magic-string: ^0.26.2
       type-fest: ^3.5.0
       unconfig: ^0.3.7
       vite: ^4.0.3
       yaml: ^2.2.1
     dependencies:
+      '@vue/compiler-sfc': 3.2.45
       debug: 4.3.4
       fast-glob: 3.2.12
       json5: 2.2.2
+      magic-string: 0.26.7
       type-fest: 3.5.0
       unconfig: 0.3.7
       yaml: 2.2.1
@@ -46,7 +49,6 @@ importers:
       '@dcloudio/types': 3.2.7
       '@types/debug': 4.1.7
       '@types/node': 18.11.18
-      '@vue/compiler-sfc': 3.2.45
       vite: 4.0.3_@types+node@18.11.18
 
   packages/playground:
@@ -3500,7 +3502,6 @@ packages:
     engines: {node: '>=12'}
     dependencies:
       sourcemap-codec: 1.4.8
-    dev: true
 
   /magic-string/0.27.0:
     resolution: {integrity: sha512-8UnnX2PeRAPZuN12svgR9j7M1uWMovg/CEnIwIG0LFkXSJJe4PdfUGiTGl8V9bsBHFUtfVINcSyYxd7q+kx9fA==}

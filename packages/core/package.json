@@ -36,9 +36,11 @@
     "stub": "unbuild --stub"
   },
   "dependencies": {
+    "@vue/compiler-sfc": "^3.2.45",
     "debug": "^4.3.4",
     "fast-glob": "^3.2.12",
     "json5": "^2.2.2",
+    "magic-string": "^0.26.2",
     "type-fest": "^3.5.0",
     "unconfig": "^0.3.7",
     "yaml": "^2.2.1"
@@ -48,7 +50,6 @@
     "@dcloudio/types": "^3.2.7",
     "@types/debug": "^4.1.7",
     "@types/node": "^18.11.18",
-    "@vue/compiler-sfc": "^3.2.45",
     "vite": "^4.0.3"
   }
 }

@@ -53,4 +53,5 @@ const nav = () => {
 <route lang="yaml">
 middlewares:
   - auth
+  - test
 </route>
