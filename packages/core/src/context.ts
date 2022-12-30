@@ -15,7 +15,6 @@ import { OUTPUT_NAME } from './constant'
 
 export class PageContext {
   private _server: ViteDevServer | undefined
-  private _pagePathMap = new Map<string, PagePath>()
 
   pagesGlobConfig: PagesConfig | undefined
   pagePaths: PagePath[] = []
@@ -36,9 +35,7 @@ export class PageContext {
     debug.options(this.options)
   }
 
-  setLogger(logger: Logger) {
-    this.logger = logger
-  }
+  setLogger(logger: Logger) { this.logger = logger }
 
   async loadUserPagesConfig() {
     const { config } = await loadConfig({

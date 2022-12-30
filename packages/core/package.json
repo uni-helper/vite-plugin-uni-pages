@@ -1,0 +1,54 @@
+{
+  "name": "@uni-helper/vite-plugin-uni-pages",
+  "type": "module",
+  "version": "0.0.7",
+  "packageManager": "pnpm@7.16.1",
+  "description": "File system based routing for uni-app applications using Vite",
+  "author": "KeJun",
+  "license": "MIT",
+  "homepage": "https://github.com/uni-helper/vite-plugin-uni-pages#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uni-helper/vite-plugin-uni-pages.git"
+  },
+  "bugs": "https://github.com/uni-helper/vite-plugin-uni-pages/issues",
+  "keywords": [],
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./client.d.ts"
+    }
+  },
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "client.d.ts"
+  ],
+  "scripts": {
+    "build": "unbuild",
+    "stub": "unbuild --stub"
+  },
+  "dependencies": {
+    "debug": "^4.3.4",
+    "fast-glob": "^3.2.12",
+    "json5": "^2.2.2",
+    "type-fest": "^3.5.0",
+    "unconfig": "^0.3.7",
+    "yaml": "^2.2.1"
+  },
+  "devDependencies": {
+    "@antfu/utils": "^0.7.2",
+    "@dcloudio/types": "^3.2.7",
+    "@types/debug": "^4.1.7",
+    "@types/node": "^18.11.18",
+    "@vue/compiler-sfc": "^3.2.45",
+    "vite": "^4.0.3"
+  }
+}

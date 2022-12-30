@@ -1,9 +1,8 @@
 {
-  "name": "@uni-helper/vite-plugin-uni-pages",
+  "name": "@vite-plugin-uni-pages/monorepo",
   "type": "module",
-  "version": "0.0.7",
+  "private": true,
   "packageManager": "pnpm@7.16.1",
-  "description": "File system based routing for uni-app applications using Vite",
   "author": "KeJun",
   "license": "MIT",
   "homepage": "https://github.com/uni-helper/vite-plugin-uni-pages#readme",
@@ -14,67 +13,26 @@
   "bugs": "https://github.com/uni-helper/vite-plugin-uni-pages/issues",
   "keywords": [],
   "sideEffects": false,
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.cjs",
-      "import": "./dist/index.js"
-    },
-    "./client": {
-      "types": "./client.d.ts"
-    }
-  },
-  "main": "./dist/index.mjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "typesVersions": {
-    "*": {
-      "*": [
-        "./dist/*",
-        "./dist/index.d.ts"
-      ],
-      "client": [
-        "./client.d.ts"
-      ]
-    }
-  },
-  "files": [
-    "dist",
-    "client.d.ts"
-  ],
   "scripts": {
-    "build": "unbuild",
-    "dev": "unbuild --tsup --watch",
-    "play:h5": "nr -C playground dev:h5",
-    "play:mp-weixin": "nr -C playground dev:mp-weixin",
-    "build:h5": "nr -C playground build:h5",
-    "build:mp-weixin": "nr -C playground build:mp-weixin",
+    "stub": "pnpm -r --filter=./packages/* --parallel run stub",
+    "dev": "pnpm stub",
+    "build": "rimraf packages/*/dist && pnpm -r --filter=./packages/* run build && pnpm -r run build-post",
+    "play:mp-weixin": "pnpm dev && npm -C packages/playground run dev:mp-weixin",
+    "build:mp-weixin": "pnpm build && npm -C packages/playground run build:mp-weixin",
+    "play:h5": "pnpm dev && npm -C playground run dev:h5",
+    "build:h5": "pnpm build && npm -C playground run build:h5",
     "prepublishOnly": "pnpm build",
     "release": "bumpp && npm publish --access public",
     "lint": "eslint .",
-    "lint:fix": "nr lint --fix",
-    "test": "vitest"
-  },
-  "dependencies": {
-    "debug": "^4.3.4",
-    "fast-glob": "^3.2.12",
-    "json5": "^2.2.2",
-    "lodash-es": "^4.17.21",
-    "type-fest": "^3.5.0",
-    "unconfig": "^0.3.7",
-    "yaml": "^2.2.0"
+    "lint:fix": "nr lint --fix"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^0.34.0",
-    "@antfu/utils": "^0.7.2",
-    "@types/debug": "^4.1.7",
-    "@types/lodash-es": "^4.17.6",
     "@types/node": "^18.11.18",
-    "@vue/compiler-sfc": "^3.2.45",
     "bumpp": "^8.2.1",
     "eslint": "^8.30.0",
+    "rimraf": "^3.0.2",
     "typescript": "^4.9.4",
-    "unbuild": "^1.0.2",
-    "vite": "^3.2.5"
+    "unbuild": "^1.0.2"
   }
 }
