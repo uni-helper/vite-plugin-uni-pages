@@ -42,24 +42,30 @@ export default definePages({
 ```
 
 Now all pages will be found automatically!
+### SFC custom block for Route Data
 
-You can use route-block in the page to specify metadata
+Add route meta to the route by adding a `<route>` block to the SFC. This will be
+directly added to the route after it is generated, and will override it.
 
-```vue
+You can specific a parser to use using `<route lang="yaml">`, or set a default
+parser using `routeBlockLang` option.
+
+- **Supported parser:** JSON, JSON5, YAML
+- **Default:** JSON5
+
+```html
 <!-- index.vue -->
 <!-- use type to set index -->
-<route lang="json" type="home">
+<route type="home">
 {
   "style": { "navigationBarTitleText": "@uni-helper" }
 }
 </route>
 
 <!-- other.vue -->
-<route lang="json">
-{
-  "style": { "navigationBarTitleText": "@uni-helper" },
-  "any-meta-data": "hello"
-}
+<route lang="yaml">
+style:
+  navigationBarTitleText: "@uni-helper"
 </route>
 ```
 
