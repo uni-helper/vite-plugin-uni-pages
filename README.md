@@ -14,52 +14,58 @@ pnpm i -D @uni-helper/vite-plugin-uni-pages
 
 ```ts
 // vite.config.ts
-import { defineConfig } from "vite";
-import Uni from "@dcloudio/vite-plugin-uni";
-import UniPages from "@uni-helper/vite-plugin-uni-pages";
+import { defineConfig } from 'vite'
+import Uni from '@dcloudio/vite-plugin-uni'
+import UniPages from '@uni-helper/vite-plugin-uni-pages'
 // It is recommended to put it in front of Uni
 export default defineConfig({
   plugins: [UniPages(), Uni()],
-});
+})
 ```
 
 Define global properties in `pages.config.(ts|mts|cts|js|cjs|mjs|json)`
 
 ```ts
 // pages.config.ts
-import { definePages } from "@uni-helper/vite-plugin-uni-pages";
+import { defineUniPages } from '@uni-helper/vite-plugin-uni-pages'
 
-export default definePages({
+export default defineUniPages({
   // You can also specify pages, and the content will be merged
-  pages: []
+  pages: [],
   globalStyle: {
-    navigationBarTextStyle: "black",
-    navigationBarTitleText: "@uni-helper",
-    navigationBarBackgroundColor: "#F8F8F8",
-    backgroundColor: "#F8F8F8",
+    navigationBarTextStyle: 'black',
+    navigationBarTitleText: '@uni-helper',
+    navigationBarBackgroundColor: '#F8F8F8',
+    backgroundColor: '#F8F8F8',
   },
-});
+})
 ```
 
 Now all pages will be found automatically!
+### SFC custom block for Route Data
 
-You can use route-block in the page to specify metadata
+Add route meta to the route by adding a `<route>` block to the SFC. This will be
+directly added to the route after it is generated, and will override it.
 
-```vue
+You can specific a parser to use using `<route lang="yaml">`, or set a default
+parser using `routeBlockLang` option.
+
+- **Supported parser:** JSON, JSON5, YAML
+- **Default:** JSON5
+
+```html
 <!-- index.vue -->
 <!-- use type to set index -->
-<route lang="json" type="home">
+<route type="home">
 {
   "style": { "navigationBarTitleText": "@uni-helper" }
 }
 </route>
 
 <!-- other.vue -->
-<route lang="json">
-{
-  "style": { "navigationBarTitleText": "@uni-helper" },
-  "any-meta-data": "hello"
-}
+<route lang="yaml">
+style:
+  navigationBarTitleText: "@uni-helper"
 </route>
 ```
 
@@ -67,8 +73,8 @@ Import the virtual module to access the metadata of all pages
 
 ```ts
 /// <reference types="@uni-helper/vite-plugin-uni-pages/client" />
-import { pages } from "virtual:uni-pages";
-console.log(pages);
+import { pages } from 'virtual:uni-pages'
+console.log(pages)
 ```
 
 ## Configuration
@@ -83,10 +89,10 @@ You can not use like `#ifdef H5` in `pages.json`, but use [hooks](./src/types.ts
 // vite.config.ts
 UniPages({
   onBeforeWriteFile(ctx) {
-    ctx.pagesMeta = ctx.pagesMeta?.filter((v) => !v.path.includes("test"));
+    ctx.pagesMeta = ctx.pagesMeta?.filter(v => !v.path.includes('test'))
   },
-});
-...
+})
+// ...
 ```
 
 This is a good alternative to conditional compilation, you can also use `exclude` in `vite.config.ts`
@@ -98,3 +104,7 @@ How? console the `process.env` and found `UNI_*`, you can do this!
 - [ ] only update the changed page
 - [x] [vite-plugin-uni-middleware](https://github.com/uni-helper/vite-plugin-uni-middleware)
 - [x] pages [type](./src/config/types.ts)
+
+## Acknowledgement
+
+- [vite-plugin-pages](https://github.com/hannoeru/vite-plugin-pages.git)

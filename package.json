@@ -1,9 +1,8 @@
 {
-  "name": "@uni-helper/vite-plugin-uni-pages",
+  "name": "@vite-plugin-uni-pages/monorepo",
   "type": "module",
-  "version": "0.0.7",
+  "private": true,
   "packageManager": "pnpm@7.16.1",
-  "description": "File system based routing for uni-app applications using Vite",
   "author": "KeJun",
   "license": "MIT",
   "homepage": "https://github.com/uni-helper/vite-plugin-uni-pages#readme",
@@ -14,57 +13,26 @@
   "bugs": "https://github.com/uni-helper/vite-plugin-uni-pages/issues",
   "keywords": [],
   "sideEffects": false,
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.cjs",
-      "import": "./dist/index.js"
-    },
-    "./client": {
-      "types": "./client.d.ts"
-    }
-  },
-  "main": "./dist/index.mjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "typesVersions": {
-    "*": {
-      "*": [
-        "./dist/*",
-        "./dist/index.d.ts"
-      ],
-      "client": [
-        "./client.d.ts"
-      ]
-    }
-  },
-  "files": [
-    "dist",
-    "client.d.ts"
-  ],
   "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
-    "play": "nr -C playground dev:h5",
+    "stub": "pnpm -r --filter=./packages/* --parallel run stub",
+    "dev": "pnpm stub",
+    "build": "rimraf packages/*/dist && pnpm -r --filter=./packages/* run build && pnpm -r run build-post",
+    "play:mp-weixin": "pnpm dev && npm -C packages/playground run dev:mp-weixin",
+    "build:mp-weixin": "pnpm build && npm -C packages/playground run build:mp-weixin",
+    "play:h5": "pnpm dev && npm -C packages/playground run dev:h5",
+    "build:h5": "pnpm build && npm -C packages/playground run build:h5",
     "prepublishOnly": "pnpm build",
     "release": "bumpp && npm publish --access public",
-    "test": "vitest"
+    "lint": "eslint .",
+    "lint:fix": "nr lint --fix"
   },
   "devDependencies": {
-    "@types/node": "^18.11.9",
+    "@antfu/eslint-config": "^0.34.0",
+    "@types/node": "^18.11.18",
     "bumpp": "^8.2.1",
-    "tsup": "^6.5.0",
-    "typescript": "^4.9.3",
-    "vite": "^3.2.4"
-  },
-  "dependencies": {
-    "@vue/compiler-dom": "^3.2.45",
-    "colorette": "^2.0.19",
-    "consola": "^2.15.3",
-    "defu": "^6.1.1",
-    "fast-glob": "^3.2.12",
-    "jsonc-parser": "^3.2.0",
-    "type-fest": "^3.2.0",
-    "unconfig": "^0.3.7"
+    "eslint": "^8.31.0",
+    "rimraf": "^3.0.2",
+    "typescript": "^4.9.4",
+    "unbuild": "^1.0.2"
   }
 }
