@@ -2,6 +2,7 @@ import fg from 'fast-glob'
 import { extsToGlob } from './utils'
 
 import type { ResolvedOptions } from './types'
+import { FILE_EXTENSIONS } from './constant'
 
 /**
  * Resolves the files that are valid pages for the given context.
@@ -9,7 +10,7 @@ import type { ResolvedOptions } from './types'
 export function getPageFiles(path: string, options: ResolvedOptions): string[] {
   const { exclude } = options
 
-  const ext = extsToGlob(['vue', 'nvue', 'uvue'])
+  const ext = extsToGlob(FILE_EXTENSIONS)
 
   const files = fg.sync(`**/*.${ext}`, {
     ignore: exclude,

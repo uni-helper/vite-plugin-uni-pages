@@ -7,7 +7,7 @@ import { loadConfig } from 'unconfig'
 import { slash } from '@antfu/utils'
 import type { PagesConfig } from './config/types'
 import type { PageMetaDatum, PagePath, ResolvedOptions, UserOptions } from './types'
-import { debug, invalidatePagesModule, isPagesDir } from './utils'
+import { debug, invalidatePagesModule, isTargetFile } from './utils'
 import { resolveOptions } from './options'
 import { getPageFiles } from './files'
 import { getRouteBlock } from './customBlock'
@@ -29,7 +29,7 @@ export class PageContext {
   constructor(userOptions: UserOptions, viteRoot: string = process.cwd()) {
     this.rawOptions = userOptions
     this.root = slash(viteRoot)
-    debug.env('root', this.root)
+    debug.options('root', this.root)
     this.options = resolveOptions(userOptions, this.root)
     this.resolvedPageJSONPath = path.join(this.root, this.options.outDir, OUTPUT_NAME)
     debug.options(this.options)
@@ -49,7 +49,7 @@ export class PageContext {
       process.exit(-1)
     }
     this.pagesGlobConfig = config as PagesConfig
-    debug.env(config)
+    debug.options(config)
   }
 
   async scanPages() {
@@ -57,7 +57,7 @@ export class PageContext {
       const pagesDirPath = slash(path.resolve(this.options.root, dir))
       const basePath = slash(path.join(this.options.root, this.options.outDir))
       const files = getPageFiles(pagesDirPath, this.options)
-      debug.search(dir, files)
+      debug.pages(dir, files)
       const pagePaths = files.map(file => slash(file))
         .map(file => ({
           relativePath: path.relative(basePath, slash(path.resolve(pagesDirPath, file))),
@@ -83,26 +83,32 @@ export class PageContext {
   }
 
   setupWatcher(watcher: FSWatcher) {
+    watcher.on('add', async (path) => {
+      path = slash(path)
+      if (!isTargetFile(path))
+        return
+
+      debug.pages(`File added: ${path}`)
+      this.updatePagesJSON()
+      this.onUpdate()
+    })
+
     watcher.on('change', async (path) => {
       path = slash(path)
-      if (!isPagesDir(path, this.options))
+      if (!isTargetFile(path))
         return
+
+      debug.pages(`File changed: ${path}`)
       this.updatePagesJSON()
       this.onUpdate()
     })
 
     watcher.on('unlink', async (path) => {
       path = slash(path)
-      if (!isPagesDir(path, this.options))
+      if (!isTargetFile(path))
         return
-      this.updatePagesJSON()
-      this.onUpdate()
-    })
 
-    watcher.on('add', async (path) => {
-      path = slash(path)
-      if (!isPagesDir(path, this.options))
-        return
+      debug.pages(`File removed: ${path}`)
       this.updatePagesJSON()
       this.onUpdate()
     })

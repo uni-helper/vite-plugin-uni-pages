@@ -37,17 +37,16 @@
   },
   "dependencies": {
     "@vue/compiler-sfc": "^3.2.45",
+    "chokidar": "^3.5.3",
     "debug": "^4.3.4",
     "fast-glob": "^3.2.12",
     "json5": "^2.2.2",
     "magic-string": "^0.26.2",
-    "type-fest": "^3.5.0",
     "unconfig": "^0.3.7",
     "yaml": "^2.2.1"
   },
   "devDependencies": {
     "@antfu/utils": "^0.7.2",
-    "@dcloudio/types": "^3.2.7",
     "@types/debug": "^4.1.7",
     "@types/node": "^18.11.18",
     "vite": "^4.0.3"
