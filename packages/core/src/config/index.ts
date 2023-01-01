@@ -2,6 +2,6 @@ import type { UserPagesConfig } from './types'
 
 export * from './types'
 
-export function definePages(config: UserPagesConfig) {
+export function defineUniPages(config: UserPagesConfig) {
   return config
 }

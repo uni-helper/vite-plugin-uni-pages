@@ -13,8 +13,8 @@ export function resolveOptions(userOptions: UserOptions, viteRoot?: string): Res
     onAfterLoadUserConfig = () => {},
     onBeforeScanPages = () => {},
     onAfterScanPages = () => {},
-    onBeforeMergePagesMeta = () => {},
-    onAfterMergePagesMeta = () => {},
+    onBeforeMergePageMetaData = () => {},
+    onAfterMergePageMetaData = () => {},
     onBeforeWriteFile = () => {},
     onAfterWriteFile = () => {},
   } = userOptions
@@ -32,8 +32,8 @@ export function resolveOptions(userOptions: UserOptions, viteRoot?: string): Res
     onAfterLoadUserConfig,
     onBeforeScanPages,
     onAfterScanPages,
-    onBeforeMergePagesMeta,
-    onAfterMergePagesMeta,
+    onBeforeMergePageMetaData,
+    onAfterMergePageMetaData,
     onBeforeWriteFile,
     onAfterWriteFile,
   }

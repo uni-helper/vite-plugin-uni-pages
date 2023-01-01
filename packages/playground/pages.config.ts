@@ -1,6 +1,6 @@
-import { definePages } from '@uni-helper/vite-plugin-uni-pages'
+import { defineUniPages } from '@uni-helper/vite-plugin-uni-pages'
 
-export default definePages({
+export default defineUniPages({
   globalStyle: {
     navigationBarTextStyle: 'black',
     navigationBarTitleText: 'uni-helper',

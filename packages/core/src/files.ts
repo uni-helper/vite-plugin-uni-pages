@@ -1,3 +1,4 @@
+import fs from 'fs'
 import fg from 'fast-glob'
 import { extsToGlob } from './utils'
 
@@ -19,4 +20,13 @@ export function getPageFiles(path: string, options: ResolvedOptions): string[] {
   })
 
   return files
+}
+
+export function checkPagesJsonFile(path: string) {
+  if (!fs.existsSync(path))
+    writeFileSync(path, JSON.stringify({ pages: [{ path: '' }] }, null, 2))
+}
+
+export function writeFileSync(path: string, content: string) {
+  fs.writeFileSync(path, content, { encoding: 'utf-8' })
 }

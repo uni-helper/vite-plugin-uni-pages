@@ -17,10 +17,11 @@ export const VitePluginUniPages = (userOptions: UserOptions = {}): Plugin => {
       ctx = new PageContext(userOptions, config.root)
       ctx.setLogger(config.logger)
       ctx.updatePagesJSON()
+
       if (config.build.watch && config.command === 'build')
         ctx.setupWatcher(chokidar.watch(ctx.options.dirs))
     },
-    // 小程序不支持自定义 route block，所以这里需要把route block去掉
+    // Applet do not support custom route block, so we need to remove the route block here
     async transform(code: string, id: string) {
       if (!/\.vue$/.test(id))
         return null

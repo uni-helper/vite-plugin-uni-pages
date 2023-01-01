@@ -8,20 +8,28 @@ import type { CustomBlock, ResolvedOptions } from './types'
 
 export async function parseSFC(code: string): Promise<SFCDescriptor> {
   try {
-    return VueParser(code, {
-      pad: 'space',
-    }).descriptor
-    // for @vue/compiler-sfc ^2.7
-    || (VueParser as any)({
-      source: code,
-    })
+    return (
+      VueParser(code, {
+        pad: 'space',
+      }).descriptor
+      // for @vue/compiler-sfc ^2.7
+      || (VueParser as any)({
+        source: code,
+      })
+    )
   }
   catch {
-    throw new Error('[vite-plugin-uni-pages] Vue3\'s "@vue/compiler-sfc" is required.')
+    throw new Error(
+      '[vite-plugin-uni-pages] Vue3\'s "@vue/compiler-sfc" is required.',
+    )
   }
 }
 
-export function parseCustomBlock(block: SFCBlock, filePath: string, options: ResolvedOptions): any {
+export function parseCustomBlock(
+  block: SFCBlock,
+  filePath: string,
+  options: ResolvedOptions,
+): any {
   const lang = block.lang ?? options.routeBlockLang
 
   debug.routeBlock(`use ${lang} parser`)
@@ -31,7 +39,9 @@ export function parseCustomBlock(block: SFCBlock, filePath: string, options: Res
       return JSON5.parse(block.content)
     }
     catch (err: any) {
-      throw new Error(`Invalid JSON5 format of <${block.type}> content in ${filePath}\n${err.message}`)
+      throw new Error(
+        `Invalid JSON5 format of <${block.type}> content in ${filePath}\n${err.message}`,
+      )
     }
   }
   else if (lang === 'json') {
@@ -39,7 +49,9 @@ export function parseCustomBlock(block: SFCBlock, filePath: string, options: Res
       return JSON.parse(block.content)
     }
     catch (err: any) {
-      throw new Error(`Invalid JSON format of <${block.type}> content in ${filePath}\n${err.message}`)
+      throw new Error(
+        `Invalid JSON format of <${block.type}> content in ${filePath}\n${err.message}`,
+      )
     }
   }
   else if (lang === 'yaml' || lang === 'yml') {
@@ -47,7 +59,9 @@ export function parseCustomBlock(block: SFCBlock, filePath: string, options: Res
       return YAMLParser(block.content)
     }
     catch (err: any) {
-      throw new Error(`Invalid YAML format of <${block.type}> content in ${filePath}\n${err.message}`)
+      throw new Error(
+        `Invalid YAML format of <${block.type}> content in ${filePath}\n${err.message}`,
+      )
     }
   }
 }

@@ -1,15 +1,13 @@
 import path from 'path'
 import type { FSWatcher } from 'fs'
-import fs from 'fs'
 import type { Logger, ViteDevServer } from 'vite'
-import fg from 'fast-glob'
 import { loadConfig } from 'unconfig'
 import { slash } from '@antfu/utils'
 import type { PagesConfig } from './config/types'
 import type { PageMetaDatum, PagePath, ResolvedOptions, UserOptions } from './types'
 import { debug, invalidatePagesModule, isTargetFile } from './utils'
 import { resolveOptions } from './options'
-import { getPageFiles } from './files'
+import { checkPagesJsonFile, getPageFiles, writeFileSync } from './files'
 import { getRouteBlock } from './customBlock'
 import { OUTPUT_NAME } from './constant'
 
@@ -17,9 +15,9 @@ export class PageContext {
   private _server: ViteDevServer | undefined
 
   pagesGlobConfig: PagesConfig | undefined
-  pagePaths: PagePath[] = []
-  pagesMetaData: PageMetaDatum[] = []
-  resolvedPageJSONPath = ''
+  pagesPath: PagePath[] = []
+  pageMetaData: PageMetaDatum[] = []
+  resolvedPagesJSONPath = ''
 
   rawOptions: UserOptions
   root: string
@@ -31,24 +29,19 @@ export class PageContext {
     this.root = slash(viteRoot)
     debug.options('root', this.root)
     this.options = resolveOptions(userOptions, this.root)
-    this.resolvedPageJSONPath = path.join(this.root, this.options.outDir, OUTPUT_NAME)
+    this.resolvedPagesJSONPath = path.join(this.root, this.options.outDir, OUTPUT_NAME)
     debug.options(this.options)
   }
 
   setLogger(logger: Logger) { this.logger = logger }
 
   async loadUserPagesConfig() {
-    const { config } = await loadConfig({
-      sources: [{ files: 'pages.config' }],
-      merge: false,
-    })
+    const { config } = await loadConfig<PagesConfig>({ sources: [{ files: 'pages.config' }] })
     if (!config) {
-      this.logger?.warn(
-        'Can\'t found pages.config, please create pages.config.(ts|mts|cts|js|cjs|mjs|json)',
-      )
+      this.logger?.warn('Can\'t found pages.config, please create pages.config.(ts|mts|cts|js|cjs|mjs|json)')
       process.exit(-1)
     }
-    this.pagesGlobConfig = config as PagesConfig
+    this.pagesGlobConfig = config
     debug.options(config)
   }
 
@@ -64,14 +57,11 @@ export class PageContext {
           absolutePath: slash(path.resolve(pagesDirPath, file)),
         }))
 
-      return {
-        dir,
-        files: pagePaths,
-      }
+      return { dir, files: pagePaths }
     })
 
-    this.pagePaths = pageDirFiles.map(page => page.files).flat()
-    debug.pages(this.pagePaths)
+    this.pagesPath = pageDirFiles.map(page => page.files).flat()
+    debug.pages(this.pagesPath)
   }
 
   setupViteServer(server: ViteDevServer) {
@@ -125,61 +115,43 @@ export class PageContext {
     })
   }
 
-  get debug() {
-    return debug
-  }
-
-  async virtualModule() {
-    return `export const pages = ${JSON.stringify(this.pagesMetaData, null, 2)};`
-  }
-
-  async pagesConfigSourcePaths() {
-    return await fg('pages.config.(ts|mts|cts|js|cjs|mjs|json)', {
-      deep: 0,
-      onlyFiles: true,
-      absolute: true,
-    })
-  }
-
   async parsePage(page: PagePath): Promise<PageMetaDatum> {
     const { relativePath, absolutePath } = page
     const routeBlock = await getRouteBlock(absolutePath, this.options)
     const relativePathWithFileName = relativePath.replace(path.extname(relativePath), '')
-    const pageMetaDatum: PageMetaDatum = {
-      path: relativePathWithFileName,
-      type: 'page',
-    }
+    const pageMetaDatum: PageMetaDatum = { path: relativePathWithFileName, type: 'page' }
+
     if (routeBlock)
       Object.assign(pageMetaDatum, routeBlock)
 
     return pageMetaDatum
   }
 
-  async mergePagesMeta() {
-    const generatedPageMetadata = await Promise.all(
-      this.pagePaths.map(async page => await this.parsePage(page)),
+  async mergePageMetaData() {
+    const generatedPageMetaData = await Promise.all(
+      this.pagesPath.map(async page => await this.parsePage(page)),
     )
     if (this.pagesGlobConfig?.pages) {
-      const customPageMetadata = this.pagesGlobConfig?.pages || []
-      const generatedPagePaths = generatedPageMetadata.map(page => page.path)
-      const customPagePaths = customPageMetadata.map(page => page.path)
+      const customPageMetaData = this.pagesGlobConfig?.pages || []
+      const generatedPagePaths = generatedPageMetaData.map(page => page.path)
+      const customPagePaths = customPageMetaData.map(page => page.path)
 
-      // 检查是否有重复的 path，如果有，深度合并到 generatedPageMetadata
+      // merge page metadata
       const duplicatePaths = customPagePaths.filter(path => generatedPagePaths.includes(path))
       if (duplicatePaths.length > 0) {
         duplicatePaths.forEach((path) => {
-          const customPage = customPageMetadata.find(page => page.path === path)
-          const index = generatedPageMetadata.findIndex(page => page.path === path)
-          Object.assign(generatedPageMetadata[index], customPage)
+          const duplicatePageMeta = customPageMetaData.find(page => page.path === path)
+          const index = generatedPageMetaData.findIndex(page => page.path === path)
+          Object.assign(generatedPageMetaData[index], duplicatePageMeta)
         })
       }
     }
-    this.pagesMetaData = generatedPageMetadata
-    debug.pages(generatedPageMetadata)
+    this.pageMetaData = generatedPageMetaData
+    debug.pages(generatedPageMetaData)
   }
 
   async updatePagesJSON() {
-    this.checkPagesFile(this.resolvedPageJSONPath)
+    checkPagesJsonFile(this.resolvedPagesJSONPath)
     this.options.onBeforeLoadUserConfig(this)
     await this.loadUserPagesConfig()
     this.options.onAfterLoadUserConfig(this)
@@ -188,24 +160,17 @@ export class PageContext {
     await this.scanPages()
     this.options.onAfterScanPages(this)
 
-    this.options.onBeforeMergePagesMeta(this)
-    await this.mergePagesMeta()
-    this.options.onAfterMergePagesMeta(this)
+    this.options.onBeforeMergePageMetaData(this)
+    await this.mergePageMetaData()
+    this.options.onAfterMergePageMetaData(this)
 
     this.options.onBeforeWriteFile(this)
-    fs.writeFileSync(this.resolvedPageJSONPath, this.pagesJson(), { encoding: 'utf-8' })
+    const pagesJson = JSON.stringify({ ...this.pagesGlobConfig, pages: this.pageMetaData }, null, 2)
+    writeFileSync(this.resolvedPagesJSONPath, pagesJson)
     this.options.onAfterWriteFile(this)
   }
 
-  pagesJson() {
-    return JSON.stringify({ ...this.pagesGlobConfig, pages: this.pagesMetaData }, null, 2)
-  }
-
-  checkPagesFile(path: string) {
-    if (!fs.existsSync(path)) {
-      fs.writeFileSync(path,
-        JSON.stringify({ pages: [{ path: '' }] }, null, 2), { encoding: 'utf-8' },
-      )
-    }
+  async virtualModule() {
+    return `export const pages = ${JSON.stringify(this.pageMetaData, null, 2)};`
   }
 }

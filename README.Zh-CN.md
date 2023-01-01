@@ -27,9 +27,9 @@ export default defineConfig({
 
 ```ts
 // pages.config.ts
-import { definePages } from '@uni-helper/vite-plugin-uni-pages'
+import { defineUniPages } from '@uni-helper/vite-plugin-uni-pages'
 
-export default definePages({
+export default defineUniPages({
   // You can also specify pages, and the content will be merged
   pages: [],
   globalStyle: {

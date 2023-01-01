@@ -31,8 +31,8 @@ export interface Options {
   onAfterLoadUserConfig: (ctx: PageContext) => void
   onBeforeScanPages: (ctx: PageContext) => void
   onAfterScanPages: (ctx: PageContext) => void
-  onBeforeMergePagesMeta: (ctx: PageContext) => void
-  onAfterMergePagesMeta: (ctx: PageContext) => void
+  onBeforeMergePageMetaData: (ctx: PageContext) => void
+  onAfterMergePageMetaData: (ctx: PageContext) => void
   onBeforeWriteFile: (ctx: PageContext) => void
   onAfterWriteFile: (ctx: PageContext) => void
 }
