@@ -5,7 +5,7 @@ import { loadConfig } from 'unconfig'
 import { slash } from '@antfu/utils'
 import type { PagesConfig } from './config/types'
 import type { PageMetaDatum, PagePath, ResolvedOptions, UserOptions } from './types'
-import { debug, invalidatePagesModule, isTargetFile } from './utils'
+import { debug, invalidatePagesModule, isTargetFile, mergePageMetaDataArray } from './utils'
 import { resolveOptions } from './options'
 import { checkPagesJsonFile, getPageFiles, writeFileSync } from './files'
 import { getRouteBlock } from './customBlock'
@@ -133,20 +133,11 @@ export class PageContext {
     )
     if (this.pagesGlobConfig?.pages) {
       const customPageMetaData = this.pagesGlobConfig?.pages || []
-      const generatedPagePaths = generatedPageMetaData.map(page => page.path)
-      const customPagePaths = customPageMetaData.map(page => page.path)
-
-      // merge page metadata
-      const duplicatePaths = customPagePaths.filter(path => generatedPagePaths.includes(path))
-      if (duplicatePaths.length > 0) {
-        duplicatePaths.forEach((path) => {
-          const duplicatePageMeta = customPageMetaData.find(page => page.path === path)
-          const index = generatedPageMetaData.findIndex(page => page.path === path)
-          Object.assign(generatedPageMetaData[index], duplicatePageMeta)
-        })
-      }
+      this.pageMetaData = mergePageMetaDataArray(generatedPageMetaData.concat(customPageMetaData))
     }
-    this.pageMetaData = generatedPageMetaData
+    else {
+      this.pageMetaData = generatedPageMetaData
+    }
     debug.pages(generatedPageMetaData)
   }
 

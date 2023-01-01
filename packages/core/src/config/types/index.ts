@@ -1,3 +1,4 @@
+import type { PageMetaDatum } from '../../types'
 import type { EasyCom } from './easycom'
 import type { GlobalStyle } from './globalStyle'
 import type { TabBar } from './tabBar'
@@ -5,20 +6,6 @@ import type { TabBar } from './tabBar'
 export * from './easycom'
 export * from './globalStyle'
 export * from './tabBar'
-
-export interface Page {
-  /**
-   * 配置页面路径
-   */
-  path: string
-
-  /**
-   * 配置页面窗口表现，配置项参考下方 pageStyle
-   */
-  style?: GlobalStyle
-
-  [x: string]: any
-}
 
 export interface TheWindow {
   /**
@@ -101,7 +88,7 @@ export interface PagesConfig {
   /**
    * 设置页面路径及窗口表现
    */
-  pages?: Page[]
+  pages?: PageMetaDatum[]
 
   /**
    * 设置默认页面的窗口表现
