@@ -6,6 +6,13 @@ import { PageContext } from './context'
 import { MODULE_ID_VIRTUAL, RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 
 export * from './config'
+export * from './types'
+export * from './constant'
+export * from './context'
+export * from './utils'
+export * from './files'
+export * from './options'
+export * from './customBlock'
 
 export const VitePluginUniPages = (userOptions: UserOptions = {}): Plugin => {
   let ctx: PageContext
