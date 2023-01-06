@@ -1,9 +1,11 @@
+import path from 'path'
 import type { Plugin } from 'vite'
 import MagicString from 'magic-string'
 import chokidar from 'chokidar'
 import type { UserOptions } from './types'
 import { PageContext } from './context'
-import { MODULE_ID_VIRTUAL, RESOLVED_MODULE_ID_VIRTUAL } from './constant'
+import { MODULE_ID_VIRTUAL, OUTPUT_NAME, RESOLVED_MODULE_ID_VIRTUAL } from './constant'
+import { checkPagesJsonFile } from './files'
 
 export * from './config'
 export * from './types'
@@ -16,6 +18,10 @@ export * from './customBlock'
 
 export const VitePluginUniPages = (userOptions: UserOptions = {}): Plugin => {
   let ctx: PageContext
+
+  // TODO: check if the pages.json file is valid
+  const resolvedPagesJSONPath = path.join(process.cwd(), userOptions.outDir ?? 'src', OUTPUT_NAME)
+  checkPagesJsonFile(resolvedPagesJSONPath)
 
   return {
     name: 'vite-plugin-uni-pages',

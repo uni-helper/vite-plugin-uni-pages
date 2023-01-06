@@ -32,6 +32,10 @@ export function isTargetFile(path: string) {
   return FILE_EXTENSIONS.includes(ext!)
 }
 
+export function isConfigFile(path: string) {
+  return path.includes('pages.config')
+}
+
 /**
  * merge page meta data array by path and assign style
  * @param pageMetaData  page meta data array
