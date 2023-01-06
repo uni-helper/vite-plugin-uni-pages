@@ -5,7 +5,7 @@ import { loadConfig } from 'unconfig'
 import { slash } from '@antfu/utils'
 import type { PagesConfig } from './config/types'
 import type { PageMetaDatum, PagePath, ResolvedOptions, UserOptions } from './types'
-import { debug, invalidatePagesModule, isTargetFile, mergePageMetaDataArray } from './utils'
+import { debug, invalidatePagesModule, isConfigFile, isTargetFile, mergePageMetaDataArray } from './utils'
 import { resolveOptions } from './options'
 import { checkPagesJsonFile, getPageFiles, writeFileSync } from './files'
 import { getRouteBlock } from './customBlock'
@@ -85,7 +85,7 @@ export class PageContext {
 
     watcher.on('change', async (path) => {
       path = slash(path)
-      if (!isTargetFile(path))
+      if (!isTargetFile(path) && !isConfigFile(path))
         return
 
       debug.pages(`File changed: ${path}`)
@@ -168,7 +168,7 @@ export class PageContext {
   }
 
   async virtualModule() {
-    return `export const pages = ${JSON.stringify(this.pageMetaData, null, 2)};`
+    return `export const pages = ${this.resolveRoutes()};`
   }
 
   resolveRoutes() {
