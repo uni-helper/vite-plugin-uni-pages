@@ -5,6 +5,12 @@ export type CustomBlock = Record<string, any>
 
 export interface Options {
   /**
+   * Whether to merge pages in pages.json
+   * @default true
+   */
+  mergePages: boolean
+
+  /**
    * Paths to the directory to search for page components.
    * @default 'src/pages'
    */
