@@ -9,6 +9,9 @@
     "strictNullChecks": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "skipDefaultLibCheck": true
+    "skipDefaultLibCheck": true,
+    "paths": {
+      "@uni-helper/vite-plugin-uni-pages": ["./packages/core/src/index.ts"]
+    }
   }
 }

@@ -23,6 +23,8 @@
     "build:h5": "pnpm build && npm -C packages/playground run build:h5",
     "prepublishOnly": "pnpm build",
     "release": "bumpp && npm publish --access public",
+    "test": "vitest",
+    "coverage": "vitest run --coverage",
     "lint": "eslint .",
     "lint:fix": "nr lint --fix"
   },
@@ -33,6 +35,8 @@
     "eslint": "^8.31.0",
     "rimraf": "^3.0.2",
     "typescript": "^4.9.4",
-    "unbuild": "^1.0.2"
+    "unbuild": "^1.0.2",
+    "vitest": "^0.26.3"
+
   }
 }

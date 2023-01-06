@@ -170,4 +170,8 @@ export class PageContext {
   async virtualModule() {
     return `export const pages = ${JSON.stringify(this.pageMetaData, null, 2)};`
   }
+
+  resolveRoutes() {
+    return JSON.stringify(this.pageMetaData, null, 2)
+  }
 }
