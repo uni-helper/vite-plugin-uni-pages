@@ -131,13 +131,19 @@ export class PageContext {
     const generatedPageMetaData = await Promise.all(
       this.pagesPath.map(async page => await this.parsePage(page)),
     )
-    if (this.pagesGlobConfig?.pages) {
-      const customPageMetaData = this.pagesGlobConfig?.pages || []
-      this.pageMetaData = mergePageMetaDataArray(generatedPageMetaData.concat(customPageMetaData))
+    const customPageMetaData = this.pagesGlobConfig?.pages || []
+
+    if (!this.options.mergePages) {
+      this.pageMetaData = customPageMetaData
     }
     else {
-      this.pageMetaData = generatedPageMetaData
+      if (this.pagesGlobConfig?.pages)
+        this.pageMetaData = mergePageMetaDataArray(generatedPageMetaData.concat(customPageMetaData))
+
+      else
+        this.pageMetaData = generatedPageMetaData
     }
+
     debug.pages(generatedPageMetaData)
   }
 

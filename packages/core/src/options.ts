@@ -4,6 +4,7 @@ import type { ResolvedOptions, UserOptions } from './types'
 
 export function resolveOptions(userOptions: UserOptions, viteRoot?: string): ResolvedOptions {
   const {
+    mergePages = true,
     dir = 'src/pages',
     outDir = 'src',
     exclude = ['node_modules', '.git', '**/__*__/**'],
@@ -23,6 +24,7 @@ export function resolveOptions(userOptions: UserOptions, viteRoot?: string): Res
   const resolvedDirs = resolvePageDirs(dir, root, exclude)
 
   const resolvedOptions: ResolvedOptions = {
+    mergePages,
     dirs: resolvedDirs,
     outDir,
     exclude,
