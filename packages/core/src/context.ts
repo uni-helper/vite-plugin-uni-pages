@@ -153,9 +153,11 @@ export class PageContext {
     await this.loadUserPagesConfig()
     this.options.onAfterLoadUserConfig(this)
 
-    this.options.onBeforeScanPages(this)
-    await this.scanPages()
-    this.options.onAfterScanPages(this)
+    if (this.options.mergePages) {
+      this.options.onBeforeScanPages(this)
+      await this.scanPages()
+      this.options.onAfterScanPages(this)
+    }
 
     this.options.onBeforeMergePageMetaData(this)
     await this.mergePageMetaData()
