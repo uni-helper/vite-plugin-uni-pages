@@ -23,25 +23,24 @@ export default defineConfig({
 })
 ```
 
-Define global properties in `pages.config.(ts|mts|cts|js|cjs|mjs|json)`
+Define global properties in `pages.config.(ts|mts|cts|js|cjs|mjs|json)`, You can use like `#ifdef H5` in the file.
 
 ```ts
 // pages.config.ts
 import { defineUniPages } from '@uni-helper/vite-plugin-uni-pages'
 
 export default defineUniPages({
-  // You can also specify pages, and the content will be merged
+  // You can also define pages fields, which have the highest priority.priority.
   pages: [],
   globalStyle: {
     navigationBarTextStyle: 'black',
     navigationBarTitleText: '@uni-helper',
-    navigationBarBackgroundColor: '#F8F8F8',
-    backgroundColor: '#F8F8F8',
   },
 })
 ```
 
 Now all pages will be found automatically!
+
 ### SFC custom block for Route Data
 
 Add route meta to the route by adding a `<route>` block to the SFC. This will be
@@ -79,25 +78,48 @@ console.log(pages)
 
 ## Configuration
 
-see [types.ts](./src/types.ts)
-
-## Hooks
-
-You can not use like `#ifdef H5` in `pages.json`, but use [hooks](./src/types.ts) to change pagesMeta.
-
 ```ts
-// vite.config.ts
-UniPages({
-  onBeforeWriteFile(ctx) {
-    ctx.pagesMeta = ctx.pagesMeta?.filter(v => !v.path.includes('test'))
-  },
-})
-// ...
+export interface Options {
+  /**
+   * Whether to scan and merge pages in pages.json
+   * @default true
+   */
+  mergePages: boolean
+
+  /**
+   * Paths to the directory to search for page components.
+   * @default 'src/pages'
+   */
+  dir: string
+
+  /**
+   * pages.json dir
+   * @default "src"
+   */
+  outDir: string
+
+  /**
+   * exclude page
+   * @default []
+   */
+  exclude: string[]
+
+  /**
+   * Set the default route block parser, or use `<route lang="xxx">` in SFC route block
+   * @default 'json5'
+   */
+  routeBlockLang: 'json5' | 'json' | 'yaml' | 'yml'
+
+  onBeforeLoadUserConfig: (ctx: PageContext) => void
+  onAfterLoadUserConfig: (ctx: PageContext) => void
+  onBeforeScanPages: (ctx: PageContext) => void
+  onAfterScanPages: (ctx: PageContext) => void
+  onBeforeMergePageMetaData: (ctx: PageContext) => void
+  onAfterMergePageMetaData: (ctx: PageContext) => void
+  onBeforeWriteFile: (ctx: PageContext) => void
+  onAfterWriteFile: (ctx: PageContext) => void
+}
 ```
-
-This is a good alternative to conditional compilation, you can also use `exclude` in `vite.config.ts`
-
-How? console the `process.env` and found `UNI_*`, you can do this!
 
 ## TODO
 

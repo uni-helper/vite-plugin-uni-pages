@@ -23,20 +23,18 @@ export default defineConfig({
 })
 ```
 
-在 `pages.config.(ts|mts|cts|js|cjs|mjs|json)` 定义全局属性
+在 `pages.config.(ts|mts|cts|js|cjs|mjs|json)` 定义全局属性，你可以在文件中使用 `#ifdef H5` 类似语法。
 
 ```ts
 // pages.config.ts
 import { defineUniPages } from '@uni-helper/vite-plugin-uni-pages'
 
 export default defineUniPages({
-  // You can also specify pages, and the content will be merged
+  // 你也可以定义 pages 字段，它具有最高的优先级。
   pages: [],
   globalStyle: {
     navigationBarTextStyle: 'black',
     navigationBarTitleText: '@uni-helper',
-    navigationBarBackgroundColor: '#F8F8F8',
-    backgroundColor: '#F8F8F8',
   },
 })
 ```
@@ -45,16 +43,12 @@ export default defineUniPages({
 
 ### SFC 自定义块用于路由数据
 
-
-Add route meta to the route by adding a `<route>` block to the SFC. This will be
-directly added to the route after it is generated, and will override it.
-
-通过添加一个`<route>`块到 SFC 中来添加路由元数据。这将会在路由生成后直接添加到路由中，并且会覆盖。
+通过添加一个 `<route>` 块到 SFC 中来添加路由元数据。这将会在路由生成后直接添加到路由中，并且会覆盖。
 
 你可以使用 `<route lang="yaml">` 来指定一个解析器，或者使用 `routeBlockLang` 选项来设置一个默认的解析器。
 
-- **Supported parser:** JSON, JSON5, YAML
-- **Default:** JSON5
+- **解析器支持：** JSON, JSON5, YAML
+- **默认：** JSON5
 
 ```html
 <!-- index.vue -->
@@ -82,25 +76,48 @@ console.log(pages)
 
 ## 配置
 
-查看 [types.ts](./src/types.ts)
-
-## 钩子
-
-你不能在 `pages.json` 中使用类似 `#ifdef H5`, 但是使用 [hooks](./src/types.ts) 可以改变 pagesMeta.
-
 ```ts
-// vite.config.ts
-UniPages({
-  onBeforeWriteFile(ctx) {
-    ctx.pagesMeta = ctx.pagesMeta?.filter(v => !v.path.includes('test'))
-  },
-})
-// ...
+export interface Options {
+  /**
+   * 是否扫描并合并 pages.json 中 pages 字段
+   * @default true
+   */
+  mergePages: boolean
+
+  /**
+   * 扫描的目录
+   * @default 'src/pages'
+   */
+  dir: string
+
+  /**
+   * 输出 pages.json 目录
+   * @default "src"
+   */
+  outDir: string
+
+  /**
+   * 排除的页面
+   * @default []
+   */
+  exclude: string[]
+
+  /**
+   * 自定义块语言
+   * @default 'json5'
+   */
+  routeBlockLang: 'json5' | 'json' | 'yaml' | 'yml'
+
+  onBeforeLoadUserConfig: (ctx: PageContext) => void
+  onAfterLoadUserConfig: (ctx: PageContext) => void
+  onBeforeScanPages: (ctx: PageContext) => void
+  onAfterScanPages: (ctx: PageContext) => void
+  onBeforeMergePageMetaData: (ctx: PageContext) => void
+  onAfterMergePageMetaData: (ctx: PageContext) => void
+  onBeforeWriteFile: (ctx: PageContext) => void
+  onAfterWriteFile: (ctx: PageContext) => void
+}
 ```
-
-这是条件编译的一个很好的替代方案, 你还可以在 `vite.config.ts` 中使用 `exclude` 来排除部分页面。
-
-怎么做? 打印 `process.env` 然后找到 `UNI_*`, 我相信你已经会了
 
 ## 感谢
 
