@@ -1,15 +1,3 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:base"
-  ],
-  "packageRules": [
-    {
-      "packagePatterns": [
-        "^@dcloudio.*"
-      ],
-      "groupName": "@dcloudio",
-      "automerge": true
-    }
-  ]
+  "extends": ["github>uni-helper/renovate-config"]
 }
