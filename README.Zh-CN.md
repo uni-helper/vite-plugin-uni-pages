@@ -1,6 +1,8 @@
 # @uni-helper/vite-plugin-uni-pages
 
-在 Vite 驱动的 uni-app 上使用基于文件的路由系统
+在 Vite 驱动的 uni-app 上使用基于文件的路由系统。
+
+<a href="https://www.npmjs.com/package/@uni-helper/vite-plugin-uni-pages"><img src="https://img.shields.io/npm/v/@uni-helper/vite-plugin-uni-pages" alt="NPM version"></a></p>
 
 [English](./README.md) | 简体中文
 
