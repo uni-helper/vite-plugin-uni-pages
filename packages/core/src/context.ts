@@ -1,6 +1,6 @@
 import path from 'path'
 import type { FSWatcher } from 'fs'
-import type { Logger, ViteDevServer } from 'vite'
+import { Logger, normalizePath, ViteDevServer } from 'vite'
 import { loadConfig } from 'unconfig'
 import { slash } from '@antfu/utils'
 import type { PagesConfig } from './config/types'
@@ -119,7 +119,7 @@ export class PageContext {
     const { relativePath, absolutePath } = page
     const routeBlock = await getRouteBlock(absolutePath, this.options)
     const relativePathWithFileName = relativePath.replace(path.extname(relativePath), '')
-    const pageMetaDatum: PageMetaDatum = { path: relativePathWithFileName, type: 'page' }
+    const pageMetaDatum: PageMetaDatum = { path: normalizePath(relativePathWithFileName), type: 'page' }
 
     if (routeBlock)
       Object.assign(pageMetaDatum, routeBlock)
