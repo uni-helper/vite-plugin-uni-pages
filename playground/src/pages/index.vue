@@ -3,7 +3,7 @@ import { ref } from 'vue'
 const title = ref('Hello')
 const nav = () => {
   uni.navigateTo({
-    url: '/pages/test',
+    url: '/pages/test-json',
   })
 }
 </script>
@@ -54,4 +54,5 @@ const nav = () => {
 middlewares:
   - auth
   - test
+type: home
 </route>

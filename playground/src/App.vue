@@ -10,6 +10,10 @@ onShow(() => {
 onHide(() => {
   console.log('App Hide')
 })
+
+const pages = getCurrentPages()
+const page = pages[pages.length - 1]
+console.log(page)
 </script>
 
 <style></style>

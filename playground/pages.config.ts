@@ -14,7 +14,26 @@ export default defineUniPages({
         navigationBarTextStyle: 'black',
         navigationBarTitleText: 'uni-helper',
       },
-      type: 'home',
     },
   ],
+  tabBar: {
+    color: '#666',
+    selectedColor: '#333',
+    backgroundColor: '#fff',
+    borderStyle: 'black',
+    list: [
+      {
+        pagePath: 'pages/index',
+        text: '首页',
+        iconPath: 'assets/images/tabbar/home.png',
+        selectedIconPath: 'assets/images/tabbar/home-active.png',
+      },
+      {
+        pagePath: 'pages/my',
+        text: '我的',
+        iconPath: 'assets/images/tabbar/my.png',
+        selectedIconPath: 'assets/images/tabbar/my-active.png',
+      },
+    ],
+  },
 })
