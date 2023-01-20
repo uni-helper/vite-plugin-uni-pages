@@ -1,6 +1,7 @@
 {
   "name": "@vite-plugin-uni-pages/monorepo",
   "type": "module",
+  "version": "0.1.1",
   "private": true,
   "packageManager": "pnpm@7.16.1",
   "author": "KeJun",
@@ -22,7 +23,7 @@
     "play:h5": "pnpm dev && npm -C packages/playground run dev:h5",
     "build:h5": "pnpm build && npm -C packages/playground run build:h5",
     "prepublishOnly": "pnpm build",
-    "release": "bumpp package.json packages/core/package.json packages/playground/package.json",
+    "release": "bumpp package.json playground/package.json packages/*/package.json ",
     "test": "vitest",
     "coverage": "vitest run --coverage",
     "lint": "eslint .",
@@ -37,6 +38,5 @@
     "typescript": "^4.9.4",
     "unbuild": "^1.0.2",
     "vitest": "^0.27.0"
-  },
-  "version": "0.1.1"
+  }
 }

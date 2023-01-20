@@ -55,7 +55,10 @@ importers:
       '@types/node': 18.11.18
       vite: 4.0.3_@types+node@18.11.18
 
-  packages/playground:
+  packages/guard:
+    specifiers: {}
+
+  playground:
     specifiers:
       '@dcloudio/types': ^3.2.7
       '@dcloudio/uni-app': 3.0.0-alpha-3061620221230002
@@ -80,7 +83,7 @@ importers:
       '@dcloudio/uni-automator': 3.0.0-alpha-3061620221230002_postcss@8.4.20+vue@3.2.45
       '@dcloudio/uni-cli-shared': 3.0.0-alpha-3061620221230002_postcss@8.4.20+vue@3.2.45
       '@dcloudio/vite-plugin-uni': 3.0.0-alpha-3061620221230002_gioipz73x7e6odstk4bwyk6buq
-      '@uni-helper/vite-plugin-uni-pages': link:../core
+      '@uni-helper/vite-plugin-uni-pages': link:../packages/core
       postcss: 8.4.20
       vite: 4.0.3
 
