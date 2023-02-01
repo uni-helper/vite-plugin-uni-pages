@@ -1,7 +1,10 @@
 import type { GlobalStyle } from './config'
 import type { PageContext } from './context'
 
-export type CustomBlock = Record<string, any>
+export interface CustomBlock {
+  attr: Record<string, any>
+  content: Record<string, any>
+}
 
 export interface Options {
   /**

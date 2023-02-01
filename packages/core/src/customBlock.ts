@@ -29,14 +29,18 @@ export function parseCustomBlock(
   block: SFCBlock,
   filePath: string,
   options: ResolvedOptions,
-): any {
+): CustomBlock | undefined {
   const lang = block.lang ?? options.routeBlockLang
-
+  const attr = {
+    type: 'page',
+    ...block.attrs,
+  }
+  let content: Record<string, any> | undefined
   debug.routeBlock(`use ${lang} parser`)
 
   if (lang === 'json5') {
     try {
-      return JSON5.parse(block.content)
+      content = JSON5.parse(block.content)
     }
     catch (err: any) {
       throw new Error(
@@ -46,7 +50,7 @@ export function parseCustomBlock(
   }
   else if (lang === 'json') {
     try {
-      return JSON.parse(block.content)
+      content = JSON.parse(block.content)
     }
     catch (err: any) {
       throw new Error(
@@ -56,7 +60,7 @@ export function parseCustomBlock(
   }
   else if (lang === 'yaml' || lang === 'yml') {
     try {
-      return YAMLParser(block.content)
+      content = YAMLParser(block.content)
     }
     catch (err: any) {
       throw new Error(
@@ -64,9 +68,15 @@ export function parseCustomBlock(
       )
     }
   }
+  if (content) {
+    return {
+      attr,
+      content,
+    }
+  }
 }
 
-export async function getRouteBlock(path: string, options: ResolvedOptions) {
+export async function getRouteBlock(path: string, options: ResolvedOptions): Promise<CustomBlock | undefined> {
   const content = fs.readFileSync(path, 'utf8')
 
   const parsedSFC = await parseSFC(content)
@@ -75,7 +85,7 @@ export async function getRouteBlock(path: string, options: ResolvedOptions) {
   if (!blockStr)
     return
 
-  const result = parseCustomBlock(blockStr, path, options) as CustomBlock
+  const result = parseCustomBlock(blockStr, path, options)
 
   return result
 }
