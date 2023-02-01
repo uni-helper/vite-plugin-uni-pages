@@ -54,7 +54,7 @@ export default defineUniPages({
 
 ```html
 <!-- index.vue -->
-<!-- use type to set index -->
+<!-- 使用 type="home" 属性设置首页 -->
 <route type="home">
 {
   "style": { "navigationBarTitleText": "@uni-helper" }
