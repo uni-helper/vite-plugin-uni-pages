@@ -26,14 +26,14 @@ importers:
     specifiers:
       '@antfu/utils': ^0.7.2
       '@types/debug': ^4.1.7
-      '@types/lodash-es': ^4.17.6
+      '@types/lodash': ^4.14.191
       '@types/node': ^18.11.18
       '@vue/compiler-sfc': ^3.2.45
       chokidar: ^3.5.3
       debug: ^4.3.4
       fast-glob: ^3.2.12
       json5: ^2.2.3
-      lodash-es: ^4.17.21
+      lodash: ^4.17.21
       magic-string: ^0.27.0
       unconfig: ^0.3.7
       vite: ^4.0.3
@@ -44,14 +44,14 @@ importers:
       debug: 4.3.4
       fast-glob: 3.2.12
       json5: 2.2.3
-      lodash-es: 4.17.21
+      lodash: 4.17.21
       magic-string: 0.27.0
       unconfig: 0.3.7
       yaml: 2.2.1
     devDependencies:
       '@antfu/utils': 0.7.2
       '@types/debug': 4.1.7
-      '@types/lodash-es': 4.17.6
+      '@types/lodash': 4.14.191
       '@types/node': 18.11.18
       vite: 4.0.3_@types+node@18.11.18
 
@@ -1241,12 +1241,6 @@ packages:
 
   /@types/json5/0.0.29:
     resolution: {integrity: sha512-dRLjCWHYg4oaA77cxO64oO+7JwCwnIzkZPdrrC71jQmQtlhM556pwKo5bUzqvZndkVbeFLIIi+9TC40JNF5hNQ==}
-    dev: true
-
-  /@types/lodash-es/4.17.6:
-    resolution: {integrity: sha512-R+zTeVUKDdfoRxpAryaQNRKk3105Rrgx2CFRClIgRGaqDTdjsm8h6IYA8ir584W3ePzkZfst5xIgDwYrlh9HLg==}
-    dependencies:
-      '@types/lodash': 4.14.191
     dev: true
 
   /@types/lodash/4.14.191:
@@ -3530,10 +3524,6 @@ packages:
       p-locate: 5.0.0
     dev: true
 
-  /lodash-es/4.17.21:
-    resolution: {integrity: sha512-mKnC+QJ9pWVzv+C4/U3rRsHapFfHvQFoFB92e52xeyGMcX6/OlIl78je1u8vePzYZSkkogMPJ2yjxxsb89cxyw==}
-    dev: false
-
   /lodash.camelcase/4.3.0:
     resolution: {integrity: sha512-TwuEnCnxbc3rAvhf/LbG7tJUDzhqXyFnv3dtzLOPgCG/hODL7WFnsbwktkD7yUV0RrreP/l1PALq/YSg6VvjlA==}
 
@@ -3543,7 +3533,6 @@ packages:
 
   /lodash/4.17.21:
     resolution: {integrity: sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==}
-    dev: true
 
   /loupe/2.3.6:
     resolution: {integrity: sha512-RaPMZKiMy8/JruncMU5Bt6na1eftNoo++R4Y+N2FrxkDVTrGvcyzFTsaGif4QTeKESheMGegbhw6iUAq+5A8zA==}
