@@ -1,12 +1,12 @@
 import path from 'path'
-import type { FSWatcher } from 'fs'
+import type { FSWatcher } from 'chokidar'
 import type { Logger, ViteDevServer } from 'vite'
 import { normalizePath } from 'vite'
 import { loadConfig } from 'unconfig'
 import { slash } from '@antfu/utils'
 import type { PagesConfig } from './config/types'
 import type { PageMetaDatum, PagePath, ResolvedOptions, UserOptions } from './types'
-import { debug, invalidatePagesModule, isConfigFile, isTargetFile, mergePageMetaDataArray } from './utils'
+import { debug, getPagesConfigSourcePaths, invalidatePagesModule, isConfigFile, isTargetFile, mergePageMetaDataArray } from './utils'
 import { resolveOptions } from './options'
 import { checkPagesJsonFile, getPageFiles, writeFileSync } from './files'
 import { getRouteBlock } from './customBlock'
@@ -73,7 +73,11 @@ export class PageContext {
     this.setupWatcher(server.watcher)
   }
 
-  setupWatcher(watcher: FSWatcher) {
+  async setupWatcher(watcher: FSWatcher) {
+    if (process.env.UNI_PLATFORM !== 'h5') {
+      const configs = await getPagesConfigSourcePaths()
+      watcher.add(configs)
+    }
     watcher.on('add', async (path) => {
       path = slash(path)
       if (!isTargetFile(path))

@@ -1,6 +1,7 @@
 import Debug from 'debug'
 import type { ModuleNode, ViteDevServer } from 'vite'
 import { groupBy } from 'lodash'
+import fg from 'fast-glob'
 import { FILE_EXTENSIONS, RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import type { PageMetaDatum } from './types'
 
@@ -54,4 +55,12 @@ export function mergePageMetaDataArray(pageMetaData: PageMetaDatum[]) {
     result.push(options)
   }
   return result
+}
+
+export const getPagesConfigSourcePaths = async () => {
+  return await fg('pages.config.(ts|mts|cts|js|cjs|mjs|json)', {
+    deep: 0,
+    onlyFiles: true,
+    absolute: true,
+  })
 }
