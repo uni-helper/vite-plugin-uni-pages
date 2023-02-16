@@ -1,5 +1,5 @@
 import type { AppPlus } from './appPlus'
-import type { HEXColor } from './common'
+import type { HEXColor, ThemeColor } from './common'
 import type { H5 } from './h5'
 
 export interface GlobalStyle {
@@ -8,7 +8,7 @@ export interface GlobalStyle {
    * @default "#F7F7F7"
    * @desc APP与H5为#F7F7F7，小程序平台请参考相应小程序文档
    */
-  navigationBarBackgroundColor?: HEXColor
+  navigationBarBackgroundColor?: HEXColor | ThemeColor
 
   /**
    * 导航栏标题颜色及状态栏前景颜色，仅支持 black/white
@@ -35,7 +35,7 @@ export interface GlobalStyle {
    * @default "#ffffff"
    * @desc 微信小程序
    */
-  backgroundColor?: HEXColor
+  backgroundColor?: HEXColor | ThemeColor
 
   /**
    * 下拉 loading 的样式，仅支持 dark / light
@@ -63,14 +63,14 @@ export interface GlobalStyle {
    * @default "#ffffff"
    * @desc 仅 iOS 平台
    */
-  backgroundColorTop?: HEXColor
+  backgroundColorTop?: HEXColor | ThemeColor
 
   /**
    * 底部窗口的背景色（bounce回弹区域）
    * @default "#ffffff"
    * @desc 仅 iOS 平台
    */
-  backgroundColorBottom?: HEXColor
+  backgroundColorBottom?: HEXColor | ThemeColor
 
   /**
    * 导航栏图片地址（替换当前文字标题），支付宝小程序内必须使用https的图片链接地址
