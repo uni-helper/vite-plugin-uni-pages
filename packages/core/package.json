@@ -42,7 +42,7 @@
     "fast-glob": "^3.2.12",
     "json5": "^2.2.3",
     "lodash": "^4.17.21",
-    "magic-string": "^0.27.0",
+    "magic-string": "^0.30.0",
     "unconfig": "^0.3.7",
     "yaml": "^2.2.1"
   },

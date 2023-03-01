@@ -34,7 +34,7 @@ importers:
       fast-glob: ^3.2.12
       json5: ^2.2.3
       lodash: ^4.17.21
-      magic-string: ^0.27.0
+      magic-string: ^0.30.0
       unconfig: ^0.3.7
       vite: ^4.0.3
       yaml: ^2.2.1
@@ -45,7 +45,7 @@ importers:
       fast-glob: 3.2.12
       json5: 2.2.3
       lodash: 4.17.21
-      magic-string: 0.27.0
+      magic-string: 0.30.0
       unconfig: 0.3.7
       yaml: 2.2.1
     devDependencies:
@@ -5365,6 +5365,13 @@ packages:
     engines: {node: '>=12'}
     dependencies:
       '@jridgewell/sourcemap-codec': 1.4.14
+
+  /magic-string/0.30.0:
+    resolution: {integrity: sha512-LA+31JYDJLs82r2ScLrlz1GjSgu66ZV518eyWT+S8VhyQn/JL0u9MeBOvQMGYiPk1DBiSN9DDMOcXvigJZaViQ==}
+    engines: {node: '>=12'}
+    dependencies:
+      '@jridgewell/sourcemap-codec': 1.4.14
+    dev: false
 
   /mdast-util-from-markdown/0.8.5:
     resolution: {integrity: sha512-2hkTXtYYnr+NubD/g6KGBS/0mFmBcifAsI0yIWRiRo0PjVs6SSOSOdtzbp6kSGnShDN6G5aWZpKQ2lWRy27mWQ==}
