@@ -120,7 +120,9 @@ export interface PagesConfig {
    * 分包预下载规则
    * @desc 微信小程序
    */
-  preloadRule?: PreloadRule
+  preloadRule?: {
+    [path: string]: PreloadRule
+  }
 
   /**
    * `Worker` 代码放置的目录
