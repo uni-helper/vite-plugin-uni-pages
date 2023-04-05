@@ -32,7 +32,7 @@ Define global properties in `pages.config.(ts|mts|cts|js|cjs|mjs|json)`, You can
 import { defineUniPages } from '@uni-helper/vite-plugin-uni-pages'
 
 export default defineUniPages({
-  // You can also define pages fields, which have the highest priority.priority.
+  // You can also define pages fields, which have the highest priority.
   pages: [],
   globalStyle: {
     navigationBarTextStyle: 'black',

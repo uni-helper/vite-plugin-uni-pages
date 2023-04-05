@@ -80,6 +80,6 @@ export interface PageMetaDatum {
   /**
    * 当前页面是否需要登录才可以访问，此配置优先级高于 uniIdRouter 下的 needLogin
    */
-  needLogin?: boolean;
+  needLogin?: boolean
   [x: string]: any
 }
