@@ -1,4 +1,4 @@
-import type { HEXColor } from './common'
+import type { Color } from './common'
 
 export interface IconFont {
   /**
@@ -108,17 +108,17 @@ export interface TabBar {
   /**
    * tab 上的文字默认颜色
    */
-  color?: HEXColor
+  color?: Color
 
   /**
    * tab 上的文字选中时的颜色
    */
-  selectedColor?: HEXColor
+  selectedColor?: Color
 
   /**
    * tab 的背景色
    */
-  backgroundColor?: HEXColor
+  backgroundColor?: Color
 
   /**
    * tabbar 上边框的颜色，可选值 black/white，也支持其他颜色值
