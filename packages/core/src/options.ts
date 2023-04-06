@@ -9,6 +9,7 @@ export function resolveOptions(userOptions: UserOptions, viteRoot?: string): Res
     outDir = 'src',
     exclude = ['node_modules', '.git', '**/__*__/**'],
     routeBlockLang = 'json5',
+    minify = false,
 
     onBeforeLoadUserConfig = () => {},
     onAfterLoadUserConfig = () => {},
@@ -30,6 +31,7 @@ export function resolveOptions(userOptions: UserOptions, viteRoot?: string): Res
     exclude,
     routeBlockLang,
     root,
+    minify,
     onBeforeLoadUserConfig,
     onAfterLoadUserConfig,
     onBeforeScanPages,

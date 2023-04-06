@@ -171,7 +171,7 @@ export class PageContext {
     this.options.onAfterMergePageMetaData(this)
 
     this.options.onBeforeWriteFile(this)
-    const pagesJson = JSON.stringify({ ...this.pagesGlobConfig, pages: this.pageMetaData }, null, 2)
+    const pagesJson = JSON.stringify({ ...this.pagesGlobConfig, pages: this.pageMetaData }, null, this.options.minify ? undefined : 2)
     writeFileSync(this.resolvedPagesJSONPath, pagesJson)
     this.options.onAfterWriteFile(this)
   }

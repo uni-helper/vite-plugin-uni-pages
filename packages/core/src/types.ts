@@ -37,6 +37,12 @@ export interface Options {
    */
   routeBlockLang: 'json5' | 'json' | 'yaml' | 'yml'
 
+  /**
+   * minify the `pages.json`
+   * @default false
+   */
+  minify: boolean
+
   onBeforeLoadUserConfig: (ctx: PageContext) => void
   onAfterLoadUserConfig: (ctx: PageContext) => void
   onBeforeScanPages: (ctx: PageContext) => void
