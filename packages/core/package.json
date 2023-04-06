@@ -2,7 +2,7 @@
   "name": "@uni-helper/vite-plugin-uni-pages",
   "type": "module",
   "version": "0.1.6",
-  "packageManager": "pnpm@7.16.1",
+  "packageManager": "pnpm@8.1.1",
   "description": "File system based routing for uni-app applications using Vite",
   "author": "KeJun",
   "license": "MIT",
