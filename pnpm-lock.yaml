@@ -17,8 +17,8 @@ importers:
         specifier: ^8.31.0
         version: 8.31.0
       rimraf:
-        specifier: ^3.0.2
-        version: 3.0.2
+        specifier: ^4.0.0
+        version: 4.0.0
       typescript:
         specifier: ^4.9.4
         version: 4.9.4
@@ -7607,6 +7607,13 @@ packages:
     hasBin: true
     dependencies:
       glob: 7.2.3
+    dev: true
+
+  /rimraf@4.0.0:
+    resolution: {integrity: sha512-1jUYEffrxKEAYJLJvqYLvKQW5oExH8QhBVYKUO1YXPrKTpobYuZ89KbgmpGbeTj+6kUXqGrIT1w+3BI4T6hR1w==}
+    engines: {node: '>=14'}
+    deprecated: Please upgrade to 4.3.1 or higher to fix a potentially damaging issue regarding symbolic link following. See https://github.com/isaacs/rimraf/issues/259 for details.
+    hasBin: true
     dev: true
 
   /rollup-plugin-dts@5.1.0(rollup@3.9.0)(typescript@4.9.4):
