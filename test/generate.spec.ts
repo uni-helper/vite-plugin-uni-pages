@@ -31,21 +31,21 @@ describe('Generate routes', () => {
     expect(routes).toMatchInlineSnapshot(`
       "[
         {
-          \\"path\\": \\"../packages/playground/src/pages/index\\",
-          \\"type\\": \\"page\\",
-          \\"middlewares\\": [
-            \\"auth\\",
-            \\"test\\"
-          ]
-        },
-        {
           \\"path\\": \\"../packages/playground/src/pages/test-json\\",
-          \\"type\\": \\"page\\",
+          \\"type\\": \\"home\\",
           \\"style\\": {
             \\"navigationBarTitleText\\": \\"test json page\\"
           },
           \\"middlewares\\": [
             \\"auth\\"
+          ]
+        },
+        {
+          \\"path\\": \\"../packages/playground/src/pages/index\\",
+          \\"type\\": \\"page\\",
+          \\"middlewares\\": [
+            \\"auth\\",
+            \\"test\\"
           ]
         },
         {

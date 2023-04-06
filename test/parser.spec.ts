@@ -1,4 +1,4 @@
-import { resolve } from 'path'
+import { resolve } from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { getRouteBlock, resolveOptions } from '../packages/core/src/index'
 
@@ -12,11 +12,16 @@ describe('Parser', () => {
     const routeBlock = await getRouteBlock(path, options)
     expect(routeBlock).toMatchInlineSnapshot(`
       {
-        "middlewares": [
-          "auth",
-        ],
-        "style": {
-          "navigationBarTitleText": "test json page",
+        "attr": {
+          "type": "home",
+        },
+        "content": {
+          "middlewares": [
+            "auth",
+          ],
+          "style": {
+            "navigationBarTitleText": "test json page",
+          },
         },
       }
     `)
@@ -27,11 +32,17 @@ describe('Parser', () => {
     const routeBlock = await getRouteBlock(path, options)
     expect(routeBlock).toMatchInlineSnapshot(`
       {
-        "middlewares": [
-          "auth",
-        ],
-        "style": {
-          "navigationBarTitleText": "test yaml page",
+        "attr": {
+          "lang": "yaml",
+          "type": "page",
+        },
+        "content": {
+          "middlewares": [
+            "auth",
+          ],
+          "style": {
+            "navigationBarTitleText": "test yaml page",
+          },
         },
       }
     `)
