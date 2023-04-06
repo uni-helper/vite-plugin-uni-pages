@@ -23,8 +23,11 @@ export function getPageFiles(path: string, options: ResolvedOptions): string[] {
 }
 
 export function checkPagesJsonFile(path: string) {
-  if (!fs.existsSync(path))
+  if (!fs.existsSync(path)) {
     writeFileSync(path, JSON.stringify({ pages: [{ path: '' }] }, null, 2))
+    return false
+  }
+  return true
 }
 
 export function writeFileSync(path: string, content: string) {
