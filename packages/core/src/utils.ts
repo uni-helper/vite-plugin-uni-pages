@@ -1,6 +1,6 @@
 import Debug from 'debug'
 import type { ModuleNode, ViteDevServer } from 'vite'
-import { groupBy } from 'lodash'
+import { groupBy } from 'lodash-unified'
 import fg from 'fast-glob'
 import { FILE_EXTENSIONS, RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import type { PageMetaDatum } from './types'

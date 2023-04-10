@@ -40,7 +40,7 @@
     "debug": "^4.3.4",
     "fast-glob": "^3.2.12",
     "json5": "^2.2.3",
-    "lodash": "^4.17.21",
+    "lodash-unified": "^1.0.3",
     "magic-string": "^0.30.0",
     "unconfig": "^0.3.7",
     "yaml": "^2.2.1"
@@ -48,7 +48,6 @@
   "devDependencies": {
     "@antfu/utils": "^0.7.2",
     "@types/debug": "^4.1.7",
-    "@types/lodash": "^4.14.192",
     "@types/node": "^18.15.11",
     "vite": "^4.2.1"
   }
