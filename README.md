@@ -1,18 +1,18 @@
 # @uni-helper/vite-plugin-uni-pages
 
-File system-based routing for uni-app applications using Vite.
+在 Vite 驱动的 uni-app 上使用基于文件的路由系统。
 
 <a href="https://www.npmjs.com/package/@uni-helper/vite-plugin-uni-pages"><img src="https://img.shields.io/npm/v/@uni-helper/vite-plugin-uni-pages" alt="NPM version"></a></p>
 
-English | [简体中文](./README.Zh-CN.md)
+[English](./README.md) | 简体中文
 
-## Installation
+## 安装
 
 ```bash
 pnpm i -D @uni-helper/vite-plugin-uni-pages
 ```
 
-## Usage
+## 使用
 
 ```ts
 // vite.config.ts
@@ -25,14 +25,14 @@ export default defineConfig({
 })
 ```
 
-Define global properties in `pages.config.(ts|mts|cts|js|cjs|mjs|json)`, You can use like `#ifdef H5` in the file.
+在 `pages.config.(ts|mts|cts|js|cjs|mjs|json)` 定义全局属性，你可以在文件中使用 `#ifdef H5` 类似语法。
 
 ```ts
 // pages.config.ts
 import { defineUniPages } from '@uni-helper/vite-plugin-uni-pages'
 
 export default defineUniPages({
-  // You can also define pages fields, which have the highest priority.
+  // 你也可以定义 pages 字段，它具有最高的优先级。
   pages: [],
   globalStyle: {
     navigationBarTextStyle: 'black',
@@ -41,22 +41,20 @@ export default defineUniPages({
 })
 ```
 
-Now all pages will be found automatically!
+现在所有的 page 都会被自动发现！
 
-### SFC custom block for Route Data
+### SFC 自定义块用于路由数据
 
-Add route meta to the route by adding a `<route>` block to the SFC. This will be
-directly added to the route after it is generated, and will override it.
+通过添加一个 `<route>` 块到 SFC 中来添加路由元数据。这将会在路由生成后直接添加到路由中，并且会覆盖。
 
-You can specific a parser to use using `<route lang="yaml">`, or set a default
-parser using `routeBlockLang` option.
+你可以使用 `<route lang="yaml">` 来指定一个解析器，或者使用 `routeBlockLang` 选项来设置一个默认的解析器。
 
-- **Supported parser:** JSON, JSON5, YAML
-- **Default:** JSON5
+- **解析器支持：** JSON, JSON5, YAML
+- **默认：** JSON5
 
 ```html
 <!-- index.vue -->
-<!-- use type to set index -->
+<!-- 使用 type="home" 属性设置首页 -->
 <route type="home">
 {
   "style": { "navigationBarTitleText": "@uni-helper" }
@@ -70,7 +68,7 @@ style:
 </route>
 ```
 
-Import the virtual module to access the metadata of all pages
+导入虚拟模块即可访问所有页面的元数据
 
 ```ts
 /// <reference types="@uni-helper/vite-plugin-uni-pages/client" />
@@ -78,36 +76,36 @@ import { pages } from 'virtual:uni-pages'
 console.log(pages)
 ```
 
-## Configuration
+## 配置
 
 ```ts
 export interface Options {
   /**
-   * Whether to scan and merge pages in pages.json
+   * 是否扫描并合并 pages.json 中 pages 字段
    * @default true
    */
   mergePages: boolean
 
   /**
-   * Paths to the directory to search for page components.
+   * 扫描的目录
    * @default 'src/pages'
    */
   dir: string
 
   /**
-   * pages.json dir
+   * 输出 pages.json 目录
    * @default "src"
    */
   outDir: string
 
   /**
-   * exclude page
+   * 排除的页面
    * @default []
    */
   exclude: string[]
 
   /**
-   * Set the default route block parser, or use `<route lang="xxx">` in SFC route block
+   * 自定义块语言
    * @default 'json5'
    */
   routeBlockLang: 'json5' | 'json' | 'yaml' | 'yml'
@@ -123,12 +121,6 @@ export interface Options {
 }
 ```
 
-## TODO
-
-- [ ] only update the changed page
-- [x] [vite-plugin-uni-middleware](https://github.com/uni-helper/vite-plugin-uni-middleware)
-- [x] pages [type](./src/config/types.ts)
-
-## Acknowledgement
+## 感谢
 
 - [vite-plugin-pages](https://github.com/hannoeru/vite-plugin-pages.git)
