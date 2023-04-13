@@ -1,0 +1,40 @@
+{
+  "name": "@uni-helper/volar-plugin-uni-pages",
+  "version": "0.0.1",
+  "description": "Volar plugin for route custom block in Vue SFC",
+  "keywords": [
+    "volar",
+    "json",
+    "jsonschema"
+  ],
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.cjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "unbuild --stub",
+    "build": "unbuild",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "@uni-helper/pages-json-schema": "workspace:^",
+    "ts-json-schema-generator": "^1.2.0",
+    "vscode-json-languageservice": "^5.2.0",
+    "vscode-languageserver-protocol": "^3.17.3",
+    "vscode-languageserver-textdocument": "^1.0.8"
+  },
+  "devDependencies": {
+    "@types/json-schema": "^7.0.11",
+    "@volar/language-service": "1.4.0-alpha.7"
+  }
+}
