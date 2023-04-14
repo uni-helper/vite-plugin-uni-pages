@@ -23,7 +23,7 @@
     "play:h5": "pnpm dev && npm -C packages/playground run dev:h5",
     "build:h5": "pnpm build && npm -C packages/playground run build:h5",
     "prepublishOnly": "pnpm build",
-    "release": "bumpp package.json packages/core/package.json packages/playground/package.json",
+    "release": "bumpp",
     "test": "vitest",
     "coverage": "vitest run --coverage",
     "lint": "eslint .",
