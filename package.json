@@ -23,7 +23,7 @@
     "play:h5": "pnpm dev && npm -C packages/playground run dev:h5",
     "build:h5": "pnpm build && npm -C packages/playground run build:h5",
     "prepublishOnly": "pnpm build",
-    "release": "bumpp package.json packages/core/package.json packages/playground/package.json",
+    "release": "bumpp",
     "test": "vitest",
     "coverage": "vitest run --coverage",
     "lint": "eslint .",
@@ -32,6 +32,7 @@
   "devDependencies": {
     "@antfu/eslint-config": "^0.38.4",
     "@types/node": "^18.15.11",
+    "@uni-helper/volar-plugin-uni-pages": "workspace:*",
     "bumpp": "^9.1.0",
     "eslint": "^8.37.0",
     "rimraf": "^4.4.1",

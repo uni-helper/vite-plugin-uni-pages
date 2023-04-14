@@ -1,0 +1,23 @@
+{
+  "name": "@uni-helper/pages-json-schema",
+  "version": "0.1.6",
+  "description": "Schema for uni-app pages.json",
+  "author": "KeJun",
+  "license": "MIT",
+  "homepage": "https://github.com/uni-helper/vite-plugin-uni-pages#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uni-helper/vite-plugin-uni-pages.git"
+  },
+  "bugs": "https://github.com/uni-helper/vite-plugin-uni-pages/issues",
+  "keywords": [
+    "jsonschema"
+  ],
+  "scripts": {
+    "generate": "ts-json-schema-generator -p \"../core/src/config/types/index.ts\" -t \"PagesConfig\" -o \"schema.json\" --no-type-check",
+    "prepublishOnly": "pnpm generate"
+  },
+  "devDependencies": {
+    "ts-json-schema-generator": "^1.2.0"
+  }
+}

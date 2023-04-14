@@ -4,9 +4,13 @@
   <div>test</div>
 </template>
 
-<route type="home">
+<route type="home" lang="jsonc">
 {
-  "style": { "navigationBarTitleText": "test json page" },
-  "middlewares": ["auth"]
+  "style": {
+    "navigationBarTitleText": "test json page"
+  },
+  "middlewares": [
+    "auth"
+  ]
 }
 </route>
