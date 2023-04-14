@@ -17,7 +17,7 @@
 
 - [pages-json-schema](./packages/schema/)
 
-  为 `pages.json` 提供 schema
+  为 uni-app 的 `pages.json` 提供 schema
 
 
 ## 安装
