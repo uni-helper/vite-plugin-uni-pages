@@ -4,6 +4,22 @@
 
 <a href="https://www.npmjs.com/package/@uni-helper/vite-plugin-uni-pages"><img src="https://img.shields.io/npm/v/@uni-helper/vite-plugin-uni-pages" alt="NPM version"></a></p>
 
+
+## Packages
+
+- [vite-plugin-uni-pages](./packages/core/)
+
+  核心，提供基于文件的路由系统
+
+- [volar-plugin-uni-pages](./packages/volar/)
+
+  为 `<route>` 块 提供 IntelliSense
+
+- [pages-json-schema](./packages/schema/)
+
+  为 `pages.json` 提供 schema
+
+
 ## 安装
 
 ```bash
@@ -71,6 +87,7 @@ style:
 ```ts
 /// <reference types="@uni-helper/vite-plugin-uni-pages/client" />
 import { pages } from 'virtual:uni-pages'
+
 console.log(pages)
 ```
 
