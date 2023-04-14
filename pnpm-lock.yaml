@@ -34,6 +34,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@uni-helper/uni-env':
+        specifier: ^0.0.2
+        version: 0.0.2
       '@vue/compiler-sfc':
         specifier: ^3.2.47
         version: 3.2.47
@@ -3533,6 +3536,10 @@ packages:
       '@typescript-eslint/types': 5.57.1
       eslint-visitor-keys: 3.4.0
     dev: true
+
+  /@uni-helper/uni-env@0.0.2:
+    resolution: {integrity: sha512-5eeGoP3Y+v77jybH2HkmjE5+SnYmFw8Hcuxnn+l6fRNyPNcF7tUuTm3xvBJc9qbtE3Bphs1dJQ6Ru+yHl/OEmw==}
+    dev: false
 
   /@vitejs/plugin-legacy@4.0.2(terser@5.16.1)(vite@4.0.3):
     resolution: {integrity: sha512-ivnt9sCkgwJTYTWLjuvY6H/HTuiQC1EgzAPkiAvi0yNAssiqOJjyjhG3hAK5LFUUorE0w9kGxn8K0f/74DlbxQ==}

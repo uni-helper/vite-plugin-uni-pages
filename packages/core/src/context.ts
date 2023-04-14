@@ -1,9 +1,10 @@
-import path from 'path'
+import path from 'node:path'
 import type { FSWatcher } from 'chokidar'
 import type { Logger, ViteDevServer } from 'vite'
 import { normalizePath } from 'vite'
 import { loadConfig } from 'unconfig'
 import { slash } from '@antfu/utils'
+import { isH5 } from '@uni-helper/uni-env'
 import type { PagesConfig } from './config/types'
 import type { PageMetaDatum, PagePath, ResolvedOptions, UserOptions } from './types'
 import { debug, getPagesConfigSourcePaths, invalidatePagesModule, isConfigFile, isTargetFile, mergePageMetaDataArray } from './utils'
@@ -74,7 +75,7 @@ export class PageContext {
   }
 
   async setupWatcher(watcher: FSWatcher) {
-    if (process.env.UNI_PLATFORM !== 'h5') {
+    if (!isH5) {
       const configs = await getPagesConfigSourcePaths()
       watcher.add(configs)
     }

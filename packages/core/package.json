@@ -35,6 +35,7 @@
     "stub": "unbuild --stub"
   },
   "dependencies": {
+    "@uni-helper/uni-env": "^0.0.2",
     "@vue/compiler-sfc": "^3.2.47",
     "chokidar": "^3.5.3",
     "debug": "^4.3.4",
