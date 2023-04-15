@@ -108,6 +108,11 @@ export interface Options {
   dir: string
 
   /**
+   * subPackages 扫描的目录，例如：src/pages-sub
+   */
+  subPackages: string[]
+
+  /**
    * 输出 pages.json 目录
    * @default "src"
    */
