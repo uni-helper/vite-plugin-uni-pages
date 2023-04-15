@@ -6,6 +6,8 @@ export function resolveOptions(userOptions: UserOptions, viteRoot?: string): Res
   const {
     mergePages = true,
     dir = 'src/pages',
+    subPackages = [],
+
     outDir = 'src',
     exclude = ['node_modules', '.git', '**/__*__/**'],
     routeBlockLang = 'json5',
@@ -24,10 +26,12 @@ export function resolveOptions(userOptions: UserOptions, viteRoot?: string): Res
 
   const root = viteRoot || slash(process.cwd())
   const resolvedDirs = resolvePageDirs(dir, root, exclude)
+  const resolvedSubDirs = subPackages.map(dir => slash(dir))
 
   const resolvedOptions: ResolvedOptions = {
     mergePages,
     dirs: resolvedDirs,
+    subPackages: resolvedSubDirs,
     outDir,
     exclude,
     routeBlockLang,
