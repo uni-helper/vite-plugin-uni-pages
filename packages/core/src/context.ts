@@ -7,7 +7,7 @@ import { slash } from '@antfu/utils'
 import { isH5 } from '@uni-helper/uni-env'
 import dbg from 'debug'
 import type { PagesConfig } from './config/types'
-import type { PageMetaDatum, PagePath, ResolvedOptions, UserOptions } from './types'
+import type { PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
 import { debug, getPagesConfigSourcePaths, invalidatePagesModule, isConfigFile, isTargetFile, mergePageMetaDataArray } from './utils'
 import { resolveOptions } from './options'
 import { checkPagesJsonFile, getPageFiles, writeFileSync } from './files'
@@ -18,8 +18,12 @@ export class PageContext {
   private _server: ViteDevServer | undefined
 
   pagesGlobConfig: PagesConfig | undefined
+
   pagesPath: PagePath[] = []
+  subPagesPath: Record<string, PagePath[]> = {}
   pageMetaData: PageMetaDatum[] = []
+  subPageMetaData: SubPageMetaDatum[] = []
+
   resolvedPagesJSONPath = ''
 
   rawOptions: UserOptions
@@ -57,21 +61,21 @@ export class PageContext {
 
   async scanPages() {
     const pageDirFiles = this.options.dirs.map((dir) => {
-      const pagesDirPath = slash(path.resolve(this.options.root, dir))
-      const basePath = slash(path.join(this.options.root, this.options.outDir))
-      const files = getPageFiles(pagesDirPath, this.options)
-      debug.pages(dir, files)
-      const pagePaths = files.map(file => slash(file))
-        .map(file => ({
-          relativePath: path.relative(basePath, slash(path.resolve(pagesDirPath, file))),
-          absolutePath: slash(path.resolve(pagesDirPath, file)),
-        }))
-
-      return { dir, files: pagePaths }
+      return { dir, files: getPagePaths(dir, this.options) }
     })
 
     this.pagesPath = pageDirFiles.map(page => page.files).flat()
     debug.pages(this.pagesPath)
+  }
+
+  async scanSubPages() {
+    const subPagesPath: Record<string, PagePath[]> = {}
+    for (const dir of this.options.subPackages) {
+      const pagePaths = getPagePaths(dir, this.options)
+      subPagesPath[dir] = pagePaths
+    }
+    this.subPagesPath = subPagesPath
+    debug.subPages(this.subPagesPath)
   }
 
   setupViteServer(server: ViteDevServer) {
@@ -141,26 +145,51 @@ export class PageContext {
     return pageMetaDatum
   }
 
-  async mergePageMetaData() {
+  async parsePages(pages: PagePath[], overrides?: PageMetaDatum[]) {
     const generatedPageMetaData = await Promise.all(
-      this.pagesPath.map(async page => await this.parsePage(page)),
+      pages.map(async page => await this.parsePage(page)),
     )
-    const customPageMetaData = this.pagesGlobConfig?.pages || []
+    const customPageMetaData = overrides || []
 
-    if (!this.options.mergePages) {
-      this.pageMetaData = customPageMetaData
+    const result = customPageMetaData.length
+      ? mergePageMetaDataArray(generatedPageMetaData.concat(customPageMetaData))
+      : generatedPageMetaData
+
+    result.sort(page => (page.type === 'home' ? -1 : 0))
+
+    return result
+  }
+
+  async mergePageMetaData() {
+    const pageMetaData = await this.parsePages(this.pagesPath, this.pagesGlobConfig?.pages)
+    this.pageMetaData = pageMetaData
+    debug.pages(this.pageMetaData)
+  }
+
+  async mergeSubPageMetaData() {
+    const subPageMaps: Record<string, PageMetaDatum[]> = {}
+    const subPackages = this.pagesGlobConfig?.subPackages || []
+
+    for (const [dir, pages] of Object.entries(this.subPagesPath)) {
+      const root = path.basename(dir)
+
+      const globPackage = subPackages?.find(v => v.root === root)
+      subPageMaps[root] = await this.parsePages(pages, globPackage?.pages)
+      subPageMaps[root] = subPageMaps[root].map(page => ({ ...page, path: slash(path.relative(root, page.path)) }))
     }
-    else {
-      if (this.pagesGlobConfig?.pages)
-        this.pageMetaData = mergePageMetaDataArray(generatedPageMetaData.concat(customPageMetaData))
 
-      else
-        this.pageMetaData = generatedPageMetaData
+    // Inherit subPackages that do not exist in the config
+    for (const { root, pages } of subPackages) {
+      if (root && !subPageMaps[root])
+        subPageMaps[root] = pages || []
     }
 
-    this.pageMetaData.sort(page => (page.type === 'home' ? -1 : 0))
+    const subPageMetaData = Object
+      .keys(subPageMaps)
+      .map(root => ({ root, pages: subPageMaps[root] }))
 
-    debug.pages(generatedPageMetaData)
+    this.subPageMetaData = subPageMetaData
+    debug.subPages(this.subPageMetaData)
   }
 
   async updatePagesJSON() {
@@ -172,16 +201,26 @@ export class PageContext {
     if (this.options.mergePages) {
       this.options.onBeforeScanPages(this)
       await this.scanPages()
+      await this.scanSubPages()
       this.options.onAfterScanPages(this)
     }
 
     this.options.onBeforeMergePageMetaData(this)
     await this.mergePageMetaData()
+    await this.mergeSubPageMetaData()
     this.options.onAfterMergePageMetaData(this)
 
     this.options.onBeforeWriteFile(this)
-    const pagesJson = JSON.stringify({ ...this.pagesGlobConfig, pages: this.pageMetaData }, null, this.options.minify ? undefined : 2)
+
+    const data = {
+      ...this.pagesGlobConfig,
+      pages: this.pageMetaData,
+      subPackages: this.subPageMetaData,
+    }
+
+    const pagesJson = JSON.stringify(data, null, this.options.minify ? undefined : 2)
     writeFileSync(this.resolvedPagesJSONPath, pagesJson)
+
     this.options.onAfterWriteFile(this)
   }
 
@@ -192,4 +231,18 @@ export class PageContext {
   resolveRoutes() {
     return JSON.stringify(this.pageMetaData, null, 2)
   }
+}
+
+function getPagePaths(dir: string, options: ResolvedOptions) {
+  const pagesDirPath = slash(path.resolve(options.root, dir))
+  const basePath = slash(path.join(options.root, options.outDir))
+  const files = getPageFiles(pagesDirPath, options)
+  debug.pages(dir, files)
+  const pagePaths = files.map(file => slash(file))
+    .map(file => ({
+      relativePath: path.relative(basePath, slash(path.resolve(pagesDirPath, file))),
+      absolutePath: slash(path.resolve(pagesDirPath, file)),
+    }))
+
+  return pagePaths
 }

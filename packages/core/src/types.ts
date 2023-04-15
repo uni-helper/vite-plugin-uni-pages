@@ -23,6 +23,12 @@ export interface Options {
   dir: string
 
   /**
+   * all root directories loaded by subPackages
+   * @default []
+   */
+  subPackages: string[]
+
+  /**
    * pages.json dir
    * @default "src"
    */
@@ -74,6 +80,7 @@ export interface ResolvedOptions extends Omit<Options, 'dir'> {
    * Resolved page dirs
    */
   dirs: string[]
+
 }
 
 export interface PagePath {
@@ -96,4 +103,9 @@ export interface PageMetaDatum {
    */
   needLogin?: boolean
   [x: string]: any
+}
+
+export interface SubPageMetaDatum {
+  root: string
+  pages: PageMetaDatum[]
 }

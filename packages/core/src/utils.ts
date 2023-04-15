@@ -21,6 +21,7 @@ export const debug = {
   routeBlock: Debug('vite-plugin-uni-pages:routeBlock'),
   options: Debug('vite-plugin-uni-pages:options'),
   pages: Debug('vite-plugin-uni-pages:pages'),
+  subPages: Debug('vite-plugin-uni-pages:subPages'),
   error: Debug('vite-plugin-uni-pages:error'),
 }
 

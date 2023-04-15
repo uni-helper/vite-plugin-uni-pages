@@ -6,5 +6,6 @@ import UniPages from '@uni-helper/vite-plugin-uni-pages'
 export default defineConfig({
   plugins: [UniPages({
     debug: true,
+    subPackages: ['src/pages-sub'],
   }), uni()],
 })
