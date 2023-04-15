@@ -5,6 +5,7 @@ import { normalizePath } from 'vite'
 import { loadConfig } from 'unconfig'
 import { slash } from '@antfu/utils'
 import { isH5 } from '@uni-helper/uni-env'
+import dbg from 'debug'
 import type { PagesConfig } from './config/types'
 import type { PageMetaDatum, PagePath, ResolvedOptions, UserOptions } from './types'
 import { debug, getPagesConfigSourcePaths, invalidatePagesModule, isConfigFile, isTargetFile, mergePageMetaDataArray } from './utils'
@@ -31,6 +32,13 @@ export class PageContext {
     this.root = slash(viteRoot)
     debug.options('root', this.root)
     this.options = resolveOptions(userOptions, this.root)
+    // debug logic
+    const debugOption = this.options.debug
+    if (debugOption) {
+      const prefix = 'vite-plugin-uni-pages:'
+      const suffix = typeof debugOption === 'boolean' ? '*' : debugOption
+      dbg.enable(`${prefix}${suffix}`)
+    }
     this.resolvedPagesJSONPath = path.join(this.root, this.options.outDir, OUTPUT_NAME)
     debug.options(this.options)
   }

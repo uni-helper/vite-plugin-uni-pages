@@ -5,6 +5,6 @@ import UniPages from '@uni-helper/vite-plugin-uni-pages'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [UniPages({
-    minify: true,
+    debug: true,
   }), uni()],
 })

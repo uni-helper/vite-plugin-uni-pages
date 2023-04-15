@@ -57,7 +57,7 @@ export function mergePageMetaDataArray(pageMetaData: PageMetaDatum[]) {
   return result
 }
 
-export const getPagesConfigSourcePaths = async () => {
+export async function getPagesConfigSourcePaths() {
   return await fg('pages.config.(ts|mts|cts|js|cjs|mjs|json)', {
     deep: 0,
     onlyFiles: true,

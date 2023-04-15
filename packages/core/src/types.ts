@@ -1,10 +1,13 @@
 import type { GlobalStyle } from './config'
 import type { PageContext } from './context'
+import type { debug } from './utils'
 
 export interface CustomBlock {
   attr: Record<string, any>
   content: Record<string, any>
 }
+
+export type debugType = keyof typeof debug
 
 export interface Options {
   /**
@@ -42,6 +45,11 @@ export interface Options {
    * @default false
    */
   minify: boolean
+
+  /**
+   * enable debug log
+   */
+  debug: boolean | debugType
 
   onBeforeLoadUserConfig: (ctx: PageContext) => void
   onAfterLoadUserConfig: (ctx: PageContext) => void
