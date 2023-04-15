@@ -1,4 +1,4 @@
-import fs from 'fs'
+import fs from 'node:fs'
 import JSON5 from 'json5'
 import { parse as YAMLParser } from 'yaml'
 import { parse as VueParser } from '@vue/compiler-sfc'
@@ -38,7 +38,7 @@ export function parseCustomBlock(
   let content: Record<string, any> | undefined
   debug.routeBlock(`use ${lang} parser`)
 
-  if (lang === 'json5') {
+  if (lang === 'json5' || lang === 'jsonc') {
     try {
       content = JSON5.parse(block.content)
     }
