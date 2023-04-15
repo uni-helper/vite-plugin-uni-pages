@@ -168,7 +168,7 @@ export class PageContext {
 
   async mergeSubPageMetaData() {
     const subPageMaps: Record<string, PageMetaDatum[]> = {}
-    const subPackages = this.pagesGlobConfig?.subPackages
+    const subPackages = this.pagesGlobConfig?.subPackages || []
 
     for (const [dir, pages] of Object.entries(this.subPagesPath)) {
       const root = path.basename(dir)
@@ -176,6 +176,12 @@ export class PageContext {
       const globPackage = subPackages?.find(v => v.root === root)
       subPageMaps[root] = await this.parsePages(pages, globPackage?.pages)
       subPageMaps[root] = subPageMaps[root].map(page => ({ ...page, path: slash(path.relative(root, page.path)) }))
+    }
+
+    // Inherit subPackages that do not exist in the config
+    for (const { root, pages } of subPackages) {
+      if (root && !subPageMaps[root])
+        subPageMaps[root] = pages || []
     }
 
     const subPageMetaData = Object
