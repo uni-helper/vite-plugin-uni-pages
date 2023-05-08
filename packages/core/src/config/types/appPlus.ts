@@ -9,10 +9,10 @@ export interface AppPlus {
   background?: HEXColor
 
   /**
-   * 导航栏 ，详见?:导航栏
+   * 导航栏 ，详见?:导航栏; 设置为 false 不显示默认导航栏
    * @desc App、H5
    */
-  titleNView?: object
+  titleNView?: object | false
 
   /**
    * 原生子窗体，详见?:原生子窗体
