@@ -12,7 +12,7 @@ export interface AppPlus {
    * 导航栏 ，详见?:导航栏
    * @desc App、H5
    */
-  titleNView?: object
+  titleNView?: object | boolean
 
   /**
    * 原生子窗体，详见?:原生子窗体
