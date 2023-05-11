@@ -4,6 +4,7 @@ import type { ResolvedOptions, UserOptions } from './types'
 
 export function resolveOptions(userOptions: UserOptions, viteRoot?: string): ResolvedOptions {
   const {
+    homePage = 'pages/index',
     mergePages = true,
     dir = 'src/pages',
     subPackages = [],
@@ -29,6 +30,7 @@ export function resolveOptions(userOptions: UserOptions, viteRoot?: string): Res
   const resolvedSubDirs = subPackages.map(dir => slash(dir))
 
   const resolvedOptions: ResolvedOptions = {
+    homePage,
     mergePages,
     dirs: resolvedDirs,
     subPackages: resolvedSubDirs,

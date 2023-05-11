@@ -1,5 +1,5 @@
-import path from 'path'
-import { spawn } from 'child_process'
+import path from 'node:path'
+import { spawn } from 'node:child_process'
 import type { Plugin } from 'vite'
 import { createLogger } from 'vite'
 import MagicString from 'magic-string'
@@ -37,7 +37,7 @@ async function restart() {
   })
 }
 
-export const VitePluginUniPages = (userOptions: UserOptions = {}): Plugin => {
+export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
   let ctx: PageContext
 
   // TODO: check if the pages.json file is valid

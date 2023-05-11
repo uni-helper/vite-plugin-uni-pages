@@ -11,6 +11,12 @@ export type debugType = keyof typeof debug
 
 export interface Options {
   /**
+   * The default application entry page is the home page
+   * @default 'pages/index'
+   */
+  homePage: string
+
+  /**
    * Whether to merge pages in pages.json
    * @default true
    */
