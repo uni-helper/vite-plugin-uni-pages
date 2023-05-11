@@ -155,13 +155,28 @@ export class PageContext {
       ? mergePageMetaDataArray(generatedPageMetaData.concat(customPageMetaData))
       : generatedPageMetaData
 
-    const isHome = result.find(page => page.type === 'home')
-    if (!isHome)
-      result.some(item => ['pages/index', 'pages/index/index'].includes(item.path) && (item.type = 'home'))
+    this.setDefaultHome(result)
 
     result.sort(page => (page.type === 'home' ? -1 : 0))
 
     return result
+  }
+
+  setDefaultHome(result: PageMetaDatum[]) {
+    const isHome = result.find(page => page.type === 'home')
+    if (isHome)
+      return
+
+    result.some((item) => {
+      const list = item.path.split('/')
+      const path = list.splice(1, list.length).join('/')
+
+      if (!['index', 'index/index'].includes(path))
+        return false
+
+      item.type = 'home'
+      return true
+    })
   }
 
   async mergePageMetaData() {
