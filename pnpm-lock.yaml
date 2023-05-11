@@ -143,8 +143,8 @@ importers:
         specifier: ^7.0.11
         version: 7.0.11
       '@volar/language-service':
-        specifier: 1.6.2
-        version: 1.6.2
+        specifier: 1.4.0-alpha.7
+        version: 1.4.0-alpha.7
 
 packages:
 
@@ -3393,18 +3393,18 @@ packages:
       pretty-format: 27.5.1
     dev: true
 
-  /@volar/language-core@1.6.2:
-    resolution: {integrity: sha512-Dah3TB04p49TBgDmZxHKAIIfZ+Xc8zV9sYQgyixYw09h4MalhzTxrS1jdgVJGyO3QEoiBic4bVnRMf4BFgDmhA==}
+  /@volar/language-core@1.4.0-alpha.7:
+    resolution: {integrity: sha512-kn/xA+RANXogFHv8Md7lmM4BsVcV51EmgROPiiE1km0PtZ7Po8VFj0Y5B5MNd3RZO/DLWiNfUtXC8MKmHGeDgA==}
     dependencies:
-      '@volar/source-map': 1.6.2
+      '@volar/source-map': 1.4.0-alpha.7
     dev: true
 
-  /@volar/language-service@1.6.2:
-    resolution: {integrity: sha512-vaZKhtd0ymh+t9ccG89kQelNpvqYnwrPeUR5nGpN3Mt0CRHY3LT8fkIgBm+rzkVDq4q8cCLzJ6d6p32wYITRFw==}
+  /@volar/language-service@1.4.0-alpha.7:
+    resolution: {integrity: sha512-XodDIn+9HztyiKsUmRzpcB0T1jcRPKLhledR00108q04IM6is/KNlEI24OfxeG4fuBXvyPsfjs1MeBrFUIctpw==}
     dependencies:
-      '@volar/language-core': 1.6.2
-      '@volar/source-map': 1.6.2
-      typescript-auto-import-cache: 0.2.1
+      '@volar/language-core': 1.4.0-alpha.7
+      '@volar/source-map': 1.4.0-alpha.7
+      typescript-auto-import-cache: 0.1.0
       vscode-html-languageservice: 5.0.4
       vscode-json-languageservice: 5.3.5
       vscode-languageserver-protocol: 3.17.3
@@ -3412,10 +3412,10 @@ packages:
       vscode-uri: 3.0.7
     dev: true
 
-  /@volar/source-map@1.6.2:
-    resolution: {integrity: sha512-PvMwymFRK7EeY0eqQxCQtrMH05gx6OK4oaJxAwEeI41hlG3QgrDHX5IABNKgCX/vijOHuOaXyY0wmgb/O5aMKQ==}
+  /@volar/source-map@1.4.0-alpha.7:
+    resolution: {integrity: sha512-JV5LAe7kgjM8l9yvnve15M2rAJnJ+1hi4G7AbkfMvfn9IkH/BFeSwJo/aIFSRMH0m67BMbP30Ao03NQvCgqOcQ==}
     dependencies:
-      muggle-string: 0.3.1
+      muggle-string: 0.2.2
     dev: true
 
   /@vscode/l10n@0.0.11:
@@ -6944,8 +6944,8 @@ packages:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
     dev: true
 
-  /muggle-string@0.3.1:
-    resolution: {integrity: sha512-ckmWDJjphvd/FvZawgygcUeQCxzvohjFO5RxTjj4eq8kw359gFF3E1brjfI+viLMxss5JrHTDRHZvu2/tuy0Qg==}
+  /muggle-string@0.2.2:
+    resolution: {integrity: sha512-YVE1mIJ4VpUMqZObFndk9CJu6DBJR/GB13p3tXuNbwD4XExaI5EOuRl6BHeIDxIqXZVxSfAC+y6U1Z/IxCfKUg==}
     dev: true
 
   /nanoid@3.3.6:
@@ -8232,8 +8232,8 @@ packages:
       is-typedarray: 1.0.0
     dev: true
 
-  /typescript-auto-import-cache@0.2.1:
-    resolution: {integrity: sha512-FD5uYQSNkVTX4b3lvtifP+SR3bARWGmKe/uyp5BfuW2ZUCYG7vHKPddrteLU06Uh68woRaYIX+Sbs2nnySpGLw==}
+  /typescript-auto-import-cache@0.1.0:
+    resolution: {integrity: sha512-lzBAiBPthEDU12dM+h+nDUJbjOinn9v7XqDgicj8Ki8+boXEI/Jbs45J6iilnUoQKQM7OiaQALPrmWhXyH1ptA==}
     dependencies:
       semver: 7.3.8
     dev: true

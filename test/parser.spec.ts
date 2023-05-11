@@ -13,7 +13,8 @@ describe('Parser', () => {
     expect(routeBlock).toMatchInlineSnapshot(`
       {
         "attr": {
-          "type": "home",
+          "lang": "jsonc",
+          "type": "page",
         },
         "content": {
           "middlewares": [
