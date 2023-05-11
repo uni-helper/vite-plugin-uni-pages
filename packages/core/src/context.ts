@@ -163,7 +163,17 @@ export class PageContext {
   }
 
   setDefaultHome(result: PageMetaDatum[]) {
-    const isHome = result.find(page => page.type === 'home')
+    const isHome = result.some((page) => {
+      if (page.type === 'home')
+        return true
+
+      // Exclusion of subcontracting
+      const base = page.path.split('/')[0]
+      if (this.options.subPackages.includes(`src/${base}`))
+        return true
+
+      return false
+    })
     if (isHome)
       return
 
