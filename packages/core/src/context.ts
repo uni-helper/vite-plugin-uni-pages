@@ -155,14 +155,14 @@ export class PageContext {
       ? mergePageMetaDataArray(generatedPageMetaData.concat(customPageMetaData))
       : generatedPageMetaData
 
-    this.setDefaultHome(result)
+    this.hasHome(result)
 
     result.sort(page => (page.type === 'home' ? -1 : 0))
 
     return result
   }
 
-  setDefaultHome(result: PageMetaDatum[]) {
+  hasHome(result: PageMetaDatum[]) {
     const isHome = result.some((page) => {
       if (page.type === 'home')
         return true
