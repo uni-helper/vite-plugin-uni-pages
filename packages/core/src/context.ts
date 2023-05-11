@@ -155,6 +155,10 @@ export class PageContext {
       ? mergePageMetaDataArray(generatedPageMetaData.concat(customPageMetaData))
       : generatedPageMetaData
 
+    const isHome = result.find(page => page.type === 'home')
+    if (!isHome)
+      result.some(item => ['pages/index', 'pages/index/index'].includes(item.path) && (item.type = 'home'))
+
     result.sort(page => (page.type === 'home' ? -1 : 0))
 
     return result

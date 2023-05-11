@@ -4,7 +4,7 @@
   <div>test</div>
 </template>
 
-<route type="home" lang="jsonc">
+<route lang="jsonc">
 {
   "style": {
     "navigationBarTitleText": "test json page"

@@ -14,7 +14,6 @@ export default defineUniPages({
         navigationBarTextStyle: 'black',
         navigationBarTitleText: 'uni-helper',
       },
-      type: 'home',
     },
   ],
 })
