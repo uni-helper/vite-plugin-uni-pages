@@ -1,5 +1,5 @@
 {
-  "name": "@uni-helper/volar-plugin-uni-pages",
+  "name": "@uni-helper/volar-service-uni-pages",
   "version": "0.1.8",
   "description": "Volar plugin for route custom block in Vue SFC",
   "author": "KeJun",
@@ -43,6 +43,6 @@
   },
   "devDependencies": {
     "@types/json-schema": "^7.0.11",
-    "@volar/language-service": "1.4.0-alpha.7"
+    "@volar/language-service": "1.6.2"
   }
 }

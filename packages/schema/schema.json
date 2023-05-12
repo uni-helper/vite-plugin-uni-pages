@@ -51,8 +51,16 @@
           "type": "object"
         },
         "titleNView": {
-          "description": "导航栏 ，详见?:导航栏",
-          "type": "object"
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "const": false,
+              "type": "boolean"
+            }
+          ],
+          "description": "导航栏 ，详见?:导航栏; 设置为 false 不显示默认导航栏"
         }
       },
       "type": "object"
