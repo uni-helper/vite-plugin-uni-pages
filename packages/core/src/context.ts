@@ -165,15 +165,15 @@ export class PageContext {
       ? mergePageMetaDataArray(generatedPageMetaData.concat(customPageMetaData))
       : generatedPageMetaData
 
-    this.hasHome(result)
+    this.setHomePage(result)
 
     result.sort(page => (page.type === 'home' ? -1 : 0))
 
     return result
   }
 
-  hasHome(result: PageMetaDatum[]) {
-    const isHome = result.some((page) => {
+  setHomePage(result: PageMetaDatum[]) {
+    const hasHome = result.some((page) => {
       if (page.type === 'home')
         return true
 
@@ -185,22 +185,23 @@ export class PageContext {
       return false
     })
 
-    if (isHome)
+    if (hasHome)
       return true
 
-    const findHome = result.some((item) => {
-      if (this.options.homePage === item.path) {
+    const isFoundHome = result.some((item) => {
+      if (this.options.homePage.includes(item.path)) {
         item.type = 'home'
         return true
       }
-      else {
-        return false
-      }
+      else { return false }
     })
 
-    if (findHome)
-      return true
-    else console.warn('No home page found, please check the configuration of pages.config.ts')
+    if (isFoundHome) { return true }
+    else {
+      this.logger?.warn('No home page found, check the configuration of pages.config.ts, or add the `homePage` option to UniPages in vite.config.js, or add `type="home"` to the routeBlock of your vue page.', {
+        timestamp: true,
+      })
+    }
   }
 
   async mergePageMetaData() {

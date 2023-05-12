@@ -1,4 +1,4 @@
-import fs from 'fs'
+import fs from 'node:fs'
 import fg from 'fast-glob'
 import { extsToGlob } from './utils'
 
