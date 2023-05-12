@@ -26,7 +26,7 @@ export const debug = {
 }
 
 export function extsToGlob(extensions: string[]) {
-  return extensions.length > 1 ? `{${extensions.join(',')}}` : extensions[0] || ''
+  return extensions.length > 1 ? `{${extensions.join(',')}}` : (extensions[0] || '')
 }
 
 export function isTargetFile(path: string) {

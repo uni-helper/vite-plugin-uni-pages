@@ -96,6 +96,12 @@ console.log(pages)
 ```ts
 export interface Options {
   /**
+   * 设置默认路由入口
+   * @default 'pages/index' || 'pages/index/index'
+   */
+  homePage: string
+
+  /**
    * 是否扫描并合并 pages.json 中 pages 字段
    * @default true
    */
