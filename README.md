@@ -11,7 +11,7 @@
 
   核心，提供基于文件的路由系统
 
-- [volar-plugin-uni-pages](./packages/volar/)
+- [volar-service-uni-pages](./packages/volar/)
 
   为 `<route>` 块 提供 IntelliSense
 

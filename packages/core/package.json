@@ -49,6 +49,6 @@
   "devDependencies": {
     "@antfu/utils": "^0.7.2",
     "@types/debug": "^4.1.7",
-    "@types/node": "^18.16.7"
+    "@types/node": "^18.16.8"
   }
 }
