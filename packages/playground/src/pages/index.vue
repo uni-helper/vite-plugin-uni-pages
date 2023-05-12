@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+
 const title = ref('Hello')
-const nav = () => {
+function nav() {
   uni.navigateTo({
     url: '/pages/test',
   })

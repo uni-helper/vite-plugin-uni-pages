@@ -196,12 +196,11 @@ export class PageContext {
       else { return false }
     })
 
-    if (isFoundHome) { return true }
-    else {
-      this.logger?.warn('No home page found, check the configuration of pages.config.ts, or add the `homePage` option to UniPages in vite.config.js, or add `type="home"` to the routeBlock of your vue page.', {
-        timestamp: true,
-      })
-    }
+    if (isFoundHome)
+      return true
+    this.logger?.warn('No home page found, check the configuration of pages.config.ts, or add the `homePage` option to UniPages in vite.config.js, or add `type="home"` to the routeBlock of your vue page.', {
+      timestamp: true,
+    })
   }
 
   async mergePageMetaData() {
