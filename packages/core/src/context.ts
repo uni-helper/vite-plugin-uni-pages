@@ -8,7 +8,14 @@ import { isH5 } from '@uni-helper/uni-env'
 import dbg from 'debug'
 import type { PagesConfig } from './config/types'
 import type { PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
-import { debug, getPagesConfigSourcePaths, invalidatePagesModule, isConfigFile, isTargetFile, mergePageMetaDataArray } from './utils'
+import {
+  debug,
+  getPagesConfigSourcePaths,
+  invalidatePagesModule,
+  isConfigFile,
+  isTargetFile,
+  mergePageMetaDataArray,
+} from './utils'
 import { resolveOptions } from './options'
 import { checkPagesJsonFile, getPageFiles, writeFileSync } from './files'
 import { getRouteBlock } from './customBlock'
@@ -47,7 +54,9 @@ export class PageContext {
     debug.options(this.options)
   }
 
-  setLogger(logger: Logger) { this.logger = logger }
+  setLogger(logger: Logger) {
+    this.logger = logger
+  }
 
   async loadUserPagesConfig() {
     const { config } = await loadConfig<PagesConfig>({ sources: [{ files: 'pages.config' }] })
@@ -137,7 +146,10 @@ export class PageContext {
     const { relativePath, absolutePath } = page
     const routeBlock = await getRouteBlock(absolutePath, this.options)
     const relativePathWithFileName = relativePath.replace(path.extname(relativePath), '')
-    const pageMetaDatum: PageMetaDatum = { path: normalizePath(relativePathWithFileName), type: routeBlock?.attr.type ?? 'page' }
+    const pageMetaDatum: PageMetaDatum = {
+      path: normalizePath(relativePathWithFileName),
+      type: routeBlock?.attr.type ?? 'page',
+    }
 
     if (routeBlock)
       Object.assign(pageMetaDatum, routeBlock.content)
@@ -146,18 +158,50 @@ export class PageContext {
   }
 
   async parsePages(pages: PagePath[], overrides?: PageMetaDatum[]) {
-    const generatedPageMetaData = await Promise.all(
-      pages.map(async page => await this.parsePage(page)),
-    )
+    const generatedPageMetaData = await Promise.all(pages.map(async page => await this.parsePage(page)))
     const customPageMetaData = overrides || []
 
     const result = customPageMetaData.length
       ? mergePageMetaDataArray(generatedPageMetaData.concat(customPageMetaData))
       : generatedPageMetaData
 
+    this.setHomePage(result)
+
     result.sort(page => (page.type === 'home' ? -1 : 0))
 
     return result
+  }
+
+  setHomePage(result: PageMetaDatum[]) {
+    const hasHome = result.some((page) => {
+      if (page.type === 'home')
+        return true
+
+      // Exclusion of subcontracting
+      const base = page.path.split('/')[0]
+      if (this.options.subPackages.includes(`src/${base}`))
+        return true
+
+      return false
+    })
+
+    if (hasHome)
+      return true
+
+    const isFoundHome = result.some((item) => {
+      if (this.options.homePage.includes(item.path)) {
+        item.type = 'home'
+        return true
+      }
+      else { return false }
+    })
+
+    if (isFoundHome) { return true }
+    else {
+      this.logger?.warn('No home page found, check the configuration of pages.config.ts, or add the `homePage` option to UniPages in vite.config.js, or add `type="home"` to the routeBlock of your vue page.', {
+        timestamp: true,
+      })
+    }
   }
 
   async mergePageMetaData() {
@@ -184,9 +228,7 @@ export class PageContext {
         subPageMaps[root] = pages || []
     }
 
-    const subPageMetaData = Object
-      .keys(subPageMaps)
-      .map(root => ({ root, pages: subPageMaps[root] }))
+    const subPageMetaData = Object.keys(subPageMaps).map(root => ({ root, pages: subPageMaps[root] }))
 
     this.subPageMetaData = subPageMetaData
     debug.subPages(this.subPageMetaData)
@@ -238,7 +280,8 @@ function getPagePaths(dir: string, options: ResolvedOptions) {
   const basePath = slash(path.join(options.root, options.outDir))
   const files = getPageFiles(pagesDirPath, options)
   debug.pages(dir, files)
-  const pagePaths = files.map(file => slash(file))
+  const pagePaths = files
+    .map(file => slash(file))
     .map(file => ({
       relativePath: path.relative(basePath, slash(path.resolve(pagesDirPath, file))),
       absolutePath: slash(path.resolve(pagesDirPath, file)),

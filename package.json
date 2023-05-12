@@ -3,7 +3,7 @@
   "type": "module",
   "version": "0.1.8",
   "private": true,
-  "packageManager": "pnpm@8.2.0",
+  "packageManager": "pnpm@8.5.0",
   "author": "KeJun",
   "license": "MIT",
   "homepage": "https://github.com/uni-helper/vite-plugin-uni-pages#readme",
@@ -30,14 +30,15 @@
     "lint:fix": "pnpm lint --fix"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "^0.38.4",
-    "@types/node": "^18.15.11",
+    "@antfu/eslint-config": "^0.38.6",
+    "@types/node": "^18.16.7",
     "@uni-helper/volar-plugin-uni-pages": "workspace:*",
     "bumpp": "^9.1.0",
-    "eslint": "^8.37.0",
-    "rimraf": "^4.4.1",
-    "typescript": "^5.0.3",
-    "unbuild": "^1.2.0",
-    "vitest": "^0.30.0"
+    "eslint": "^8.40.0",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.0.4",
+    "unbuild": "^1.2.1",
+    "vite": "^4.3.5",
+    "vitest": "^0.31.0"
   }
 }

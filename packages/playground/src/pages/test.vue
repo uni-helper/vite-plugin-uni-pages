@@ -7,7 +7,7 @@
 <route lang="jsonc">
 {
   "style": {
-    "navigationBarTitleText": "test json page"
+    "navigationBarTitleText": "test page"
   },
   "middlewares": [
     "auth"

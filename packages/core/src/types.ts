@@ -11,6 +11,12 @@ export type debugType = keyof typeof debug
 
 export interface Options {
   /**
+   * The default application entry page is the home page
+   * @default 'pages/index' or 'pages/index/index'
+   */
+  homePage: string
+
+  /**
    * Whether to merge pages in pages.json
    * @default true
    */
@@ -69,7 +75,7 @@ export interface Options {
 
 export type UserOptions = Partial<Options>
 
-export interface ResolvedOptions extends Omit<Options, 'dir'> {
+export interface ResolvedOptions extends Omit<Options, 'dir' | 'homePage'> {
   /**
    * Resolves to the `root` value from Vite config.
    * @default config.root
@@ -80,7 +86,10 @@ export interface ResolvedOptions extends Omit<Options, 'dir'> {
    * Resolved page dirs
    */
   dirs: string[]
-
+  /**
+   * Resolved entry page
+   */
+  homePage: string[]
 }
 
 export interface PagePath {
