@@ -1,31 +1,25 @@
-import type { InjectionKey, Service } from '@volar/language-service'
-import { defineProvide } from '@volar/language-service'
+import type { Service } from '@volar/language-service'
 import * as json from 'vscode-json-languageservice'
-import type * as vscode from 'vscode-languageserver-protocol'
-import type { TextDocument } from 'vscode-languageserver-textdocument'
 import pagesJsonSchema from '@uni-helper/pages-json-schema/schema.json'
+
+type TextDocument = any
 
 pagesJsonSchema.$ref = '#/definitions/PageMetaDatum'
 pagesJsonSchema.definitions.PageMetaDatum.required = []
-
-const injectionKeys: {
-  jsonDocument: InjectionKey<[TextDocument], json.JSONDocument>
-  languageService: InjectionKey<[], json.LanguageService>
-} = {
-  jsonDocument: 'json/jsonDocument',
-  languageService: 'json/languageService',
+export interface Provide {
+  'json/jsonDocument': (document: TextDocument) => json.JSONDocument | undefined
+  'json/languageService': () => json.LanguageService
 }
 
-export default (): Service => (context): ReturnType<Service> => {
+export default (): Service<Provide> => (context): ReturnType<Service<Provide>> => {
   // https://github.com/microsoft/vscode/blob/09850876e652688fb142e2e19fd00fd38c0bc4ba/extensions/json-language-features/server/src/jsonServer.ts#L150
   const triggerCharacters = ['"', ':']
 
   if (!context)
-    return { triggerCharacters }
+    return { triggerCharacters } as any
 
   const jsonDocuments = new WeakMap<TextDocument, [number, json.JSONDocument]>()
-  const jsonLs = json.getLanguageService({ schemaRequestService: context.env.schemaRequestService })
-
+  const jsonLs = json.getLanguageService({})
   jsonLs.configure({
     allowComments: true,
     schemas: [
@@ -42,8 +36,8 @@ export default (): Service => (context): ReturnType<Service> => {
   return {
 
     provide: {
-      ...defineProvide(injectionKeys.jsonDocument, getJsonDocument),
-      ...defineProvide(injectionKeys.languageService, () => jsonLs),
+      'json/jsonDocument': getJsonDocument,
+      'json/languageService': () => jsonLs,
     },
 
     triggerCharacters,
@@ -73,7 +67,7 @@ export default (): Service => (context): ReturnType<Service> => {
           jsonDocument,
           documentLanguageSettings,
           undefined, // TODO
-        ) as vscode.Diagnostic[]
+        ) as json.Diagnostic[]
       })
     },
 

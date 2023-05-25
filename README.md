@@ -33,6 +33,7 @@ pnpm i -D @uni-helper/vite-plugin-uni-pages
 import { defineConfig } from 'vite'
 import Uni from '@dcloudio/vite-plugin-uni'
 import UniPages from '@uni-helper/vite-plugin-uni-pages'
+
 // It is recommended to put it in front of Uni
 export default defineConfig({
   plugins: [UniPages(), Uni()],

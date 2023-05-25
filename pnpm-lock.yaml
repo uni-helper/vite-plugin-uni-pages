@@ -132,19 +132,16 @@ importers:
       vscode-json-languageservice:
         specifier: ^5.3.5
         version: 5.3.5
-      vscode-languageserver-protocol:
-        specifier: ^3.17.3
-        version: 3.17.3
-      vscode-languageserver-textdocument:
-        specifier: ^1.0.8
-        version: 1.0.8
     devDependencies:
       '@types/json-schema':
         specifier: ^7.0.11
         version: 7.0.11
       '@volar/language-service':
-        specifier: 1.6.2
-        version: 1.6.2
+        specifier: 1.6.9
+        version: 1.6.9
+      unbuild:
+        specifier: ^1.2.1
+        version: 1.2.1
 
 packages:
 
@@ -2922,7 +2919,7 @@ packages:
     dev: true
     optional: true
 
-  /@rollup/plugin-alias@5.0.0(rollup@3.20.2):
+  /@rollup/plugin-alias@5.0.0(rollup@3.21.6):
     resolution: {integrity: sha512-l9hY5chSCjuFRPsnRm16twWBiSApl2uYFLsepQYwtBuAxNMQ/1dJqADld40P0Jkqm65GRTLy/AC6hnpVebtLsA==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
@@ -2931,11 +2928,11 @@ packages:
       rollup:
         optional: true
     dependencies:
-      rollup: 3.20.2
+      rollup: 3.21.6
       slash: 4.0.0
     dev: true
 
-  /@rollup/plugin-commonjs@24.1.0(rollup@3.20.2):
+  /@rollup/plugin-commonjs@24.1.0(rollup@3.21.6):
     resolution: {integrity: sha512-eSL45hjhCWI0jCCXcNtLVqM5N1JlBGvlFfY0m6oOYnLCJ6N0qEXoZql4sY2MOUArzhH4SA/qBpTxvvZp2Sc+DQ==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
@@ -2944,16 +2941,16 @@ packages:
       rollup:
         optional: true
     dependencies:
-      '@rollup/pluginutils': 5.0.2(rollup@3.20.2)
+      '@rollup/pluginutils': 5.0.2(rollup@3.21.6)
       commondir: 1.0.1
       estree-walker: 2.0.2
       glob: 8.0.3
       is-reference: 1.2.1
       magic-string: 0.27.0
-      rollup: 3.20.2
+      rollup: 3.21.6
     dev: true
 
-  /@rollup/plugin-json@6.0.0(rollup@3.20.2):
+  /@rollup/plugin-json@6.0.0(rollup@3.21.6):
     resolution: {integrity: sha512-i/4C5Jrdr1XUarRhVu27EEwjt4GObltD7c+MkCIpO2QIbojw8MUs+CCTqOphQi3Qtg1FLmYt+l+6YeoIf51J7w==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
@@ -2962,11 +2959,11 @@ packages:
       rollup:
         optional: true
     dependencies:
-      '@rollup/pluginutils': 5.0.2(rollup@3.20.2)
-      rollup: 3.20.2
+      '@rollup/pluginutils': 5.0.2(rollup@3.21.6)
+      rollup: 3.21.6
     dev: true
 
-  /@rollup/plugin-node-resolve@15.0.2(rollup@3.20.2):
+  /@rollup/plugin-node-resolve@15.0.2(rollup@3.21.6):
     resolution: {integrity: sha512-Y35fRGUjC3FaurG722uhUuG8YHOJRJQbI6/CkbRkdPotSpDj9NtIN85z1zrcyDcCQIW4qp5mgG72U+gJ0TAFEg==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
@@ -2975,16 +2972,16 @@ packages:
       rollup:
         optional: true
     dependencies:
-      '@rollup/pluginutils': 5.0.2(rollup@3.20.2)
+      '@rollup/pluginutils': 5.0.2(rollup@3.21.6)
       '@types/resolve': 1.20.2
       deepmerge: 4.2.2
       is-builtin-module: 3.2.1
       is-module: 1.0.0
       resolve: 1.22.1
-      rollup: 3.20.2
+      rollup: 3.21.6
     dev: true
 
-  /@rollup/plugin-replace@5.0.2(rollup@3.20.2):
+  /@rollup/plugin-replace@5.0.2(rollup@3.21.6):
     resolution: {integrity: sha512-M9YXNekv/C/iHHK+cvORzfRYfPbq0RDD8r0G+bMiTXjNGKulPnCT9O3Ss46WfhI6ZOCgApOP7xAdmCQJ+U2LAA==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
@@ -2993,9 +2990,9 @@ packages:
       rollup:
         optional: true
     dependencies:
-      '@rollup/pluginutils': 5.0.2(rollup@3.20.2)
+      '@rollup/pluginutils': 5.0.2(rollup@3.21.6)
       magic-string: 0.27.0
-      rollup: 3.20.2
+      rollup: 3.21.6
     dev: true
 
   /@rollup/pluginutils@4.2.1:
@@ -3005,7 +3002,7 @@ packages:
       estree-walker: 2.0.2
       picomatch: 2.3.1
 
-  /@rollup/pluginutils@5.0.2(rollup@3.20.2):
+  /@rollup/pluginutils@5.0.2(rollup@3.21.6):
     resolution: {integrity: sha512-pTd9rIsP92h+B6wWwFbW8RkZv4hiR/xKsqre4SIuAOaOEQRxi0lqLke9k2/7WegC85GgUs9pjmOjCUi3In4vwA==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
@@ -3017,7 +3014,7 @@ packages:
       '@types/estree': 1.0.0
       estree-walker: 2.0.2
       picomatch: 2.3.1
-      rollup: 3.20.2
+      rollup: 3.21.6
     dev: true
 
   /@sinonjs/commons@1.8.6:
@@ -3393,37 +3390,31 @@ packages:
       pretty-format: 27.5.1
     dev: true
 
-  /@volar/language-core@1.6.2:
-    resolution: {integrity: sha512-Dah3TB04p49TBgDmZxHKAIIfZ+Xc8zV9sYQgyixYw09h4MalhzTxrS1jdgVJGyO3QEoiBic4bVnRMf4BFgDmhA==}
+  /@volar/language-core@1.6.9:
+    resolution: {integrity: sha512-7v8zsq3VMUBF5fI6FfjZ9pEkOuTiWD+AjxHVI3UXXXPoDeV9RcK3oPUfyQCV4Aj9Dqx4DPPI9Pcphyo6gZ8SAw==}
     dependencies:
-      '@volar/source-map': 1.6.2
+      '@volar/source-map': 1.6.9
     dev: true
 
-  /@volar/language-service@1.6.2:
-    resolution: {integrity: sha512-vaZKhtd0ymh+t9ccG89kQelNpvqYnwrPeUR5nGpN3Mt0CRHY3LT8fkIgBm+rzkVDq4q8cCLzJ6d6p32wYITRFw==}
+  /@volar/language-service@1.6.9:
+    resolution: {integrity: sha512-DBdpypXVuRcW3td0l4nezuNqc0RR9NLScjTQ/xtE1vou5gaMyRETphbVaTgo2OnivK474tkCQ8YJTkSaMUizNA==}
     dependencies:
-      '@volar/language-core': 1.6.2
-      '@volar/source-map': 1.6.2
-      typescript-auto-import-cache: 0.2.1
-      vscode-html-languageservice: 5.0.4
-      vscode-json-languageservice: 5.3.5
-      vscode-languageserver-protocol: 3.17.3
+      '@volar/language-core': 1.6.9
+      '@volar/source-map': 1.6.9
+      typescript-auto-import-cache: 0.3.0
       vscode-languageserver-textdocument: 1.0.8
       vscode-uri: 3.0.7
     dev: true
 
-  /@volar/source-map@1.6.2:
-    resolution: {integrity: sha512-PvMwymFRK7EeY0eqQxCQtrMH05gx6OK4oaJxAwEeI41hlG3QgrDHX5IABNKgCX/vijOHuOaXyY0wmgb/O5aMKQ==}
+  /@volar/source-map@1.6.9:
+    resolution: {integrity: sha512-D+IgnJGxO2Q1tL5qh3vU7iaLHtfGXptpdUDLMwmx292Fz0aVIXlC85mHHawGjBWeg/JhRGtEl4BvfTdn+4Ng/w==}
     dependencies:
       muggle-string: 0.3.1
     dev: true
 
-  /@vscode/l10n@0.0.11:
-    resolution: {integrity: sha512-ukOMWnCg1tCvT7WnDfsUKQOFDQGsyR5tNgRpwmqi+5/vzU3ghdDXzvIM4IOPdSb3OeSsBNvmSL8nxIVOqi2WXA==}
-    dev: true
-
   /@vscode/l10n@0.0.13:
     resolution: {integrity: sha512-A3uY356uOU9nGa+TQIT/i3ziWUgJjVMUrGGXSrtRiTwklyCFjGVWIOHoEIHbJpiyhDkJd9kvIWUOfXK1IkK8XQ==}
+    dev: false
 
   /@vue/babel-helper-vue-transform-on@1.0.2:
     resolution: {integrity: sha512-hz4R8tS5jMn8lDq6iD+yWL6XNB699pGIVLk7WSJnn1dbpjaazsjZQkieJoRX6gW5zpYSCFqQ7jUquPNY65tQYA==}
@@ -7636,7 +7627,7 @@ packages:
       glob: 10.2.3
     dev: true
 
-  /rollup-plugin-dts@5.3.0(rollup@3.20.2)(typescript@5.0.4):
+  /rollup-plugin-dts@5.3.0(rollup@3.21.6)(typescript@5.0.4):
     resolution: {integrity: sha512-8FXp0ZkyZj1iU5klkIJYLjIq/YZSwBoERu33QBDxm/1yw5UU4txrEtcmMkrq+ZiKu3Q4qvPCNqc3ovX6rjqzbQ==}
     engines: {node: '>=v14'}
     peerDependencies:
@@ -7644,18 +7635,10 @@ packages:
       typescript: ^4.1 || ^5.0
     dependencies:
       magic-string: 0.30.0
-      rollup: 3.20.2
+      rollup: 3.21.6
       typescript: 5.0.4
     optionalDependencies:
       '@babel/code-frame': 7.21.4
-    dev: true
-
-  /rollup@3.20.2:
-    resolution: {integrity: sha512-3zwkBQl7Ai7MFYQE0y1MeQ15+9jsi7XxfrqwTb/9EK8D9C9+//EBR4M+CuA1KODRaNbFez/lWxA5vhEGZp4MUg==}
-    engines: {node: '>=14.18.0', npm: '>=8.0.0'}
-    hasBin: true
-    optionalDependencies:
-      fsevents: 2.3.2
     dev: true
 
   /rollup@3.21.6:
@@ -8232,8 +8215,8 @@ packages:
       is-typedarray: 1.0.0
     dev: true
 
-  /typescript-auto-import-cache@0.2.1:
-    resolution: {integrity: sha512-FD5uYQSNkVTX4b3lvtifP+SR3bARWGmKe/uyp5BfuW2ZUCYG7vHKPddrteLU06Uh68woRaYIX+Sbs2nnySpGLw==}
+  /typescript-auto-import-cache@0.3.0:
+    resolution: {integrity: sha512-Rq6/q4O9iyqUdjvOoyas7x/Qf9nWUMeqpP3YeTaLA+uECgfy5wOhfOS+SW/+fZ/uI/ZcKaf+2/ZhFzXh8xfofQ==}
     dependencies:
       semver: 7.3.8
     dev: true
@@ -8266,12 +8249,12 @@ packages:
     resolution: {integrity: sha512-J4efk69Aye43tWcBPCsLK7TIRppGrEN4pAlDzRKo3HSE6MgTSTBxSEuE3ccx7ixc62JvGQ/CoFXYqqF2AHozow==}
     hasBin: true
     dependencies:
-      '@rollup/plugin-alias': 5.0.0(rollup@3.20.2)
-      '@rollup/plugin-commonjs': 24.1.0(rollup@3.20.2)
-      '@rollup/plugin-json': 6.0.0(rollup@3.20.2)
-      '@rollup/plugin-node-resolve': 15.0.2(rollup@3.20.2)
-      '@rollup/plugin-replace': 5.0.2(rollup@3.20.2)
-      '@rollup/pluginutils': 5.0.2(rollup@3.20.2)
+      '@rollup/plugin-alias': 5.0.0(rollup@3.21.6)
+      '@rollup/plugin-commonjs': 24.1.0(rollup@3.21.6)
+      '@rollup/plugin-json': 6.0.0(rollup@3.21.6)
+      '@rollup/plugin-node-resolve': 15.0.2(rollup@3.21.6)
+      '@rollup/plugin-replace': 5.0.2(rollup@3.21.6)
+      '@rollup/pluginutils': 5.0.2(rollup@3.21.6)
       chalk: 5.2.0
       consola: 3.1.0
       defu: 6.1.2
@@ -8286,8 +8269,8 @@ packages:
       pathe: 1.1.0
       pkg-types: 1.0.2
       pretty-bytes: 6.1.0
-      rollup: 3.20.2
-      rollup-plugin-dts: 5.3.0(rollup@3.20.2)(typescript@5.0.4)
+      rollup: 3.21.6
+      rollup-plugin-dts: 5.3.0(rollup@3.21.6)(typescript@5.0.4)
       scule: 1.0.0
       typescript: 5.0.4
       untyped: 1.3.2
@@ -8540,15 +8523,6 @@ packages:
       - terser
     dev: true
 
-  /vscode-html-languageservice@5.0.4:
-    resolution: {integrity: sha512-tvrySfpglu4B2rQgWGVO/IL+skvU7kBkQotRlxA7ocSyRXOZUd6GA13XHkxo8LPe07KWjeoBlN1aVGqdfTK4xA==}
-    dependencies:
-      '@vscode/l10n': 0.0.11
-      vscode-languageserver-textdocument: 1.0.8
-      vscode-languageserver-types: 3.17.3
-      vscode-uri: 3.0.7
-    dev: true
-
   /vscode-json-languageservice@5.3.5:
     resolution: {integrity: sha512-DasT+bKtpaS2rTPEB4VMROnvO1WES2KD8RZZxXbumnk9sk5wco10VdB6sJgTlsKQN14tHQLZDXuHnSoSAlE8LQ==}
     dependencies:
@@ -8557,22 +8531,14 @@ packages:
       vscode-languageserver-textdocument: 1.0.8
       vscode-languageserver-types: 3.17.3
       vscode-uri: 3.0.7
-
-  /vscode-jsonrpc@8.1.0:
-    resolution: {integrity: sha512-6TDy/abTQk+zDGYazgbIPc+4JoXdwC8NHU9Pbn4UJP1fehUyZmM4RHp5IthX7A6L5KS30PRui+j+tbbMMMafdw==}
-    engines: {node: '>=14.0.0'}
-
-  /vscode-languageserver-protocol@3.17.3:
-    resolution: {integrity: sha512-924/h0AqsMtA5yK22GgMtCYiMdCOtWTSGgUOkgEDX+wk2b0x4sAfLiO4NxBxqbiVtz7K7/1/RgVrVI0NClZwqA==}
-    dependencies:
-      vscode-jsonrpc: 8.1.0
-      vscode-languageserver-types: 3.17.3
+    dev: false
 
   /vscode-languageserver-textdocument@1.0.8:
     resolution: {integrity: sha512-1bonkGqQs5/fxGT5UchTgjGVnfysL0O8v1AYMBjqTbWQTFn721zaPGDYFkOKtfDgFiSgXM3KwaG3FMGfW4Ed9Q==}
 
   /vscode-languageserver-types@3.17.3:
     resolution: {integrity: sha512-SYU4z1dL0PyIMd4Vj8YOqFvHu7Hz/enbWtpfnVbJHU4Nd1YNYx8u0ennumc6h48GQNeOLxmwySmnADouT/AuZA==}
+    dev: false
 
   /vscode-uri@3.0.7:
     resolution: {integrity: sha512-eOpPHogvorZRobNqJGhapa0JdwaxpjVvyBp0QIUMRMSf8ZAlqOdEquKuRmw9Qwu0qXtJIWqFtMkmvJjUZmMjVA==}
@@ -8615,6 +8581,7 @@ packages:
 
   /w3c-hr-time@1.0.2:
     resolution: {integrity: sha512-z8P5DvDNjKDoFIHK7q8r8lackT6l+jo/Ye3HOle7l9nICP9lf1Ci25fy9vHd0JOWewkIFzXIEig3TdKT7JQ5fQ==}
+    deprecated: Use your platform's native performance.now() and performance.timeOrigin.
     dependencies:
       browser-process-hrtime: 1.0.0
     dev: true
