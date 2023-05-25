@@ -17,7 +17,7 @@
   "scripts": {
     "stub": "pnpm -r --filter=./packages/* --parallel run stub",
     "dev": "pnpm stub",
-    "build": "rimraf packages/*/dist && pnpm -r --filter=./packages/* run build && pnpm -r run build-post",
+    "build": "rimraf --glob packages/*/dist && pnpm -r --filter=./packages/* run build && pnpm -r run build-post",
     "play:mp-weixin": "pnpm dev && npm -C packages/playground run dev:mp-weixin",
     "build:mp-weixin": "pnpm build && npm -C packages/playground run build:mp-weixin",
     "play:h5": "pnpm dev && npm -C packages/playground run dev:h5",
