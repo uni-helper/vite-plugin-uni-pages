@@ -68,11 +68,9 @@ export function parseCustomBlock(
       )
     }
   }
-  if (content) {
-    return {
-      attr,
-      content,
-    }
+  return {
+    attr,
+    content: content ?? {},
   }
 }
 
