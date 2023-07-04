@@ -1,7 +1,6 @@
 declare module "virtual:uni-pages" {
-  export const pages: {
-    path: string;
-    type: "home" | "page";
-    style: any;
-  }[];
+  import { PageMetaDatum } from "./src/types";
+  import { SubPackage } from "./src/config/types/index";
+  export const pages: PageMetaDatum[];
+  export const subPackages: SubPackage[];
 }
