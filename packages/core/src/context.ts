@@ -265,12 +265,18 @@ export class PageContext {
     this.options.onAfterWriteFile(this)
   }
 
-  async virtualModule() {
-    return `export const pages = ${this.resolveRoutes()};`
+  virtualModule() {
+    const pages = `export const pages = ${this.resolveRoutes()};`
+    const subPackages = `export const subPackages = ${this.resolveSubRoutes()};`
+    return [pages, subPackages].join('\n')
   }
 
   resolveRoutes() {
     return JSON.stringify(this.pageMetaData, null, 2)
+  }
+
+  resolveSubRoutes() {
+    return JSON.stringify(this.subPageMetaData, null, 2)
   }
 }
 
