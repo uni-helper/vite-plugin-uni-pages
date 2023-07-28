@@ -7,6 +7,8 @@ function nav() {
     url: '/pages/test',
   })
 }
+
+throw new Error('233')
 </script>
 
 <template>

@@ -75,7 +75,9 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
     async transform(code: string, id: string) {
       if (!/\.vue$/.test(id))
         return null
-      const s = new MagicString(code.toString())
+      const s = new MagicString(code.toString(), {
+        filename: id,
+      })
       const routeBlockMatches = s.original.matchAll(
         /<route[^>]*>([\s\S]*?)<\/route>/g,
       )
@@ -85,7 +87,12 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
         const length = match[0].length
         s.remove(index, index + length)
       }
-      return s.toString()
+      return {
+        code: s.toString(),
+        map: s.generateMap({
+          source: code,
+        }),
+      }
     },
     configureServer(server) {
       ctx.setupViteServer(server)
