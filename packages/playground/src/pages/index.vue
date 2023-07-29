@@ -7,8 +7,7 @@ function nav() {
     url: '/pages/test',
   })
 }
-
-throw new Error('233')
+const count = ref(0)
 </script>
 
 <template>
@@ -21,6 +20,14 @@ throw new Error('233')
     </view>
     <button @click="nav">
       nav
+    </button>
+
+    <button @click="count--">
+      -
+    </button>
+    {{ count }}
+    <button @click="count++">
+      +
     </button>
   </view>
 </template>

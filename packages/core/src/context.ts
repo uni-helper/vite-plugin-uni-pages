@@ -15,12 +15,16 @@ import {
   isConfigFile,
   isTargetFile,
   mergePageMetaDataArray,
+  useCachedPages,
 } from './utils'
 import { resolveOptions } from './options'
 import { checkPagesJsonFile, getPageFiles, writeFileSync } from './files'
-import { getRouteBlock } from './customBlock'
+import { getRouteBlock, getRouteSfcBlock } from './customBlock'
 import { OUTPUT_NAME } from './constant'
 
+let lsatPagesJson = ''
+
+const { setCache, hasChanged } = useCachedPages()
 export class PageContext {
   private _server: ViteDevServer | undefined
 
@@ -106,8 +110,8 @@ export class PageContext {
         return
 
       debug.pages(`File added: ${path}`)
-      this.updatePagesJSON()
-      this.onUpdate()
+      if (await this.updatePagesJSON())
+        this.onUpdate()
     })
 
     watcher.on('change', async (path) => {
@@ -116,8 +120,8 @@ export class PageContext {
         return
 
       debug.pages(`File changed: ${path}`)
-      this.updatePagesJSON()
-      this.onUpdate()
+      if (await this.updatePagesJSON(path))
+        this.onUpdate()
     })
 
     watcher.on('unlink', async (path) => {
@@ -126,8 +130,8 @@ export class PageContext {
         return
 
       debug.pages(`File removed: ${path}`)
-      this.updatePagesJSON()
-      this.onUpdate()
+      if (await this.updatePagesJSON())
+        this.onUpdate()
     })
   }
 
@@ -144,7 +148,9 @@ export class PageContext {
 
   async parsePage(page: PagePath): Promise<PageMetaDatum> {
     const { relativePath, absolutePath } = page
-    const routeBlock = await getRouteBlock(absolutePath, this.options)
+    const routeSfcBlock = await getRouteSfcBlock(absolutePath)
+    const routeBlock = await getRouteBlock(absolutePath, routeSfcBlock, this.options)
+    setCache(absolutePath, routeSfcBlock)
     const relativePathWithFileName = relativePath.replace(path.extname(relativePath), '')
     const pageMetaDatum: PageMetaDatum = {
       path: normalizePath(relativePathWithFileName),
@@ -233,7 +239,14 @@ export class PageContext {
     debug.subPages(this.subPageMetaData)
   }
 
-  async updatePagesJSON() {
+  async updatePagesJSON(filepath?: string) {
+    if (filepath) {
+      if (!await hasChanged(filepath)) {
+        debug.cache(`The route block on page ${filepath} did not send any changes, skipping`)
+        return false
+      }
+    }
+
     checkPagesJsonFile(this.resolvedPagesJSONPath)
     this.options.onBeforeLoadUserConfig(this)
     await this.loadUserPagesConfig()
@@ -260,9 +273,16 @@ export class PageContext {
     }
 
     const pagesJson = JSON.stringify(data, null, this.options.minify ? undefined : 2)
+    if (lsatPagesJson === pagesJson) {
+      debug.pages('PagesJson Not have change')
+      return false
+    }
+
     writeFileSync(this.resolvedPagesJSONPath, pagesJson)
+    lsatPagesJson = pagesJson
 
     this.options.onAfterWriteFile(this)
+    return true
   }
 
   virtualModule() {

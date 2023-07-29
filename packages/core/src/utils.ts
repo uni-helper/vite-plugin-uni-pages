@@ -1,9 +1,11 @@
 import Debug from 'debug'
-import type { ModuleNode, ViteDevServer } from 'vite'
+import { type ModuleNode, type ViteDevServer, normalizePath } from 'vite'
 import { groupBy } from 'lodash-unified'
 import fg from 'fast-glob'
+import type { SFCBlock } from '@vue/compiler-sfc'
 import { FILE_EXTENSIONS, RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import type { PageMetaDatum } from './types'
+import { getRouteSfcBlock } from './customBlock'
 
 export function invalidatePagesModule(server: ViteDevServer) {
   const { moduleGraph } = server
@@ -23,6 +25,7 @@ export const debug = {
   pages: Debug('vite-plugin-uni-pages:pages'),
   subPages: Debug('vite-plugin-uni-pages:subPages'),
   error: Debug('vite-plugin-uni-pages:error'),
+  cache: Debug('vite-plugin-uni-pages:cache'),
 }
 
 export function extsToGlob(extensions: string[]) {
@@ -64,4 +67,31 @@ export async function getPagesConfigSourcePaths() {
     onlyFiles: true,
     absolute: true,
   })
+}
+
+export function useCachedPages() {
+  const pages = new Map<string, string>()
+
+  function parseData(block?: SFCBlock) {
+    return {
+      content: block?.loc.source.trim() ?? '',
+      attr: block?.attrs ?? '',
+    }
+  }
+
+  function setCache(filePath: string, routeBlock?: SFCBlock) {
+    pages.set(filePath, JSON.stringify(parseData(routeBlock)))
+  }
+
+  async function hasChanged(filePath: string, routeBlock?: SFCBlock) {
+    if (!routeBlock)
+      routeBlock = await getRouteSfcBlock(normalizePath(filePath))
+
+    return !pages.has(filePath) || JSON.stringify(parseData(routeBlock)) !== pages.get(filePath)
+  }
+
+  return {
+    setCache,
+    hasChanged,
+  }
 }
