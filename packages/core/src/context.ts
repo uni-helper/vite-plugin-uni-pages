@@ -63,7 +63,7 @@ export class PageContext {
   }
 
   async loadUserPagesConfig() {
-    const { config } = await loadConfig<PagesConfig>({ sources: [{ files: 'pages.config' }] })
+    const { config } = await loadConfig<PagesConfig>({ cwd: this.root, sources: [{ files: 'pages.config' }] })
     if (!config) {
       this.logger?.warn('Can\'t found pages.config, please create pages.config.(ts|mts|cts|js|cjs|mjs|json)')
       process.exit(-1)
