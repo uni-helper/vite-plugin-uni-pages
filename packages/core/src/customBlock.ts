@@ -83,7 +83,7 @@ export async function getRouteSfcBlock(path: string): Promise<SFCBlock | undefin
   return blockStr
 }
 
-export async function getRouteBlock(path: string, blockStr?: SFCBlock, options: ResolvedOptions): Promise<CustomBlock | undefined> {
+export async function getRouteBlock(path: string, blockStr: SFCBlock | undefined, options: ResolvedOptions): Promise<CustomBlock | undefined> {
   if (!blockStr)
     return
   return parseCustomBlock(blockStr, path, options)
