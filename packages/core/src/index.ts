@@ -90,9 +90,9 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
         return {
           code: s.toString(),
           map: s.generateMap({
-            source: code,
+            source: id,
             includeContent: true,
-            file: id,
+            file: `${id}.map`,
           }),
         }
       }

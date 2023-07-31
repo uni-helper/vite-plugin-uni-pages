@@ -19,7 +19,7 @@ function nav() {
       </text>
     </view>
     <button @click="nav">
-      nav
+      nav%
     </button>
     <Counter />
   </view>
