@@ -1,4 +1,5 @@
 import path from 'node:path'
+import process from 'node:process'
 import type { FSWatcher } from 'chokidar'
 import type { Logger, ViteDevServer } from 'vite'
 import { normalizePath } from 'vite'
@@ -104,9 +105,14 @@ export class PageContext {
       const configs = await getPagesConfigSourcePaths()
       watcher.add(configs)
     }
+    const targetDirs = [...this.options.dirs, ...this.options.subPackages].map(v => slash(path.resolve(this.root, v)))
+    const isInTargetDirs = (path: string) => targetDirs.some(v => path.startsWith(v))
     watcher.on('add', async (path) => {
       path = slash(path)
       if (!isTargetFile(path))
+        return
+
+      if (!isInTargetDirs(path))
         return
 
       debug.pages(`File added: ${path}`)
@@ -118,8 +124,12 @@ export class PageContext {
       path = slash(path)
       if (!isTargetFile(path) && !isConfigFile(path))
         return
+      if (!isInTargetDirs(path))
+        return
 
       debug.pages(`File changed: ${path}`)
+      debug.pages(targetDirs)
+      debug.pages(isInTargetDirs(path))
       if (await this.updatePagesJSON(path))
         this.onUpdate()
     })
@@ -127,6 +137,9 @@ export class PageContext {
     watcher.on('unlink', async (path) => {
       path = slash(path)
       if (!isTargetFile(path))
+        return
+
+      if (!isInTargetDirs(path))
         return
 
       debug.pages(`File removed: ${path}`)

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import Counter from '@/components/Counter.vue'
 
 const title = ref('Hello')
 function nav() {
@@ -7,7 +8,6 @@ function nav() {
     url: '/pages/test',
   })
 }
-const count = ref(0)
 </script>
 
 <template>
@@ -21,14 +21,7 @@ const count = ref(0)
     <button @click="nav">
       nav
     </button>
-
-    <button @click="count--">
-      -
-    </button>
-    {{ count }}
-    <button @click="count++">
-      +
-    </button>
+    <Counter />
   </view>
 </template>
 

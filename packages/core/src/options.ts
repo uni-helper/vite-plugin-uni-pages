@@ -1,3 +1,4 @@
+import process from 'node:process'
 import { slash } from '@antfu/utils'
 import fg from 'fast-glob'
 import type { ResolvedOptions, UserOptions } from './types'
