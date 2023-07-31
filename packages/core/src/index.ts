@@ -73,11 +73,9 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
     },
     // Applet do not support custom route block, so we need to remove the route block here
     async transform(code: string, id: string) {
-      if (!/\.vue$/.test(id))
+      if (!/\.n?vue$/.test(id) && !code.includes('</route>'))
         return null
-      const s = new MagicString(code.toString(), {
-        filename: id,
-      })
+      const s = new MagicString(code)
       const routeBlockMatches = s.original.matchAll(
         /<route[^>]*>([\s\S]*?)<\/route>/g,
       )
@@ -87,11 +85,16 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
         const length = match[0].length
         s.remove(index, index + length)
       }
-      return {
-        code: s.toString(),
-        map: s.generateMap({
-          source: code,
-        }),
+
+      if (s.hasChanged()) {
+        return {
+          code: s.toString(),
+          map: s.generateMap({
+            source: code,
+            includeContent: true,
+            file: id,
+          }),
+        }
       }
     },
     configureServer(server) {
