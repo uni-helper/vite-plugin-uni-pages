@@ -86,8 +86,6 @@ style:
   navigationBarTitleText: "@uni-helper"
 </route>
 ```
-> [!IMPORTANT]
-> Crucial information necessary for users to succeed.
 
 导入虚拟模块即可访问所有页面的元数据
 
