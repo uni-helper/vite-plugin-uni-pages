@@ -127,7 +127,7 @@ export interface Options {
 
 ## TODO
 
-- [ ] only update the changed page
+- [x] only update the changed page
 - [x] [vite-plugin-uni-middleware](https://github.com/uni-helper/vite-plugin-uni-middleware)
 - [x] pages [type](./src/config/types.ts)
 
