@@ -1,4 +1,4 @@
-import type { Color } from './common'
+import type { Color, ThemeColor } from './common'
 
 export interface IconFont {
   /**
@@ -108,24 +108,24 @@ export interface TabBar {
   /**
    * tab 上的文字默认颜色
    */
-  color?: Color
+  color?: Color | ThemeColor
 
   /**
    * tab 上的文字选中时的颜色
    */
-  selectedColor?: Color
+  selectedColor?: Color | ThemeColor
 
   /**
    * tab 的背景色
    */
-  backgroundColor?: Color
+  backgroundColor?: Color | ThemeColor
 
   /**
    * tabbar 上边框的颜色，可选值 black/white，也支持其他颜色值
    * @default "black"
    * @desc App 2.3.4+ 、H5 3.0.0+
    */
-  borderStyle?: string
+  borderStyle?: string | ThemeColor
 
   /**
    * iOS 高斯模糊效果，可选值 dark/extralight/light/none（参考?:使用说明）
