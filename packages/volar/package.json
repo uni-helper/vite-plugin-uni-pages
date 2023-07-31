@@ -40,8 +40,8 @@
     "vscode-json-languageservice": "^5.3.5"
   },
   "devDependencies": {
-    "@types/json-schema": "^7.0.11",
-    "@volar/language-service": "1.6.9",
+    "@types/json-schema": "^7.0.12",
+    "@volar/language-service": "1.10.0",
     "unbuild": "^1.2.1"
   }
 }
