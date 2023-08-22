@@ -1,4 +1,5 @@
-import type { GlobalStyle } from './config'
+import type { LoadConfigSource } from 'unconfig'
+import type { GlobalStyle, PagesConfig } from './config'
 import type { PageContext } from './context'
 import type { debug } from './utils'
 
@@ -9,15 +10,15 @@ export interface CustomBlock {
 
 export type debugType = keyof typeof debug
 
-export interface ConfigFile { path: string;field: string }
+export type ConfigSource = string | LoadConfigSource<PagesConfig> | LoadConfigSource<PagesConfig>[]
 
 export interface Options {
-
   /**
-   * configFile
+   * Load from configs files
+   *
    * @default 'pages.config.(ts|mts|cts|js|cjs|mjs|json)',
    */
-  configFile: string | ConfigFile
+  configSource: ConfigSource
   /**
    * The default application entry page is the home page
    * @default 'pages/index' or 'pages/index/index'
@@ -83,7 +84,7 @@ export interface Options {
 
 export type UserOptions = Partial<Options>
 
-export interface ResolvedOptions extends Omit<Options, 'dir' | 'homePage'> {
+export interface ResolvedOptions extends Omit<Options, 'dir' | 'homePage' | 'configSource'> {
   /**
    * Resolves to the `root` value from Vite config.
    * @default config.root
@@ -98,6 +99,8 @@ export interface ResolvedOptions extends Omit<Options, 'dir' | 'homePage'> {
    * Resolved entry page
    */
   homePage: string[]
+
+  configSource: LoadConfigSource<PagesConfig>[]
 }
 
 export interface PagePath {

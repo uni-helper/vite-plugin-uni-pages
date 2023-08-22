@@ -8,7 +8,7 @@ import { slash } from '@antfu/utils'
 import { isH5 } from '@uni-helper/uni-env'
 import dbg from 'debug'
 import type { PagesConfig } from './config/types'
-import type { ConfigFile, PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
+import type { PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
 import {
   debug,
   getPagesConfigSourcePaths,
@@ -63,20 +63,10 @@ export class PageContext {
     this.logger = logger
   }
 
-  async loadUserPagesConfig(configFile: string | ConfigFile) {
-    let configPath = configFile as string
-    let configField
-    if (typeof configFile !== 'string') {
-      configPath = configFile.path
-      configField = configFile.field
-    }
-    configPath = configPath.replace('.(ts|mts|cts|js|cjs|mjs|json)', '')
-    const { config } = await loadConfig<PagesConfig>({ cwd: this.root, sources: [{ files: configPath }], defaults: configField })
-    if (!config) {
-      this.logger?.warn(`Can't found,${configFile} please create ${configFile}`)
-      process.exit(-1)
-    }
-    this.pagesGlobConfig = configField ? config[configField] : config
+  async loadUserPagesConfig() {
+    const sources = this.options.configSource
+    const { config } = await loadConfig<PagesConfig>({ cwd: this.root, sources, defaults: {} })
+    this.pagesGlobConfig = config
     debug.options(config)
   }
 
@@ -109,7 +99,7 @@ export class PageContext {
 
   async setupWatcher(watcher: FSWatcher) {
     if (!isH5) {
-      const configs = await getPagesConfigSourcePaths(this.options.configFile)
+      const configs = await getPagesConfigSourcePaths(this.options.configSource)
       watcher.add(configs)
     }
     const targetDirs = [...this.options.dirs, ...this.options.subPackages].map(v => slash(path.resolve(this.root, v)))
@@ -269,7 +259,7 @@ export class PageContext {
 
     checkPagesJsonFile(this.resolvedPagesJSONPath)
     this.options.onBeforeLoadUserConfig(this)
-    await this.loadUserPagesConfig(this.options.configFile)
+    await this.loadUserPagesConfig()
     this.options.onAfterLoadUserConfig(this)
 
     if (this.options.mergePages) {

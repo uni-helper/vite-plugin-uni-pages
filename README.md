@@ -99,7 +99,7 @@ export interface Options {
    * 配置文件
    * @default 'pages.config.(ts|mts|cts|js|cjs|mjs|json)',
    */
-  homePage: string | { path: string, field: string }
+  configSource: ConfigSource
 
   /**
    * 设置默认路由入口
