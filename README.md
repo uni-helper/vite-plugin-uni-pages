@@ -4,21 +4,17 @@
 
 <a href="https://www.npmjs.com/package/@uni-helper/vite-plugin-uni-pages"><img src="https://img.shields.io/npm/v/@uni-helper/vite-plugin-uni-pages" alt="NPM version"></a></p>
 
-
 ## Packages
 
 - [vite-plugin-uni-pages](./packages/core/)
 
   核心，提供基于文件的路由系统
-
 - [volar-service-uni-pages](./packages/volar/)
 
   为 `<route>` 块 提供 IntelliSense
-
 - [pages-json-schema](./packages/schema/)
 
   为 uni-app 的 `pages.json` 提供 schema
-
 
 ## 安装
 
@@ -70,7 +66,6 @@ export default defineUniPages({
 > [!NOTE]
 > 尽管支持多种解析器，但是建议你始终使用 `json`、`json5` 来作为默认解析器，因为这些解析器可以配合 [volar-service-uni-pages](./packages/volar/) 来获得**智能感知**和**字段提示**能力。
 
-
 ```html
 <!-- index.vue -->
 <!-- 使用 type="home" 属性设置首页 -->
@@ -100,6 +95,12 @@ console.log(pages)
 
 ```ts
 export interface Options {
+  /**
+   * 配置文件
+   * @default 'pages.config.(ts|mts|cts|js|cjs|mjs|json)',
+   */
+  homePage: string | { path: string, field: string }
+
   /**
    * 设置默认路由入口
    * @default 'pages/index' || 'pages/index/index'

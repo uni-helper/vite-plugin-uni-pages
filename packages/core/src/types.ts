@@ -9,7 +9,15 @@ export interface CustomBlock {
 
 export type debugType = keyof typeof debug
 
+export interface ConfigFile { path: string;field: string }
+
 export interface Options {
+
+  /**
+   * configFile
+   * @default 'pages.config.(ts|mts|cts|js|cjs|mjs|json)',
+   */
+  configFile: string | ConfigFile
   /**
    * The default application entry page is the home page
    * @default 'pages/index' or 'pages/index/index'

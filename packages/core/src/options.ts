@@ -5,6 +5,7 @@ import type { ResolvedOptions, UserOptions } from './types'
 
 export function resolveOptions(userOptions: UserOptions, viteRoot?: string): ResolvedOptions {
   const {
+    configFile = 'pages.config.(ts|mts|cts|js|cjs|mjs|json)',
     homePage = ['pages/index', 'pages/index/index'],
     mergePages = true,
     dir = 'src/pages',
@@ -32,6 +33,7 @@ export function resolveOptions(userOptions: UserOptions, viteRoot?: string): Res
   const ResolvedHomePage = typeof homePage === 'string' ? [homePage] : homePage
 
   const resolvedOptions: ResolvedOptions = {
+    configFile,
     homePage: ResolvedHomePage,
     mergePages,
     dirs: resolvedDirs,

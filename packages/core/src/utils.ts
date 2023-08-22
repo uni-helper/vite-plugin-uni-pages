@@ -4,7 +4,7 @@ import { groupBy } from 'lodash-unified'
 import fg from 'fast-glob'
 import type { SFCBlock } from '@vue/compiler-sfc'
 import { FILE_EXTENSIONS, RESOLVED_MODULE_ID_VIRTUAL } from './constant'
-import type { PageMetaDatum } from './types'
+import type { ConfigFile, PageMetaDatum } from './types'
 import { getRouteSfcBlock } from './customBlock'
 
 export function invalidatePagesModule(server: ViteDevServer) {
@@ -61,12 +61,21 @@ export function mergePageMetaDataArray(pageMetaData: PageMetaDatum[]) {
   return result
 }
 
-export async function getPagesConfigSourcePaths() {
-  return await fg('pages.config.(ts|mts|cts|js|cjs|mjs|json)', {
-    deep: 0,
-    onlyFiles: true,
-    absolute: true,
-  })
+export async function getPagesConfigSourcePaths(configFile: string | ConfigFile) {
+  if (typeof configFile === 'string') {
+    return await fg(configFile, {
+      deep: 0,
+      onlyFiles: true,
+      absolute: true,
+    })
+  }
+  else {
+    return await fg(configFile.path, {
+      deep: 0,
+      onlyFiles: true,
+      absolute: true,
+    })
+  }
 }
 
 export function useCachedPages() {
