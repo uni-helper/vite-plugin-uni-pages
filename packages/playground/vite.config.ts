@@ -5,9 +5,6 @@ import UniPages from '@uni-helper/vite-plugin-uni-pages'
 
 declare module 'vite' {
   interface UserConfig {
-    /**
-       * Options for Vitest
-       */
     UniPages?: PagesConfig
   }
 }
