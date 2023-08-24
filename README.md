@@ -96,6 +96,17 @@ console.log(pages)
 ```ts
 export interface Options {
   /**
+   * 为页面路径生成 TypeScript 声明
+   *
+   * 接受布尔值或与相对项目根目录的路径
+   *
+   * 默认为 uni-pages.d.ts
+   *
+   * @default true
+   */
+  dts?: boolean | string
+
+  /**
    * 配置文件
    * @default 'pages.config.(ts|mts|cts|js|cjs|mjs|json)',
    */
