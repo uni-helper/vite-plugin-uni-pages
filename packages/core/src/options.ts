@@ -1,10 +1,13 @@
 import process from 'node:process'
 import { slash } from '@antfu/utils'
 import fg from 'fast-glob'
+import type { LoadConfigSource } from 'unconfig'
 import type { ResolvedOptions, UserOptions } from './types'
+import type { PagesConfig } from './config'
 
 export function resolveOptions(userOptions: UserOptions, viteRoot?: string): ResolvedOptions {
   const {
+    configSource = 'pages.config.(ts|mts|cts|js|cjs|mjs|json)',
     homePage = ['pages/index', 'pages/index/index'],
     mergePages = true,
     dir = 'src/pages',
@@ -29,10 +32,12 @@ export function resolveOptions(userOptions: UserOptions, viteRoot?: string): Res
   const root = viteRoot || slash(process.cwd())
   const resolvedDirs = resolvePageDirs(dir, root, exclude)
   const resolvedSubDirs = subPackages.map(dir => slash(dir))
-  const ResolvedHomePage = typeof homePage === 'string' ? [homePage] : homePage
+  const resolvedHomePage = typeof homePage === 'string' ? [homePage] : homePage
+  const resolvedConfigSource = typeof configSource === 'string' ? [{ files: configSource } as LoadConfigSource<PagesConfig>] : configSource
 
   const resolvedOptions: ResolvedOptions = {
-    homePage: ResolvedHomePage,
+    configSource: Array.isArray(resolvedConfigSource) ? resolvedConfigSource : [resolvedConfigSource],
+    homePage: resolvedHomePage,
     mergePages,
     dirs: resolvedDirs,
     subPackages: resolvedSubDirs,

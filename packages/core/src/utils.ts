@@ -3,9 +3,11 @@ import { type ModuleNode, type ViteDevServer, normalizePath } from 'vite'
 import { groupBy } from 'lodash-unified'
 import fg from 'fast-glob'
 import type { SFCBlock } from '@vue/compiler-sfc'
+import type { LoadConfigSource } from 'unconfig'
 import { FILE_EXTENSIONS, RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import type { PageMetaDatum } from './types'
 import { getRouteSfcBlock } from './customBlock'
+import type { PagesConfig } from './config'
 
 export function invalidatePagesModule(server: ViteDevServer) {
   const { moduleGraph } = server
@@ -61,8 +63,8 @@ export function mergePageMetaDataArray(pageMetaData: PageMetaDatum[]) {
   return result
 }
 
-export async function getPagesConfigSourcePaths() {
-  return await fg('pages.config.(ts|mts|cts|js|cjs|mjs|json)', {
+export async function getPagesConfigSourcePaths(configSource: LoadConfigSource<PagesConfig>[]) {
+  return await fg(configSource.map(v => v.files).flat(), {
     deep: 0,
     onlyFiles: true,
     absolute: true,

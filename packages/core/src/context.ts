@@ -64,11 +64,8 @@ export class PageContext {
   }
 
   async loadUserPagesConfig() {
-    const { config } = await loadConfig<PagesConfig>({ cwd: this.root, sources: [{ files: 'pages.config' }] })
-    if (!config) {
-      this.logger?.warn('Can\'t found pages.config, please create pages.config.(ts|mts|cts|js|cjs|mjs|json)')
-      process.exit(-1)
-    }
+    const sources = this.options.configSource
+    const { config } = await loadConfig<PagesConfig>({ cwd: this.root, sources, defaults: {} })
     this.pagesGlobConfig = config
     debug.options(config)
   }
@@ -102,7 +99,7 @@ export class PageContext {
 
   async setupWatcher(watcher: FSWatcher) {
     if (!isH5) {
-      const configs = await getPagesConfigSourcePaths()
+      const configs = await getPagesConfigSourcePaths(this.options.configSource)
       watcher.add(configs)
     }
     const targetDirs = [...this.options.dirs, ...this.options.subPackages].map(v => slash(path.resolve(this.root, v)))
