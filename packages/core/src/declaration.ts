@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import path, { dirname, join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { mkdir, readFile, writeFile as writeFile_ } from 'node:fs/promises'
 
 import { normalizePath } from 'vite'

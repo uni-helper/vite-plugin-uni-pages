@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { spawn } from 'node:child_process'
+import process from 'node:process'
 import type { Plugin } from 'vite'
 import { createLogger } from 'vite'
 import MagicString from 'magic-string'
