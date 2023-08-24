@@ -13,6 +13,15 @@ export type debugType = keyof typeof debug
 export type ConfigSource = string | LoadConfigSource<PagesConfig> | LoadConfigSource<PagesConfig>[]
 
 export interface Options {
+
+  /**
+   * Generate TypeScript declaration for pages path
+   *
+   * Accept boolean or a path related to project root
+   *
+   * @default true
+   */
+  dts?: boolean | string
   /**
    * Load from configs files
    *
@@ -84,12 +93,14 @@ export interface Options {
 
 export type UserOptions = Partial<Options>
 
-export interface ResolvedOptions extends Omit<Options, 'dir' | 'homePage' | 'configSource'> {
+export interface ResolvedOptions extends Omit<Options, 'dir' | 'homePage' | 'configSource' | 'dts'> {
   /**
    * Resolves to the `root` value from Vite config.
    * @default config.root
    */
   root: string
+
+  dts: string | false
 
   /**
    * Resolved page dirs

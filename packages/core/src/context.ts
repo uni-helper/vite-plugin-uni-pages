@@ -9,6 +9,8 @@ import { isH5 } from '@uni-helper/uni-env'
 import dbg from 'debug'
 import type { PagesConfig } from './config/types'
 import type { PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
+import { writeDeclaration } from './declaration'
+
 import {
   debug,
   getPagesConfigSourcePaths,
@@ -283,6 +285,7 @@ export class PageContext {
     }
 
     const pagesJson = JSON.stringify(data, null, this.options.minify ? undefined : 2)
+    this.generateDeclaration()
     if (lsatPagesJson === pagesJson) {
       debug.pages('PagesJson Not have change')
       return false
@@ -307,6 +310,14 @@ export class PageContext {
 
   resolveSubRoutes() {
     return JSON.stringify(this.subPageMetaData, null, 2)
+  }
+
+  generateDeclaration() {
+    if (!this.options.dts)
+      return
+
+    debug.declaration('generating')
+    return writeDeclaration(this, this.options.dts)
   }
 }
 
