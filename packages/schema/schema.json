@@ -563,7 +563,14 @@
     "TabBar": {
       "properties": {
         "backgroundColor": {
-          "$ref": "#/definitions/Color",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Color"
+            },
+            {
+              "$ref": "#/definitions/ThemeColor"
+            }
+          ],
           "description": "tab 的背景色"
         },
         "blurEffect": {
@@ -572,12 +579,26 @@
           "type": "string"
         },
         "borderStyle": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeColor"
+            }
+          ],
           "default": "black",
-          "description": "tabbar 上边框的颜色，可选值 black/white，也支持其他颜色值",
-          "type": "string"
+          "description": "tabbar 上边框的颜色，可选值 black/white，也支持其他颜色值"
         },
         "color": {
-          "$ref": "#/definitions/Color",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Color"
+            },
+            {
+              "$ref": "#/definitions/ThemeColor"
+            }
+          ],
           "description": "tab 上的文字默认颜色"
         },
         "fontSize": {
@@ -616,7 +637,14 @@
           "type": "string"
         },
         "selectedColor": {
-          "$ref": "#/definitions/Color",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Color"
+            },
+            {
+              "$ref": "#/definitions/ThemeColor"
+            }
+          ],
           "description": "tab 上的文字选中时的颜色"
         },
         "spacing": {

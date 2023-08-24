@@ -21,6 +21,6 @@
     "@dcloudio/uni-cli-shared": "3.0.0-alpha-3081120230719001",
     "@dcloudio/vite-plugin-uni": "3.0.0-alpha-3081120230719001",
     "@uni-helper/vite-plugin-uni-pages": "workspace:*",
-    "postcss": "^8.4.27"
+    "postcss": "^8.4.28"
   }
 }
