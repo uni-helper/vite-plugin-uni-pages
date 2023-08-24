@@ -7,7 +7,7 @@ import type { PagesConfig } from './config'
 
 export function resolveOptions(userOptions: UserOptions, viteRoot?: string): ResolvedOptions {
   const {
-    configSource = 'pages.config.(ts|mts|cts|js|cjs|mjs|json)',
+    configSource = 'pages.config',
     homePage = ['pages/index', 'pages/index/index'],
     mergePages = true,
     dir = 'src/pages',
