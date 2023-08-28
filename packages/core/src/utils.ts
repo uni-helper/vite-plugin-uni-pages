@@ -28,6 +28,7 @@ export const debug = {
   subPages: Debug('vite-plugin-uni-pages:subPages'),
   error: Debug('vite-plugin-uni-pages:error'),
   cache: Debug('vite-plugin-uni-pages:cache'),
+  declaration: Debug('vite-plugin-uni-pages:declaration'),
 }
 
 export function extsToGlob(extensions: string[]) {

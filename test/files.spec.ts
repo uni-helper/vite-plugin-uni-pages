@@ -1,3 +1,4 @@
+import process from 'node:process'
 import { describe, expect, test } from 'vitest'
 import { getPageFiles, resolveOptions } from '../packages/core/src'
 

@@ -13,6 +13,7 @@ declare module 'vite' {
 export default defineConfig({
   plugins: [
     UniPages({
+      dts: 'src/uni-pages.d.ts',
       homePage: 'pages/index',
       debug: true,
       subPackages: ['src/pages-sub'],
