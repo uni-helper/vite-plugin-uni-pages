@@ -105,9 +105,11 @@ export class PageContext {
       watcher.add(configs)
     }
     const targetDirs = [...this.options.dirs, ...this.options.subPackages].map(v => slash(path.resolve(this.root, v)))
-    const isInTargetDirs = (path: string) => targetDirs.some(v => path.startsWith(v))
+    const isInTargetDirs = (filePath: string) => targetDirs.some(v => slash(path.resolve(this.root, filePath)).startsWith(v))
+
     watcher.on('add', async (path) => {
       path = slash(path)
+
       if (!isTargetFile(path))
         return
 
