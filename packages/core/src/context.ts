@@ -5,7 +5,6 @@ import type { Logger, ViteDevServer } from 'vite'
 import { normalizePath } from 'vite'
 import { loadConfig } from 'unconfig'
 import { slash } from '@antfu/utils'
-import { isH5 } from '@uni-helper/uni-env'
 import dbg from 'debug'
 import type { PagesConfig } from './config/types'
 import type { PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
@@ -13,9 +12,7 @@ import { writeDeclaration } from './declaration'
 
 import {
   debug,
-  getPagesConfigSourcePaths,
   invalidatePagesModule,
-  isConfigFile,
   isTargetFile,
   mergePageMetaDataArray,
   useCachedPages,

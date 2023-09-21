@@ -121,7 +121,7 @@ export interface GlobalStyle {
 
   /**
    * 设置编译到 H5 平台的特定样式，配置项参考下方 H5
-   * @type H5
+   * @type {H5}
    * @desc H5
    */
   h5?: H5
@@ -176,7 +176,7 @@ export interface GlobalStyle {
 
   /**
    * 引用小程序组件，参考 小程序组件
-   * @type Record<string, string>
+   * @type {Record<string, string>}
    * @desc
    */
   usingComponents?: Record<string, string>

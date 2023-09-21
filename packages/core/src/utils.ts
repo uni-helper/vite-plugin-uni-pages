@@ -1,14 +1,10 @@
-import process from 'node:process'
 import Debug from 'debug'
 import { type ModuleNode, type ViteDevServer, normalizePath } from 'vite'
 import { groupBy } from 'lodash-unified'
-import fg from 'fast-glob'
 import type { SFCBlock } from '@vue/compiler-sfc'
-import type { LoadConfigSource } from 'unconfig'
 import { FILE_EXTENSIONS, RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import type { PageMetaDatum } from './types'
 import { getRouteSfcBlock } from './customBlock'
-import type { PagesConfig } from './config'
 
 export function invalidatePagesModule(server: ViteDevServer) {
   const { moduleGraph } = server
