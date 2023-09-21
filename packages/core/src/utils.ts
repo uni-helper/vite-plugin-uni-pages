@@ -1,3 +1,4 @@
+import process from 'node:process'
 import Debug from 'debug'
 import { type ModuleNode, type ViteDevServer, normalizePath } from 'vite'
 import { groupBy } from 'lodash-unified'
@@ -40,10 +41,6 @@ export function isTargetFile(path: string) {
   return FILE_EXTENSIONS.includes(ext!)
 }
 
-export function isConfigFile(path: string) {
-  return path.includes('pages.config')
-}
-
 /**
  * merge page meta data array by path and assign style
  * @param pageMetaData  page meta data array
@@ -62,14 +59,6 @@ export function mergePageMetaDataArray(pageMetaData: PageMetaDatum[]) {
     result.push(options)
   }
   return result
-}
-
-export async function getPagesConfigSourcePaths(configSource: LoadConfigSource<PagesConfig>[]) {
-  return await fg(configSource.map(v => v.files).flat(), {
-    deep: 0,
-    onlyFiles: true,
-    absolute: true,
-  })
 }
 
 export function useCachedPages() {

@@ -32,6 +32,7 @@ export class PageContext {
   private _server: ViteDevServer | undefined
 
   pagesGlobConfig: PagesConfig | undefined
+  pagesConfigSourcePaths: string[] = []
 
   pagesPath: PagePath[] = []
   subPagesPath: Record<string, PagePath[]> = {}
@@ -66,9 +67,10 @@ export class PageContext {
   }
 
   async loadUserPagesConfig() {
-    const sources = this.options.configSource
-    const { config } = await loadConfig<PagesConfig>({ cwd: this.root, sources, defaults: {} })
+    const configSource = this.options.configSource
+    const { config, sources } = await loadConfig<PagesConfig>({ cwd: this.root, sources: configSource, defaults: {} })
     this.pagesGlobConfig = config
+    this.pagesConfigSourcePaths = sources
     debug.options(config)
   }
 
@@ -100,10 +102,7 @@ export class PageContext {
   }
 
   async setupWatcher(watcher: FSWatcher) {
-    if (!isH5) {
-      const configs = await getPagesConfigSourcePaths(this.options.configSource)
-      watcher.add(configs)
-    }
+    watcher.add(this.pagesConfigSourcePaths)
     const targetDirs = [...this.options.dirs, ...this.options.subPackages].map(v => slash(path.resolve(this.root, v)))
     const isInTargetDirs = (filePath: string) => targetDirs.some(v => slash(path.resolve(this.root, filePath)).startsWith(v))
 
@@ -123,7 +122,7 @@ export class PageContext {
 
     watcher.on('change', async (path) => {
       path = slash(path)
-      if (!isTargetFile(path) && !isConfigFile(path))
+      if (!isTargetFile(path))
         return
       if (!isInTargetDirs(path))
         return
@@ -133,6 +132,14 @@ export class PageContext {
       debug.pages(isInTargetDirs(path))
       if (await this.updatePagesJSON(path))
         this.onUpdate()
+    })
+
+    watcher.on('change', async (path)=> {
+      if (this.pagesConfigSourcePaths.includes(path)) {
+        debug.pages(`Config source changed: ${path}`)
+        if (await this.updatePagesJSON())
+          this.onUpdate()
+      }
     })
 
     watcher.on('unlink', async (path) => {

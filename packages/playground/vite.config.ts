@@ -17,15 +17,15 @@ export default defineConfig({
       homePage: 'pages/index',
       debug: true,
       subPackages: ['src/pages-sub'],
-      configSource: [
-        {
-          files: 'vite.config',
-          async rewrite(config) {
-            const resolved = await (typeof config === 'function' ? config() : config)
-            return resolved?.UniPages
-          },
-        },
-      ],
+      // configSource: [
+      //   {
+      //     files: 'vite.config',
+      //     async rewrite(config) {
+      //       const resolved = await (typeof config === 'function' ? config() : config)
+      //       return resolved?.UniPages
+      //     },
+      //   },
+      // ],
     }),
     uni(),
   ],
