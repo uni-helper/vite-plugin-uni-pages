@@ -1,14 +1,15 @@
 import type { Service } from '@volar/language-service'
-import * as json from 'vscode-json-languageservice'
-import pagesJsonSchema from '@uni-helper/pages-json-schema/schema.json'
+import { type LanguageService } from 'yaml-language-server'
+import type * as json from 'vscode-json-languageservice'
+import { type TextDocument } from 'vscode-languageserver-textdocument'
+import { createJsonLs } from './jsonLs'
+import { createYamlLs } from './yamlLs'
+import { isYaml } from './utils'
 
-type TextDocument = any
-
-pagesJsonSchema.$ref = '#/definitions/PageMetaDatum'
-pagesJsonSchema.definitions.PageMetaDatum.required = []
 export interface Provide {
   'json/jsonDocument': (document: TextDocument) => json.JSONDocument | undefined
   'json/languageService': () => json.LanguageService
+  'yaml/languageService': () => LanguageService
 }
 
 export default (): Service<Provide> => (context): ReturnType<Service<Provide>> => {
@@ -19,30 +20,39 @@ export default (): Service<Provide> => (context): ReturnType<Service<Provide>> =
     return { triggerCharacters } as any
 
   const jsonDocuments = new WeakMap<TextDocument, [number, json.JSONDocument]>()
-  const jsonLs = json.getLanguageService({})
-  jsonLs.configure({
-    allowComments: true,
-    schemas: [
-      {
-        fileMatch: ['*.customBlock_route_*.json*'],
-        uri: 'foo://route-custom-block.schema.json',
-        schema: {
-          ...pagesJsonSchema,
-        },
-      },
-    ],
-  })
+  const jsonLs = createJsonLs(context)
+  const yamlLs = createYamlLs(context)
 
   return {
 
     provide: {
       'json/jsonDocument': getJsonDocument,
       'json/languageService': () => jsonLs,
+      'yaml/languageService': () => yamlLs,
     },
 
     triggerCharacters,
 
+    provideCodeActions(document, range, context) {
+      if (isYaml(document)) {
+        return yamlLs.getCodeAction(document, {
+          context,
+          range,
+          textDocument: document,
+        })
+      }
+    },
+
+    provideCodeLenses(document) {
+      if (isYaml(document))
+        return yamlLs.getCodeLens(document)
+
+    },
+
     provideCompletionItems(document, position) {
+      if (isYaml(document))
+        return yamlLs.doComplete(document, position, false)
+
       return worker(document, async (jsonDocument) => {
         return await jsonLs.doComplete(document, position, jsonDocument)
       })
@@ -53,12 +63,18 @@ export default (): Service<Provide> => (context): ReturnType<Service<Provide>> =
     },
 
     provideDefinition(document, position) {
+      if (isYaml(document))
+        return yamlLs.doDefinition(document, { position, textDocument: document })
+
       return worker(document, async (jsonDocument) => {
         return await jsonLs.findDefinition(document, position, jsonDocument)
       })
     },
 
     provideDiagnostics(document) {
+      if (isYaml(document))
+        return yamlLs.doValidation(document, false)
+
       return worker(document, async (jsonDocument) => {
         const documentLanguageSettings = undefined // await getSettings(); // TODO
 
@@ -71,19 +87,29 @@ export default (): Service<Provide> => (context): ReturnType<Service<Provide>> =
       })
     },
 
+
     provideHover(document, position) {
+      if (isYaml(document))
+        return yamlLs.doHover(document, position)
+
       return worker(document, async (jsonDocument) => {
         return await jsonLs.doHover(document, position, jsonDocument)
       })
     },
 
     provideDocumentLinks(document) {
+      if (isYaml(document))
+        return yamlLs.findLinks(document)
+
       return worker(document, async (jsonDocument) => {
         return await jsonLs.findLinks(document, jsonDocument)
       })
     },
 
     provideDocumentSymbols(document) {
+      if (isYaml(document))
+        return yamlLs.findDocumentSymbols2(document, {})
+
       return worker(document, async (jsonDocument) => {
         return await jsonLs.findDocumentSymbols2(document, jsonDocument)
       })
@@ -102,15 +128,26 @@ export default (): Service<Provide> => (context): ReturnType<Service<Provide>> =
     },
 
     provideFoldingRanges(document) {
+      if (isYaml(document))
+        return yamlLs.getFoldingRanges(document, {})
+
+
       return worker(document, async () => {
         return await jsonLs.getFoldingRanges(document)
       })
     },
 
     provideSelectionRanges(document, positions) {
+      if (isYaml(document))
+        return yamlLs.getSelectionRanges(document, positions)
+
       return worker(document, async (jsonDocument) => {
         return await jsonLs.getSelectionRanges(document, positions, jsonDocument)
       })
+    },
+
+    resolveCodeLens(codeLens) {
+      return yamlLs.resolveCodeLens(codeLens)
     },
 
     provideDocumentFormattingEdits(document, range, options) {

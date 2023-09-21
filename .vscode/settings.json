@@ -1,3 +1,4 @@
 {
-  "vue.server.configFilePath": "./packages/playground/volar.config.js"
+  "vue.server.configFilePath": "./packages/playground/volar.config.js",
+  "prettier.enable": false
 }

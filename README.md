@@ -63,9 +63,6 @@ export default defineUniPages({
 - **解析器支持：** JSON, JSON5, YAML
 - **默认：** JSON5
 
-> [!NOTE]
-> 尽管支持多种解析器，但是建议你始终使用 `json`、`json5` 来作为默认解析器，因为这些解析器可以配合 [volar-service-uni-pages](./packages/volar/) 来获得**智能感知**和**字段提示**能力。
-
 ```html
 <!-- index.vue -->
 <!-- 使用 type="home" 属性设置首页 -->
