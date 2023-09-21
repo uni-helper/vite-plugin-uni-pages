@@ -131,7 +131,6 @@ export default (): Service<Provide> => (context): ReturnType<Service<Provide>> =
       if (isYaml(document))
         return yamlLs.getFoldingRanges(document, {})
 
-
       return worker(document, async () => {
         return await jsonLs.getFoldingRanges(document)
       })

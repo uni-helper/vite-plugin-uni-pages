@@ -33,6 +33,8 @@ export function createYamlLs(context: ServiceContext) {
       {
         fileMatch: ['*.customBlock_route_*.yaml*'],
         uri: 'foo://route-custom-block.schema.yaml',
+        name: 'volar-service-uni-pages',
+        description: 'Volar plugin for uni-pages route custom block in Vue SFC',
         schema,
       },
     ],
