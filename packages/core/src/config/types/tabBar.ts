@@ -136,9 +136,9 @@ export interface TabBar {
 
   /**
    * tab 的列表，详见 list 属性说明，最少2个、最多5个 tab
-   * @type TabBarItem[]
+   * @type {TabBarItem[]}
    */
-  list?: TabBarItem[]
+  list: [TabBarItem, TabBarItem, TabBarItem?, TabBarItem?, TabBarItem?]
 
   /**
    * 可选值 bottom、top
