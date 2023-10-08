@@ -1,13 +1,13 @@
 import { resolve } from 'node:path'
-import { describe, expect, test } from 'vitest'
+import { describe, expect } from 'vitest'
 import { getRouteBlock, resolveOptions } from '../packages/core/src/index'
 
 const options = resolveOptions({})
 const pagesJson = 'packages/playground/src/pages/test-json.vue'
 const pagesYaml = 'packages/playground/src/pages/test-yaml.vue'
 
-describe('Parser', () => {
-  test('custom block', async () => {
+describe('parser', () => {
+  it('custom block', async () => {
     const path = resolve(pagesJson)
     const routeBlock = await getRouteBlock(path, options)
     expect(routeBlock).toMatchInlineSnapshot(`
@@ -28,7 +28,7 @@ describe('Parser', () => {
     `)
   })
 
-  test('yaml comment', async () => {
+  it('yaml comment', async () => {
     const path = resolve(pagesYaml)
     const routeBlock = await getRouteBlock(path, options)
     expect(routeBlock).toMatchInlineSnapshot(`

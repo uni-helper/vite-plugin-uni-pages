@@ -46,7 +46,6 @@ export default (): Service<Provide> => (context): ReturnType<Service<Provide>> =
     provideCodeLenses(document) {
       if (isYaml(document))
         return yamlLs.getCodeLens(document)
-
     },
 
     provideCompletionItems(document, position) {
@@ -86,7 +85,6 @@ export default (): Service<Provide> => (context): ReturnType<Service<Provide>> =
         ) as json.Diagnostic[]
       })
     },
-
 
     provideHover(document, position) {
       if (isYaml(document))

@@ -32,8 +32,8 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist",
-    "client.d.ts"
+    "client.d.ts",
+    "dist"
   ],
   "scripts": {
     "build": "unbuild",
@@ -47,13 +47,13 @@
     "fast-glob": "^3.3.1",
     "json5": "^2.2.3",
     "lodash-unified": "^1.0.3",
-    "magic-string": "^0.30.3",
-    "unconfig": "^0.3.10",
+    "magic-string": "^0.30.4",
+    "unconfig": "^0.3.11",
     "yaml": "^2.3.2"
   },
   "devDependencies": {
     "@antfu/utils": "^0.7.6",
-    "@types/debug": "^4.1.8",
-    "@types/node": "^18.17.18"
+    "@types/debug": "^4.1.9",
+    "@types/node": "^20.8.3"
   }
 }

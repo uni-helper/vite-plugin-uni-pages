@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect } from 'vitest'
 import type { UserPagesConfig } from '../packages/core/src'
 import { PageContext } from '../packages/core/src'
 
@@ -21,8 +21,8 @@ const pagesGlobConfig: UserPagesConfig = {
   ],
 }
 
-describe('Generate routes', () => {
-  test('vue - pages snapshot', async () => {
+describe('generate routes', () => {
+  it('vue - pages snapshot', async () => {
     const ctx = new PageContext({ dir: 'packages/playground/src/pages', homePage: 'pages/index' })
     await ctx.scanPages()
     await ctx.mergePageMetaData()
@@ -84,7 +84,7 @@ describe('Generate routes', () => {
     `)
   })
 
-  test('vue - not merge pages snapshot', async () => {
+  it('vue - not merge pages snapshot', async () => {
     const ctx = new PageContext({ dir: 'packages/playground/src/pages', mergePages: false })
     await ctx.scanPages()
     ctx.pagesGlobConfig = pagesGlobConfig

@@ -16,11 +16,11 @@
     "vue": "^3.3.4"
   },
   "devDependencies": {
-    "@dcloudio/types": "^3.3.3",
+    "@dcloudio/types": "^3.4.0",
     "@dcloudio/uni-automator": "3.0.0-alpha-3090020230909001",
     "@dcloudio/uni-cli-shared": "3.0.0-alpha-3090020230909001",
     "@dcloudio/vite-plugin-uni": "3.0.0-alpha-3090020230909001",
     "@uni-helper/vite-plugin-uni-pages": "workspace:*",
-    "postcss": "^8.4.30"
+    "postcss": "^8.4.31"
   }
 }

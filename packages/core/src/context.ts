@@ -134,7 +134,7 @@ export class PageContext {
         this.onUpdate()
     })
 
-    watcher.on('change', async (path)=> {
+    watcher.on('change', async (path) => {
       if (this.pagesConfigSourcePaths.includes(path)) {
         debug.pages(`Config source changed: ${path}`)
         if (await this.updatePagesJSON())

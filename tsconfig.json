@@ -1,17 +1,17 @@
 {
   "compilerOptions": {
     "target": "es2018",
-    "module": "esnext",
     "lib": ["esnext"],
+    "module": "esnext",
     "moduleResolution": "node",
-    "esModuleInterop": true,
-    "strict": true,
-    "strictNullChecks": true,
-    "resolveJsonModule": true,
-    "skipLibCheck": true,
-    "skipDefaultLibCheck": true,
     "paths": {
       "@uni-helper/vite-plugin-uni-pages": ["./packages/core/src/index.ts"]
-    }
+    },
+    "resolveJsonModule": true,
+    "strict": true,
+    "strictNullChecks": true,
+    "esModuleInterop": true,
+    "skipDefaultLibCheck": true,
+    "skipLibCheck": true
   }
 }
