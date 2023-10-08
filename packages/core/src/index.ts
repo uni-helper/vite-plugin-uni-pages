@@ -54,6 +54,10 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
     enforce: 'pre',
     async configResolved(config) {
       ctx = new PageContext(userOptions, config.root)
+
+      if (config.plugins.some(v=>v.name === 'vite-plugin-uni-platform'))
+        ctx.withUniPlatform = true
+
       const logger = createLogger(undefined, {
         prefix: '[vite-plugin-uni-pages]',
       })

@@ -6,6 +6,7 @@ import { normalizePath } from 'vite'
 import { loadConfig } from 'unconfig'
 import { slash } from '@antfu/utils'
 import dbg from 'debug'
+import { platform } from '@uni-helper/uni-env'
 import type { PagesConfig } from './config/types'
 import type { PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
 import { writeDeclaration } from './declaration'
@@ -42,6 +43,8 @@ export class PageContext {
   root: string
   options: ResolvedOptions
   logger?: Logger
+
+  withUniPlatform = false
 
   constructor(userOptions: UserOptions, viteRoot: string = process.cwd()) {
     this.rawOptions = userOptions
@@ -281,6 +284,13 @@ export class PageContext {
     await this.mergePageMetaData()
     await this.mergeSubPageMetaData()
     this.options.onAfterMergePageMetaData(this)
+
+    if (this.withUniPlatform) {
+      const pagesMap = new Map()
+      const pages = this.pageMetaData.filter(v => !/\..*$/.test(v.path) || v.path.includes(platform)).map(v => ({ ...v, path: v.path.replace(/\..*$/, '') }))
+      pages.forEach(v => pagesMap.set(v.path, v))
+      this.pageMetaData = [...pagesMap.values()]
+    }
 
     this.options.onBeforeWriteFile(this)
 
