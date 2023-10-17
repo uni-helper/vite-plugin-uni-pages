@@ -216,7 +216,7 @@ export class PageContext {
       return true
 
     const isFoundHome = result.some((item) => {
-      if (this.options.homePage.includes(item.path)) {
+      if (this.options.homePage.some(v => v.startsWith(item.path))) {
         item.type = 'home'
         return true
       }
