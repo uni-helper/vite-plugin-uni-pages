@@ -70,7 +70,8 @@ describe('generate routes', () => {
           },
           \\"middlewares\\": [
             \\"auth\\"
-          ]
+          ],
+          \\"customAttribute\\": \\"custom attribute\\"
         },
         {
           \\"path\\": \\"../packages/playground/src/pages/blog/index\\",
@@ -143,7 +144,8 @@ describe('generate routes', () => {
           },
           \\"middlewares\\": [
             \\"auth\\"
-          ]
+          ],
+          \\"customAttribute\\": \\"custom attribute\\"
         },
         {
           \\"path\\": \\"../packages/playground/src/pages/blog/index\\",

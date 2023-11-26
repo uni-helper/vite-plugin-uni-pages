@@ -5,6 +5,9 @@ import { type TextDocument } from 'vscode-languageserver-textdocument'
 import { createJsonLs } from './jsonLs'
 import { createYamlLs } from './yamlLs'
 import { isYaml } from './utils'
+import { type Config } from "ts-json-schema-generator";
+
+export type PluginConfig = Pick<Config, "path" | "tsconfig">;
 
 export interface Provide {
   'json/jsonDocument': (document: TextDocument) => json.JSONDocument | undefined
@@ -12,7 +15,7 @@ export interface Provide {
   'yaml/languageService': () => LanguageService
 }
 
-export default (): Service<Provide> => (context): ReturnType<Service<Provide>> => {
+export default (config: PluginConfig = {}): Service<Provide> => (context): ReturnType<Service<Provide>> => {
   // https://github.com/microsoft/vscode/blob/09850876e652688fb142e2e19fd00fd38c0bc4ba/extensions/json-language-features/server/src/jsonServer.ts#L150
   const triggerCharacters = ['"', ':']
 
@@ -20,7 +23,7 @@ export default (): Service<Provide> => (context): ReturnType<Service<Provide>> =
     return { triggerCharacters } as any
 
   const jsonDocuments = new WeakMap<TextDocument, [number, json.JSONDocument]>()
-  const jsonLs = createJsonLs(context)
+  const jsonLs = createJsonLs(context, config)
   const yamlLs = createYamlLs(context)
 
   return {
