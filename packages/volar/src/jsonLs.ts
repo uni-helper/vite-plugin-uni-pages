@@ -5,32 +5,31 @@ import { createGenerator } from "ts-json-schema-generator";
 import type { PluginConfig } from './index'
 import { JSONSchema7 } from 'json-schema';
 
+
 export function createJsonLs(_context: ServiceContext, config: PluginConfig) {
   const jsonLs = json.getLanguageService({})
   try {
-    const routeMetaSchema = createGenerator({
+    const key = 'ExtraPageMetaDatum'
+    const pageMetaDatumSchema = createGenerator({
       skipTypeCheck: true,
-      type: "UniPagesRouteMeta",
+      type: key,
       tsconfig: './tsconfig.json',
       ...config,
-    }).createSchema("UniPagesRouteMeta");
+    }).createSchema(key);
 
-    const routeMeta = routeMetaSchema.definitions.UniPagesRouteMeta as JSONSchema7
-    if (routeMeta) {
-      for (const key in schema.definitions) {
-        const exist = routeMeta.properties[key]
-        if (exist && typeof exist === 'object') {
-          schema.definitions[key] = {
-            ...schema.definitions[key],
-            ...exist
-          }
-        }
+    const pageMeta = pageMetaDatumSchema.definitions
+    if (pageMeta) {
+      schema.definitions.PageMetaDatum = {
+        ...schema.definitions.PageMetaDatum,
+        // @ts-expect-error Ignore type
+        ...pageMeta[key],
       }
     }
   } catch (e) {
     console.log("[Error] @uni-helper/volar-service-uni-pages:");
     console.log(e);
   }
+
 
   jsonLs.configure({
     allowComments: true,
