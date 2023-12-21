@@ -1,4 +1,4 @@
 export interface EasyCom {
-  autoscan: boolean
-  custom: Record<string, string>
+  autoscan?: boolean
+  custom?: Record<string, string>
 }
