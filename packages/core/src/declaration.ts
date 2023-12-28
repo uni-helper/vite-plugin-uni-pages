@@ -9,8 +9,8 @@ export function getDeclaration(ctx: PageContext) {
   const subPagesPath = ctx.subPageMetaData.map((sub) => {
     return sub.pages.map(v => (`"/${normalizePath(join(sub.root, v.path))}"`))
   }).flat()
-  const tabsPagesPath = ctx.pagesGlobConfig?.tabBar?.list?.map((v: any) => {
-    return `"/${v.pagePath}"`
+  const tabsPagesPath = ctx.pagesGlobConfig?.tabBar?.list?.map((v) => {
+    return `"/${v!.pagePath}"`
   }) ?? []
   const allPagesPath = [...ctx.pageMetaData.filter(page => !tabsPagesPath.includes(page.path)).map(v => `"/${v.path}"`), ...subPagesPath]
   const code = `/* eslint-disable */
