@@ -73,7 +73,7 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
         }
 
         if (config.build.watch)
-          ctx.setupWatcher(chokidar.watch(ctx.options.dirs))
+          ctx.setupWatcher(chokidar.watch([...ctx.options.dirs, ...ctx.options.subPackages]))
       }
     },
     // Applet do not support custom route block, so we need to remove the route block here
