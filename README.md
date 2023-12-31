@@ -139,8 +139,9 @@ export interface Options {
   outDir: string
 
   /**
-   * 排除的页面
+   * 排除的页面，相对于 dir 和 subPackages
    * @default []
+   * @example ['**/components/**/*.*']
    */
   exclude: string[]
 
