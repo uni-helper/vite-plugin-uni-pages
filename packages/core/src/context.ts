@@ -285,12 +285,12 @@ export class PageContext {
     await this.mergeSubPageMetaData()
     this.options.onAfterMergePageMetaData(this)
 
-    if (this.withUniPlatform) {
-      const pagesMap = new Map()
-      const pages = this.pageMetaData.filter(v => !/\..*$/.test(v.path) || v.path.includes(platform)).map(v => ({ ...v, path: v.path.replace(/\..*$/, '') }))
-      pages.forEach(v => pagesMap.set(v.path, v))
-      this.pageMetaData = [...pagesMap.values()]
-    }
+    const pagesMap = new Map()
+    const pages = this.withUniPlatform
+      ? this.pageMetaData.filter(v => !/\..*$/.test(v.path) || v.path.includes(platform)).map(v => ({ ...v, path: v.path.replace(/\..*$/, '') }))
+      : this.pageMetaData
+    pages.forEach(v => pagesMap.set(v.path, v))
+    this.pageMetaData = [...pagesMap.values()]
 
     this.options.onBeforeWriteFile(this)
 
