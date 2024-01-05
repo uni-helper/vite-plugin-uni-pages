@@ -184,7 +184,14 @@ export class PageContext {
     return pageMetaDatum
   }
 
-  async parsePages(pages: PagePath[], overrides?: PageMetaDatum[]) {
+  /**
+   * parse pages rules && set page type
+   * @param pages page path array
+   * @param type  page type
+   * @param overrides custom page config
+   * @returns pages rules
+   */
+  async parsePages(pages: PagePath[], type: 'main' | 'sub', overrides?: PageMetaDatum[]) {
     const generatedPageMetaData = await Promise.all(pages.map(async page => await this.parsePage(page)))
     const customPageMetaData = overrides || []
 
@@ -192,8 +199,7 @@ export class PageContext {
       ? mergePageMetaDataArray(generatedPageMetaData.concat(customPageMetaData))
       : generatedPageMetaData
 
-    this.setHomePage(result)
-
+    type === 'main' && this.setHomePage(result)
     result.sort(page => (page.type === 'home' ? -1 : 0))
 
     return result
@@ -231,7 +237,7 @@ export class PageContext {
   }
 
   async mergePageMetaData() {
-    const pageMetaData = await this.parsePages(this.pagesPath, this.pagesGlobConfig?.pages)
+    const pageMetaData = await this.parsePages(this.pagesPath, 'main', this.pagesGlobConfig?.pages)
     this.pageMetaData = pageMetaData
     debug.pages(this.pageMetaData)
   }
@@ -244,7 +250,7 @@ export class PageContext {
       const root = path.basename(dir)
 
       const globPackage = subPackages?.find(v => v.root === root)
-      subPageMaps[root] = await this.parsePages(pages, globPackage?.pages)
+      subPageMaps[root] = await this.parsePages(pages, 'sub', globPackage?.pages)
       subPageMaps[root] = subPageMaps[root].map(page => ({ ...page, path: slash(path.relative(root, page.path)) }))
     }
 
