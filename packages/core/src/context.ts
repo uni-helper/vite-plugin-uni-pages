@@ -199,41 +199,33 @@ export class PageContext {
       ? mergePageMetaDataArray(generatedPageMetaData.concat(customPageMetaData))
       : generatedPageMetaData
 
-    type === 'main' && this.setHomePage(result)
+    return type === 'main' ? this.setHomePage(result) : result
+  }
+
+  /**
+   * set home page
+   * @param result pages rules array
+   * @returns pages rules
+   */
+  setHomePage(result: PageMetaDatum[]): PageMetaDatum[] {
+    const hasHome = result.some(({ type }) => type === 'home')
+    if (!hasHome) {
+      const isFoundHome = result.some((item) => {
+        const isFound = this.options.homePage.some(v => v.startsWith(item.path))
+        if (isFound) item.type = 'home'
+
+        return isFound
+      })
+
+      if (!isFoundHome)
+        this.logger?.warn('No home page found, check the configuration of pages.config.ts, or add the `homePage` option to UniPages in vite.config.js, or add `type="home"` to the routeBlock of your vue page.', {
+          timestamp: true,
+        })
+    }
+
     result.sort(page => (page.type === 'home' ? -1 : 0))
 
     return result
-  }
-
-  setHomePage(result: PageMetaDatum[]) {
-    const hasHome = result.some((page) => {
-      if (page.type === 'home')
-        return true
-
-      // Exclusion of subcontracting
-      const base = page.path.split('/')[0]
-      if (this.options.subPackages.includes(`src/${base}`))
-        return true
-
-      return false
-    })
-
-    if (hasHome)
-      return true
-
-    const isFoundHome = result.some((item) => {
-      if (this.options.homePage.some(v => v.startsWith(item.path))) {
-        item.type = 'home'
-        return true
-      }
-      else { return false }
-    })
-
-    if (isFoundHome)
-      return true
-    this.logger?.warn('No home page found, check the configuration of pages.config.ts, or add the `homePage` option to UniPages in vite.config.js, or add `type="home"` to the routeBlock of your vue page.', {
-      timestamp: true,
-    })
   }
 
   async mergePageMetaData() {
