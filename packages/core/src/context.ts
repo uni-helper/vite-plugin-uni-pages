@@ -212,15 +212,17 @@ export class PageContext {
     if (!hasHome) {
       const isFoundHome = result.some((item) => {
         const isFound = this.options.homePage.find(v => (v === item.path))
-        if (isFound) item.type = 'home'
+        if (isFound)
+          item.type = 'home'
 
         return isFound
       })
 
-      if (!isFoundHome)
+      if (!isFoundHome) {
         this.logger?.warn('No home page found, check the configuration of pages.config.ts, or add the `homePage` option to UniPages in vite.config.js, or add `type="home"` to the routeBlock of your vue page.', {
           timestamp: true,
         })
+      }
     }
 
     result.sort(page => (page.type === 'home' ? -1 : 0))
