@@ -184,7 +184,14 @@ export class PageContext {
     return pageMetaDatum
   }
 
-  async parsePages(pages: PagePath[], overrides?: PageMetaDatum[]) {
+  /**
+   * parse pages rules && set page type
+   * @param pages page path array
+   * @param type  page type
+   * @param overrides custom page config
+   * @returns pages rules
+   */
+  async parsePages(pages: PagePath[], type: 'main' | 'sub', overrides?: PageMetaDatum[]) {
     const generatedPageMetaData = await Promise.all(pages.map(async page => await this.parsePage(page)))
     const customPageMetaData = overrides || []
 
@@ -192,46 +199,37 @@ export class PageContext {
       ? mergePageMetaDataArray(generatedPageMetaData.concat(customPageMetaData))
       : generatedPageMetaData
 
-    this.setHomePage(result)
+    return type === 'main' ? this.setHomePage(result) : result
+  }
+
+  /**
+   * set home page
+   * @param result pages rules array
+   * @returns pages rules
+   */
+  setHomePage(result: PageMetaDatum[]): PageMetaDatum[] {
+    const hasHome = result.some(({ type }) => type === 'home')
+    if (!hasHome) {
+      const isFoundHome = result.some((item) => {
+        const isFound = this.options.homePage.find(v => (v === item.path))
+        if (isFound) item.type = 'home'
+
+        return isFound
+      })
+
+      if (!isFoundHome)
+        this.logger?.warn('No home page found, check the configuration of pages.config.ts, or add the `homePage` option to UniPages in vite.config.js, or add `type="home"` to the routeBlock of your vue page.', {
+          timestamp: true,
+        })
+    }
 
     result.sort(page => (page.type === 'home' ? -1 : 0))
 
     return result
   }
 
-  setHomePage(result: PageMetaDatum[]) {
-    const hasHome = result.some((page) => {
-      if (page.type === 'home')
-        return true
-
-      // Exclusion of subcontracting
-      const base = page.path.split('/')[0]
-      if (this.options.subPackages.includes(`src/${base}`))
-        return true
-
-      return false
-    })
-
-    if (hasHome)
-      return true
-
-    const isFoundHome = result.some((item) => {
-      if (this.options.homePage.some(v => v.startsWith(item.path))) {
-        item.type = 'home'
-        return true
-      }
-      else { return false }
-    })
-
-    if (isFoundHome)
-      return true
-    this.logger?.warn('No home page found, check the configuration of pages.config.ts, or add the `homePage` option to UniPages in vite.config.js, or add `type="home"` to the routeBlock of your vue page.', {
-      timestamp: true,
-    })
-  }
-
   async mergePageMetaData() {
-    const pageMetaData = await this.parsePages(this.pagesPath, this.pagesGlobConfig?.pages)
+    const pageMetaData = await this.parsePages(this.pagesPath, 'main', this.pagesGlobConfig?.pages)
     this.pageMetaData = pageMetaData
     debug.pages(this.pageMetaData)
   }
@@ -244,7 +242,7 @@ export class PageContext {
       const root = path.basename(dir)
 
       const globPackage = subPackages?.find(v => v.root === root)
-      subPageMaps[root] = await this.parsePages(pages, globPackage?.pages)
+      subPageMaps[root] = await this.parsePages(pages, 'sub', globPackage?.pages)
       subPageMaps[root] = subPageMaps[root].map(page => ({ ...page, path: slash(path.relative(root, page.path)) }))
     }
 
