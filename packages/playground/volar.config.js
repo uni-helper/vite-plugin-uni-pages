@@ -2,6 +2,6 @@ const volarServiceUniPages = require('@uni-helper/volar-service-uni-pages')
 
 module.exports = {
   services: [
-    volarServiceUniPages(),
+    volarServiceUniPages({ path: './src/custom.d.ts' }),
   ],
 }

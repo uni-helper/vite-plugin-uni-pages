@@ -11,6 +11,7 @@
   },
   "middlewares": [
     "auth"
-  ]
+  ],
+  "customAttribute": "custom attribute"
 }
 </route>
