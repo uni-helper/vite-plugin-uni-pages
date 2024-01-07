@@ -31,54 +31,54 @@ describe('generate routes', () => {
     expect(routes).toMatchInlineSnapshot(`
       "[
         {
-          \\"path\\": \\"../packages/playground/src/pages/A-top\\",
-          \\"type\\": \\"page\\"
+          "path": "../packages/playground/src/pages/A-top",
+          "type": "page"
         },
         {
-          \\"path\\": \\"../packages/playground/src/pages/index\\",
-          \\"type\\": \\"page\\",
-          \\"middlewares\\": [
-            \\"auth\\",
-            \\"test\\"
+          "path": "../packages/playground/src/pages/index",
+          "type": "page",
+          "middlewares": [
+            "auth",
+            "test"
           ]
         },
         {
-          \\"path\\": \\"../packages/playground/src/pages/test-json\\",
-          \\"type\\": \\"page\\",
-          \\"style\\": {
-            \\"navigationBarTitleText\\": \\"test json page\\"
+          "path": "../packages/playground/src/pages/test-json",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "test json page"
           },
-          \\"middlewares\\": [
-            \\"auth\\"
+          "middlewares": [
+            "auth"
           ]
         },
         {
-          \\"path\\": \\"../packages/playground/src/pages/test-yaml\\",
-          \\"type\\": \\"page\\",
-          \\"style\\": {
-            \\"navigationBarTitleText\\": \\"test yaml page\\"
+          "path": "../packages/playground/src/pages/test-yaml",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "test yaml page"
           },
-          \\"middlewares\\": [
-            \\"auth\\"
+          "middlewares": [
+            "auth"
           ]
         },
         {
-          \\"path\\": \\"../packages/playground/src/pages/test\\",
-          \\"type\\": \\"page\\",
-          \\"style\\": {
-            \\"navigationBarTitleText\\": \\"test page\\"
+          "path": "../packages/playground/src/pages/test",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "test page"
           },
-          \\"middlewares\\": [
-            \\"auth\\"
+          "middlewares": [
+            "auth"
           ]
         },
         {
-          \\"path\\": \\"../packages/playground/src/pages/blog/index\\",
-          \\"type\\": \\"page\\"
+          "path": "../packages/playground/src/pages/blog/index",
+          "type": "page"
         },
         {
-          \\"path\\": \\"../packages/playground/src/pages/blog/post\\",
-          \\"type\\": \\"page\\"
+          "path": "../packages/playground/src/pages/blog/post",
+          "type": "page"
         }
       ]"
     `)
@@ -94,66 +94,66 @@ describe('generate routes', () => {
     expect(routes).toMatchInlineSnapshot(`
       "[
         {
-          \\"path\\": \\"pages/index\\",
-          \\"style\\": {
-            \\"navigationBarTextStyle\\": \\"black\\",
-            \\"navigationBarTitleText\\": \\"uni-helper\\"
+          "path": "pages/index",
+          "style": {
+            "navigationBarTextStyle": "black",
+            "navigationBarTitleText": "uni-helper"
           },
-          \\"type\\": \\"home\\"
+          "type": "home"
         },
         {
-          \\"path\\": \\"../packages/playground/src/pages/A-top\\",
-          \\"type\\": \\"page\\",
-          \\"style\\": {}
+          "path": "../packages/playground/src/pages/A-top",
+          "type": "page",
+          "style": {}
         },
         {
-          \\"path\\": \\"../packages/playground/src/pages/index\\",
-          \\"type\\": \\"page\\",
-          \\"middlewares\\": [
-            \\"auth\\",
-            \\"test\\"
+          "path": "../packages/playground/src/pages/index",
+          "type": "page",
+          "middlewares": [
+            "auth",
+            "test"
           ],
-          \\"style\\": {}
+          "style": {}
         },
         {
-          \\"path\\": \\"../packages/playground/src/pages/test-json\\",
-          \\"type\\": \\"page\\",
-          \\"style\\": {
-            \\"navigationBarTitleText\\": \\"test json page\\"
+          "path": "../packages/playground/src/pages/test-json",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "test json page"
           },
-          \\"middlewares\\": [
-            \\"auth\\"
+          "middlewares": [
+            "auth"
           ]
         },
         {
-          \\"path\\": \\"../packages/playground/src/pages/test-yaml\\",
-          \\"type\\": \\"page\\",
-          \\"style\\": {
-            \\"navigationBarTitleText\\": \\"test yaml page\\"
+          "path": "../packages/playground/src/pages/test-yaml",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "test yaml page"
           },
-          \\"middlewares\\": [
-            \\"auth\\"
+          "middlewares": [
+            "auth"
           ]
         },
         {
-          \\"path\\": \\"../packages/playground/src/pages/test\\",
-          \\"type\\": \\"page\\",
-          \\"style\\": {
-            \\"navigationBarTitleText\\": \\"test page\\"
+          "path": "../packages/playground/src/pages/test",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "test page"
           },
-          \\"middlewares\\": [
-            \\"auth\\"
+          "middlewares": [
+            "auth"
           ]
         },
         {
-          \\"path\\": \\"../packages/playground/src/pages/blog/index\\",
-          \\"type\\": \\"page\\",
-          \\"style\\": {}
+          "path": "../packages/playground/src/pages/blog/index",
+          "type": "page",
+          "style": {}
         },
         {
-          \\"path\\": \\"../packages/playground/src/pages/blog/post\\",
-          \\"type\\": \\"page\\",
-          \\"style\\": {}
+          "path": "../packages/playground/src/pages/blog/post",
+          "type": "page",
+          "style": {}
         }
       ]"
     `)
