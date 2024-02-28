@@ -123,10 +123,6 @@
           "type": "object"
         }
       },
-      "required": [
-        "autoscan",
-        "custom"
-      ],
       "type": "object"
     },
     "GlobalStyle": {
@@ -555,8 +551,7 @@
         "pages": {
           "description": "子包由哪些页面组成，参数同 pages",
           "items": {
-              "description": "子包的页面配置项，参数同 PageMetaDatum",
-              "$ref": "#/definitions/PageMetaDatum"
+            "$ref": "#/definitions/PageMetaDatum"
           },
           "type": "array"
         },
@@ -632,6 +627,8 @@
           "items": {
             "$ref": "#/definitions/TabBarItem"
           },
+          "maxItems": 5,
+          "minItems": 2,
           "type": "array"
         },
         "midButton": {
@@ -660,6 +657,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "list"
+      ],
       "type": "object"
     },
     "TabBarItem": {

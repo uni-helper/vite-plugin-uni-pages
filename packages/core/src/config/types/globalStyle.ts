@@ -46,7 +46,7 @@ export interface GlobalStyle {
 
   /**
    * 是否开启下拉刷新，详见页面生命周期。
-   * @default "false"
+   * @default false
    * @desc
    */
   enablePullDownRefresh?: boolean
@@ -189,21 +189,21 @@ export interface GlobalStyle {
 
   /**
    * 当存在 leftWindow 时，默认是否显示 leftWindow
-   * @default "true"
+   * @default true
    * @desc H5
    */
   leftWindow?: boolean
 
   /**
    * 当存在 topWindow 时，默认是否显示 topWindow
-   * @default "true"
+   * @default true
    * @desc H5
    */
   topWindow?: boolean
 
   /**
    * 当存在 rightWindow 时，默认是否显示 rightWindow
-   * @default "true"
+   * @default true
    * @desc H5
    */
   rightWindow?: boolean
@@ -231,7 +231,7 @@ export interface GlobalStyle {
 
   /**
    * 动态 rpx，屏幕大小变化会重新渲染 rpx
-   * @default "false"
+   * @default false
    * @desc App-nvue（vue3 固定值为 true） 3.2.13+
    */
   dynamicRpx?: boolean
