@@ -261,11 +261,7 @@
         "navigationStyle": {
           "default": "default",
           "description": "导航栏样式，仅支持 default/custom。custom即取消默认的原生导航栏，需看使用注意",
-          "type": "string",
-          "enum": [
-              "default",
-              "custom"
-          ]
+          "type": "string"
         },
         "onReachBottomDistance": {
           "default": "50",
