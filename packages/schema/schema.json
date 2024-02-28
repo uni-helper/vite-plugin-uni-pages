@@ -123,10 +123,6 @@
           "type": "object"
         }
       },
-      "required": [
-        "autoscan",
-        "custom"
-      ],
       "type": "object"
     },
     "GlobalStyle": {
@@ -187,12 +183,12 @@
           "type": "string"
         },
         "dynamicRpx": {
-          "default": "false",
+          "default": false,
           "description": "动态 rpx，屏幕大小变化会重新渲染 rpx",
           "type": "boolean"
         },
         "enablePullDownRefresh": {
-          "default": "false",
+          "default": false,
           "description": "是否开启下拉刷新，详见页面生命周期。",
           "type": "boolean"
         },
@@ -201,7 +197,7 @@
           "description": "设置编译到 H5 平台的特定样式，配置项参考下方 H5"
         },
         "leftWindow": {
-          "default": "true",
+          "default": true,
           "description": "当存在 leftWindow 时，默认是否显示 leftWindow",
           "type": "boolean"
         },
@@ -282,7 +278,7 @@
           "type": "string"
         },
         "rightWindow": {
-          "default": "true",
+          "default": true,
           "description": "当存在 rightWindow 时，默认是否显示 rightWindow",
           "type": "boolean"
         },
@@ -311,7 +307,7 @@
           "type": "string"
         },
         "topWindow": {
-          "default": "true",
+          "default": true,
           "description": "当存在 topWindow 时，默认是否显示 topWindow",
           "type": "boolean"
         },
@@ -550,7 +546,9 @@
       "properties": {
         "pages": {
           "description": "子包由哪些页面组成，参数同 pages",
-          "items": {},
+          "items": {
+            "$ref": "#/definitions/PageMetaDatum"
+          },
           "type": "array"
         },
         "root": {
@@ -625,6 +623,8 @@
           "items": {
             "$ref": "#/definitions/TabBarItem"
           },
+          "maxItems": 5,
+          "minItems": 2,
           "type": "array"
         },
         "midButton": {
@@ -653,6 +653,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "list"
+      ],
       "type": "object"
     },
     "TabBarItem": {

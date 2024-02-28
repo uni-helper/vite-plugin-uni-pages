@@ -69,7 +69,7 @@ export interface SubPackage {
   /**
    * 子包由哪些页面组成，参数同 pages
    */
-  pages?: any[]
+  pages?: PageMetaDatum[]
 }
 
 export interface ConditionItem {
