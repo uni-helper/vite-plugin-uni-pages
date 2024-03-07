@@ -41,19 +41,19 @@
   },
   "dependencies": {
     "@uni-helper/uni-env": "^0.1.1",
-    "@vue/compiler-sfc": "^3.4.5",
-    "chokidar": "^3.5.3",
+    "@vue/compiler-sfc": "^3.4.21",
+    "chokidar": "^3.6.0",
     "debug": "^4.3.4",
     "fast-glob": "^3.3.2",
     "json5": "^2.2.3",
     "lodash-unified": "^1.0.3",
-    "magic-string": "^0.30.5",
+    "magic-string": "^0.30.8",
     "unconfig": "^0.3.11",
-    "yaml": "^2.3.4"
+    "yaml": "^2.4.0"
   },
   "devDependencies": {
     "@antfu/utils": "^0.7.7",
     "@types/debug": "^4.1.12",
-    "@types/node": "^20.10.6"
+    "@types/node": "^20.11.24"
   }
 }

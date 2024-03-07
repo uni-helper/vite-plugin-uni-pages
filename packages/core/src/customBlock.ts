@@ -18,10 +18,8 @@ export async function parseSFC(code: string): Promise<SFCDescriptor> {
       })
     )
   }
-  catch {
-    throw new Error(
-      '[vite-plugin-uni-pages] Vue3\'s "@vue/compiler-sfc" is required.',
-    )
+  catch (error) {
+    throw new Error(`[vite-plugin-uni-pages] Vue3's "@vue/compiler-sfc" is required. \nOriginal error: \n${error}`)
   }
 }
 
