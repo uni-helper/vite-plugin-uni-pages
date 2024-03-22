@@ -54,7 +54,31 @@ export default defineUniPages({
 
 现在所有的 page 都会被自动发现！
 
-### SFC 自定义块用于路由数据
+### 页面调用方式（1）： `definePage` 宏定义路由数据
+```html
+<!-- index.vue -->
+<script setup>
+// 参数为对象
+definePage({
+  type: 'home',
+  style: { navigationBarTitleText: 'index page' }
+})
+</script>
+
+<!-- other.vue -->
+<script setup>
+// 参数为函数
+// 注意：暂未支持外部 import
+definePage(() => {
+  const hello = ['hello', 'world']
+  return {
+    style: { navigationBarTitleText: hello.join(' ') }
+  }
+})
+</script>
+```
+
+### 页面调用方式（2）：SFC 自定义块用于路由数据
 
 通过添加一个 `<route>` 块到 SFC 中来添加路由元数据。这将会在路由生成后直接添加到路由中，并且会覆盖。
 

@@ -8,11 +8,14 @@ import chokidar from 'chokidar'
 import type { UserOptions } from './types'
 import { PageContext } from './context'
 import {
+  DEFINE_PAGE,
   MODULE_ID_VIRTUAL,
   OUTPUT_NAME,
   RESOLVED_MODULE_ID_VIRTUAL,
 } from './constant'
 import { checkPagesJsonFile } from './files'
+import { findMacro } from './page'
+import { isTargetFile, parseSFC } from './utils'
 
 export * from './config'
 export * from './types'
@@ -21,7 +24,7 @@ export * from './context'
 export * from './utils'
 export * from './files'
 export * from './options'
-export * from './customBlock'
+export * from './page'
 
 async function restart() {
   return new Promise((resolve) => {
@@ -78,17 +81,35 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
     },
     // Applet do not support custom route block, so we need to remove the route block here
     async transform(code: string, id: string) {
-      if (!/\.n?vue$/.test(id) && !code.includes('</route>'))
+      if (!isTargetFile(id))
         return null
-      const s = new MagicString(code)
-      const routeBlockMatches = s.original.matchAll(
-        /<route[^>]*>([\s\S]*?)<\/route>/g,
-      )
 
-      for (const match of routeBlockMatches) {
-        const index = match.index!
-        const length = match[0].length
-        s.remove(index, index + length)
+      const sfc = await parseSFC(code, { filename: id })
+
+      const macro = findMacro(sfc.scriptSetup)
+      const routeBlock = sfc.customBlocks.find(block => block.type === 'route')
+
+      if (!macro && !routeBlock)
+        return null
+
+      if (macro && routeBlock)
+        throw new Error(`mixed ${DEFINE_PAGE}() and <route/> is not allowed`)
+
+      const s = new MagicString(code)
+
+      if (macro)
+        s.remove(macro.start!, macro.end!)
+
+      if (routeBlock) {
+        const routeBlockMatches = s.original.matchAll(
+          /<route[^>]*>([\s\S]*?)<\/route>/g,
+        )
+
+        for (const match of routeBlockMatches) {
+          const index = match.index!
+          const length = match[0].length
+          s.remove(index, index + length)
+        }
       }
 
       if (s.hasChanged()) {

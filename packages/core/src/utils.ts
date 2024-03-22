@@ -1,10 +1,10 @@
 import Debug from 'debug'
-import { type ModuleNode, type ViteDevServer, normalizePath } from 'vite'
+import type { ModuleNode, ViteDevServer } from 'vite'
 import { groupBy } from 'lodash-unified'
-import type { SFCBlock } from '@vue/compiler-sfc'
+import type { SFCDescriptor, SFCParseOptions } from '@vue/compiler-sfc'
+import { parse as VueParser } from '@vue/compiler-sfc'
 import { FILE_EXTENSIONS, RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import type { PageMetaDatum } from './types'
-import { getRouteSfcBlock } from './customBlock'
 
 export function invalidatePagesModule(server: ViteDevServer) {
   const { moduleGraph } = server
@@ -19,6 +19,7 @@ export function invalidatePagesModule(server: ViteDevServer) {
 
 export const debug = {
   hmr: Debug('vite-plugin-uni-pages:hmr'),
+  definePage: Debug('vite-plugin-uni-pages:definePage'),
   routeBlock: Debug('vite-plugin-uni-pages:routeBlock'),
   options: Debug('vite-plugin-uni-pages:options'),
   pages: Debug('vite-plugin-uni-pages:pages'),
@@ -57,29 +58,21 @@ export function mergePageMetaDataArray(pageMetaData: PageMetaDatum[]) {
   return result
 }
 
-export function useCachedPages() {
-  const pages = new Map<string, string>()
-
-  function parseData(block?: SFCBlock) {
-    return {
-      content: block?.loc.source.trim() ?? '',
-      attr: block?.attrs ?? '',
-    }
+export async function parseSFC(code: string, options?: SFCParseOptions): Promise<SFCDescriptor> {
+  try {
+    return (
+      VueParser(code, {
+        pad: 'space',
+        ...options,
+      }).descriptor
+      // for @vue/compiler-sfc ^2.7
+      || (VueParser as any)({
+        source: code,
+        ...options,
+      })
+    )
   }
-
-  function setCache(filePath: string, routeBlock?: SFCBlock) {
-    pages.set(filePath, JSON.stringify(parseData(routeBlock)))
-  }
-
-  async function hasChanged(filePath: string, routeBlock?: SFCBlock) {
-    if (!routeBlock)
-      routeBlock = await getRouteSfcBlock(normalizePath(filePath))
-
-    return !pages.has(filePath) || JSON.stringify(parseData(routeBlock)) !== pages.get(filePath)
-  }
-
-  return {
-    setCache,
-    hasChanged,
+  catch (error) {
+    throw new Error(`[vite-plugin-uni-pages] Vue3's "@vue/compiler-sfc" is required. \nOriginal error: \n${error}`)
   }
 }

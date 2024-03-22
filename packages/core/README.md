@@ -44,7 +44,31 @@ export default defineUniPages({
 
 Now all pages will be found automatically!
 
-### SFC custom block for Route Data
+### Page usage (1): `definePage` macro define page options
+```html
+<!-- index.vue -->
+<script setup>
+// object argument
+definePage({
+  type: 'home',
+  style: { navigationBarTitleText: 'index page' }
+})
+</script>
+
+<!-- other.vue -->
+<script setup>
+// function argument
+// Note: import is not supported yet
+definePage(() => {
+  const hello = ['hello', 'world']
+  return {
+    style: { navigationBarTitleText: hello.join(' ') }
+  }
+})
+</script>
+```
+
+### Page usage (2): SFC custom block for Route Data
 
 Add route meta to the route by adding a `<route>` block to the SFC. This will be
 directly added to the route after it is generated, and will override it.
