@@ -74,7 +74,7 @@ style:
 Import the virtual module to access the metadata of all pages
 
 ```ts
-/// <reference types="@uni-helper/vite-plugin-uni-pages/client" />
+/// <reference types="@uni-helper/vite-plugin-uni-pages" />
 import { pages } from 'virtual:uni-pages'
 
 console.log(pages)

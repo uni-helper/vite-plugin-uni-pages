@@ -82,7 +82,7 @@ style:
 导入虚拟模块即可访问所有页面的元数据
 
 ```ts
-/// <reference types="@uni-helper/vite-plugin-uni-pages/client" />
+/// <reference types="@uni-helper/vite-plugin-uni-pages" />
 import { pages } from 'virtual:uni-pages'
 
 console.log(pages)
