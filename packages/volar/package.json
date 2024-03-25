@@ -48,7 +48,7 @@
   },
   "devDependencies": {
     "@types/json-schema": "^7.0.15",
-    "@volar/language-service": "1.10.3",
+    "@volar/language-service": "2.1.5",
     "unbuild": "^2.0.0"
   }
 }
