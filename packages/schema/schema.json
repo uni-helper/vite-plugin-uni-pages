@@ -5,7 +5,7 @@
     "AppPlus": {
       "properties": {
         "animationDuration": {
-          "default": "300",
+          "default": 300,
           "description": "窗口显示动画的持续时间，单位为 ms。",
           "type": "number"
         },
@@ -128,7 +128,7 @@
     "GlobalStyle": {
       "properties": {
         "animationDuration": {
-          "default": "300",
+          "default": 300,
           "description": "窗口显示动画的持续时间，单位为 ms",
           "type": "number"
         },
@@ -264,7 +264,7 @@
           "type": "string"
         },
         "onReachBottomDistance": {
-          "default": "50",
+          "default": 50,
           "description": "页面上拉触底事件触发时距页面底部距离，单位只支持px，详见页面生命周期",
           "type": "number"
         },
@@ -283,17 +283,17 @@
           "type": "boolean"
         },
         "rpxCalcBaseDeviceWidth": {
-          "default": "375",
+          "default": 375,
           "description": "rpx 计算使用的基准设备宽度，设备实际宽度超出 rpx 计算所支持的最大设备宽度时将按基准宽度计算，单位 px",
           "type": "number"
         },
         "rpxCalcIncludeWidth": {
-          "default": "750",
+          "default": 750,
           "description": "rpx 计算特殊处理的值，始终按实际的设备宽度计算，单位 rpx",
           "type": "number"
         },
         "rpxCalcMaxDeviceWidth": {
-          "default": "960",
+          "default": 960,
           "description": "rpx 计算所支持的最大设备宽度，单位 px",
           "type": "number"
         },
@@ -695,7 +695,7 @@
           "description": "配置显示该窗口的规则，配置项参考下方 matchMedia",
           "properties": {
             "minWidth": {
-              "default": "768",
+              "default": 768,
               "description": "当设备可见区域宽度 >= minWidth 时，显示该 window",
               "type": "number"
             }

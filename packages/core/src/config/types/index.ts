@@ -24,7 +24,7 @@ export interface TheWindow {
   matchMedia?: {
     /**
      * 当设备可见区域宽度 >= minWidth 时，显示该 window
-     * @default "768"
+     * @default 768
      */
     minWidth?: number
   }

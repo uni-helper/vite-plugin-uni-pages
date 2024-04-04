@@ -68,7 +68,7 @@ export interface AppPlus {
 
   /**
    * 窗口显示动画的持续时间，单位为 ms。
-   * @default "300"
+   * @default 300
    * @desc App
    */
   animationDuration?: number

@@ -53,7 +53,7 @@ export interface GlobalStyle {
 
   /**
    * 页面上拉触底事件触发时距页面底部距离，单位只支持px，详见页面生命周期
-   * @default "50"
+   * @default 50
    * @desc
    */
   onReachBottomDistance?: number
@@ -108,7 +108,7 @@ export interface GlobalStyle {
 
   /**
    * 窗口显示动画的持续时间，单位为 ms
-   * @default "300"
+   * @default 300
    * @desc App
    */
   animationDuration?: number
@@ -210,21 +210,21 @@ export interface GlobalStyle {
 
   /**
    * rpx 计算所支持的最大设备宽度，单位 px
-   * @default "960"
+   * @default 960
    * @desc App（vue2 且不含 nvue）、H5（2.8.12+）
    */
   rpxCalcMaxDeviceWidth?: number
 
   /**
    * rpx 计算使用的基准设备宽度，设备实际宽度超出 rpx 计算所支持的最大设备宽度时将按基准宽度计算，单位 px
-   * @default "375"
+   * @default 375
    * @desc App（vue2 且不含 nvue）、H5（2.8.12+）
    */
   rpxCalcBaseDeviceWidth?: number
 
   /**
    * rpx 计算特殊处理的值，始终按实际的设备宽度计算，单位 rpx
-   * @default "750"
+   * @default 750
    * @desc App（vue2 且不含 nvue）、H5（2.8.12+）
    */
   rpxCalcIncludeWidth?: number
