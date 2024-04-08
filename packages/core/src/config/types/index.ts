@@ -4,33 +4,11 @@ import type { EasyCom } from './easycom'
 import type { GlobalStyle } from './globalStyle'
 import type { SubPackages } from './subPackages'
 import type { TabBar } from './tabBar'
+import type { TheWindow } from './theWindow'
 
 export * from './easycom'
 export * from './globalStyle'
 export * from './tabBar'
-
-export interface TheWindow {
-  /**
-   * 配置页面路径
-   */
-  path: string
-
-  /**
-   * 配置页面窗口表现，配置项参考下方 pageStyle
-   */
-  style?: GlobalStyle
-
-  /**
-   * 配置显示该窗口的规则，配置项参考下方 matchMedia
-   */
-  matchMedia?: {
-    /**
-     * 当设备可见区域宽度 >= minWidth 时，显示该 window
-     * @default "768"
-     */
-    minWidth?: number
-  }
-}
 
 export interface UniIdRouter {
   /**
@@ -142,18 +120,21 @@ export interface PagesConfig {
 
   /**
    * 大屏左侧窗口
+   *
    * @desc H5
    */
   leftWindow?: TheWindow
 
   /**
    * 大屏顶部窗口
+   *
    * @desc H5
    */
   topWindow?: TheWindow
 
   /**
    * 大屏右侧窗口
+   *
    * @desc H5
    */
   rightWindow?: TheWindow

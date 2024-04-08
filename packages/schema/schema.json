@@ -2392,6 +2392,29 @@
           "description": "自动跳转相关配置，新增于 HBuilderX 3.5.0"
         },
         "workers": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "isSubpackage": {
+                  "default": false,
+                  "description": "是否打包为分包",
+                  "type": "boolean"
+                },
+                "path": {
+                  "description": "`Worker` 代码放置的目录",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "type": "object"
+            }
+          ],
           "description": "`Worker` 代码放置的目录"
         }
       },
@@ -2651,10 +2674,10 @@
       "properties": {
         "matchMedia": {
           "additionalProperties": false,
-          "description": "配置显示该窗口的规则，配置项参考下方 matchMedia",
+          "description": "配置显示该窗口的规则，配置项参考 [matchMedia](https://uniapp.dcloud.net.cn/collocation/pages#matchmedia)",
           "properties": {
             "minWidth": {
-              "default": "768",
+              "default": 768,
               "description": "当设备可见区域宽度 >= minWidth 时，显示该 window",
               "type": "number"
             }
@@ -2667,7 +2690,7 @@
         },
         "style": {
           "$ref": "#/definitions/GlobalStyle",
-          "description": "配置页面窗口表现，配置项参考下方 pageStyle"
+          "description": "配置页面窗口表现，配置项参考 [pageStyle](https://uniapp.dcloud.net.cn/collocation/pages#style)"
         }
       },
       "required": [
