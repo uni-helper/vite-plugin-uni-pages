@@ -2,6 +2,7 @@ import type { PageMetaDatum } from '../../types'
 import type { Condition } from './condition'
 import type { EasyCom } from './easycom'
 import type { GlobalStyle } from './globalStyle'
+import type { SubPackages } from './subPackages'
 import type { TabBar } from './tabBar'
 
 export * from './easycom'
@@ -61,18 +62,6 @@ export interface UniIdRouter {
   resToLogin?: boolean
 }
 
-export interface SubPackage {
-  /**
-   * 子包的根目录
-   */
-  root?: string
-
-  /**
-   * 子包由哪些页面组成，参数同 pages
-   */
-  pages?: PageMetaDatum[]
-}
-
 /**
  * 对 uni-app 进行全局配置，决定页面文件的路径、窗口样式、原生的导航栏、底部的原生 tabBar 等，类似微信小程序中 app.json 的页面管理部分
  *
@@ -108,8 +97,10 @@ export interface PagesConfig {
 
   /**
    * 分包加载配置
+   *
+   * @desc H5 不支持
    */
-  subPackages?: SubPackage[]
+  subPackages?: SubPackages
 
   /**
    * 分包预下载规则

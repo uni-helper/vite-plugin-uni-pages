@@ -1112,7 +1112,7 @@
       "additionalProperties": false,
       "properties": {
         "current": {
-          "description": "当前激活的模式，list节点的索引值",
+          "description": "当前激活的模式，list 节点的索引值",
           "type": "number"
         },
         "list": {
@@ -1138,6 +1138,10 @@
           "type": "array"
         }
       },
+      "required": [
+        "current",
+        "list"
+      ],
       "type": "object"
     },
     "EasyCom": {
@@ -2312,7 +2316,7 @@
       "properties": {
         "condition": {
           "$ref": "#/definitions/Condition",
-          "description": "启动模式配置"
+          "description": "启动模式配置，仅开发期间生效"
         },
         "easycom": {
           "$ref": "#/definitions/EasyCom",
@@ -2349,11 +2353,8 @@
           "description": "大屏右侧窗口"
         },
         "subPackages": {
-          "description": "分包加载配置",
-          "items": {
-            "$ref": "#/definitions/SubPackage"
-          },
-          "type": "array"
+          "$ref": "#/definitions/SubPackages",
+          "description": "分包加载配置"
         },
         "tabBar": {
           "$ref": "#/definitions/TabBar",
@@ -2415,7 +2416,17 @@
           "type": "string"
         }
       },
+      "required": [
+        "root",
+        "pages"
+      ],
       "type": "object"
+    },
+    "SubPackages": {
+      "items": {
+        "$ref": "#/definitions/SubPackage"
+      },
+      "type": "array"
     },
     "TabBar": {
       "properties": {
