@@ -2343,7 +2343,30 @@
         },
         "preloadRule": {
           "additionalProperties": {
-            "$ref": "#/definitions/PreloadRule"
+            "additionalProperties": false,
+            "description": "页面路径",
+            "properties": {
+              "network": {
+                "default": "wifi",
+                "description": "在指定网络下预下载\n\n\"all\" 不限网络\n\n\"wifi\" 仅 wifi 下预下载",
+                "enum": [
+                  "all",
+                  "wifi"
+                ],
+                "type": "string"
+              },
+              "packages": {
+                "description": "进入页面后预下载分包的 root 或 name\n\n__APP__ 表示主包",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "packages"
+            ],
+            "type": "object"
           },
           "description": "分包预下载规则",
           "type": "object"
@@ -2376,24 +2399,6 @@
     },
     "PercentageSize": {
       "type": "string"
-    },
-    "PreloadRule": {
-      "additionalProperties": false,
-      "properties": {
-        "network": {
-          "default": "wifi",
-          "description": "在指定网络下预下载，可选值为：all（不限网络）、wifi（仅wifi下预下载）",
-          "type": "string"
-        },
-        "packages": {
-          "description": "进入页面后预下载分包的 root 或 name。__APP__ 表示主包。",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        }
-      },
-      "type": "object"
     },
     "PxSize": {
       "type": "string"

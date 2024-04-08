@@ -32,19 +32,6 @@ export interface TheWindow {
   }
 }
 
-export interface PreloadRule {
-  /**
-   * 进入页面后预下载分包的 root 或 name。__APP__ 表示主包。
-   */
-  packages?: string[]
-
-  /**
-   * 在指定网络下预下载，可选值为：all（不限网络）、wifi（仅wifi下预下载）
-   * @default "wifi"
-   */
-  network?: string
-}
-
 export interface UniIdRouter {
   /**
    * 登录页面路径
@@ -104,10 +91,32 @@ export interface PagesConfig {
 
   /**
    * 分包预下载规则
+   *
    * @desc 微信小程序
    */
   preloadRule?: {
-    [path: string]: PreloadRule
+    /**
+     * 页面路径
+     */
+    [path: string]: {
+      /**
+       * 进入页面后预下载分包的 root 或 name
+       *
+       * __APP__ 表示主包
+       */
+      packages: string[]
+
+      /**
+       * 在指定网络下预下载
+       *
+       * "all" 不限网络
+       *
+       * "wifi" 仅 wifi 下预下载
+       *
+       * @default "wifi"
+       */
+      network?: 'all' | 'wifi'
+    }
   }
 
   /**
