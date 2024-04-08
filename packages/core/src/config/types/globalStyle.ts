@@ -2,6 +2,14 @@ import type { AppPlus } from './appPlus'
 import type { HEXColor, ThemeColor } from './common'
 import type { H5 } from './h5'
 
+export interface NavigationBarShadow {
+  /**
+   * 阴影颜色
+   * @desc 微信/百度/头条 需要配置: "disableScroll": true. 支付宝 "mp-alipay": { "allowsBounceVertical": "NO" }
+   */
+  colorType: 'grey' | 'blue' | 'green' | 'orange' | 'red' | 'yellow'
+}
+
 export interface GlobalStyle {
   /**
    * 导航栏背景颜色（同状态栏背景色）
@@ -22,6 +30,12 @@ export interface GlobalStyle {
    * @desc
    */
   navigationBarTitleText?: string
+
+  /**
+   * 导航栏阴影
+   * @desc
+   */
+  navigationBarShadow?: NavigationBarShadow
 
   /**
    * 导航栏样式，仅支持 default/custom。custom即取消默认的原生导航栏，需看使用注意

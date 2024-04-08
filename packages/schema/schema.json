@@ -249,6 +249,10 @@
           "default": "#F7F7F7",
           "description": "导航栏背景颜色（同状态栏背景色）"
         },
+        "navigationBarShadow": {
+          "$ref": "#/definitions/NavigationBarShadow",
+          "description": "导航栏阴影"
+        },
         "navigationBarTextStyle": {
           "default": "white",
           "description": "导航栏标题颜色及状态栏前景颜色，仅支持 black/white",
@@ -427,6 +431,27 @@
           "type": "string"
         }
       },
+      "type": "object"
+    },
+    "NavigationBarShadow": {
+      "additionalProperties": false,
+      "properties": {
+        "colorType": {
+          "description": "阴影颜色",
+          "enum": [
+            "grey",
+            "blue",
+            "green",
+            "orange",
+            "red",
+            "yellow"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "colorType"
+      ],
       "type": "object"
     },
     "PageMetaDatum": {
