@@ -35,6 +35,16 @@ export interface GlobalStyle {
   'navigationBarTitleText'?: string
 
   /**
+   * 导航栏阴影
+   */
+  'navigationBarShadow'?: {
+    /**
+     * 阴影颜色
+     */
+    colorType?: 'grey' | 'blue' | 'green' | 'orange' | 'red' | 'yellow'
+  }
+
+  /**
    * 导航栏样式，仅支持 "default" / "custom"
    *
    * "custom" 即取消默认的原生导航栏，详看 [使用注意](https://uniapp.dcloud.net.cn/collocation/pages#customnav)

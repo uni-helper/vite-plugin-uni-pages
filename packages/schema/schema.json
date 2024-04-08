@@ -1265,6 +1265,25 @@
           "description": "导航栏背景颜色（同状态栏背景色），支持 HEX 颜色",
           "format": "color"
         },
+        "navigationBarShadow": {
+          "additionalProperties": false,
+          "description": "导航栏阴影",
+          "properties": {
+            "colorType": {
+              "description": "阴影颜色",
+              "enum": [
+                "grey",
+                "blue",
+                "green",
+                "orange",
+                "red",
+                "yellow"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
         "navigationBarTextStyle": {
           "default": "black",
           "description": "导航栏标题颜色及状态栏前景颜色，仅支持 \"black\" / \"white\"",
