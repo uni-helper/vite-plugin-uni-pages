@@ -5,27 +5,11 @@ import type { GlobalStyle } from './globalStyle'
 import type { SubPackages } from './subPackages'
 import type { TabBar } from './tabBar'
 import type { TheWindow } from './theWindow'
+import type { UniIdRouter } from './uniIdRouter'
 
 export * from './easycom'
 export * from './globalStyle'
 export * from './tabBar'
-
-export interface UniIdRouter {
-  /**
-   * 登录页面路径
-   */
-  loginPage: string
-  /**
-   * 需要登录才可以访问的页面列表，可以使用正则语法
-   */
-  needLogin: string[]
-  /**
-   * 是否自动解析云对象及 clientDB 的错误码，如果是客户端 token 不正确或 token 过期则自动跳转配置的登录页面
-   *
-   * @default true
-   */
-  resToLogin?: boolean
-}
 
 /**
  * 对 uni-app 进行全局配置，决定页面文件的路径、窗口样式、原生的导航栏、底部的原生 tabBar 等，类似微信小程序中 app.json 的页面管理部分
@@ -141,6 +125,8 @@ export interface PagesConfig {
 
   /**
    * 自动跳转相关配置，新增于 HBuilderX 3.5.0
+   *
+   * @desc uni-app 3.5.0+、uni-app-x 3.99+
    */
   uniIdRouter?: UniIdRouter
 

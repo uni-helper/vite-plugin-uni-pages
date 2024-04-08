@@ -2804,10 +2804,18 @@
       "properties": {
         "loginPage": {
           "description": "登录页面路径",
+          "examples": [
+            "pages/index/index"
+          ],
           "type": "string"
         },
         "needLogin": {
           "description": "需要登录才可以访问的页面列表，可以使用正则语法",
+          "examples": [
+            [
+              "pages/detail/.*"
+            ]
+          ],
           "items": {
             "type": "string"
           },
@@ -2815,7 +2823,7 @@
         },
         "resToLogin": {
           "default": true,
-          "description": "是否自动解析云对象及 clientDB 的错误码，如果是客户端 token 不正确或 token 过期则自动跳转配置的登录页面",
+          "description": "是否是否自动解析云对象及 clientDB 的错误码，如果是客户端 token 不正确或 token 过期则自动跳转配置的登录页面",
           "type": "boolean"
         }
       },
