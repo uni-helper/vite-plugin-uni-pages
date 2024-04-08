@@ -1125,19 +1125,6 @@
       },
       "type": "object"
     },
-    "Color": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/RGBColor"
-        },
-        {
-          "$ref": "#/definitions/RGBAColor"
-        },
-        {
-          "$ref": "#/definitions/HEXColor"
-        }
-      ]
-    },
     "Condition": {
       "additionalProperties": false,
       "properties": {
@@ -1522,69 +1509,6 @@
     },
     "HEXColor": {
       "type": "string"
-    },
-    "IconFont": {
-      "additionalProperties": false,
-      "properties": {
-        "color": {
-          "description": "字体图标颜色",
-          "type": "string"
-        },
-        "fontSize": {
-          "description": "字体图标字号(px)",
-          "type": "string"
-        },
-        "selectedColor": {
-          "description": "字体图标选中颜色",
-          "type": "string"
-        },
-        "selectedText": {
-          "description": "选中后字库 Unicode 码",
-          "type": "string"
-        },
-        "text": {
-          "description": "字库 Unicode 码",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "MidButton": {
-      "additionalProperties": false,
-      "properties": {
-        "backgroundImage": {
-          "description": "中间按钮的背景图片路径",
-          "type": "string"
-        },
-        "height": {
-          "default": "50px",
-          "description": "中间按钮的高度，可以大于 tabBar 高度，达到中间凸起的效果",
-          "type": "string"
-        },
-        "iconPath": {
-          "description": "中间按钮的图片路径",
-          "type": "string"
-        },
-        "iconWidth": {
-          "default": "24px",
-          "description": "图片宽度（高度等比例缩放）",
-          "type": "string"
-        },
-        "iconfont": {
-          "$ref": "#/definitions/IconFont",
-          "description": "字体图标，优先级高于 iconPath"
-        },
-        "text": {
-          "description": "中间按钮的文字",
-          "type": "string"
-        },
-        "width": {
-          "default": "80px",
-          "description": "中间按钮的宽度，tabBar 其它项为减去此宽度后平分，默认值为与其它项平分宽度",
-          "type": "string"
-        }
-      },
-      "type": "object"
     },
     "MpAlipay": {
       "description": "设置编译到 mp-alipay 平台的特定样式，配置项参考 [MP-ALIPAY](https://uniapp.dcloud.net.cn/collocation/pages#mp-alipay) 和 <https://opendocs.alipay.com/mini/framework/app-json#window>\n\n相应的类型是 MpAlipay",
@@ -2507,9 +2431,6 @@
     "RGBAColor": {
       "type": "string"
     },
-    "RGBColor": {
-      "type": "string"
-    },
     "SubPackage": {
       "additionalProperties": false,
       "properties": {
@@ -2530,43 +2451,58 @@
     "TabBar": {
       "properties": {
         "backgroundColor": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Color"
-            },
-            {
-              "$ref": "#/definitions/ThemeColor"
-            }
+          "$ref": "#/definitions/HEXColor",
+          "description": "tab 的背景色",
+          "format": "color"
+        },
+        "backgroundImage": {
+          "description": "设置背景图片，优先级高于 backgroundColor",
+          "type": "string"
+        },
+        "backgroundRepeat": {
+          "default": "no-repeat",
+          "description": "设置标题栏的背景图平铺方式\n\n\"repeat\" 背景图片在垂直方向和水平方向平铺\n\n\"repeat-x\" 背景图片在水平方向平铺，垂直方向拉伸\n\n\"repeat-y\" 背景图片在垂直方向平铺，水平方向拉伸\n\n\"no-repeat\" 背景图片在垂直方向和水平方向都拉伸",
+          "enum": [
+            "no-repeat",
+            "repeat",
+            "repeat-x",
+            "repeat-y"
           ],
-          "description": "tab 的背景色"
+          "type": "string"
         },
         "blurEffect": {
           "default": "none",
-          "description": "iOS 高斯模糊效果，可选值 dark/extralight/light/none（参考?:使用说明）",
+          "description": "iOS 高斯模糊效果，参考 [使用说明](https://ask.dcloud.net.cn/article/36617)",
+          "enum": [
+            "dark",
+            "extralight",
+            "light",
+            "none"
+          ],
           "type": "string"
         },
         "borderStyle": {
           "anyOf": [
             {
+              "const": "black",
               "type": "string"
             },
             {
-              "$ref": "#/definitions/ThemeColor"
+              "const": "white",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/HEXColor"
             }
           ],
           "default": "black",
-          "description": "tabbar 上边框的颜色，可选值 black/white，也支持其他颜色值"
+          "description": "tabBar 上边框的颜色",
+          "format": "color"
         },
         "color": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Color"
-            },
-            {
-              "$ref": "#/definitions/ThemeColor"
-            }
-          ],
-          "description": "tab 上的文字默认颜色"
+          "$ref": "#/definitions/HEXColor",
+          "description": "tab 上的文字默认颜色",
+          "format": "color"
         },
         "fontSize": {
           "default": "10px",
@@ -2584,11 +2520,11 @@
           "type": "string"
         },
         "iconfontSrc": {
-          "description": "list设置 iconfont 属性时，需要指定字体文件路径",
+          "description": "list 设置 iconfont 属性时，需要指定字体文件路径",
           "type": "string"
         },
         "list": {
-          "description": "tab 的列表，详见 list 属性说明，最少2个、最多5个 tab",
+          "description": "tab 列表，最少 2个，最多 5 个",
           "items": {
             "$ref": "#/definitions/TabBarItem"
           },
@@ -2597,24 +2533,27 @@
           "type": "array"
         },
         "midButton": {
-          "$ref": "#/definitions/MidButton",
+          "$ref": "#/definitions/TabBarMidButton",
           "description": "中间按钮 仅在 list 项为偶数时有效"
         },
         "position": {
           "default": "bottom",
-          "description": "可选值 bottom、top",
+          "description": "tab 位置",
+          "enum": [
+            "bottom",
+            "top"
+          ],
+          "type": "string"
+        },
+        "redDotColor": {
+          "description": "tabBar上红点颜色",
+          "format": "color",
           "type": "string"
         },
         "selectedColor": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Color"
-            },
-            {
-              "$ref": "#/definitions/ThemeColor"
-            }
-          ],
-          "description": "tab 上的文字选中时的颜色"
+          "$ref": "#/definitions/HEXColor",
+          "description": "tab 上的文字选中时的颜色",
+          "format": "color"
         },
         "spacing": {
           "default": "3px",
@@ -2623,18 +2562,45 @@
         }
       },
       "required": [
+        "color",
+        "selectedColor",
         "list"
       ],
+      "type": "object"
+    },
+    "TabBarIconFont": {
+      "properties": {
+        "color": {
+          "$ref": "#/definitions/HEXColor",
+          "description": "字体图标颜色"
+        },
+        "fontSize": {
+          "description": "字体图标字号，单位为 px",
+          "type": "string"
+        },
+        "selectedColor": {
+          "$ref": "#/definitions/HEXColor",
+          "description": "字体图标选中颜色"
+        },
+        "selectedText": {
+          "description": "选中后字库 Unicode 码",
+          "type": "string"
+        },
+        "text": {
+          "description": "字库 Unicode 码",
+          "type": "string"
+        }
+      },
       "type": "object"
     },
     "TabBarItem": {
       "properties": {
         "iconPath": {
-          "description": "图片路径，icon 大小限制为40kb，建议尺寸为 81px * 81px， 当 position 为 top 时，此参数无效，不支持网络图片，不支持字体图标",
+          "description": "图片路径，icon 大小限制为 40 kb，建议尺寸为 81px * 81px\n\n当 position 为 \"top\" 时，此参数无效\n\n不支持网络图片，不支持字体图标",
           "type": "string"
         },
         "iconfont": {
-          "$ref": "#/definitions/IconFont",
+          "$ref": "#/definitions/TabBarIconFont",
           "description": "字体图标，优先级高于 iconPath"
         },
         "pagePath": {
@@ -2642,16 +2608,55 @@
           "type": "string"
         },
         "selectedIconPath": {
-          "description": "选中时的图片路径，icon 大小限制为40kb，建议尺寸为 81px * 81px ，当 position 为 top 时，此参数无效",
+          "description": "选中时的图片路径，icon 大小限制为 40 kb，建议尺寸为 81px * 81px\n\n当 position 为 \"top\" 时，此参数无效\n\n不支持网络图片，不支持字体图标",
           "type": "string"
         },
         "text": {
-          "description": "tab 上按钮文字，在 App 和 H5 平台为非必填。例如中间可放一个没有文字的+号图标",
+          "description": "tab 上按钮文字，在 App 和 H5 平台为非必填，例如中间可放一个没有文字的 + 号图标",
           "type": "string"
         },
         "visible": {
           "description": "该项是否显示，默认显示",
           "type": "boolean"
+        }
+      },
+      "required": [
+        "pagePath"
+      ],
+      "type": "object"
+    },
+    "TabBarMidButton": {
+      "properties": {
+        "backgroundImage": {
+          "description": "中间按钮的背景图片路径",
+          "type": "string"
+        },
+        "height": {
+          "default": "50px",
+          "description": "中间按钮的高度，可以大于 tabBar 高度，达到中间凸起的效果",
+          "type": "string"
+        },
+        "iconPath": {
+          "description": "中间按钮的图片路径",
+          "type": "string"
+        },
+        "iconWidth": {
+          "default": "24px",
+          "description": "图片宽度（高度等比例缩放）",
+          "type": "string"
+        },
+        "iconfont": {
+          "$ref": "#/definitions/TabBarIconFont",
+          "description": "字体图标，优先级高于 iconPath"
+        },
+        "text": {
+          "description": "中间按钮的文字",
+          "type": "string"
+        },
+        "width": {
+          "default": "80px",
+          "description": "中间按钮的宽度，tabBar 其它项为减去此宽度后平分，默认值为与其它项平分宽度",
+          "type": "string"
         }
       },
       "type": "object"
@@ -2684,9 +2689,6 @@
         "path"
       ],
       "type": "object"
-    },
-    "ThemeColor": {
-      "type": "string"
     },
     "TitleNViewButton": {
       "additionalProperties": false,
