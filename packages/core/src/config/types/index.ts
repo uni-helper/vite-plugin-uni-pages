@@ -121,9 +121,24 @@ export interface PagesConfig {
 
   /**
    * `Worker` 代码放置的目录
+   *
    * @desc 微信小程序
    */
-  workers?: any
+  workers?: string | {
+    /**
+     * `Worker` 代码放置的目录
+     */
+    path: string
+
+    /**
+     * 是否打包为分包
+     *
+     * @desc 微信小程序基础库 v2.27.3
+     *
+     * @default false
+     */
+    isSubpackage?: boolean
+  }
 
   /**
    * 大屏左侧窗口
