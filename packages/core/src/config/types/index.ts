@@ -1,4 +1,5 @@
 import type { PageMetaDatum } from '../../types'
+import type { Condition } from './condition'
 import type { EasyCom } from './easycom'
 import type { GlobalStyle } from './globalStyle'
 import type { TabBar } from './tabBar'
@@ -72,35 +73,6 @@ export interface SubPackage {
   pages?: PageMetaDatum[]
 }
 
-export interface ConditionItem {
-  /**
-   * 启动模式名称
-   */
-  name?: string
-
-  /**
-   * 启动页面路径
-   */
-  path: string
-
-  /**
-   * 启动参数，可在页面的 onLoad 函数里获得
-   */
-  query?: string
-}
-
-export interface Condition {
-  /**
-   * 当前激活的模式，list节点的索引值
-   */
-  current?: number
-
-  /**
-   * 启动模式列表
-   */
-  list?: Partial<ConditionItem>[]
-}
-
 /**
  * 对 uni-app 进行全局配置，决定页面文件的路径、窗口样式、原生的导航栏、底部的原生 tabBar 等，类似微信小程序中 app.json 的页面管理部分
  *
@@ -130,7 +102,7 @@ export interface PagesConfig {
   tabBar?: TabBar
 
   /**
-   * 启动模式配置
+   * 启动模式配置，仅开发期间生效
    */
   condition?: Condition
 
