@@ -7,9 +7,13 @@ import type { TabBar } from './tabBar'
 import type { TheWindow } from './theWindow'
 import type { UniIdRouter } from './uniIdRouter'
 
+export * from './condition'
 export * from './easycom'
 export * from './globalStyle'
+export * from './subPackages'
 export * from './tabBar'
+export * from './theWindow'
+export * from './uniIdRouter'
 
 /**
  * 对 uni-app 进行全局配置，决定页面文件的路径、窗口样式、原生的导航栏、底部的原生 tabBar 等，类似微信小程序中 app.json 的页面管理部分
