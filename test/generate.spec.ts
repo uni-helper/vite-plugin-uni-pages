@@ -35,6 +35,13 @@ describe('generate routes', () => {
           "type": "page"
         },
         {
+          "path": "../packages/playground/src/pages/i18n",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "%app.name%"
+          }
+        },
+        {
           "path": "../packages/playground/src/pages/index",
           "type": "page",
           "middlewares": [
@@ -105,6 +112,13 @@ describe('generate routes', () => {
           "path": "../packages/playground/src/pages/A-top",
           "type": "page",
           "style": {}
+        },
+        {
+          "path": "../packages/playground/src/pages/i18n",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "%app.name%"
+          }
         },
         {
           "path": "../packages/playground/src/pages/index",
