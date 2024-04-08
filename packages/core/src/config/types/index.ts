@@ -101,19 +101,25 @@ export interface Condition {
   list?: Partial<ConditionItem>[]
 }
 
+/**
+ * 对 uni-app 进行全局配置，决定页面文件的路径、窗口样式、原生的导航栏、底部的原生 tabBar 等，类似微信小程序中 app.json 的页面管理部分
+ *
+ * 注意定位权限申请等原属于 app.json 的内容，需要在 manifest 中配置
+ */
 export interface PagesConfig {
-  /**
-   * 设置页面路径及窗口表现
-   */
-  pages?: PageMetaDatum[]
-
   /**
    * 设置默认页面的窗口表现
    */
   globalStyle?: GlobalStyle
 
   /**
+   * 设置页面路径及窗口表现
+   */
+  pages?: PageMetaDatum[]
+
+  /**
    * 组件自动引入规则
+   *
    * @desc 2.5.5+
    */
   easycom?: EasyCom
@@ -172,6 +178,8 @@ export interface PagesConfig {
 
   /**
    * 默认启动首页，新增于 HBuilderX 3.7.0
+   *
+   * @desc 微信小程序、支付宝小程序
    */
   entryPagePath?: string
 
