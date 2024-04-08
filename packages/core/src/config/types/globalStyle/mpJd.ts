@@ -74,4 +74,6 @@ export interface MpJd {
    * @default false
    */
   enablePullDownRefresh?: boolean
+
+  [x: string]: any
 }

@@ -121,4 +121,6 @@ export interface MpLark {
    * PCMode 模式下特定的窗口配置，支持的属性与通用 window 配置属性一致，仅当在 ext 内配置了 defaultPages.PCMode 时生效
    */
   PCMode?: Omit<MpLark, 'PCMode'>
+
+  [x: string]: any
 }

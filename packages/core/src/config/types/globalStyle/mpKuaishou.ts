@@ -94,4 +94,6 @@ export interface MpKuaishou {
    * @default "portrait"
    */
   pageOrientation?: 'auto' | 'portrait' | 'landscape'
+
+  [x: string]: any
 }

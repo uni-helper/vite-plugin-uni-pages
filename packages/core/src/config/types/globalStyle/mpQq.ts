@@ -87,4 +87,6 @@ export interface MpQq {
    * @default "portrait"
    */
   pageOrientation?: 'auto' | 'portrait' | 'landscape'
+
+  [x: string]: any
 }

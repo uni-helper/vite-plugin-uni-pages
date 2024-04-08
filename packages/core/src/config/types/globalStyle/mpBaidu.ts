@@ -111,4 +111,6 @@ export interface MpBaidu {
    * @default "portrait"
    */
   pageOrientation?: 'auto' | 'portrait' | 'landscape'
+
+  [x: string]: any
 }

@@ -179,6 +179,8 @@ export interface AppPlus {
          * @default "1px"
          */
         borderWidth?: PxSize
+
+        [x: string]: any
       }
 
       /**
@@ -242,6 +244,8 @@ export interface AppPlus {
          * 当未设置 width 值时，可通过 left 和 right 属性值来确定区域的宽度
          */
         right?: PxSize | PercentageSize | 'auto'
+
+        [x: string]: any
       }
 
       /**
@@ -281,6 +285,8 @@ export interface AppPlus {
          * @default "0px"
          */
         borderWidth?: PxSize
+
+        [x: string]: any
       }
 
       /**
@@ -349,6 +355,8 @@ export interface AppPlus {
          * 当未设置 width 值时，可通过 left 和 right 属性值来确定区域的宽度
          */
         right?: PxSize | PercentageSize | 'auto'
+
+        [x: string]: any
       }
 
       /**
@@ -486,6 +494,8 @@ export interface AppPlus {
          * @default "nowrap"
          */
         whiteSpace?: 'normal' | 'nowrap'
+
+        [x: string]: any
       }
 
       /**
@@ -516,7 +526,11 @@ export interface AppPlus {
          * 富文本默认使用的字体文件路径，必须为本地路径，如果指定的文件路径无效，则使用系统默认字体
          */
         fontSrc?: string
+
+        [x: string]: any
       }
+
+      [x: string]: any
     }[]
 
     /**
@@ -581,6 +595,8 @@ export interface AppPlus {
        * @default false
        */
       disabled?: boolean
+
+      [x: string]: any
     }
 
     /**
@@ -679,6 +695,8 @@ export interface AppPlus {
        * "bold" 粗体
        */
       titleWeight?: 'normal' | 'bold'
+
+      [x: string]: any
     }
 
     /**
@@ -769,6 +787,8 @@ export interface AppPlus {
        * @default "1px"
        */
       height?: PxSize | PercentageSize
+
+      [x: string]: any
     }
 
     /**
@@ -832,6 +852,8 @@ export interface AppPlus {
      * @default "0px"
      */
     titleIconRadius?: PxSize
+
+    [x: string]: any
   }
 
   /**
@@ -980,7 +1002,11 @@ export interface AppPlus {
        * @format color
        */
       background?: HEXColor | 'transparent'
+
+      [x: string]: any
     }
+
+    [x: string]: any
   }[]
 
   /**
@@ -1079,6 +1105,8 @@ export interface AppPlus {
        * 下拉可刷新状态时下拉刷新控件标题内容
        */
       caption?: string
+
+      [x: string]: any
     }
 
     /**
@@ -1089,15 +1117,23 @@ export interface AppPlus {
        * 释放可刷新状态时下拉刷新控件标题内容
        */
       caption?: string
+
+      [x: string]: any
     }
 
     /**
      * 正在刷新状态时配置，仅 style 为 "default" 时有效
      */
     contentrefresh?: {
-      /** 正在刷新状态时下拉刷新控件标题内容 */
+      /**
+       * 正在刷新状态时下拉刷新控件标题内容
+       */
       caption?: string
+
+      [x: string]: any
     }
+
+    [x: string]: any
   }
 
   /**

@@ -49,7 +49,6 @@
           "type": "string"
         },
         "pullToRefresh": {
-          "additionalProperties": false,
           "description": "下拉刷新",
           "properties": {
             "color": {
@@ -59,7 +58,6 @@
               "format": "color"
             },
             "contentdown": {
-              "additionalProperties": false,
               "description": "下拉可刷新状态时配置，仅 style 为 \"default\" 时有效",
               "properties": {
                 "caption": {
@@ -70,7 +68,6 @@
               "type": "object"
             },
             "contentover": {
-              "additionalProperties": false,
               "description": "释放可刷新状态时配置，仅 style 为 \"default\" 时有效",
               "properties": {
                 "caption": {
@@ -81,7 +78,6 @@
               "type": "object"
             },
             "contentrefresh": {
-              "additionalProperties": false,
               "description": "正在刷新状态时配置，仅 style 为 \"default\" 时有效",
               "properties": {
                 "caption": {
@@ -166,7 +162,6 @@
         "subNVues": {
           "description": "原生子窗体，详见 [原生子窗体](https://uniapp.dcloud.net.cn/collocation/pages#app-subNVues)",
           "items": {
-            "additionalProperties": false,
             "properties": {
               "id": {
                 "description": "原生子窗体的标识",
@@ -177,7 +172,6 @@
                 "type": "string"
               },
               "style": {
-                "additionalProperties": false,
                 "description": "原生子窗体的样式",
                 "properties": {
                   "background": {
@@ -306,7 +300,6 @@
               "type": "boolean"
             },
             {
-              "additionalProperties": false,
               "properties": {
                 "autoBackButton": {
                   "default": true,
@@ -314,7 +307,6 @@
                   "type": "boolean"
                 },
                 "backButton": {
-                  "additionalProperties": false,
                   "description": "返回按钮的样式，详见 [backButton](https://uniapp.dcloud.net.cn/collocation/pages#app-titlenview-backbuttonstyles)",
                   "properties": {
                     "background": {
@@ -458,7 +450,6 @@
                   "type": "boolean"
                 },
                 "searchInput": {
-                  "additionalProperties": false,
                   "description": "原生导航栏上的搜索框配置，详见 [searchInput](https://uniapp.dcloud.net.cn/collocation/pages#app-titlenview-searchinput)",
                   "properties": {
                     "align": {
@@ -518,7 +509,6 @@
                       "type": "boolean"
                     },
                     {
-                      "additionalProperties": false,
                       "properties": {
                         "color": {
                           "anyOf": [
@@ -594,7 +584,6 @@
                 "tags": {
                   "description": "原生 View 增强，详见 [5+ View 控件](http://www.html5plus.org/doc/zh_cn/nativeobj.html#plus.nativeObj.ViewDrawTagStyles)",
                   "items": {
-                    "additionalProperties": false,
                     "properties": {
                       "color": {
                         "anyOf": [
@@ -614,7 +603,6 @@
                         "type": "string"
                       },
                       "inputStyles": {
-                        "additionalProperties": false,
                         "description": "绘制输入框的样式\n\n当 tag 属性值为 \"input\" 时有效，用于指定绘制输入框的样式、大小位置等信息",
                         "properties": {
                           "borderColor": {
@@ -659,7 +647,6 @@
                         "type": "object"
                       },
                       "position": {
-                        "additionalProperties": false,
                         "default": {
                           "height": "100%",
                           "left": "0px",
@@ -758,7 +745,6 @@
                         "type": "object"
                       },
                       "rectStyles": {
-                        "additionalProperties": false,
                         "description": "绘制区域的样式\n\n当 tag 属性值为 \"rect\" 时有效，用于指定绘制区域的样式、填充颜色、圆角大小等信息",
                         "properties": {
                           "borderColor": {
@@ -801,7 +787,6 @@
                         "type": "object"
                       },
                       "richTextStyles": {
-                        "additionalProperties": false,
                         "description": "绘制富文本的样式\n\n当 tag 属性值为 \"richtext\" 时有效，用于指定绘制富文本内容的默认字体颜色、字体类型等信息",
                         "properties": {
                           "align": {
@@ -826,7 +811,6 @@
                         "type": "object"
                       },
                       "sprite": {
-                        "additionalProperties": false,
                         "default": {
                           "height": "100%",
                           "left": "0px",
@@ -944,7 +928,6 @@
                         "type": "string"
                       },
                       "textStyles": {
-                        "additionalProperties": false,
                         "description": "绘制文本的样式\n\n当 tag 属性值为 \"font\" 时有效，用于指定绘制文本内容的字体大小、字体颜色、字体类型等信息",
                         "properties": {
                           "align": {
@@ -1375,7 +1358,6 @@
     "H5": {
       "properties": {
         "pullToRefresh": {
-          "additionalProperties": false,
           "description": "下拉刷新，详见 [下拉刷新](https://uniapp.dcloud.net.cn/collocation/pages#h5-pulltorefresh)",
           "properties": {
             "color": {
@@ -1405,7 +1387,6 @@
               "type": "boolean"
             },
             {
-              "additionalProperties": false,
               "properties": {
                 "backgroundColor": {
                   "$ref": "#/definitions/HEXColor",
@@ -1421,7 +1402,6 @@
                   "type": "array"
                 },
                 "searchInput": {
-                  "additionalProperties": false,
                   "description": "导航栏上的搜索框配置，详见 [searchInput](https://uniapp.dcloud.net.cn/collocation/pages#h5-searchinput)",
                   "properties": {
                     "align": {
@@ -1620,7 +1600,6 @@
       "type": "object"
     },
     "MpBaidu": {
-      "additionalProperties": false,
       "description": "设置编译到 mp-baidu 平台的特定样式，配置项参考 [MP-BAIDU](https://uniapp.dcloud.net.cn/collocation/pages.html#mp-baidu) 和 <https://smartprogram.baidu.com/docs/develop/framework/process/#window>\n\n相应的类型是 MpBaidu",
       "properties": {
         "backgroundColor": {
@@ -1708,7 +1687,6 @@
       "type": "object"
     },
     "MpJd": {
-      "additionalProperties": false,
       "description": "设置编译到 mp-jd 平台的特定样式，配置项参考 <https://mp-docs.jd.com/doc/dev/framework/504#heading-3>\n\n相应的类型是 MpJd",
       "properties": {
         "backgroundColor": {
@@ -1772,7 +1750,6 @@
       "type": "object"
     },
     "MpKuaishou": {
-      "additionalProperties": false,
       "description": "设置编译到 mp-kuaishou 平台的特定样式，配置项参考 <https://mp.kuaishou.com/docs/develop/frame/config/conf_appjson.html#window>\n\n相应的类型是 MpKuaishou",
       "properties": {
         "backgroundColor": {
@@ -1851,7 +1828,6 @@
       "type": "object"
     },
     "MpLark": {
-      "additionalProperties": false,
       "description": "设置编译到 mp-lark 平台的特定样式，配置项参考 <https://open.feishu.cn/document/client-docs/gadget/introduction/global-settings#a172b7dd>\n\n相应的类型是 MpLark",
       "properties": {
         "PCMode": {
@@ -1935,7 +1911,6 @@
       "type": "object"
     },
     "MpQq": {
-      "additionalProperties": false,
       "description": "设置编译到 mp-qq 平台的特定样式，配置项参考 <https://q.qq.com/wiki/develop/miniprogram/frame/dispose.html#window>\n\n相应的类型是 MpQq",
       "properties": {
         "backgroundColor": {
@@ -2009,7 +1984,6 @@
       "type": "object"
     },
     "MpToutiao": {
-      "additionalProperties": false,
       "description": "设置编译到 mp-toutiao 平台的特定样式，配置项参考 <https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/develop/framework/general-configuration#window>\n\n相应的类型是 MpToutiao",
       "properties": {
         "backgroundColor": {
@@ -2075,11 +2049,9 @@
           "type": "number"
         },
         "skeleton": {
-          "additionalProperties": false,
           "description": "框架骨架屏配置，仅支持配置 config 属性，优先级高于 app.json，详见 [小程序框架骨架屏](https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/develop/guide/experience-optimization/list/skeleton)",
           "properties": {
             "config": {
-              "additionalProperties": false,
               "description": "包含超时移除及自动生成配置等",
               "properties": {
                 "backgroundColor": {
@@ -2089,7 +2061,6 @@
                   "format": "color"
                 },
                 "button": {
-                  "additionalProperties": false,
                   "default": "{ color: '#efefef }",
                   "description": "骨架页面中被视为按钮块的配置",
                   "properties": {
@@ -2121,7 +2092,6 @@
                   "type": "number"
                 },
                 "image": {
-                  "additionalProperties": false,
                   "default": {
                     "color": "#efefef",
                     "shape": "rect"
@@ -2197,7 +2167,6 @@
       "type": "object"
     },
     "MpWeixin": {
-      "additionalProperties": false,
       "description": "设置编译到 mp-weixin 平台的特定样式，配置项参考 [MP-WEIXIN](https://uniapp.dcloud.net.cn/collocation/pages#mp-weixin) 和 <https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html#window>\n\n相应的类型是 MpWeixin",
       "properties": {
         "backgroundColor": {

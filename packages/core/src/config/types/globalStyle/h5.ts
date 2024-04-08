@@ -111,7 +111,11 @@ export interface H5 {
        * @default false
        */
       disabled?: boolean
+
+      [x: string]: any
     }
+
+    [x: string]: any
   }
 
   /**
@@ -131,6 +135,8 @@ export interface H5 {
      * @default "0px"
      */
     offset?: PxSize | PercentageSize
+
+    [x: string]: any
   }
 
   [x: string]: any

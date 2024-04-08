@@ -144,6 +144,8 @@ export interface MpToutiao {
          * @format color
          */
         color?: HEXColor
+
+        [x: string]: any
       }
 
       /**
@@ -160,6 +162,8 @@ export interface MpToutiao {
          * @format color
          */
         color?: HEXColor
+
+        [x: string]: any
       }
 
       /**
@@ -193,11 +197,17 @@ export interface MpToutiao {
        * @default 4
        */
       decimal?: number
+
+      [x: string]: any
     }
 
     /**
      * 页面路径同骨架屏文件的对应关系
      */
     page?: Record<string, string>
+
+    [x: string]: any
   }
+
+  [x: string]: any
 }

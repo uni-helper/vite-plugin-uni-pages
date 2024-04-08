@@ -153,4 +153,6 @@ export interface MpWeixin {
    * @default "static"
    */
   handleWebviewPreload?: 'static' | 'manual' | 'auto'
+
+  [x: string]: any
 }
