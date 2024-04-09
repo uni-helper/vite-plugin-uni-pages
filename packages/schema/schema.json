@@ -2,87 +2,1117 @@
   "$ref": "#/definitions/PagesConfig",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
+    "AnimationType": {
+      "description": "窗口动画，详见 [窗口动画](https://uniapp.dcloud.net.cn/api/router.html#animation)",
+      "enum": [
+        "slide-in-right",
+        "slide-in-left",
+        "slide-in-top",
+        "slide-in-bottom",
+        "pop-in",
+        "fade-in",
+        "zoom-out",
+        "zoom-fade-out",
+        "none"
+      ],
+      "type": "string"
+    },
     "AppPlus": {
       "properties": {
         "animationDuration": {
-          "default": "300",
-          "description": "窗口显示动画的持续时间，单位为 ms。",
+          "default": 300,
+          "description": "窗口显示动画的持续时间，单位为 ms",
           "type": "number"
         },
         "animationType": {
+          "$ref": "#/definitions/AnimationType",
           "default": "pop-in",
-          "description": "窗口显示的动画效果，详见：窗口动画。",
-          "type": "string"
+          "description": "窗口显示的动画效果，详见 [窗口动画](https://uniapp.dcloud.net.cn/api/router#animation)"
         },
         "background": {
           "$ref": "#/definitions/HEXColor",
           "default": "#FFFFFF",
-          "description": "窗体背景色。无论vue页面还是nvue页面，在App上都有一个父级原生窗体，该窗体的背景色生效时间快于页面里的css生效时间"
+          "description": "窗体背景色，支持 HEX 颜色\n\n无论 vue 页面还是 nvue 页面，在 App 上都有一个父级原生窗体，该窗体的背景色生效时间快于页面里的 css 生效时间",
+          "format": "color"
         },
         "bounce": {
-          "description": "页面回弹效果，设置为 \"none\" 时关闭效果。",
+          "description": "页面回弹效果，设置为 \"none\" 时关闭效果",
           "type": "string"
         },
         "popGesture": {
           "default": "close",
-          "description": "侧滑返回功能，可选值：\"close\"（启用侧滑返回）、\"none\"（禁用侧滑返回）",
+          "description": "侧滑返回功能，仅支持 \"close\" / \"none\"\n\n\"close\" 启用侧滑返回\n\n\"none\" 禁用侧滑返回",
+          "enum": [
+            "close",
+            "none"
+          ],
           "type": "string"
         },
         "pullToRefresh": {
           "description": "下拉刷新",
+          "properties": {
+            "color": {
+              "$ref": "#/definitions/HEXColor",
+              "default": "#2BD009",
+              "description": "下拉刷新控件颜色，仅 style 为 \"circle\" 时有效，支持 HEX 颜色",
+              "format": "color"
+            },
+            "contentdown": {
+              "description": "下拉可刷新状态时配置，仅 style 为 \"default\" 时有效",
+              "properties": {
+                "caption": {
+                  "description": "下拉可刷新状态时下拉刷新控件标题内容",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "contentover": {
+              "description": "释放可刷新状态时配置，仅 style 为 \"default\" 时有效",
+              "properties": {
+                "caption": {
+                  "description": "释放可刷新状态时下拉刷新控件标题内容",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "contentrefresh": {
+              "description": "正在刷新状态时配置，仅 style 为 \"default\" 时有效",
+              "properties": {
+                "caption": {
+                  "description": "正在刷新状态时下拉刷新控件标题内容",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "height": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/PxSize"
+                },
+                {
+                  "$ref": "#/definitions/PercentageSize"
+                }
+              ],
+              "description": "下拉刷新控件进入刷新状态的拉拽高度，支持以 px 为单位的逻辑像素值或百分比"
+            },
+            "offset": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/PxSize"
+                },
+                {
+                  "$ref": "#/definitions/PercentageSize"
+                }
+              ],
+              "description": "下拉刷新控件的起始位置，仅 style 为 \"circle\" 时有效，用于定义刷新控件下拉时的起始位置，支持以 px 为单位的逻辑像素值或百分比\n\n如使用了非原生 title 且需要原生下拉刷新，一般都设置 style 为 \"circle\" 并将 offset 设置为自定义 title 的高度"
+            },
+            "range": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/PxSize"
+                },
+                {
+                  "$ref": "#/definitions/PercentageSize"
+                }
+              ],
+              "description": "窗口可下拉拖拽的范围，支持以 px 为单位的逻辑像素值或百分比"
+            },
+            "style": {
+              "default": "Android 为 \"circle\"，iOS 为 \"default\"",
+              "description": "下拉刷新控件样式\n\n\"default\" 下拉拖动时页面内容跟随\n\n\"circle\" 下拉拖动时仅刷新控件跟随",
+              "enum": [
+                "default",
+                "circle"
+              ],
+              "type": "string"
+            },
+            "support": {
+              "default": false,
+              "description": "是否开启窗口下拉刷新",
+              "type": "boolean"
+            }
+          },
           "type": "object"
         },
         "scrollIndicator": {
-          "description": "滚动条显示策略，设置为 \"none\" 时不显示滚动条。",
+          "description": "滚动条显示策略，设置为 \"none\" 时不显示滚动条",
           "type": "string"
         },
         "softInputMode": {
           "default": "adjustPan",
-          "description": "软键盘弹出模式，支持 adjustResize、adjustPan 两种模式",
+          "description": "软键盘弹出模式，仅支持 \"adjustResize\" / \"adjustPan\"",
+          "enum": [
+            "adjustResize",
+            "adjustPan"
+          ],
           "type": "string"
         },
         "softInputNavBar": {
           "default": "auto",
-          "description": "iOS软键盘上完成工具栏的显示模式，设置为 \"none\" 时关闭工具栏。",
+          "description": "iOS 软键盘上完成工具栏的显示模式，设置为 \"none\" 时关闭工具栏",
+          "enum": [
+            "auto",
+            "none"
+          ],
           "type": "string"
         },
         "subNVues": {
-          "description": "原生子窗体，详见?:原生子窗体",
-          "type": "object"
+          "description": "原生子窗体，详见 [原生子窗体](https://uniapp.dcloud.net.cn/collocation/pages#app-subNVues)",
+          "items": {
+            "properties": {
+              "id": {
+                "description": "原生子窗体的标识",
+                "type": "string"
+              },
+              "path": {
+                "description": "配置 nvue 文件路径，nvue 文件需放置到使用 subNVue 的页面文件目录下，cli 项目需要去掉 .nvue 后缀，只保留文件名",
+                "type": "string"
+              },
+              "style": {
+                "description": "原生子窗体的样式",
+                "properties": {
+                  "background": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/definitions/HEXColor"
+                      },
+                      {
+                        "const": "transparent",
+                        "type": "string"
+                      }
+                    ],
+                    "default": "#FFFFFF",
+                    "description": "窗口的背景颜色，支持 Hex 颜色\n\nAndroid 平台 4.0 以上系统支持 \"transparent\" 背景透明样式，比如 subNVue 为圆角时需要设置为 \"transparent\" 才能看到正确的效果",
+                    "format": "color"
+                  },
+                  "bottom": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/definitions/PxSize"
+                      },
+                      {
+                        "$ref": "#/definitions/PercentageSize"
+                      }
+                    ],
+                    "default": "根据 top 和 height 属性值自动计算",
+                    "description": "原生子窗体垂直向上的偏移量，支持以 px 为单位的逻辑像素值或百分比\n\n同时设置了 top 和 height 值时，忽略此属性值\n\n未设置 height 时，通过 top 和 bottom 属性值来确定原生子窗体的高度"
+                  },
+                  "dock": {
+                    "default": "bottom",
+                    "description": "原生子窗体停靠位置，仅 position 为 \"dock\" 时生效\n\n\"top\" 原生子窗体停靠在页面顶部\n\n\"bottom\" 原生子窗体停靠在页面底部\n\n\"right\" 原生子窗体停靠在页面右侧\n\n\"left\" 原生子窗体停靠在页面左侧",
+                    "enum": [
+                      "top",
+                      "bottom",
+                      "right",
+                      "left"
+                    ],
+                    "type": "string"
+                  },
+                  "height": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/definitions/PxSize"
+                      },
+                      {
+                        "$ref": "#/definitions/PercentageSize"
+                      }
+                    ],
+                    "default": "100%",
+                    "description": "原生子窗体的高度，支持以 px 为单位的逻辑像素值或百分比\n\n未设置时，可同时设置 top 和 bottom 属性值改变窗口的默认高度"
+                  },
+                  "left": {
+                    "default": "0px",
+                    "description": "原生子窗体水平向左的偏移量，支持以 px 为单位的逻辑像素值或百分比\n\n未设置 left 属性值时，优先通过 right 和 width 属性值来计算原生子窗体的 left 位置",
+                    "type": "string"
+                  },
+                  "margin": {
+                    "description": "原生子窗体的边距，用于定位原生子窗体的位置，若设置了 left、right、top、bottom 则对应的边距值失效\n\n\"auto\" 居中",
+                    "type": "string"
+                  },
+                  "mask": {
+                    "$ref": "#/definitions/RGBAColor",
+                    "default": "rgba(0,0,0,0.5)",
+                    "description": "原生子窗体的遮罩层，仅当原生子窗体 type 为 \"popup\" 时生效，支持 RGBA 颜色",
+                    "format": "color"
+                  },
+                  "position": {
+                    "default": "absolute",
+                    "description": "原生子窗体的排版位置，排版位置决定原生子窗体在父窗口中的定位方式\n\n\"static\" 原生子窗体在页面中正常定位，如果页面存在滚动条则随窗口内容滚动\n\n\"absolute\" 原生子窗体在页面中绝对定位，如果页面存在滚动条不随窗口内容滚动\n\n\"dock\" 原生子窗体在页面中停靠，停靠位置由 dock 属性值决定",
+                    "enum": [
+                      "static",
+                      "absolute",
+                      "dock"
+                    ],
+                    "type": "string"
+                  },
+                  "right": {
+                    "default": "根据 left 和 width 属性值来自动计算",
+                    "description": "原生子窗体水平向右的偏移量，支持以 px 为单位的逻辑像素值或百分比\n\n同时设置了 left 和 height 值时，忽略此属性值\n\n未设置 width 时，通过 left 和 bottom 属性值来确定原生子窗体的宽度",
+                    "type": "string"
+                  },
+                  "top": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/definitions/PxSize"
+                      },
+                      {
+                        "$ref": "#/definitions/PercentageSize"
+                      }
+                    ],
+                    "default": "0px",
+                    "description": "原生子窗体垂直向下的偏移量，支持以 px 为单位的逻辑像素值或百分比\n\n未设置 top 属性值时，优先通过 bottom 和 height 属性值来计算原生子窗体的 top 位置"
+                  },
+                  "width": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/definitions/PxSize"
+                      },
+                      {
+                        "$ref": "#/definitions/PercentageSize"
+                      }
+                    ],
+                    "default": "100%",
+                    "description": "原生子窗体的宽度，支持以 px 为单位的逻辑像素值或百分比\n\n未设置时，可同时设置 left 和 right 属性值改变窗口的默认宽度"
+                  },
+                  "zindex": {
+                    "description": "原生子窗体的窗口的堆叠顺序值，拥有更高堆叠顺序的窗口总是会处于堆叠顺序较低的窗口的前面，拥有相同堆叠顺序的窗口后调用 show 方法则在前面",
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "type": {
+                "description": "原生子窗口内置样式\n\n\"popup\" 弹出层\n\n\"navigationBar\" 导航栏",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
         },
         "titleNView": {
           "anyOf": [
             {
-              "type": "object"
-            },
-            {
               "const": false,
               "type": "boolean"
+            },
+            {
+              "properties": {
+                "autoBackButton": {
+                  "default": true,
+                  "description": "标题栏控件是否显示左侧返回按钮",
+                  "type": "boolean"
+                },
+                "backButton": {
+                  "description": "返回按钮的样式，详见 [backButton](https://uniapp.dcloud.net.cn/collocation/pages#app-titlenview-backbuttonstyles)",
+                  "properties": {
+                    "background": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/definitions/HEXColor"
+                        },
+                        {
+                          "$ref": "#/definitions/RGBAColor"
+                        }
+                      ],
+                      "default": "灰色半透明",
+                      "description": "背景颜色，仅在标题栏 type 为 \"transparent\" 时生效，当标题栏透明时按钮显示的背景颜色，支持 HEX 和 RGBA 颜色",
+                      "format": "color"
+                    },
+                    "badgeText": {
+                      "description": "角标文本，最多显示3个字符，超过则显示为 ...",
+                      "type": "string"
+                    },
+                    "color": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/definitions/HEXColor"
+                        },
+                        {
+                          "$ref": "#/definitions/RGBAColor"
+                        }
+                      ],
+                      "default": "窗口标题栏控件的标题文字颜色",
+                      "description": "图标和标题颜色，支持 HEX 和 RGBA 颜色",
+                      "format": "color"
+                    },
+                    "colorPressed": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/definitions/HEXColor"
+                        },
+                        {
+                          "$ref": "#/definitions/RGBAColor"
+                        }
+                      ],
+                      "default": "color 属性值自动调整透明度为 0.3",
+                      "description": "按下状态按钮文字颜色，支持 HEX 和 RGBA 颜色",
+                      "format": "color"
+                    },
+                    "fontSize": {
+                      "$ref": "#/definitions/PxSize",
+                      "description": "返回图标文字大小，单位为 px\n\n窗口标题栏为透明样式 type 为 \"transparent\" 时，默认值为 \"22px\"\n\n窗口标题栏为默认样式 type 为 \"default\" 时，默认值为 \"27px\""
+                    },
+                    "fontWeight": {
+                      "default": "normal",
+                      "description": "返回图标的粗细\n\n\"normal\" 正常\n\n\"bold\" 粗体",
+                      "enum": [
+                        "normal",
+                        "bold"
+                      ],
+                      "type": "string"
+                    },
+                    "redDot": {
+                      "default": false,
+                      "description": "是否显示红点，当设置了角标文本时红点不显示",
+                      "type": "boolean"
+                    },
+                    "title": {
+                      "default": "",
+                      "description": "返回按钮上的标题，显示在返回图标（字体图标）后",
+                      "type": "string"
+                    },
+                    "titleWeight": {
+                      "description": "返回按钮上标题的粗细\n\n\"normal\" 正常\n\n\"bold\" 粗体",
+                      "enum": [
+                        "normal",
+                        "bold"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "backgroundColor": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/HEXColor"
+                    },
+                    {
+                      "$ref": "#/definitions/RGBAColor"
+                    }
+                  ],
+                  "default": "#F7F7F7",
+                  "description": "背景颜色，支持 HEX 和 RGBA 颜色，App 端仅悬浮导航栏支持 RGBA 颜色",
+                  "format": "color"
+                },
+                "backgroundImage": {
+                  "description": "背景图片\n\n背景图片路径，如 \"/static/img.png\"，仅支持本地文件绝对路径，根据实际标题栏宽高拉伸绘制\n\n渐变色，仅支持线性渐变，两种颜色的渐变，如 \"linear-gradient(to top, #a80077, #66ff00)\"，其中第一个参数为渐变方向，可选 \"to right\"（从左向右渐变）/ \"to left\"（从右向左渐变）/ \"to bottom\"（从上到下渐变）/ \"to top\"（从下到上渐变）/ \"to bottom right\"（从左上到右下渐变）/\"to top left\"（从左上到右下渐变）",
+                  "type": "string"
+                },
+                "backgroundRepeat": {
+                  "default": "no-repeat",
+                  "description": "仅在 backgroundImage 设置为图片路径时有效\n\n\"repeat\" 背景图片在垂直方向和水平方向平铺\n\n\"repeat-x\" 背景图片在水平方向平铺，垂直方向拉伸\n\n\"repeat-y\" 背景图片在垂直方向平铺，水平方向拉伸\n\n\"no-repeat\" 背景图片在垂直方向和水平方向都拉伸",
+                  "enum": [
+                    "repeat",
+                    "repeat-x",
+                    "repeat-y",
+                    "no-repeat"
+                  ],
+                  "type": "string"
+                },
+                "blurEffect": {
+                  "default": "none",
+                  "description": "高斯模糊效果，仅在 type 为 \"transparent\" 或 \"float\" 时有效\n\n使用模糊效果时应避免设置背景颜色，设置背景颜色可能覆盖模糊效果\n\n\"dark\" 暗风格模糊，对应 iOS 原生 UIBlurEffectStyleDark 效果\n\n\"extralight\" 高亮风格模糊，对应 iOS 原生 UIBlurEffectStyleExtraLight 效果\n\n\"light\" 亮风格模糊，对应 iOS 原生 UIBlurEffectStyleLight 效果\n\n\"none\" 无模糊效果",
+                  "enum": [
+                    "dark",
+                    "extralight",
+                    "light",
+                    "none"
+                  ],
+                  "type": "string"
+                },
+                "buttons": {
+                  "description": "自定义按钮，详见 [自定义按钮](https://uniapp.dcloud.net.cn/collocation/pages#app-titlenview-buttons)",
+                  "items": {
+                    "$ref": "#/definitions/TitleNViewButton"
+                  },
+                  "type": "array"
+                },
+                "coverage": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/PxSize"
+                    },
+                    {
+                      "$ref": "#/definitions/PercentageSize"
+                    }
+                  ],
+                  "default": "132px",
+                  "description": "标题栏控件变化作用范围，仅在 type 为 \"transparent\" 时有效，页面滚动时标题栏背景透明度将发生变化\n\n当页面滚动到指定偏移量时标题栏背景变为完全不透明\n\n支持单位为 px 的逻辑像素值、百分比"
+                },
+                "homeButton": {
+                  "default": false,
+                  "description": "标题栏控件是否显示 Home 按钮",
+                  "type": "boolean"
+                },
+                "searchInput": {
+                  "description": "原生导航栏上的搜索框配置，详见 [searchInput](https://uniapp.dcloud.net.cn/collocation/pages#app-titlenview-searchinput)",
+                  "properties": {
+                    "align": {
+                      "default": "center",
+                      "description": "非输入状态下文本的对齐方式\n\n\"left\" 居左对齐\n\n\"right\" 居右对齐\n\n\"center\" 居中对齐",
+                      "enum": [
+                        "center",
+                        "left",
+                        "right"
+                      ],
+                      "type": "string"
+                    },
+                    "autoFocus": {
+                      "default": false,
+                      "description": "是否自动获取焦点",
+                      "type": "boolean"
+                    },
+                    "backgroundColor": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/definitions/HEXColor"
+                        },
+                        {
+                          "$ref": "#/definitions/RGBAColor"
+                        }
+                      ],
+                      "default": "rgba(255,255,255,0.5)",
+                      "description": "背景颜色，支持 HEX 和 RGBA 颜色",
+                      "format": "color"
+                    },
+                    "borderRadius": {
+                      "$ref": "#/definitions/PxSize",
+                      "default": "0px",
+                      "description": "输入框的圆角半径，单位为 px"
+                    },
+                    "disabled": {
+                      "default": false,
+                      "description": "是否禁止输入",
+                      "type": "boolean"
+                    },
+                    "placeholder": {
+                      "description": "提示文本",
+                      "type": "string"
+                    },
+                    "placeholderColor": {
+                      "$ref": "#/definitions/HEXColor",
+                      "default": "#CCCCCC",
+                      "description": "提示文本颜色，支持 HEX 颜色",
+                      "format": "color"
+                    }
+                  },
+                  "type": "object"
+                },
+                "splitLine": {
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "properties": {
+                        "color": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/definitions/HEXColor"
+                            },
+                            {
+                              "$ref": "#/definitions/RGBAColor"
+                            }
+                          ],
+                          "default": "#CCCCCC",
+                          "description": "底部分割线颜色，支持 HEX 和 RGBA 颜色",
+                          "format": "color"
+                        },
+                        "height": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/definitions/PxSize"
+                            },
+                            {
+                              "$ref": "#/definitions/PercentageSize"
+                            }
+                          ],
+                          "default": "1px",
+                          "description": "底部分割线高度，支持单位为 px 的逻辑像素值、百分比"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  ],
+                  "default": false,
+                  "description": "是否显示标题栏的底部分割线"
+                },
+                "subtitleColor": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/HEXColor"
+                    },
+                    {
+                      "$ref": "#/definitions/RGBAColor"
+                    }
+                  ],
+                  "default": "与主标题文字颜色一致",
+                  "description": "副标题文字颜色，支持 HEX 和 RGBA 颜色",
+                  "format": "color"
+                },
+                "subtitleOverflow": {
+                  "default": "ellipsis",
+                  "description": "标题文字超出显示区域时处理方式\n\n\"clip\" 超出显示区域时内容裁剪\n\n\"ellipsis\" 超出显示区域时尾部显示省略标记（...）",
+                  "enum": [
+                    "clip",
+                    "ellipsis"
+                  ],
+                  "type": "string"
+                },
+                "subtitleSize": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/PxSize"
+                    },
+                    {
+                      "const": "auto",
+                      "type": "string"
+                    }
+                  ],
+                  "default": "auto",
+                  "description": "副标题文字字体大小，单位为 px\n\n\"auto\" 自动计算，约为 12px"
+                },
+                "subtitleText": {
+                  "description": "副标题文字内容，设置副标题后将显示两行标题，副标题显示在主标题（titleText）下方\n\n设置副标题后将居左显示",
+                  "type": "string"
+                },
+                "tags": {
+                  "description": "原生 View 增强，详见 [5+ View 控件](http://www.html5plus.org/doc/zh_cn/nativeobj.html#plus.nativeObj.ViewDrawTagStyles)",
+                  "items": {
+                    "properties": {
+                      "color": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/definitions/HEXColor"
+                          },
+                          {
+                            "$ref": "#/definitions/RGBAColor"
+                          }
+                        ],
+                        "default": "#FFFFFF",
+                        "description": "矩形区域颜色，支持 HEX 和 RGBA 颜色\n\n不推荐使用，推荐使用 rectStyles\n\n当 tag 属性值为 \"rect\" 时有效，用于指定矩形区域颜色",
+                        "format": "color"
+                      },
+                      "id": {
+                        "description": "绘制操作标识\n\n可通过 view 对象的 drawBitmap / drawRect / drawText / clearRect 方法进行更新",
+                        "type": "string"
+                      },
+                      "inputStyles": {
+                        "description": "绘制输入框的样式\n\n当 tag 属性值为 \"input\" 时有效，用于指定绘制输入框的样式、大小位置等信息",
+                        "properties": {
+                          "borderColor": {
+                            "$ref": "#/definitions/HEXColor",
+                            "default": "#000000",
+                            "description": "输入框的边框颜色，支持 HEX 颜色",
+                            "format": "color"
+                          },
+                          "borderRadius": {
+                            "$ref": "#/definitions/PxSize",
+                            "default": "0px",
+                            "description": "输入框的边框圆角半径，单位为 px"
+                          },
+                          "borderWidth": {
+                            "$ref": "#/definitions/PxSize",
+                            "default": "1px",
+                            "description": "输入框的边框宽度，单位为 px"
+                          },
+                          "fontSize": {
+                            "$ref": "#/definitions/PxSize",
+                            "default": "16px",
+                            "description": "输入框的字体大小，单位为 px"
+                          },
+                          "placeholder": {
+                            "description": "输入框的提示文本\n\n当用户未输入内容时显示在编辑框中（灰色文字）。",
+                            "type": "string"
+                          },
+                          "type": {
+                            "default": "text",
+                            "description": "输入框类型\n\n\"email\" 邮箱地址输入框\n\n\"number\" 数字输入框\n\n\"search\" 搜索文本输入框\n\n\"tel\" 电话号码输入框\n\n\"text\" 普通文本输入框\n\n\"url\" URL地址输入框",
+                            "enum": [
+                              "email",
+                              "number",
+                              "search",
+                              "tel",
+                              "text",
+                              "url"
+                            ],
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "position": {
+                        "default": {
+                          "height": "100%",
+                          "left": "0px",
+                          "top": "0px",
+                          "width": "100%"
+                        },
+                        "description": "绘制内容区域，相对于 View 控件的区域信息\n\n当 tag 属性值为 \"img\" 时，用于指定绘制图片的目标区域\n\n当 tag 属性值为 \"rect\" 时，用于指定绘制的矩形区域\n\n当 tag 属性值为 \"font\" 时，用于指定绘制文本的目标区域，此时 height 属性值支持设置为 \"wrap_content\"，表示文本高度根据内容自动计算，此时通过 top 来定位文本绘制的起始位置",
+                        "properties": {
+                          "bottom": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/definitions/PxSize"
+                              },
+                              {
+                                "$ref": "#/definitions/PercentageSize"
+                              },
+                              {
+                                "const": "auto",
+                                "type": "string"
+                              }
+                            ],
+                            "description": "区域顶部相对于作用对象或容器向上的偏移量，支持单位为 px 的逻辑像素值、百分比（相对于作用对象或容器的高度）或 \"auto\"\n\n当设置了 top 和 height 值时，忽略此属性值\n\n当未设置 top 值时，可通过 bottom 属性值来确定区域的垂直位置\n\n当未设置 height 值时，可通过 top 和 bottom 属性值来确定区域的高度"
+                          },
+                          "height": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/definitions/PxSize"
+                              },
+                              {
+                                "$ref": "#/definitions/PercentageSize"
+                              }
+                            ],
+                            "default": "100%",
+                            "description": "区域高度，相对于作用对象或容器的高度，支持单位为 px 的逻辑像素值或百分比"
+                          },
+                          "left": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/definitions/PxSize"
+                              },
+                              {
+                                "$ref": "#/definitions/PercentageSize"
+                              },
+                              {
+                                "const": "auto",
+                                "type": "string"
+                              }
+                            ],
+                            "default": "0px",
+                            "description": "区域顶部相对于作用对象或容器向右的偏移量，支持单位为 px 的逻辑像素值、百分比（相对于作用对象或容器的高度）或 \"auto\""
+                          },
+                          "right": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/definitions/PxSize"
+                              },
+                              {
+                                "$ref": "#/definitions/PercentageSize"
+                              },
+                              {
+                                "const": "auto",
+                                "type": "string"
+                              }
+                            ],
+                            "description": "区域顶部相对于作用对象或容器向左的偏移量，支持单位为 px 的逻辑像素值、百分比（相对于作用对象或容器的高度）或 \"auto\"\n\n当设置了 left 和 width 值时，忽略此属性值\n\n当未设置 left 值时，可通过 right 属性值来确定区域的水平位置\n\n当未设置 width 值时，可通过 left 和 right 属性值来确定区域的宽度"
+                          },
+                          "top": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/definitions/PxSize"
+                              },
+                              {
+                                "$ref": "#/definitions/PercentageSize"
+                              },
+                              {
+                                "const": "auto",
+                                "type": "string"
+                              }
+                            ],
+                            "default": "0px",
+                            "description": "区域顶部相对于作用对象或容器向下的偏移量，支持单位为 px 的逻辑像素值、百分比（相对于作用对象或容器的高度）或 \"auto\""
+                          },
+                          "width": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/definitions/PxSize"
+                              },
+                              {
+                                "$ref": "#/definitions/PercentageSize"
+                              }
+                            ],
+                            "default": "100%",
+                            "description": "区域宽度，相对于作用对象或容器的宽度，支持单位为 px 的逻辑像素值或百分比"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "rectStyles": {
+                        "description": "绘制区域的样式\n\n当 tag 属性值为 \"rect\" 时有效，用于指定绘制区域的样式、填充颜色、圆角大小等信息",
+                        "properties": {
+                          "borderColor": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/definitions/HEXColor"
+                              },
+                              {
+                                "$ref": "#/definitions/RGBAColor"
+                              }
+                            ],
+                            "default": "color 属性值",
+                            "description": "矩形边框颜色，绘制矩形边框的颜色，支持 HEX 和 RGBA 颜色",
+                            "format": "color"
+                          },
+                          "borderWidth": {
+                            "$ref": "#/definitions/PxSize",
+                            "default": "0px",
+                            "description": "矩形边框宽度，单位为 px"
+                          },
+                          "color": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/definitions/HEXColor"
+                              },
+                              {
+                                "$ref": "#/definitions/RGBAColor"
+                              }
+                            ],
+                            "default": "#FFFFFF",
+                            "description": "绘制颜色，矩形填充区域的颜色，支持 HEX 和 RGBA 颜色",
+                            "format": "color"
+                          },
+                          "radius": {
+                            "$ref": "#/definitions/PxSize",
+                            "default": "0px",
+                            "description": "矩形区域的圆角半径，单位为 px"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "richTextStyles": {
+                        "description": "绘制富文本的样式\n\n当 tag 属性值为 \"richtext\" 时有效，用于指定绘制富文本内容的默认字体颜色、字体类型等信息",
+                        "properties": {
+                          "align": {
+                            "default": "left",
+                            "description": "富文本内容的水平对齐方式，对整体内容有效，无法单独控制每行的内容\n\n\"left\" 字体在指定的区域中水平居左对齐\n\n\"center\" 字体在指定的区域中水平居中对齐\n\n\"right\" 字体在指定的区域中水平居右对齐",
+                            "enum": [
+                              "left",
+                              "right",
+                              "center"
+                            ],
+                            "type": "string"
+                          },
+                          "family": {
+                            "description": "富文本默认使用的字体名称，如果指定名称的字体不存在，则使用默认字体",
+                            "type": "string"
+                          },
+                          "fontSrc": {
+                            "description": "富文本默认使用的字体文件路径，必须为本地路径，如果指定的文件路径无效，则使用系统默认字体",
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "sprite": {
+                        "default": {
+                          "height": "100%",
+                          "left": "0px",
+                          "top": "0px",
+                          "width": "100%"
+                        },
+                        "description": "图片源的绘制区域\n\n当 tag 属性值为 \"img\" 时有效，用于指定图片源的绘制区域，相对于图片的区域信息",
+                        "properties": {
+                          "bottom": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/definitions/PxSize"
+                              },
+                              {
+                                "$ref": "#/definitions/PercentageSize"
+                              },
+                              {
+                                "const": "auto",
+                                "type": "string"
+                              }
+                            ],
+                            "description": "区域顶部相对于作用对象或容器向上的偏移量，支持单位为 px 的逻辑像素值、百分比（相对于作用对象或容器的高度）或 \"auto\"\n\n当设置了 top 和 height 值时，忽略此属性值\n\n当未设置 top 值时，可通过 bottom 属性值来确定区域的垂直位置\n\n当未设置 height 值时，可通过 top 和 bottom 属性值来确定区域的高度"
+                          },
+                          "height": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/definitions/PxSize"
+                              },
+                              {
+                                "$ref": "#/definitions/PercentageSize"
+                              }
+                            ],
+                            "default": "100%",
+                            "description": "区域高度，相对于作用对象或容器的高度，支持单位为 px 的逻辑像素值或百分比"
+                          },
+                          "left": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/definitions/PxSize"
+                              },
+                              {
+                                "$ref": "#/definitions/PercentageSize"
+                              },
+                              {
+                                "const": "auto",
+                                "type": "string"
+                              }
+                            ],
+                            "default": "0px",
+                            "description": "区域顶部相对于作用对象或容器向右的偏移量，支持单位为 px 的逻辑像素值、百分比（相对于作用对象或容器的高度）或 \"auto\""
+                          },
+                          "right": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/definitions/PxSize"
+                              },
+                              {
+                                "$ref": "#/definitions/PercentageSize"
+                              },
+                              {
+                                "const": "auto",
+                                "type": "string"
+                              }
+                            ],
+                            "description": "区域顶部相对于作用对象或容器向左的偏移量，支持单位为 px 的逻辑像素值、百分比（相对于作用对象或容器的高度）或 \"auto\"\n\n当设置了 left 和 width 值时，忽略此属性值\n\n当未设置 left 值时，可通过 right 属性值来确定区域的水平位置\n\n当未设置 width 值时，可通过 left 和 right 属性值来确定区域的宽度"
+                          },
+                          "top": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/definitions/PxSize"
+                              },
+                              {
+                                "$ref": "#/definitions/PercentageSize"
+                              },
+                              {
+                                "const": "auto",
+                                "type": "string"
+                              }
+                            ],
+                            "default": "0px",
+                            "description": "区域顶部相对于作用对象或容器向下的偏移量，支持单位为 px 的逻辑像素值、百分比（相对于作用对象或容器的高度）或 \"auto\""
+                          },
+                          "width": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/definitions/PxSize"
+                              },
+                              {
+                                "$ref": "#/definitions/PercentageSize"
+                              }
+                            ],
+                            "default": "100%",
+                            "description": "区域宽度，相对于作用对象或容器的宽度，支持单位为 px 的逻辑像素值或百分比"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "src": {
+                        "description": "绘制的图片资源\n\n当 tag 属性值为 \"img\" 时有效，可以是图片资源路径（字符串类型）或者图片对象（plus.nativeObj.Bitmap对象）\n\nsrc 路径支持 gif 图片，设置的图片路径文件使用 \".gif\" 后缀时则认为是 gif 图片，如\"_www/loading.gif\"",
+                        "type": "string"
+                      },
+                      "tag": {
+                        "description": "绘制操作类型\n\n\"img\" 绘制图片，与 drawBitmap 操作一致，此时 id、src、position、sprite 属性值有效\n\n\"rect\" 绘制矩形区域，与 drawRect 操作一致，此时 id、color、position、rectStyles 属性值有效\n\n\"font\" 绘制文本内容，与 drawText 操作一致，此时 id、position、text、textStyles 属性值有效\n\n\"richtext\" 绘制富文本内容，与 drawRichText 操作一致，此时 id、position、text、richTextStyles 属性值有效\n\n\"input\" 绘制输入框内容，此时 id、position、inputStyles 属性值有效",
+                        "enum": [
+                          "img",
+                          "react",
+                          "font",
+                          "richtext",
+                          "input"
+                        ],
+                        "type": "string"
+                      },
+                      "text": {
+                        "description": "绘制的文本内容\n\n当 tag 属性值为 \"font\" 时有效，用于保存绘制的文本内容",
+                        "type": "string"
+                      },
+                      "textStyles": {
+                        "description": "绘制文本的样式\n\n当 tag 属性值为 \"font\" 时有效，用于指定绘制文本内容的字体大小、字体颜色、字体类型等信息",
+                        "properties": {
+                          "align": {
+                            "default": "center",
+                            "description": "水平对齐方式\n\n\"left\" 字体在指定的区域中水平居左对齐\n\n\"center\" 字体在指定的区域中水平居中对齐\n\n\"right\" 字体在指定的区域中水平居右对齐",
+                            "enum": [
+                              "left",
+                              "right",
+                              "center"
+                            ],
+                            "type": "string"
+                          },
+                          "color": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/definitions/HEXColor"
+                              },
+                              {
+                                "$ref": "#/definitions/RGBAColor"
+                              }
+                            ],
+                            "default": "#000000",
+                            "description": "字体颜色，支持 HEX 和 RGBA 颜色",
+                            "format": "color"
+                          },
+                          "decoration": {
+                            "default": "none",
+                            "description": "文本装饰\n\n\"none\" 无装饰效果\n\n\"underline\" 文本带下划线效果\n\n\"line-through\" 文本带贯穿线（删除线）效果",
+                            "enum": [
+                              "none",
+                              "underline",
+                              "line-through"
+                            ],
+                            "type": "string"
+                          },
+                          "family": {
+                            "description": "字体名称，如果指定名称的字体不存在，则使用默认字体",
+                            "type": "string"
+                          },
+                          "fontSrc": {
+                            "description": "字体文件路径",
+                            "type": "string"
+                          },
+                          "lineSpacing": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/definitions/PxSize"
+                              },
+                              {
+                                "$ref": "#/definitions/PercentageSize"
+                              }
+                            ],
+                            "default": "20%",
+                            "description": "文本行间距，支持单位为 px 的逻辑像素值或百分比"
+                          },
+                          "margin": {
+                            "default": "0px",
+                            "description": "文本间距，用于设置字体在绘制目标区域四个方向（top / right / bottom / left）的边距，支持单位为 px 的逻辑像素值或百分比（相对于绘制目标区域）",
+                            "type": "string"
+                          },
+                          "overflow": {
+                            "default": "clip",
+                            "description": "文本内容超出显示区域时处理方式\n\n\"clip\" 超出显示区域时内容裁剪\n\n\"ellipsis\" 超出显示区域时尾部显示省略标记（...）",
+                            "enum": [
+                              "clip",
+                              "ellipsis"
+                            ],
+                            "type": "string"
+                          },
+                          "size": {
+                            "$ref": "#/definitions/PxSize",
+                            "default": "16px",
+                            "description": "字体大小，单位为 px"
+                          },
+                          "style": {
+                            "default": "normal",
+                            "description": "字体样式\n\n\"normal\" 正常样式\n\n\"italic\" 斜体样式",
+                            "enum": [
+                              "normal",
+                              "italic"
+                            ],
+                            "type": "string"
+                          },
+                          "verticalAlign": {
+                            "default": "middle",
+                            "description": "垂直对齐方式，文本内容在指定绘制区域中的垂直对齐方式\n\n\"top\" 垂直居顶对齐\n\n\"middle\" 垂直居中对齐\n\n\"bottom\" - 垂直居底对齐",
+                            "enum": [
+                              "top",
+                              "middle",
+                              "bottom"
+                            ],
+                            "type": "string"
+                          },
+                          "weight": {
+                            "default": "normal",
+                            "description": "字体粗细\n\n\"normal\" 正常\n\n\"bold\" 粗体",
+                            "enum": [
+                              "normal",
+                              "bold"
+                            ],
+                            "type": "string"
+                          },
+                          "whiteSpace": {
+                            "default": "nowrap",
+                            "description": "文本换行模式\n\n\"nowrap\" 不换行，将所有文本在一行中绘制，忽略换行符(\"\\n\")\n\n\"normal\" 自动换行，当指定的宽度无法绘制所有文本时自动换行绘制，碰到 \"\\n\" 字符时强制换行",
+                            "enum": [
+                              "normal",
+                              "nowrap"
+                            ],
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "titleAlign": {
+                  "default": "auto",
+                  "description": "文本对齐方式\n\n\"center\" 居中对齐\n\n\"left\" 居左对齐\n\n\"auto\" 根据平台自动选择（Android 平台居左对齐，iOS 平台居中对齐）",
+                  "enum": [
+                    "auto",
+                    "center",
+                    "left"
+                  ],
+                  "type": "string"
+                },
+                "titleColor": {
+                  "$ref": "#/definitions/HEXColor",
+                  "default": "#000000",
+                  "description": "标题文字颜色，支持 HEX 颜色",
+                  "format": "color"
+                },
+                "titleIcon": {
+                  "description": "标题图标，图标路径如 \"./img/t.png\"，仅支持本地文件路径，相对路径，相对于当前页面的 host 位置，固定宽高为逻辑像素值 \"34px\"\n\n图片的宽高需要相同\n\n设置标题图标后标题将居左显示",
+                  "type": "string"
+                },
+                "titleIconRadius": {
+                  "$ref": "#/definitions/PxSize",
+                  "default": "0px",
+                  "description": "标题图标圆角，单位为 px"
+                },
+                "titleOverflow": {
+                  "default": "ellipsis",
+                  "description": "标题文字超出显示区域时处理方式\n\n\"ellipsis\" 超出显示区域时尾部显示省略标记（...）\n\n\"clip\" 超出显示区域时内容裁剪",
+                  "enum": [
+                    "ellipsis",
+                    "clip"
+                  ],
+                  "type": "string"
+                },
+                "titleSize": {
+                  "description": "标题文字大小",
+                  "type": "string"
+                },
+                "titleText": {
+                  "description": "标题文字内容",
+                  "type": "string"
+                },
+                "type": {
+                  "default": "default",
+                  "description": "导航栏样式\n\n\"default\" 默认样式\n\n\"transparent\" 滚动透明渐变\n\n\"float\" 悬浮导航栏",
+                  "enum": [
+                    "default",
+                    "transparent",
+                    "float"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object"
             }
           ],
-          "description": "导航栏 ，详见?:导航栏; 设置为 false 不显示默认导航栏"
+          "description": "导航栏，详见 [导航栏](https://uniapp.dcloud.net.cn/collocation/pages#app-titlenview)\n\n当 navigationStyle 设为 \"custom\" 或 titleNView 设为 false时，原生导航栏不显示，详见 [自定义导航栏使用注意](https://uniapp.dcloud.net.cn/collocation/pages#customnav)"
         }
       },
       "type": "object"
-    },
-    "Color": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/RGBColor"
-        },
-        {
-          "$ref": "#/definitions/RGBAColor"
-        },
-        {
-          "$ref": "#/definitions/HEXColor"
-        }
-      ]
     },
     "Condition": {
       "additionalProperties": false,
       "properties": {
         "current": {
-          "description": "当前激活的模式，list节点的索引值",
+          "description": "当前激活的模式，list 节点的索引值",
           "type": "number"
         },
         "list": {
@@ -108,18 +1138,25 @@
           "type": "array"
         }
       },
+      "required": [
+        "current",
+        "list"
+      ],
       "type": "object"
     },
     "EasyCom": {
       "additionalProperties": false,
       "properties": {
         "autoscan": {
+          "default": true,
+          "description": "是否开启自动扫描，开启后将会自动扫描符合 `components/组件名称/组件名称.vue` 目录结构的组件",
           "type": "boolean"
         },
         "custom": {
           "additionalProperties": {
             "type": "string"
           },
+          "description": "以正则方式自定义组件匹配规则\n\n如果 `autoscan` 不能满足需求，可以使用 `custom` 自定义匹配规则",
           "type": "object"
         }
       },
@@ -128,130 +1165,132 @@
     "GlobalStyle": {
       "properties": {
         "animationDuration": {
-          "default": "300",
+          "default": 300,
           "description": "窗口显示动画的持续时间，单位为 ms",
           "type": "number"
         },
         "animationType": {
+          "$ref": "#/definitions/AnimationType",
           "default": "pop-in",
-          "description": "窗口显示的动画效果，详见：窗口动画",
-          "type": "string"
+          "description": "窗口显示的动画效果，详见 [窗口动画](https://uniapp.dcloud.net.cn/api/router#animation)"
         },
         "app-plus": {
           "$ref": "#/definitions/AppPlus",
-          "description": "设置编译到 App 平台的特定样式，配置项参考下方 app-plus"
+          "description": "设置编译到 App 平台的特定样式，配置项参考 [app-plus](https://uniapp.dcloud.net.cn/collocation/pages#app-plus)\n\n相应的类型是 AppPlus"
         },
         "backgroundColor": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/HEXColor"
-            },
-            {
-              "$ref": "#/definitions/ThemeColor"
-            }
-          ],
+          "$ref": "#/definitions/HEXColor",
           "default": "#ffffff",
-          "description": "下拉显示出来的窗口的背景色"
+          "description": "下拉显示出来的窗口的背景色，支持 HEX 颜色",
+          "format": "color"
         },
         "backgroundColorBottom": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/HEXColor"
-            },
-            {
-              "$ref": "#/definitions/ThemeColor"
-            }
-          ],
+          "$ref": "#/definitions/HEXColor",
           "default": "#ffffff",
-          "description": "底部窗口的背景色（bounce回弹区域）"
+          "description": "底部窗口的背景色（bounce回弹区域）",
+          "format": "color"
         },
         "backgroundColorTop": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/HEXColor"
-            },
-            {
-              "$ref": "#/definitions/ThemeColor"
-            }
-          ],
+          "$ref": "#/definitions/HEXColor",
           "default": "#ffffff",
-          "description": "顶部窗口的背景色（bounce回弹区域）"
+          "description": "顶部窗口的背景色（bounce回弹区域）",
+          "format": "color"
         },
         "backgroundTextStyle": {
           "default": "dark",
-          "description": "下拉 loading 的样式，仅支持 dark / light",
+          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\"",
+          "enum": [
+            "dark",
+            "light"
+          ],
           "type": "string"
         },
         "dynamicRpx": {
           "default": false,
-          "description": "动态 rpx，屏幕大小变化会重新渲染 rpx",
+          "description": "是否使用动态 rpx，屏幕大小变化会重新渲染 rpx",
           "type": "boolean"
         },
         "enablePullDownRefresh": {
           "default": false,
-          "description": "是否开启下拉刷新，详见页面生命周期。",
+          "description": "是否开启下拉刷新，详见 [页面生命周期](https://uniapp.dcloud.net.cn/tutorial/page.html#lifecycle)",
           "type": "boolean"
         },
         "h5": {
           "$ref": "#/definitions/H5",
-          "description": "设置编译到 H5 平台的特定样式，配置项参考下方 H5"
+          "description": "设置编译到 H5 平台的特定样式，配置项参考 [H5](https://uniapp.dcloud.net.cn/collocation/pages#h5)\n\n相应的类型是 H5"
         },
         "leftWindow": {
           "default": true,
-          "description": "当存在 leftWindow 时，默认是否显示 leftWindow",
+          "description": "当存在 leftWindow 时，默认是否显示 leftWindow，详见 [topWindow](https://uniapp.dcloud.net.cn/collocation/pages.html#topwindow)",
           "type": "boolean"
         },
         "maxWidth": {
-          "description": "单位px，当浏览器可见区域宽度大于maxWidth时，两侧留白，当小于等于maxWidth时，页面铺满；不同页面支持配置不同的maxWidth；maxWidth = leftWindow(可选)+page(页面主体)+rightWindow(可选)",
+          "description": "当浏览器可见区域宽度大于 maxWidth 时两侧留白，当小于等于 maxWidth 时页面铺满，单位为 px\n\n不同页面支持配置不同的 maxWidth\n\nmaxWidth = leftWindow（可选）+ page（页面主体）+ rightWindow（可选）\n\n使用时，页面内 fixed 元素需要使用 --window-left 和 --window-right 来保证布局位置正确",
           "type": "number"
         },
         "mp-alipay": {
-          "description": "设置编译到 mp-alipay 平台的特定样式，配置项参考下方 MP-ALIPAY",
-          "type": "object"
+          "$ref": "#/definitions/MpAlipay",
+          "description": "设置编译到 mp-alipay 平台的特定样式，配置项参考 [MP-ALIPAY](https://uniapp.dcloud.net.cn/collocation/pages#mp-alipay) 和 <https://opendocs.alipay.com/mini/framework/app-json#window>\n\n相应的类型是 MpAlipay"
         },
         "mp-baidu": {
-          "description": "设置编译到 mp-baidu 平台的特定样式",
-          "type": "object"
+          "$ref": "#/definitions/MpBaidu",
+          "description": "设置编译到 mp-baidu 平台的特定样式，配置项参考 [MP-BAIDU](https://uniapp.dcloud.net.cn/collocation/pages.html#mp-baidu) 和 <https://smartprogram.baidu.com/docs/develop/framework/process/#window>\n\n相应的类型是 MpBaidu"
         },
         "mp-jd": {
-          "description": "设置编译到 mp-jd 平台的特定样式",
-          "type": "object"
+          "$ref": "#/definitions/MpJd",
+          "description": "设置编译到 mp-jd 平台的特定样式\n\n相应的类型是 MpJd"
         },
         "mp-kuaishou": {
-          "description": "设置编译到 mp-kuaishou 平台的特定样式",
-          "type": "object"
+          "$ref": "#/definitions/MpKuaishou",
+          "description": "设置编译到 mp-kuaishou 平台的特定样式\n\n相应的类型是 MpKuaishou"
         },
         "mp-lark": {
-          "description": "设置编译到 mp-lark 平台的特定样式",
-          "type": "object"
+          "$ref": "#/definitions/MpLark",
+          "description": "设置编译到 mp-lark 平台的特定样式\n\n相应的类型是 MpLark"
         },
         "mp-qq": {
-          "description": "设置编译到 mp-qq 平台的特定样式",
-          "type": "object"
+          "$ref": "#/definitions/MpQq",
+          "description": "设置编译到 mp-qq 平台的特定样式\n\n相应的类型是 MpQq"
         },
         "mp-toutiao": {
-          "description": "设置编译到 mp-toutiao 平台的特定样式",
-          "type": "object"
+          "$ref": "#/definitions/MpToutiao",
+          "description": "设置编译到 mp-toutiao 平台的特定样式，配置项参考 <https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/develop/framework/general-configuration#window>\n\n相应的类型是 MpToutiao"
         },
         "mp-weixin": {
-          "description": "设置编译到 mp-weixin 平台的特定样式",
-          "type": "object"
+          "$ref": "#/definitions/MpWeixin",
+          "description": "设置编译到 mp-weixin 平台的特定样式，配置项参考 [MP-WEIXIN](https://uniapp.dcloud.net.cn/collocation/pages#mp-weixin) 和 <https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html#window>\n\n相应的类型是 MpWeixin"
         },
         "navigationBarBackgroundColor": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/HEXColor"
-            },
-            {
-              "$ref": "#/definitions/ThemeColor"
+          "$ref": "#/definitions/HEXColor",
+          "description": "导航栏背景颜色（同状态栏背景色），支持 HEX 颜色",
+          "format": "color"
+        },
+        "navigationBarShadow": {
+          "additionalProperties": false,
+          "description": "导航栏阴影",
+          "properties": {
+            "colorType": {
+              "description": "阴影颜色",
+              "enum": [
+                "grey",
+                "blue",
+                "green",
+                "orange",
+                "red",
+                "yellow"
+              ],
+              "type": "string"
             }
-          ],
-          "default": "#F7F7F7",
-          "description": "导航栏背景颜色（同状态栏背景色）"
+          },
+          "type": "object"
         },
         "navigationBarTextStyle": {
-          "default": "white",
-          "description": "导航栏标题颜色及状态栏前景颜色，仅支持 black/white",
+          "default": "black",
+          "description": "导航栏标题颜色及状态栏前景颜色，仅支持 \"black\" / \"white\"",
+          "enum": [
+            "black",
+            "white"
+          ],
           "type": "string"
         },
         "navigationBarTitleText": {
@@ -260,67 +1299,80 @@
         },
         "navigationStyle": {
           "default": "default",
-          "description": "导航栏样式，仅支持 default/custom。custom即取消默认的原生导航栏，需看使用注意",
+          "description": "导航栏样式，仅支持 \"default\" / \"custom\"\n\n\"custom\" 即取消默认的原生导航栏，详看 [使用注意](https://uniapp.dcloud.net.cn/collocation/pages#customnav)",
+          "enum": [
+            "default",
+            "custom"
+          ],
           "type": "string"
         },
         "onReachBottomDistance": {
-          "default": "50",
-          "description": "页面上拉触底事件触发时距页面底部距离，单位只支持px，详见页面生命周期",
+          "default": 50,
+          "description": "页面上拉触底事件触发时距页面底部距离，单位为 px，详见 [页面生命周期](https://uniapp.dcloud.net.cn/tutorial/page.html#lifecycle)",
           "type": "number"
         },
         "pageOrientation": {
           "default": "portrait",
-          "description": "横屏配置，屏幕旋转设置，仅支持 auto / portrait / landscape 详见 响应显示区域变化",
+          "description": "横屏配置，屏幕旋转设置，仅支持 \"auto\" / \"portrait\" / \"landscape\"，详见 [响应显示区域变化](https://developers.weixin.qq.com/miniprogram/dev/framework/view/resizable.html)\n\n\"auto\" 自动\n\n\"portrait\" 竖屏\n\n\"landscape\" 横屏",
           "type": "string"
         },
         "renderingMode": {
-          "description": "同层渲染，webrtc(实时音视频) 无法正常时尝试配置 seperated 强制关掉同层",
+          "description": "同层渲染，webrtc（实时音视频）无法正常时尝试配置为 \"seperated\" 强制关掉同层渲染",
           "type": "string"
         },
         "rightWindow": {
           "default": true,
-          "description": "当存在 rightWindow 时，默认是否显示 rightWindow",
+          "description": "当存在 rightWindow 时，默认是否显示 rightWindow，详见 [topWindow](https://uniapp.dcloud.net.cn/collocation/pages.html#topwindow)",
           "type": "boolean"
         },
         "rpxCalcBaseDeviceWidth": {
-          "default": "375",
-          "description": "rpx 计算使用的基准设备宽度，设备实际宽度超出 rpx 计算所支持的最大设备宽度时将按基准宽度计算，单位 px",
+          "default": 375,
+          "description": "rpx 计算使用的基准设备宽度，设备实际宽度超出 rpx 计算所支持的最大设备宽度时将按基准宽度计算，单位为 px",
           "type": "number"
         },
         "rpxCalcIncludeWidth": {
-          "default": "750",
-          "description": "rpx 计算特殊处理的值，始终按实际的设备宽度计算，单位 rpx",
+          "default": 750,
+          "description": "rpx 计算特殊处理的值，始终按实际的设备宽度计算，单位为 rpx",
           "type": "number"
         },
         "rpxCalcMaxDeviceWidth": {
-          "default": "960",
-          "description": "rpx 计算所支持的最大设备宽度，单位 px",
+          "default": 960,
+          "description": "rpx 计算所支持的最大设备宽度，单位为 px",
           "type": "number"
         },
         "titleImage": {
-          "description": "导航栏图片地址（替换当前文字标题），支付宝小程序内必须使用https的图片链接地址",
+          "description": "导航栏图片地址（替换当前文字标题）\n\n支付宝小程序内必须使用 https 图片链接地址",
           "type": "string"
         },
         "titlePenetrate": {
           "default": "NO",
           "description": "导航栏点击穿透",
+          "enum": [
+            "YES",
+            "NO"
+          ],
           "type": "string"
         },
         "topWindow": {
           "default": true,
-          "description": "当存在 topWindow 时，默认是否显示 topWindow",
+          "description": "当存在 topWindow 时，默认是否显示 topWindow，详见 [topWindow](https://uniapp.dcloud.net.cn/collocation/pages.html#topwindow)",
           "type": "boolean"
         },
         "transparentTitle": {
           "default": "none",
-          "description": "导航栏整体（前景、背景）透明设置。支持 always 一直透明 / auto 滑动自适应 / none 不透明",
+          "description": "导航栏整体（前景、背景）透明设置，仅支持 \"always\" / \"auto\" / \"none\n\n\"always\" 一直透明\n\n\"auto\" 滑动自适应\n\n\"none\" 不透明",
+          "enum": [
+            "always",
+            "auto",
+            "none"
+          ],
           "type": "string"
         },
         "usingComponents": {
           "additionalProperties": {
             "type": "string"
           },
-          "description": "引用小程序组件，参考 小程序组件",
+          "description": "引用小程序组件，详见 [小程序组件](https://uniapp.dcloud.net.cn/tutorial/miniprogram-subject.html#%E5%B0%8F%E7%A8%8B%E5%BA%8F%E8%87%AA%E5%AE%9A%E4%B9%89%E7%BB%84%E4%BB%B6%E6%94%AF%E6%8C%81)",
           "type": "object"
         }
       },
@@ -328,37 +1380,132 @@
     },
     "H5": {
       "properties": {
-        "backgroundColor": {
-          "$ref": "#/definitions/HEXColor",
-          "default": "#F7F7F7",
-          "description": "背景颜色，颜色值格式为\"#RRGGBB\"。"
-        },
-        "buttons": {
-          "description": "自定义按钮，参考 buttons",
-          "items": {},
-          "type": "array"
-        },
-        "searchInput": {
-          "description": "导航栏上的搜索框样式，详见：searchInput",
+        "pullToRefresh": {
+          "description": "下拉刷新，详见 [下拉刷新](https://uniapp.dcloud.net.cn/collocation/pages#h5-pulltorefresh)",
+          "properties": {
+            "color": {
+              "$ref": "#/definitions/HEXColor",
+              "default": "#2BD009",
+              "description": "下拉刷新控件颜色，支持 HEX 颜色"
+            },
+            "offset": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/PxSize"
+                },
+                {
+                  "$ref": "#/definitions/PercentageSize"
+                }
+              ],
+              "default": "0px",
+              "description": "下拉刷新控件起始位置，支持支持单位为 px 的逻辑像素值或百分比"
+            }
+          },
           "type": "object"
         },
-        "titleColor": {
-          "$ref": "#/definitions/HEXColor",
-          "default": "#000000",
-          "description": "标题文字颜色"
-        },
-        "titleSize": {
-          "description": "标题文字字体大小",
-          "type": "string"
-        },
-        "titleText": {
-          "description": "标题文字内容",
-          "type": "string"
-        },
-        "type": {
-          "default": "default",
-          "description": "导航栏样式。\"default\"-默认样式；\"transparent\"-透明渐变。",
-          "type": "string"
+        "titleNView": {
+          "anyOf": [
+            {
+              "const": false,
+              "type": "boolean"
+            },
+            {
+              "properties": {
+                "backgroundColor": {
+                  "$ref": "#/definitions/HEXColor",
+                  "default": "#F7F7F7",
+                  "description": "背景颜色，支持 HEX 颜色",
+                  "format": "color"
+                },
+                "buttons": {
+                  "description": "自定义按钮，详见 [自定义按钮](https://uniapp.dcloud.net.cn/collocation/pages#app-titlenview-buttons)",
+                  "items": {
+                    "$ref": "#/definitions/TitleNViewButton"
+                  },
+                  "type": "array"
+                },
+                "searchInput": {
+                  "description": "导航栏上的搜索框配置，详见 [searchInput](https://uniapp.dcloud.net.cn/collocation/pages#h5-searchinput)",
+                  "properties": {
+                    "align": {
+                      "default": "center",
+                      "description": "非输入状态下文本的对齐方式\n\n\"left\" 居左对齐\n\n\"right\" 居右对齐\n\n\"center\" 居中对齐",
+                      "enum": [
+                        "center",
+                        "left",
+                        "right"
+                      ],
+                      "type": "string"
+                    },
+                    "autoFocus": {
+                      "default": false,
+                      "description": "是否自动获取焦点",
+                      "type": "boolean"
+                    },
+                    "backgroundColor": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/definitions/HEXColor"
+                        },
+                        {
+                          "$ref": "#/definitions/RGBAColor"
+                        }
+                      ],
+                      "default": "rgba(255,255,255,0.5)",
+                      "description": "背景颜色，支持 HEX 和 RGBA 颜色",
+                      "format": "color"
+                    },
+                    "borderRadius": {
+                      "$ref": "#/definitions/PxSize",
+                      "default": "0px",
+                      "description": "输入框的圆角半径，单位为 px"
+                    },
+                    "disabled": {
+                      "default": false,
+                      "description": "是否禁止输入",
+                      "type": "boolean"
+                    },
+                    "placeholder": {
+                      "description": "提示文本",
+                      "type": "string"
+                    },
+                    "placeholderColor": {
+                      "$ref": "#/definitions/HEXColor",
+                      "default": "#CCCCCC",
+                      "description": "提示文本颜色，支持 HEX 颜色",
+                      "format": "color"
+                    }
+                  },
+                  "type": "object"
+                },
+                "titleColor": {
+                  "$ref": "#/definitions/HEXColor",
+                  "default": "#000000",
+                  "description": "标题文字颜色，支持 HEX 颜色",
+                  "format": "color"
+                },
+                "titleSize": {
+                  "description": "标题文字大小",
+                  "type": "string"
+                },
+                "titleText": {
+                  "description": "标题文字内容",
+                  "type": "string"
+                },
+                "type": {
+                  "default": "default",
+                  "description": "导航栏样式\n\n\"default\" 默认样式\n\n\"transparent\" 滚动透明渐变",
+                  "enum": [
+                    "default",
+                    "transparent"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          ],
+          "description": "导航栏，详见 [导航栏](https://uniapp.dcloud.net.cn/collocation/pages#h5-titlenview)"
         }
       },
       "type": "object"
@@ -366,64 +1513,795 @@
     "HEXColor": {
       "type": "string"
     },
-    "IconFont": {
-      "additionalProperties": false,
+    "MpAlipay": {
+      "description": "设置编译到 mp-alipay 平台的特定样式，配置项参考 [MP-ALIPAY](https://uniapp.dcloud.net.cn/collocation/pages#mp-alipay) 和 <https://opendocs.alipay.com/mini/framework/app-json#window>\n\n相应的类型是 MpAlipay",
       "properties": {
-        "color": {
-          "description": "字体图标颜色",
+        "allowsBounceVertical": {
+          "default": "YES",
+          "description": "是否允许向下拉拽",
+          "enum": [
+            "YES",
+            "NO"
+          ],
           "type": "string"
         },
-        "fontSize": {
-          "description": "字体图标字号(px)",
+        "backgroundColor": {
+          "$ref": "#/definitions/HEXColor",
+          "description": "窗口的背景色，支持 HEX 颜色",
+          "format": "color"
+        },
+        "backgroundImageColor": {
+          "$ref": "#/definitions/HEXColor",
+          "description": "下拉露出显示背景图的底色，仅 Android 有效，iOS 下页面背景图底色会使用 backgroundColor 的值",
+          "format": "color"
+        },
+        "backgroundImageUrl": {
+          "description": "下拉露出显示背景图的链接，支持网络地址和本地地址，尽量使用绝对地址",
           "type": "string"
         },
-        "selectedColor": {
-          "description": "字体图标选中颜色",
+        "defaultTitle": {
+          "description": "页面默认标题",
           "type": "string"
         },
-        "selectedText": {
-          "description": "选中后字库 Unicode 码",
+        "enableScrollBar": {
+          "default": "YES",
+          "description": "仅支持 Android，是否显示 WebView 滚动条",
+          "enum": [
+            "YES",
+            "NO"
+          ],
           "type": "string"
         },
-        "text": {
-          "description": "字库 Unicode 码",
+        "gestureBack": {
+          "default": "YES",
+          "description": "仅支持 iOS，是否支持手势返回",
+          "enum": [
+            "YES",
+            "NO"
+          ],
+          "type": "string"
+        },
+        "navigationBarFrontColor": {
+          "description": "导航栏前景色",
+          "enum": [
+            "black",
+            "white"
+          ],
+          "type": "string"
+        },
+        "onReachBottomDistance": {
+          "description": "页面上拉触底时触发时距离页面底部的距离，单位为 px，详情可查看 [页面事件处理函数](https://opendocs.alipay.com/mini/framework/page-detail#%E9%A1%B5%E9%9D%A2%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E5%87%BD%E6%95%B0)",
+          "type": "number"
+        },
+        "pullRefresh": {
+          "default": false,
+          "description": "是否允许下拉刷新，allowsBounceVertical 值需要为 \"YES\"，全局配置后全局生效，但是如果单个页面配置了该参数，以页面的配置为准",
+          "type": "boolean"
+        },
+        "responsive": {
+          "default": true,
+          "description": "rpx 单位是否宽度自适应\n\n当设置为 false 时，2 rpx 将恒等于 1 px，不再根据屏幕宽度进行自适应，此时 750 rpx 将不再等于 100% 宽度",
+          "type": "boolean"
+        },
+        "showTitleLoading": {
+          "default": "NO",
+          "description": "是否进入时显示导航栏的 loading",
+          "enum": [
+            "YES",
+            "NO"
+          ],
+          "type": "string"
+        },
+        "titleBarColor": {
+          "$ref": "#/definitions/HEXColor",
+          "description": "导航栏背景色，支持 HEX 颜色"
+        },
+        "titleImage": {
+          "description": "导航栏图片地址，会替换当前文字标题，只支持 https 图片链接",
+          "type": "string"
+        },
+        "titlePenetrate": {
+          "default": "NO",
+          "description": "导航栏点击穿透",
+          "enum": [
+            "YES",
+            "NO"
+          ],
+          "type": "string"
+        },
+        "transparentTitle": {
+          "default": "none",
+          "description": "导航栏透明设置\n\nalways 一直透明\n\nauto 滑动自适应\n\nnone 不透明",
+          "enum": [
+            "always",
+            "auto",
+            "none"
+          ],
           "type": "string"
         }
       },
       "type": "object"
     },
-    "MidButton": {
-      "additionalProperties": false,
+    "MpBaidu": {
+      "description": "设置编译到 mp-baidu 平台的特定样式，配置项参考 [MP-BAIDU](https://uniapp.dcloud.net.cn/collocation/pages.html#mp-baidu) 和 <https://smartprogram.baidu.com/docs/develop/framework/process/#window>\n\n相应的类型是 MpBaidu",
       "properties": {
-        "backgroundImage": {
-          "description": "中间按钮的背景图片路径",
+        "backgroundColor": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#FFFFFF",
+          "description": "窗口的背景色，支持 HEX 颜色"
+        },
+        "backgroundColorBottom": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#FFFFFF",
+          "description": "底部窗口的背景色，仅 iOS 支持"
+        },
+        "backgroundColorTop": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#FFFFFF",
+          "description": "顶部窗口的背景色，仅 iOS 支持"
+        },
+        "backgroundTextStyle": {
+          "default": "dark",
+          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\"",
+          "enum": [
+            "dark",
+            "light"
+          ],
           "type": "string"
         },
-        "height": {
-          "default": "50px",
-          "description": "中间按钮的高度，可以大于 tabBar 高度，达到中间凸起的效果",
+        "enablePullDownRefresh": {
+          "default": false,
+          "description": "是否开启全局的下拉刷新",
+          "type": "boolean"
+        },
+        "navigationBarBackgroundColor": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#000000",
+          "description": "导航栏背景颜色，支持 HEX 颜色",
+          "format": "color"
+        },
+        "navigationBarTextStyle": {
+          "default": "white",
+          "description": "导航栏标题、状态栏颜色",
+          "enum": [
+            "black",
+            "white"
+          ],
           "type": "string"
         },
-        "iconPath": {
-          "description": "中间按钮的图片路径",
+        "navigationBarTitleText": {
+          "description": "导航栏标题文字内容",
           "type": "string"
         },
-        "iconWidth": {
-          "default": "24px",
-          "description": "图片宽度（高度等比例缩放）",
+        "navigationStyle": {
+          "default": "default",
+          "description": "导航栏样式\n\n\"default\" 默认样式\n\n\"custom\" 自定义导航栏，只保留右上角胶囊按钮",
+          "enum": [
+            "default",
+            "custom"
+          ],
           "type": "string"
         },
-        "iconfont": {
-          "$ref": "#/definitions/IconFont",
-          "description": "字体图标，优先级高于 iconPath"
+        "onReachBottomDistance": {
+          "default": 50,
+          "description": "页面上拉触底事件触发时距页面底部距离，单位为 px",
+          "type": "number"
         },
-        "text": {
-          "description": "中间按钮的文字",
+        "pageOrientation": {
+          "default": "portrait",
+          "description": "屏幕旋转设置，支持 auto / portrait / landscape\n\n\"auto\" 自动\n\n\"portrait\" 竖屏\n\n\"landscape\" 横屏",
+          "enum": [
+            "auto",
+            "portrait",
+            "landscape"
+          ],
           "type": "string"
         },
-        "width": {
-          "default": "80px",
-          "description": "中间按钮的宽度，tabBar 其它项为减去此宽度后平分，默认值为与其它项平分宽度",
+        "textSizeAdjust": {
+          "default": "auto",
+          "description": "小程序页面是否禁止响应字体大小的设置\n\n\"auto\" 默认响应\n\n\"none\" 不响应",
+          "enum": [
+            "auto",
+            "none"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "MpJd": {
+      "description": "设置编译到 mp-jd 平台的特定样式，配置项参考 <https://mp-docs.jd.com/doc/dev/framework/504#heading-3>\n\n相应的类型是 MpJd",
+      "properties": {
+        "backgroundColor": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#FFFFFF",
+          "description": "下拉窗口的背景色，不是页面的背景颜色"
+        },
+        "backgroundColorBottom": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#FFFFFF",
+          "description": "底部窗口的背景色，仅 iOS 支持"
+        },
+        "backgroundColorTop": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#FFFFFF",
+          "description": "顶部窗口的背景色，仅 iOS 支持"
+        },
+        "backgroundTextStyle": {
+          "default": "dark",
+          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\"",
+          "enum": [
+            "dark",
+            "light"
+          ],
+          "type": "string"
+        },
+        "enablePullDownRefresh": {
+          "default": false,
+          "description": "是否开启全局的下拉刷新，详见 [Page.onPullDownRefresh](https://mp-docs.jd.com/doc/dev/framework/520#heading-10)",
+          "type": "boolean"
+        },
+        "navigationBarBackgroundColor": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#000000",
+          "description": "导航栏背景颜色，支持 HEX 颜色",
+          "format": "color"
+        },
+        "navigationBarTextStyle": {
+          "default": "white",
+          "description": "导航栏标题、状态栏颜色",
+          "enum": [
+            "black",
+            "white"
+          ],
+          "type": "string"
+        },
+        "navigationBarTitleText": {
+          "description": "导航栏标题文字内容",
+          "type": "string"
+        },
+        "navigationStyle": {
+          "default": "default",
+          "description": "导航栏样式\n\n\"default\" 默认样式\n\n\"custom\" 自定义导航栏，只保留右上角胶囊按钮",
+          "enum": [
+            "default",
+            "custom"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "MpKuaishou": {
+      "description": "设置编译到 mp-kuaishou 平台的特定样式，配置项参考 <https://mp.kuaishou.com/docs/develop/frame/config/conf_appjson.html#window>\n\n相应的类型是 MpKuaishou",
+      "properties": {
+        "backgroundColor": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#FFFFFF",
+          "description": "窗口的背景色，支持 HEX 颜色"
+        },
+        "backgroundColorBottom": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#FFFFFF",
+          "description": "底部窗口的背景色，仅 iOS 支持"
+        },
+        "backgroundColorTop": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#FFFFFF",
+          "description": "顶部窗口的背景色，仅 iOS 支持"
+        },
+        "backgroundTextStyle": {
+          "default": "dark",
+          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\"",
+          "enum": [
+            "dark",
+            "light"
+          ],
+          "type": "string"
+        },
+        "enablePullDownRefresh": {
+          "default": false,
+          "description": "是否开启全局的下拉刷新，详见 [Page.onPullDownRefresh](https://mp.kuaishou.com/docs/develop/frame/page/page_page.html#onpulldownrefresh)",
+          "type": "boolean"
+        },
+        "navigationBarBackgroundColor": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#000000",
+          "description": "导航栏背景颜色，支持 HEX 颜色",
+          "format": "color"
+        },
+        "navigationBarTextStyle": {
+          "default": "white",
+          "description": "导航栏标题、状态栏颜色",
+          "enum": [
+            "black",
+            "white"
+          ],
+          "type": "string"
+        },
+        "navigationBarTitleText": {
+          "description": "导航栏标题文字内容",
+          "type": "string"
+        },
+        "navigationStyle": {
+          "default": "default",
+          "description": "导航栏样式\n\n\"default\" 默认样式\n\n\"custom\" 自定义导航栏，只保留右上角胶囊按钮",
+          "enum": [
+            "default",
+            "custom"
+          ],
+          "type": "string"
+        },
+        "onReachBottomDistance": {
+          "default": 50,
+          "description": "页面上拉触底事件触发时距页面底部距离，单位为 px，详见 [Page.onReachBottom](https://mp.kuaishou.com/docs/develop/frame/page/page_page.html#onreachbottom)",
+          "type": "number"
+        },
+        "pageOrientation": {
+          "default": "portrait",
+          "description": "屏幕旋转设置，支持 auto / portrait / landscape，详见 [响应显示区域变化](https://developers.weixin.qq.com/miniprogram/dev/framework/view/resizable.html)\n\n\"auto\" 自动\n\n\"portrait\" 竖屏\n\n\"landscape\" 横屏",
+          "enum": [
+            "auto",
+            "portrait",
+            "landscape"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "MpLark": {
+      "description": "设置编译到 mp-lark 平台的特定样式，配置项参考 <https://open.feishu.cn/document/client-docs/gadget/introduction/global-settings#a172b7dd>\n\n相应的类型是 MpLark",
+      "properties": {
+        "PCMode": {
+          "additionalProperties": false,
+          "description": "PCMode 模式下特定的窗口配置，支持的属性与通用 window 配置属性一致，仅当在 ext 内配置了 defaultPages.PCMode 时生效",
+          "type": "object"
+        },
+        "backgroundColor": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#FFFFFF",
+          "description": "窗口的背景色，支持 HEX 颜色"
+        },
+        "backgroundColorBottom": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#FFFFFF",
+          "description": "底部窗口的背景色"
+        },
+        "backgroundColorTop": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#FFFFFF",
+          "description": "顶部窗口的背景色"
+        },
+        "backgroundTextStyle": {
+          "default": "dark",
+          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\"",
+          "enum": [
+            "dark",
+            "light"
+          ],
+          "type": "string"
+        },
+        "enablePullDownRefresh": {
+          "default": false,
+          "description": "是否开启全局的下拉刷新",
+          "type": "boolean"
+        },
+        "navigationBarBackgroundColor": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#000000",
+          "description": "导航栏背景颜色，支持 HEX 颜色",
+          "format": "color"
+        },
+        "navigationBarTextStyle": {
+          "default": "white",
+          "description": "导航栏标题、状态栏颜色",
+          "enum": [
+            "black",
+            "white"
+          ],
+          "type": "string"
+        },
+        "navigationBarTitleText": {
+          "description": "导航栏标题文字内容",
+          "type": "string"
+        },
+        "navigationStyle": {
+          "default": "default",
+          "description": "导航栏样式\n\n\"default\" 默认样式\n\n\"custom\" 自定义导航栏，只保留右上角胶囊按钮",
+          "enum": [
+            "default",
+            "custom"
+          ],
+          "type": "string"
+        },
+        "onReachBottomDistance": {
+          "default": 50,
+          "description": "页面上拉触底事件触发时距页面底部距离，单位为 px",
+          "type": "number"
+        },
+        "transparentTitle": {
+          "default": "none",
+          "description": "导航栏透明设置\n\n\"always\" 一直透明\n\n\"auto\" 滑动自适应\n\n\"none\" 不透明",
+          "enum": [
+            "always",
+            "auto",
+            "none"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "MpQq": {
+      "description": "设置编译到 mp-qq 平台的特定样式，配置项参考 <https://q.qq.com/wiki/develop/miniprogram/frame/dispose.html#window>\n\n相应的类型是 MpQq",
+      "properties": {
+        "backgroundColor": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#FFFFFF",
+          "description": "窗口的背景色，支持 HEX 颜色"
+        },
+        "backgroundColorBottom": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#FFFFFF",
+          "description": "底部窗口的背景色，仅 iOS 支持"
+        },
+        "backgroundColorTop": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#FFFFFF",
+          "description": "顶部窗口的背景色，仅 iOS 支持"
+        },
+        "backgroundTextStyle": {
+          "default": "dark",
+          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\"",
+          "enum": [
+            "dark",
+            "light"
+          ],
+          "type": "string"
+        },
+        "enablePullDownRefresh": {
+          "default": false,
+          "description": "是否开启全局的下拉刷新，详见 [Page.onPullDownRefresh](https://q.qq.com/wiki/develop/miniprogram/frame/logic/logic_register_page.html#onPullDownRefresh)",
+          "type": "boolean"
+        },
+        "navigationBarBackgroundColor": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#000000",
+          "description": "导航栏背景颜色，支持 HEX 颜色",
+          "format": "color"
+        },
+        "navigationBarTextStyle": {
+          "default": "white",
+          "description": "导航栏标题、状态栏颜色",
+          "enum": [
+            "black",
+            "white"
+          ],
+          "type": "string"
+        },
+        "navigationBarTitleText": {
+          "description": "导航栏标题文字内容",
+          "type": "string"
+        },
+        "navigationStyle": {
+          "default": "default",
+          "description": "导航栏样式\n\n\"default\" 默认样式\n\n\"custom\" 自定义导航栏，只保留右上角胶囊按钮",
+          "enum": [
+            "default",
+            "custom"
+          ],
+          "type": "string"
+        },
+        "pageOrientation": {
+          "default": "portrait",
+          "description": "屏幕旋转设置，支持 auto / portrait / landscape，详见 [响应显示区域变化](https://q.qq.com/wiki/develop/miniprogram/frame/view/view_section_change.html)\n\n\"auto\" 自动\n\n\"portrait\" 竖屏\n\n\"landscape\" 横屏",
+          "enum": [
+            "auto",
+            "portrait",
+            "landscape"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "MpToutiao": {
+      "description": "设置编译到 mp-toutiao 平台的特定样式，配置项参考 <https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/develop/framework/general-configuration#window>\n\n相应的类型是 MpToutiao",
+      "properties": {
+        "backgroundColor": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#FFFFFF",
+          "description": "窗口的背景色，支持 HEX 颜色"
+        },
+        "backgroundColorBottom": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "同 backgroundColor",
+          "description": "底部窗口的背景色，仅 iOS 支持"
+        },
+        "backgroundColorTop": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "同 backgroundColor",
+          "description": "顶部窗口的背景色，仅 iOS 支持"
+        },
+        "backgroundTextStyle": {
+          "default": "dark",
+          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\"",
+          "enum": [
+            "dark",
+            "light"
+          ],
+          "type": "string"
+        },
+        "enablePullDownRefresh": {
+          "default": false,
+          "description": "是否开启全局的下拉刷新",
+          "type": "boolean"
+        },
+        "navigationBarBackgroundColor": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#000000",
+          "description": "导航栏背景颜色，支持 HEX 颜色",
+          "format": "color"
+        },
+        "navigationBarTextStyle": {
+          "default": "white",
+          "description": "导航栏标题颜色，同时影响标题颜色、右胶囊颜色、左返回箭头颜色",
+          "enum": [
+            "black",
+            "white"
+          ],
+          "type": "string"
+        },
+        "navigationBarTitleText": {
+          "description": "导航栏标题文字内容",
+          "type": "string"
+        },
+        "navigationStyle": {
+          "default": "default",
+          "description": "导航栏样式\n\n\"default\" 默认样式\n\n\"custom\" 自定义导航栏，只保留右上角胶囊按钮",
+          "enum": [
+            "default",
+            "custom"
+          ],
+          "type": "string"
+        },
+        "onReachBottomDistance": {
+          "default": 50,
+          "description": "页面上拉触底事件触发时距页面底部距离，单位为 px",
+          "type": "number"
+        },
+        "skeleton": {
+          "description": "框架骨架屏配置，仅支持配置 config 属性，优先级高于 app.json，详见 [小程序框架骨架屏](https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/develop/guide/experience-optimization/list/skeleton)",
+          "properties": {
+            "config": {
+              "description": "包含超时移除及自动生成配置等",
+              "properties": {
+                "backgroundColor": {
+                  "$ref": "#/definitions/HEXColor",
+                  "default": "#fff",
+                  "description": "骨架屏背景色，支持 HEX 颜色",
+                  "format": "color"
+                },
+                "button": {
+                  "default": "{ color: '#efefef }",
+                  "description": "骨架页面中被视为按钮块的配置",
+                  "properties": {
+                    "color": {
+                      "$ref": "#/definitions/HEXColor",
+                      "default": "#efefef",
+                      "description": "骨架页面中被视为按钮块的颜色，支持 HEX 颜色",
+                      "format": "color"
+                    }
+                  },
+                  "type": "object"
+                },
+                "cssUnit": {
+                  "default": "vw",
+                  "description": "CSS单位，元素绝对定位都使用 \"vw\" 与 \"vh\"",
+                  "enum": [
+                    "px",
+                    "rem",
+                    "vw",
+                    "vh",
+                    "vmin",
+                    "vmax"
+                  ],
+                  "type": "string"
+                },
+                "decimal": {
+                  "default": 4,
+                  "description": "生成骨架屏页面中 css 值保留的小数点位数，默认为 4",
+                  "type": "number"
+                },
+                "image": {
+                  "default": {
+                    "color": "#efefef",
+                    "shape": "rect"
+                  },
+                  "description": "骨架页面中图片块配置",
+                  "properties": {
+                    "color": {
+                      "$ref": "#/definitions/HEXColor",
+                      "default": "#efefef",
+                      "description": "骨架页面中图片块颜色，支持 HEX 颜色",
+                      "format": "color"
+                    },
+                    "shape": {
+                      "default": "rect",
+                      "description": "骨架页面中图片块形状\n\ncircle 圆形\n\nrect 矩形",
+                      "enum": [
+                        "circle",
+                        "rect"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "loading": {
+                  "default": "spin",
+                  "description": "骨架屏显示时的动画",
+                  "enum": [
+                    "spin",
+                    "chiaroscuro",
+                    "shine"
+                  ],
+                  "type": "string"
+                },
+                "mode": {
+                  "default": "fullscreen",
+                  "description": "默认为使用绝对定位占满全屏\n\n当对自定义组件使用，作为局部加载的样式时，可设置为 \"auto\"，高度随内容高度撑开",
+                  "enum": [
+                    "fullscreen",
+                    "auto"
+                  ],
+                  "type": "string"
+                },
+                "timeout": {
+                  "default": 2000,
+                  "description": "设置骨架屏超时移除时间，单位为 ms，为 0 时关闭超时移除",
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            },
+            "page": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "页面路径同骨架屏文件的对应关系",
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
+        "transparentTitle": {
+          "default": "none",
+          "description": "仅在 navigationStyle 为 \"default\" 时生效，用来控制导航栏透明设置\n\n\"always\" 一直透明\n\n\"auto\" 滑动自适应\n\n\"none\" 不透明",
+          "enum": [
+            "always",
+            "auto",
+            "none"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "MpWeixin": {
+      "description": "设置编译到 mp-weixin 平台的特定样式，配置项参考 [MP-WEIXIN](https://uniapp.dcloud.net.cn/collocation/pages#mp-weixin) 和 <https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html#window>\n\n相应的类型是 MpWeixin",
+      "properties": {
+        "backgroundColor": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#FFFFFF",
+          "description": "窗口的背景色，支持 HEX 颜色"
+        },
+        "backgroundColorBottom": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#FFFFFF",
+          "description": "底部窗口的背景色，仅 iOS 支持"
+        },
+        "backgroundColorTop": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#FFFFFF",
+          "description": "顶部窗口的背景色，仅 iOS 支持"
+        },
+        "backgroundTextStyle": {
+          "default": "dark",
+          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\"",
+          "enum": [
+            "dark",
+            "light"
+          ],
+          "type": "string"
+        },
+        "enablePullDownRefresh": {
+          "default": false,
+          "description": "是否开启全局的下拉刷新，详见 [Page.onPullDownRefresh](https://developers.weixin.qq.com/miniprogram/dev/reference/api/Page.html#onpulldownrefresh)",
+          "type": "boolean"
+        },
+        "handleWebviewPreload": {
+          "default": "static",
+          "description": "控制预加载下个页面的时机，详见 [控制预加载下个页面的时机](https://developers.weixin.qq.com/miniprogram/dev/framework/performance/tips/runtime_nav.html#_2-4-%E6%8E%A7%E5%88%B6%E9%A2%84%E5%8A%A0%E8%BD%BD%E4%B8%8B%E4%B8%AA%E9%A1%B5%E9%9D%A2%E7%9A%84%E6%97%B6%E6%9C%BA)\n\n\"static\" 在当前页面 onReady 触发 200ms 后触发预加载\n\n\"auto\" 渲染线程空闲时进行预加载，由基础库根据一段时间内 requestAnimationFrame 的触发频率算法判断\n\n\"manual\" 由开发者通过调用 [wx.preloadWebview](https://developers.weixin.qq.com/miniprogram/dev/api/base/performance/wx.preloadWebview.html) 触发，开发者可以在页面主要内容的 setData 结束后手动触发",
+          "enum": [
+            "static",
+            "manual",
+            "auto"
+          ],
+          "type": "string"
+        },
+        "homeButton": {
+          "default": false,
+          "description": "在非首页、非页面栈最底层页面或非 tabbar 内页面中的导航栏展示 home 键",
+          "type": "boolean"
+        },
+        "initialRenderingCache": {
+          "description": "页面初始渲染缓存配置，详见 [初始渲染缓存](https://developers.weixin.qq.com/miniprogram/dev/framework/view/initial-rendering-cache.html)",
+          "enum": [
+            "static",
+            "dynamic"
+          ],
+          "type": "string"
+        },
+        "navigationBarBackgroundColor": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "#000000",
+          "description": "导航栏背景颜色，支持 HEX 颜色",
+          "format": "color"
+        },
+        "navigationBarTextStyle": {
+          "default": "white",
+          "description": "导航栏标题、状态栏颜色",
+          "enum": [
+            "black",
+            "white"
+          ],
+          "type": "string"
+        },
+        "navigationBarTitleText": {
+          "description": "导航栏标题文字内容",
+          "type": "string"
+        },
+        "navigationStyle": {
+          "default": "default",
+          "description": "导航栏样式\n\n\"default\" 默认样式\n\n\"custom\" 自定义导航栏，只保留右上角胶囊按钮",
+          "enum": [
+            "default",
+            "custom"
+          ],
+          "type": "string"
+        },
+        "onReachBottomDistance": {
+          "default": 50,
+          "description": "页面上拉触底事件触发时距页面底部距离，单位为 px，详见 [Page.onReachBottom](https://developers.weixin.qq.com/miniprogram/dev/reference/api/Page.html#onreachbottom)",
+          "type": "number"
+        },
+        "pageOrientation": {
+          "default": "portrait",
+          "description": "屏幕旋转设置，支持 auto / portrait / landscape，详见 [响应显示区域变化](https://developers.weixin.qq.com/miniprogram/dev/framework/view/resizable.html)\n\n\"auto\" 自动\n\n\"portrait\" 竖屏\n\n\"landscape\" 横屏",
+          "enum": [
+            "auto",
+            "portrait",
+            "landscape"
+          ],
+          "type": "string"
+        },
+        "restartStrategy": {
+          "description": "重新启动策略配置\n\n\"homePage\" 如果从这个页面退出小程序，下次将从首页冷启动\n\n\"homePageAndLatestPage\" 如果从这个页面退出小程序，下次冷启动后立刻加载这个页面，页面的参数保持不变（不可用于 tab 页）",
+          "enum": [
+            "homePage",
+            "homePageAndLatestPage"
+          ],
+          "type": "string"
+        },
+        "visualEffectInBackground": {
+          "default": "none",
+          "description": "切入系统后台时，隐藏页面内容，保护用户隐私",
+          "enum": [
+            "hidden",
+            "none"
+          ],
           "type": "string"
         }
       },
@@ -453,10 +2331,11 @@
       "type": "object"
     },
     "PagesConfig": {
+      "description": "对 uni-app 进行全局配置，决定页面文件的路径、窗口样式、原生的导航栏、底部的原生 tabBar 等，类似微信小程序中 app.json 的页面管理部分\n\n注意定位权限申请等原属于 app.json 的内容，需要在 manifest 中配置",
       "properties": {
         "condition": {
           "$ref": "#/definitions/Condition",
-          "description": "启动模式配置"
+          "description": "启动模式配置，仅开发期间生效"
         },
         "easycom": {
           "$ref": "#/definitions/EasyCom",
@@ -483,7 +2362,30 @@
         },
         "preloadRule": {
           "additionalProperties": {
-            "$ref": "#/definitions/PreloadRule"
+            "additionalProperties": false,
+            "description": "页面路径",
+            "properties": {
+              "network": {
+                "default": "wifi",
+                "description": "在指定网络下预下载\n\n\"all\" 不限网络\n\n\"wifi\" 仅 wifi 下预下载",
+                "enum": [
+                  "all",
+                  "wifi"
+                ],
+                "type": "string"
+              },
+              "packages": {
+                "description": "进入页面后预下载分包的 root 或 name\n\n__APP__ 表示主包",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "packages"
+            ],
+            "type": "object"
           },
           "description": "分包预下载规则",
           "type": "object"
@@ -493,11 +2395,8 @@
           "description": "大屏右侧窗口"
         },
         "subPackages": {
-          "description": "分包加载配置",
-          "items": {
-            "$ref": "#/definitions/SubPackage"
-          },
-          "type": "array"
+          "$ref": "#/definitions/SubPackages",
+          "description": "分包加载配置"
         },
         "tabBar": {
           "$ref": "#/definitions/TabBar",
@@ -512,33 +2411,41 @@
           "description": "自动跳转相关配置，新增于 HBuilderX 3.5.0"
         },
         "workers": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "isSubpackage": {
+                  "default": false,
+                  "description": "是否打包为分包",
+                  "type": "boolean"
+                },
+                "path": {
+                  "description": "`Worker` 代码放置的目录",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "type": "object"
+            }
+          ],
           "description": "`Worker` 代码放置的目录"
         }
       },
       "type": "object"
     },
-    "PreloadRule": {
-      "additionalProperties": false,
-      "properties": {
-        "network": {
-          "default": "wifi",
-          "description": "在指定网络下预下载，可选值为：all（不限网络）、wifi（仅wifi下预下载）",
-          "type": "string"
-        },
-        "packages": {
-          "description": "进入页面后预下载分包的 root 或 name。__APP__ 表示主包。",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        }
-      },
-      "type": "object"
-    },
-    "RGBAColor": {
+    "PercentageSize": {
       "type": "string"
     },
-    "RGBColor": {
+    "PxSize": {
+      "type": "string"
+    },
+    "RGBAColor": {
       "type": "string"
     },
     "SubPackage": {
@@ -556,48 +2463,73 @@
           "type": "string"
         }
       },
+      "required": [
+        "root",
+        "pages"
+      ],
       "type": "object"
+    },
+    "SubPackages": {
+      "items": {
+        "$ref": "#/definitions/SubPackage"
+      },
+      "type": "array"
     },
     "TabBar": {
       "properties": {
         "backgroundColor": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Color"
-            },
-            {
-              "$ref": "#/definitions/ThemeColor"
-            }
+          "$ref": "#/definitions/HEXColor",
+          "description": "tab 的背景色",
+          "format": "color"
+        },
+        "backgroundImage": {
+          "description": "设置背景图片，优先级高于 backgroundColor",
+          "type": "string"
+        },
+        "backgroundRepeat": {
+          "default": "no-repeat",
+          "description": "设置标题栏的背景图平铺方式\n\n\"repeat\" 背景图片在垂直方向和水平方向平铺\n\n\"repeat-x\" 背景图片在水平方向平铺，垂直方向拉伸\n\n\"repeat-y\" 背景图片在垂直方向平铺，水平方向拉伸\n\n\"no-repeat\" 背景图片在垂直方向和水平方向都拉伸",
+          "enum": [
+            "no-repeat",
+            "repeat",
+            "repeat-x",
+            "repeat-y"
           ],
-          "description": "tab 的背景色"
+          "type": "string"
         },
         "blurEffect": {
           "default": "none",
-          "description": "iOS 高斯模糊效果，可选值 dark/extralight/light/none（参考?:使用说明）",
+          "description": "iOS 高斯模糊效果，参考 [使用说明](https://ask.dcloud.net.cn/article/36617)",
+          "enum": [
+            "dark",
+            "extralight",
+            "light",
+            "none"
+          ],
           "type": "string"
         },
         "borderStyle": {
           "anyOf": [
             {
+              "const": "black",
               "type": "string"
             },
             {
-              "$ref": "#/definitions/ThemeColor"
+              "const": "white",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/HEXColor"
             }
           ],
           "default": "black",
-          "description": "tabbar 上边框的颜色，可选值 black/white，也支持其他颜色值"
+          "description": "tabBar 上边框的颜色",
+          "format": "color"
         },
         "color": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Color"
-            },
-            {
-              "$ref": "#/definitions/ThemeColor"
-            }
-          ],
-          "description": "tab 上的文字默认颜色"
+          "$ref": "#/definitions/HEXColor",
+          "description": "tab 上的文字默认颜色",
+          "format": "color"
         },
         "fontSize": {
           "default": "10px",
@@ -615,11 +2547,11 @@
           "type": "string"
         },
         "iconfontSrc": {
-          "description": "list设置 iconfont 属性时，需要指定字体文件路径",
+          "description": "list 设置 iconfont 属性时，需要指定字体文件路径",
           "type": "string"
         },
         "list": {
-          "description": "tab 的列表，详见 list 属性说明，最少2个、最多5个 tab",
+          "description": "tab 列表，最少 2个，最多 5 个",
           "items": {
             "$ref": "#/definitions/TabBarItem"
           },
@@ -628,24 +2560,27 @@
           "type": "array"
         },
         "midButton": {
-          "$ref": "#/definitions/MidButton",
+          "$ref": "#/definitions/TabBarMidButton",
           "description": "中间按钮 仅在 list 项为偶数时有效"
         },
         "position": {
           "default": "bottom",
-          "description": "可选值 bottom、top",
+          "description": "tab 位置",
+          "enum": [
+            "bottom",
+            "top"
+          ],
+          "type": "string"
+        },
+        "redDotColor": {
+          "description": "tabBar上红点颜色",
+          "format": "color",
           "type": "string"
         },
         "selectedColor": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Color"
-            },
-            {
-              "$ref": "#/definitions/ThemeColor"
-            }
-          ],
-          "description": "tab 上的文字选中时的颜色"
+          "$ref": "#/definitions/HEXColor",
+          "description": "tab 上的文字选中时的颜色",
+          "format": "color"
         },
         "spacing": {
           "default": "3px",
@@ -654,18 +2589,45 @@
         }
       },
       "required": [
+        "color",
+        "selectedColor",
         "list"
       ],
+      "type": "object"
+    },
+    "TabBarIconFont": {
+      "properties": {
+        "color": {
+          "$ref": "#/definitions/HEXColor",
+          "description": "字体图标颜色"
+        },
+        "fontSize": {
+          "description": "字体图标字号，单位为 px",
+          "type": "string"
+        },
+        "selectedColor": {
+          "$ref": "#/definitions/HEXColor",
+          "description": "字体图标选中颜色"
+        },
+        "selectedText": {
+          "description": "选中后字库 Unicode 码",
+          "type": "string"
+        },
+        "text": {
+          "description": "字库 Unicode 码",
+          "type": "string"
+        }
+      },
       "type": "object"
     },
     "TabBarItem": {
       "properties": {
         "iconPath": {
-          "description": "图片路径，icon 大小限制为40kb，建议尺寸为 81px * 81px， 当 position 为 top 时，此参数无效，不支持网络图片，不支持字体图标",
+          "description": "图片路径，icon 大小限制为 40 kb，建议尺寸为 81px * 81px\n\n当 position 为 \"top\" 时，此参数无效\n\n不支持网络图片，不支持字体图标",
           "type": "string"
         },
         "iconfont": {
-          "$ref": "#/definitions/IconFont",
+          "$ref": "#/definitions/TabBarIconFont",
           "description": "字体图标，优先级高于 iconPath"
         },
         "pagePath": {
@@ -673,16 +2635,55 @@
           "type": "string"
         },
         "selectedIconPath": {
-          "description": "选中时的图片路径，icon 大小限制为40kb，建议尺寸为 81px * 81px ，当 position 为 top 时，此参数无效",
+          "description": "选中时的图片路径，icon 大小限制为 40 kb，建议尺寸为 81px * 81px\n\n当 position 为 \"top\" 时，此参数无效\n\n不支持网络图片，不支持字体图标",
           "type": "string"
         },
         "text": {
-          "description": "tab 上按钮文字，在 App 和 H5 平台为非必填。例如中间可放一个没有文字的+号图标",
+          "description": "tab 上按钮文字，在 App 和 H5 平台为非必填，例如中间可放一个没有文字的 + 号图标",
           "type": "string"
         },
         "visible": {
           "description": "该项是否显示，默认显示",
           "type": "boolean"
+        }
+      },
+      "required": [
+        "pagePath"
+      ],
+      "type": "object"
+    },
+    "TabBarMidButton": {
+      "properties": {
+        "backgroundImage": {
+          "description": "中间按钮的背景图片路径",
+          "type": "string"
+        },
+        "height": {
+          "default": "50px",
+          "description": "中间按钮的高度，可以大于 tabBar 高度，达到中间凸起的效果",
+          "type": "string"
+        },
+        "iconPath": {
+          "description": "中间按钮的图片路径",
+          "type": "string"
+        },
+        "iconWidth": {
+          "default": "24px",
+          "description": "图片宽度（高度等比例缩放）",
+          "type": "string"
+        },
+        "iconfont": {
+          "$ref": "#/definitions/TabBarIconFont",
+          "description": "字体图标，优先级高于 iconPath"
+        },
+        "text": {
+          "description": "中间按钮的文字",
+          "type": "string"
+        },
+        "width": {
+          "default": "80px",
+          "description": "中间按钮的宽度，tabBar 其它项为减去此宽度后平分，默认值为与其它项平分宽度",
+          "type": "string"
         }
       },
       "type": "object"
@@ -692,10 +2693,10 @@
       "properties": {
         "matchMedia": {
           "additionalProperties": false,
-          "description": "配置显示该窗口的规则，配置项参考下方 matchMedia",
+          "description": "配置显示该窗口的规则，配置项参考 [matchMedia](https://uniapp.dcloud.net.cn/collocation/pages#matchmedia)",
           "properties": {
             "minWidth": {
-              "default": "768",
+              "default": 768,
               "description": "当设备可见区域宽度 >= minWidth 时，显示该 window",
               "type": "number"
             }
@@ -708,7 +2709,7 @@
         },
         "style": {
           "$ref": "#/definitions/GlobalStyle",
-          "description": "配置页面窗口表现，配置项参考下方 pageStyle"
+          "description": "配置页面窗口表现，配置项参考 [pageStyle](https://uniapp.dcloud.net.cn/collocation/pages#style)"
         }
       },
       "required": [
@@ -716,18 +2717,124 @@
       ],
       "type": "object"
     },
-    "ThemeColor": {
-      "type": "string"
+    "TitleNViewButton": {
+      "additionalProperties": false,
+      "properties": {
+        "background": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/RGBAColor"
+            }
+          ],
+          "default": "灰色半透明",
+          "description": "自定义按钮背景色，仅在标题栏 type 为 \"transparent\" 时生效，支持 HEX 和 RGBA 颜色",
+          "format": "color"
+        },
+        "color": {
+          "$ref": "#/definitions/HEXColor",
+          "default": "与标题文字样式一样",
+          "description": "自定义按钮文字颜色，支持 HEX 颜色",
+          "format": "color"
+        },
+        "colorPressed": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/RGBAColor"
+            }
+          ],
+          "default": "color 属性值自动调整透明度为 0.3",
+          "description": "自定义按钮按下状态文字颜色，支持 HEX 和 RGBA 颜色",
+          "format": "color"
+        },
+        "float": {
+          "default": "right",
+          "description": "自定义按钮在标题栏的显示位置，仅支持 \"right\" / \"left\"\n\n\"right\" 右侧\n\n\"left\" 左侧",
+          "enum": [
+            "right",
+            "left"
+          ],
+          "type": "string"
+        },
+        "fontSize": {
+          "description": "自定义按钮文字大小",
+          "type": "string"
+        },
+        "fontSrc": {
+          "description": "自定义按钮字体文件路径，只支持本地地址",
+          "type": "string"
+        },
+        "fontWeight": {
+          "default": "normal",
+          "description": "自定义按钮文字粗细，仅支持 \"normal\" | \"bold\"\n\n\"normal\" 标准\n\n\"bold\" 加粗",
+          "enum": [
+            "normal",
+            "bold"
+          ],
+          "type": "string"
+        },
+        "select": {
+          "default": false,
+          "description": "自定义按钮是否显示选择指示图标（向下箭头），常用于城市选择",
+          "type": "boolean"
+        },
+        "text": {
+          "description": "自定义按钮文字内容。使用字体图标时 unicode 字符表示必须以\"\\\\u\" 开头，如 \"\\\\ue123\"",
+          "type": "string"
+        },
+        "type": {
+          "default": "none",
+          "description": "自定义按钮样式，详见 [自定义按钮样式](https://uniapp.dcloud.net.cn/collocation/pages#app-titlenview-buttons-type)\n\n\"forward\" 前进按钮\n\n\"back\" 后退按钮\n\n\"share\" 分享按钮\n\n\"favorite\" 收藏按钮\n\n\"home\" 主页按钮\n\n\"menu\" 菜单按钮\n\n\"close\" 关闭按钮\n\n\"none\" 无样式，需通过 text 属性设置按钮上显示的内容、通过 fontSrc 属性设置使用的字体库",
+          "enum": [
+            "forward",
+            "back",
+            "share",
+            "favorite",
+            "home",
+            "menu",
+            "close",
+            "none"
+          ],
+          "type": "string"
+        },
+        "width": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PxSize"
+            },
+            {
+              "const": "auto",
+              "type": "string"
+            }
+          ],
+          "default": "44px",
+          "description": "自定义按钮文字宽度，支持单位为 px 的逻辑像素值或 \"auto\"，按钮内容居中显示"
+        }
+      },
+      "type": "object"
     },
     "UniIdRouter": {
       "additionalProperties": false,
       "properties": {
         "loginPage": {
           "description": "登录页面路径",
+          "examples": [
+            "pages/index/index"
+          ],
           "type": "string"
         },
         "needLogin": {
           "description": "需要登录才可以访问的页面列表，可以使用正则语法",
+          "examples": [
+            [
+              "pages/detail/.*"
+            ]
+          ],
           "items": {
             "type": "string"
           },
@@ -735,7 +2842,7 @@
         },
         "resToLogin": {
           "default": true,
-          "description": "是否自动解析云对象及 clientDB 的错误码，如果是客户端 token 不正确或 token 过期则自动跳转配置的登录页面",
+          "description": "是否是否自动解析云对象及 clientDB 的错误码，如果是客户端 token 不正确或 token 过期则自动跳转配置的登录页面",
           "type": "boolean"
         }
       },
