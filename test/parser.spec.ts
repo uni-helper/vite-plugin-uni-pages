@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { getRouteBlock, resolveOptions, getRouteSfcBlock } from '../packages/core/src/index'
+import { getRouteBlock, getRouteSfcBlock, resolveOptions } from '../packages/core/src/index'
 
 const options = resolveOptions({})
 const pagesJson = 'packages/playground/src/pages/test-json.vue'
