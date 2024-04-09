@@ -224,9 +224,16 @@
                     "description": "原生子窗体的高度，支持以 px 为单位的逻辑像素值或百分比\n\n未设置时，可同时设置 top 和 bottom 属性值改变窗口的默认高度"
                   },
                   "left": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/definitions/PxSize"
+                      },
+                      {
+                        "$ref": "#/definitions/PercentageSize"
+                      }
+                    ],
                     "default": "0px",
-                    "description": "原生子窗体水平向左的偏移量，支持以 px 为单位的逻辑像素值或百分比\n\n未设置 left 属性值时，优先通过 right 和 width 属性值来计算原生子窗体的 left 位置",
-                    "type": "string"
+                    "description": "原生子窗体水平向左的偏移量，支持以 px 为单位的逻辑像素值或百分比\n\n未设置 left 属性值时，优先通过 right 和 width 属性值来计算原生子窗体的 left 位置"
                   },
                   "margin": {
                     "description": "原生子窗体的边距，用于定位原生子窗体的位置，若设置了 left、right、top、bottom 则对应的边距值失效\n\n\"auto\" 居中",
@@ -249,9 +256,16 @@
                     "type": "string"
                   },
                   "right": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/definitions/PxSize"
+                      },
+                      {
+                        "$ref": "#/definitions/PercentageSize"
+                      }
+                    ],
                     "default": "根据 left 和 width 属性值来自动计算",
-                    "description": "原生子窗体水平向右的偏移量，支持以 px 为单位的逻辑像素值或百分比\n\n同时设置了 left 和 height 值时，忽略此属性值\n\n未设置 width 时，通过 left 和 bottom 属性值来确定原生子窗体的宽度",
-                    "type": "string"
+                    "description": "原生子窗体水平向右的偏移量，支持以 px 为单位的逻辑像素值或百分比\n\n同时设置了 left 和 height 值时，忽略此属性值\n\n未设置 width 时，通过 left 和 bottom 属性值来确定原生子窗体的宽度"
                   },
                   "top": {
                     "anyOf": [
@@ -916,7 +930,7 @@
                         "description": "绘制操作类型\n\n\"img\" 绘制图片，与 drawBitmap 操作一致，此时 id、src、position、sprite 属性值有效\n\n\"rect\" 绘制矩形区域，与 drawRect 操作一致，此时 id、color、position、rectStyles 属性值有效\n\n\"font\" 绘制文本内容，与 drawText 操作一致，此时 id、position、text、textStyles 属性值有效\n\n\"richtext\" 绘制富文本内容，与 drawRichText 操作一致，此时 id、position、text、richTextStyles 属性值有效\n\n\"input\" 绘制输入框内容，此时 id、position、inputStyles 属性值有效",
                         "enum": [
                           "img",
-                          "react",
+                          "rect",
                           "font",
                           "richtext",
                           "input"
