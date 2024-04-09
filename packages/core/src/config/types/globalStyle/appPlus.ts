@@ -103,7 +103,7 @@ export interface AppPlus {
        *
        * "input" 绘制输入框内容，此时 id、position、inputStyles 属性值有效
        */
-      tag?: 'img' | 'react' | 'font' | 'richtext' | 'input'
+      tag?: 'img' | 'rect' | 'font' | 'richtext' | 'input'
 
       /**
        * 矩形区域颜色，支持 HEX 和 RGBA 颜色
@@ -967,7 +967,7 @@ export interface AppPlus {
        *
        * @default "0px"
        */
-      left?: string
+      left?: PxSize | PercentageSize
 
       /**
        * 原生子窗体水平向右的偏移量，支持以 px 为单位的逻辑像素值或百分比
@@ -978,7 +978,7 @@ export interface AppPlus {
        *
        * @default 根据 left 和 width 属性值来自动计算
        */
-      right?: string
+      right?: PxSize | PercentageSize
 
       /**
        * 原生子窗体的边距，用于定位原生子窗体的位置，若设置了 left、right、top、bottom 则对应的边距值失效
