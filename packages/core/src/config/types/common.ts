@@ -1,12 +1,13 @@
 export type RGBColor = `rgb(${number}, ${number}, ${number})`
 export type RGBAColor = `rgba(${number}, ${number}, ${number}, ${number})`
 export type HEXColor = `#${string}`
-export type ThemeColor = `@${string}`
 export type Color = RGBColor | RGBAColor | HEXColor
 
 export type PxSize = `${number}px`
 export type RpxSize = `${number}rpx`
 export type PercentageSize = `${number}%`
+
+export type ThemeVar = `@${string}`
 
 /**
  * 窗口动画，详见 [窗口动画](https://uniapp.dcloud.net.cn/api/router.html#animation)

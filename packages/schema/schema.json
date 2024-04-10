@@ -1193,31 +1193,60 @@
           "description": "设置编译到 App 平台的特定样式，配置项参考 [app-plus](https://uniapp.dcloud.net.cn/collocation/pages#app-plus)\n\n相应的类型是 AppPlus"
         },
         "backgroundColor": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#ffffff",
           "description": "下拉显示出来的窗口的背景色，支持 HEX 颜色",
           "format": "color"
         },
         "backgroundColorBottom": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#ffffff",
           "description": "底部窗口的背景色（bounce回弹区域）",
           "format": "color"
         },
         "backgroundColorTop": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#ffffff",
           "description": "顶部窗口的背景色（bounce回弹区域）",
           "format": "color"
         },
         "backgroundTextStyle": {
-          "default": "dark",
-          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\"",
-          "enum": [
-            "dark",
-            "light"
+          "anyOf": [
+            {
+              "const": "dark",
+              "type": "string"
+            },
+            {
+              "const": "light",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
           ],
-          "type": "string"
+          "default": "dark",
+          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\""
         },
         "dynamicRpx": {
           "default": false,
@@ -1275,7 +1304,14 @@
           "description": "设置编译到 mp-weixin 平台的特定样式，配置项参考 [MP-WEIXIN](https://uniapp.dcloud.net.cn/collocation/pages#mp-weixin) 和 <https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html#window>\n\n相应的类型是 MpWeixin"
         },
         "navigationBarBackgroundColor": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "description": "导航栏背景颜色（同状态栏背景色），支持 HEX 颜色",
           "format": "color"
         },
@@ -1299,13 +1335,21 @@
           "type": "object"
         },
         "navigationBarTextStyle": {
-          "default": "black",
-          "description": "导航栏标题颜色及状态栏前景颜色，仅支持 \"black\" / \"white\"",
-          "enum": [
-            "black",
-            "white"
+          "anyOf": [
+            {
+              "const": "black",
+              "type": "string"
+            },
+            {
+              "const": "white",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
           ],
-          "type": "string"
+          "default": "black",
+          "description": "导航栏标题颜色及状态栏前景颜色，仅支持 \"black\" / \"white\""
         },
         "navigationBarTitleText": {
           "description": "导航栏标题文字内容",
@@ -1540,7 +1584,14 @@
           "type": "string"
         },
         "backgroundColor": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "description": "窗口的背景色，支持 HEX 颜色",
           "format": "color"
         },
@@ -1640,28 +1691,57 @@
       "description": "设置编译到 mp-baidu 平台的特定样式，配置项参考 [MP-BAIDU](https://uniapp.dcloud.net.cn/collocation/pages.html#mp-baidu) 和 <https://smartprogram.baidu.com/docs/develop/framework/process/#window>\n\n相应的类型是 MpBaidu",
       "properties": {
         "backgroundColor": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#FFFFFF",
           "description": "窗口的背景色，支持 HEX 颜色"
         },
         "backgroundColorBottom": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#FFFFFF",
           "description": "底部窗口的背景色，仅 iOS 支持"
         },
         "backgroundColorTop": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#FFFFFF",
           "description": "顶部窗口的背景色，仅 iOS 支持"
         },
         "backgroundTextStyle": {
-          "default": "dark",
-          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\"",
-          "enum": [
-            "dark",
-            "light"
+          "anyOf": [
+            {
+              "const": "dark",
+              "type": "string"
+            },
+            {
+              "const": "light",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
           ],
-          "type": "string"
+          "default": "dark",
+          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\""
         },
         "enablePullDownRefresh": {
           "default": false,
@@ -1669,19 +1749,34 @@
           "type": "boolean"
         },
         "navigationBarBackgroundColor": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#000000",
           "description": "导航栏背景颜色，支持 HEX 颜色",
           "format": "color"
         },
         "navigationBarTextStyle": {
-          "default": "white",
-          "description": "导航栏标题、状态栏颜色",
-          "enum": [
-            "black",
-            "white"
+          "anyOf": [
+            {
+              "const": "black",
+              "type": "string"
+            },
+            {
+              "const": "white",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
           ],
-          "type": "string"
+          "default": "white",
+          "description": "导航栏标题、状态栏颜色"
         },
         "navigationBarTitleText": {
           "description": "导航栏标题文字内容",
@@ -1727,28 +1822,57 @@
       "description": "设置编译到 mp-jd 平台的特定样式，配置项参考 <https://mp-docs.jd.com/doc/dev/framework/504#heading-3>\n\n相应的类型是 MpJd",
       "properties": {
         "backgroundColor": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#FFFFFF",
           "description": "下拉窗口的背景色，不是页面的背景颜色"
         },
         "backgroundColorBottom": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#FFFFFF",
           "description": "底部窗口的背景色，仅 iOS 支持"
         },
         "backgroundColorTop": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#FFFFFF",
           "description": "顶部窗口的背景色，仅 iOS 支持"
         },
         "backgroundTextStyle": {
-          "default": "dark",
-          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\"",
-          "enum": [
-            "dark",
-            "light"
+          "anyOf": [
+            {
+              "const": "dark",
+              "type": "string"
+            },
+            {
+              "const": "light",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
           ],
-          "type": "string"
+          "default": "dark",
+          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\""
         },
         "enablePullDownRefresh": {
           "default": false,
@@ -1756,19 +1880,34 @@
           "type": "boolean"
         },
         "navigationBarBackgroundColor": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#000000",
           "description": "导航栏背景颜色，支持 HEX 颜色",
           "format": "color"
         },
         "navigationBarTextStyle": {
-          "default": "white",
-          "description": "导航栏标题、状态栏颜色",
-          "enum": [
-            "black",
-            "white"
+          "anyOf": [
+            {
+              "const": "black",
+              "type": "string"
+            },
+            {
+              "const": "white",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
           ],
-          "type": "string"
+          "default": "white",
+          "description": "导航栏标题、状态栏颜色"
         },
         "navigationBarTitleText": {
           "description": "导航栏标题文字内容",
@@ -1790,28 +1929,57 @@
       "description": "设置编译到 mp-kuaishou 平台的特定样式，配置项参考 <https://mp.kuaishou.com/docs/develop/frame/config/conf_appjson.html#window>\n\n相应的类型是 MpKuaishou",
       "properties": {
         "backgroundColor": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#FFFFFF",
           "description": "窗口的背景色，支持 HEX 颜色"
         },
         "backgroundColorBottom": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#FFFFFF",
           "description": "底部窗口的背景色，仅 iOS 支持"
         },
         "backgroundColorTop": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#FFFFFF",
           "description": "顶部窗口的背景色，仅 iOS 支持"
         },
         "backgroundTextStyle": {
-          "default": "dark",
-          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\"",
-          "enum": [
-            "dark",
-            "light"
+          "anyOf": [
+            {
+              "const": "dark",
+              "type": "string"
+            },
+            {
+              "const": "light",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
           ],
-          "type": "string"
+          "default": "dark",
+          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\""
         },
         "enablePullDownRefresh": {
           "default": false,
@@ -1819,19 +1987,34 @@
           "type": "boolean"
         },
         "navigationBarBackgroundColor": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#000000",
           "description": "导航栏背景颜色，支持 HEX 颜色",
           "format": "color"
         },
         "navigationBarTextStyle": {
-          "default": "white",
-          "description": "导航栏标题、状态栏颜色",
-          "enum": [
-            "black",
-            "white"
+          "anyOf": [
+            {
+              "const": "black",
+              "type": "string"
+            },
+            {
+              "const": "white",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
           ],
-          "type": "string"
+          "default": "white",
+          "description": "导航栏标题、状态栏颜色"
         },
         "navigationBarTitleText": {
           "description": "导航栏标题文字内容",
@@ -1873,28 +2056,57 @@
           "type": "object"
         },
         "backgroundColor": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#FFFFFF",
           "description": "窗口的背景色，支持 HEX 颜色"
         },
         "backgroundColorBottom": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#FFFFFF",
           "description": "底部窗口的背景色"
         },
         "backgroundColorTop": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#FFFFFF",
           "description": "顶部窗口的背景色"
         },
         "backgroundTextStyle": {
-          "default": "dark",
-          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\"",
-          "enum": [
-            "dark",
-            "light"
+          "anyOf": [
+            {
+              "const": "dark",
+              "type": "string"
+            },
+            {
+              "const": "light",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
           ],
-          "type": "string"
+          "default": "dark",
+          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\""
         },
         "enablePullDownRefresh": {
           "default": false,
@@ -1902,19 +2114,34 @@
           "type": "boolean"
         },
         "navigationBarBackgroundColor": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#000000",
           "description": "导航栏背景颜色，支持 HEX 颜色",
           "format": "color"
         },
         "navigationBarTextStyle": {
-          "default": "white",
-          "description": "导航栏标题、状态栏颜色",
-          "enum": [
-            "black",
-            "white"
+          "anyOf": [
+            {
+              "const": "black",
+              "type": "string"
+            },
+            {
+              "const": "white",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
           ],
-          "type": "string"
+          "default": "white",
+          "description": "导航栏标题、状态栏颜色"
         },
         "navigationBarTitleText": {
           "description": "导航栏标题文字内容",
@@ -1951,28 +2178,57 @@
       "description": "设置编译到 mp-qq 平台的特定样式，配置项参考 <https://q.qq.com/wiki/develop/miniprogram/frame/dispose.html#window>\n\n相应的类型是 MpQq",
       "properties": {
         "backgroundColor": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#FFFFFF",
           "description": "窗口的背景色，支持 HEX 颜色"
         },
         "backgroundColorBottom": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#FFFFFF",
           "description": "底部窗口的背景色，仅 iOS 支持"
         },
         "backgroundColorTop": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#FFFFFF",
           "description": "顶部窗口的背景色，仅 iOS 支持"
         },
         "backgroundTextStyle": {
-          "default": "dark",
-          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\"",
-          "enum": [
-            "dark",
-            "light"
+          "anyOf": [
+            {
+              "const": "dark",
+              "type": "string"
+            },
+            {
+              "const": "light",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
           ],
-          "type": "string"
+          "default": "dark",
+          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\""
         },
         "enablePullDownRefresh": {
           "default": false,
@@ -1980,19 +2236,34 @@
           "type": "boolean"
         },
         "navigationBarBackgroundColor": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#000000",
           "description": "导航栏背景颜色，支持 HEX 颜色",
           "format": "color"
         },
         "navigationBarTextStyle": {
-          "default": "white",
-          "description": "导航栏标题、状态栏颜色",
-          "enum": [
-            "black",
-            "white"
+          "anyOf": [
+            {
+              "const": "black",
+              "type": "string"
+            },
+            {
+              "const": "white",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
           ],
-          "type": "string"
+          "default": "white",
+          "description": "导航栏标题、状态栏颜色"
         },
         "navigationBarTitleText": {
           "description": "导航栏标题文字内容",
@@ -2024,28 +2295,57 @@
       "description": "设置编译到 mp-toutiao 平台的特定样式，配置项参考 <https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/develop/framework/general-configuration#window>\n\n相应的类型是 MpToutiao",
       "properties": {
         "backgroundColor": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#FFFFFF",
           "description": "窗口的背景色，支持 HEX 颜色"
         },
         "backgroundColorBottom": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "同 backgroundColor",
           "description": "底部窗口的背景色，仅 iOS 支持"
         },
         "backgroundColorTop": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "同 backgroundColor",
           "description": "顶部窗口的背景色，仅 iOS 支持"
         },
         "backgroundTextStyle": {
-          "default": "dark",
-          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\"",
-          "enum": [
-            "dark",
-            "light"
+          "anyOf": [
+            {
+              "const": "dark",
+              "type": "string"
+            },
+            {
+              "const": "light",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
           ],
-          "type": "string"
+          "default": "dark",
+          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\""
         },
         "enablePullDownRefresh": {
           "default": false,
@@ -2053,19 +2353,34 @@
           "type": "boolean"
         },
         "navigationBarBackgroundColor": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#000000",
           "description": "导航栏背景颜色，支持 HEX 颜色",
           "format": "color"
         },
         "navigationBarTextStyle": {
-          "default": "white",
-          "description": "导航栏标题颜色，同时影响标题颜色、右胶囊颜色、左返回箭头颜色",
-          "enum": [
-            "black",
-            "white"
+          "anyOf": [
+            {
+              "const": "black",
+              "type": "string"
+            },
+            {
+              "const": "white",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
           ],
-          "type": "string"
+          "default": "white",
+          "description": "导航栏标题颜色，同时影响标题颜色、右胶囊颜色、左返回箭头颜色"
         },
         "navigationBarTitleText": {
           "description": "导航栏标题文字内容",
@@ -2207,28 +2522,57 @@
       "description": "设置编译到 mp-weixin 平台的特定样式，配置项参考 [MP-WEIXIN](https://uniapp.dcloud.net.cn/collocation/pages#mp-weixin) 和 <https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html#window>\n\n相应的类型是 MpWeixin",
       "properties": {
         "backgroundColor": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#FFFFFF",
           "description": "窗口的背景色，支持 HEX 颜色"
         },
         "backgroundColorBottom": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#FFFFFF",
           "description": "底部窗口的背景色，仅 iOS 支持"
         },
         "backgroundColorTop": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#FFFFFF",
           "description": "顶部窗口的背景色，仅 iOS 支持"
         },
         "backgroundTextStyle": {
-          "default": "dark",
-          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\"",
-          "enum": [
-            "dark",
-            "light"
+          "anyOf": [
+            {
+              "const": "dark",
+              "type": "string"
+            },
+            {
+              "const": "light",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
           ],
-          "type": "string"
+          "default": "dark",
+          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\""
         },
         "enablePullDownRefresh": {
           "default": false,
@@ -2259,19 +2603,34 @@
           "type": "string"
         },
         "navigationBarBackgroundColor": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "default": "#000000",
           "description": "导航栏背景颜色，支持 HEX 颜色",
           "format": "color"
         },
         "navigationBarTextStyle": {
-          "default": "white",
-          "description": "导航栏标题、状态栏颜色",
-          "enum": [
-            "black",
-            "white"
+          "anyOf": [
+            {
+              "const": "black",
+              "type": "string"
+            },
+            {
+              "const": "white",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
           ],
-          "type": "string"
+          "default": "white",
+          "description": "导航栏标题、状态栏颜色"
         },
         "navigationBarTitleText": {
           "description": "导航栏标题文字内容",
@@ -2492,7 +2851,14 @@
     "TabBar": {
       "properties": {
         "backgroundColor": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "description": "tab 的背景色",
           "format": "color"
         },
@@ -2534,6 +2900,9 @@
             },
             {
               "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
             }
           ],
           "default": "black",
@@ -2541,7 +2910,14 @@
           "format": "color"
         },
         "color": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "description": "tab 上的文字默认颜色",
           "format": "color"
         },
@@ -2592,7 +2968,14 @@
           "type": "string"
         },
         "selectedColor": {
-          "$ref": "#/definitions/HEXColor",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
           "description": "tab 上的文字选中时的颜色",
           "format": "color"
         },
@@ -2637,8 +3020,15 @@
     "TabBarItem": {
       "properties": {
         "iconPath": {
-          "description": "图片路径，icon 大小限制为 40 kb，建议尺寸为 81px * 81px\n\n当 position 为 \"top\" 时，此参数无效\n\n不支持网络图片，不支持字体图标",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "description": "图片路径，icon 大小限制为 40 kb，建议尺寸为 81px * 81px\n\n当 position 为 \"top\" 时，此参数无效\n\n不支持网络图片，不支持字体图标"
         },
         "iconfont": {
           "$ref": "#/definitions/TabBarIconFont",
@@ -2649,8 +3039,15 @@
           "type": "string"
         },
         "selectedIconPath": {
-          "description": "选中时的图片路径，icon 大小限制为 40 kb，建议尺寸为 81px * 81px\n\n当 position 为 \"top\" 时，此参数无效\n\n不支持网络图片，不支持字体图标",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "description": "选中时的图片路径，icon 大小限制为 40 kb，建议尺寸为 81px * 81px\n\n当 position 为 \"top\" 时，此参数无效\n\n不支持网络图片，不支持字体图标"
         },
         "text": {
           "description": "tab 上按钮文字，在 App 和 H5 平台为非必填，例如中间可放一个没有文字的 + 号图标",
@@ -2730,6 +3127,9 @@
         "path"
       ],
       "type": "object"
+    },
+    "ThemeVar": {
+      "type": "string"
     },
     "TitleNViewButton": {
       "additionalProperties": false,

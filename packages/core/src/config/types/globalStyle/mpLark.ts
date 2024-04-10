@@ -1,4 +1,4 @@
-import type { HEXColor } from '../common'
+import type { HEXColor, ThemeVar } from '../common'
 
 /**
  * 设置编译到 mp-lark 平台的特定样式，配置项参考 <https://open.feishu.cn/document/client-docs/gadget/introduction/global-settings#a172b7dd>
@@ -17,7 +17,7 @@ export interface MpLark {
    *
    * @format color
    */
-  navigationBarBackgroundColor?: HEXColor
+  navigationBarBackgroundColor?: HEXColor | ThemeVar
 
   /**
    * 导航栏标题、状态栏颜色
@@ -26,7 +26,7 @@ export interface MpLark {
    *
    * @default "white"
    */
-  navigationBarTextStyle?: 'black' | 'white'
+  navigationBarTextStyle?: 'black' | 'white' | ThemeVar
 
   /**
    * 导航栏标题文字内容
@@ -70,7 +70,7 @@ export interface MpLark {
    *
    * @default "#FFFFFF"
    */
-  backgroundColor?: HEXColor
+  backgroundColor?: HEXColor | ThemeVar
 
   /**
    * 下拉 loading 的样式，仅支持 "dark" / "light"
@@ -79,7 +79,7 @@ export interface MpLark {
    *
    * @default "dark"
    */
-  backgroundTextStyle?: 'dark' | 'light'
+  backgroundTextStyle?: 'dark' | 'light' | ThemeVar
 
   /**
    * 顶部窗口的背景色
@@ -88,7 +88,7 @@ export interface MpLark {
    *
    * @default "#FFFFFF"
    */
-  backgroundColorTop?: HEXColor
+  backgroundColorTop?: HEXColor | ThemeVar
 
   /**
    * 底部窗口的背景色
@@ -97,7 +97,7 @@ export interface MpLark {
    *
    * @default "#FFFFFF"
    */
-  backgroundColorBottom?: HEXColor
+  backgroundColorBottom?: HEXColor | ThemeVar
 
   /**
    * 是否开启全局的下拉刷新

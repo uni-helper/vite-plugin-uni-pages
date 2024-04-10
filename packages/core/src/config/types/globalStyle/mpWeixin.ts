@@ -1,4 +1,4 @@
-import type { HEXColor } from '../common'
+import type { HEXColor, ThemeVar } from '../common'
 
 /**
  * 设置编译到 mp-weixin 平台的特定样式，配置项参考 [MP-WEIXIN](https://uniapp.dcloud.net.cn/collocation/pages#mp-weixin) 和 <https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html#window>
@@ -15,14 +15,14 @@ export interface MpWeixin {
    *
    * @format color
    */
-  navigationBarBackgroundColor?: HEXColor
+  navigationBarBackgroundColor?: HEXColor | ThemeVar
 
   /**
    * 导航栏标题、状态栏颜色
    *
    * @default "white"
    */
-  navigationBarTextStyle?: 'black' | 'white'
+  navigationBarTextStyle?: 'black' | 'white' | ThemeVar
 
   /**
    * 导航栏标题文字内容
@@ -56,14 +56,14 @@ export interface MpWeixin {
    *
    * @default "#FFFFFF"
    */
-  backgroundColor?: HEXColor
+  backgroundColor?: HEXColor | ThemeVar
 
   /**
    * 下拉 loading 的样式，仅支持 "dark" / "light"
    *
    * @default "dark"
    */
-  backgroundTextStyle?: 'dark' | 'light'
+  backgroundTextStyle?: 'dark' | 'light' | ThemeVar
 
   /**
    * 顶部窗口的背景色，仅 iOS 支持
@@ -72,7 +72,7 @@ export interface MpWeixin {
    *
    * @default "#FFFFFF"
    */
-  backgroundColorTop?: HEXColor
+  backgroundColorTop?: HEXColor | ThemeVar
 
   /**
    * 底部窗口的背景色，仅 iOS 支持
@@ -81,7 +81,7 @@ export interface MpWeixin {
    *
    * @default "#FFFFFF"
    */
-  backgroundColorBottom?: HEXColor
+  backgroundColorBottom?: HEXColor | ThemeVar
 
   /**
    * 是否开启全局的下拉刷新，详见 [Page.onPullDownRefresh](https://developers.weixin.qq.com/miniprogram/dev/reference/api/Page.html#onpulldownrefresh)

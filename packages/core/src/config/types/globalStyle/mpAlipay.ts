@@ -1,4 +1,4 @@
-import type { HEXColor } from '../common'
+import type { HEXColor, ThemeVar } from '../common'
 
 /**
  * 设置编译到 mp-alipay 平台的特定样式，配置项参考 [MP-ALIPAY](https://uniapp.dcloud.net.cn/collocation/pages#mp-alipay) 和 <https://opendocs.alipay.com/mini/framework/app-json#window>
@@ -20,7 +20,7 @@ export interface MpAlipay {
    *
    * @format color
    */
-  backgroundColor?: HEXColor
+  backgroundColor?: HEXColor | ThemeVar
 
   /**
    * 下拉露出显示背景图的底色，仅 Android 有效，iOS 下页面背景图底色会使用 backgroundColor 的值

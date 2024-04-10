@@ -1,4 +1,4 @@
-import type { HEXColor } from './common'
+import type { HEXColor, ThemeVar } from './common'
 
 export interface TabBarIconFont {
   /**
@@ -47,7 +47,7 @@ export interface TabBarItem {
    *
    * 不支持网络图片，不支持字体图标
    */
-  iconPath?: string
+  iconPath?: string | ThemeVar
 
   /**
    * 选中时的图片路径，icon 大小限制为 40 kb，建议尺寸为 81px * 81px
@@ -56,7 +56,7 @@ export interface TabBarItem {
    *
    * 不支持网络图片，不支持字体图标
    */
-  selectedIconPath?: string
+  selectedIconPath?: string | ThemeVar
 
   /**
    * 该项是否显示，默认显示
@@ -128,21 +128,21 @@ export interface TabBar {
    *
    * @format color
    */
-  color: HEXColor
+  color: HEXColor | ThemeVar
 
   /**
    * tab 上的文字选中时的颜色
    *
    * @format color
    */
-  selectedColor: HEXColor
+  selectedColor: HEXColor | ThemeVar
 
   /**
    * tab 的背景色
    *
    * @format color
    */
-  backgroundColor?: HEXColor
+  backgroundColor?: HEXColor | ThemeVar
 
   /**
    * tabBar 上边框的颜色
@@ -153,7 +153,7 @@ export interface TabBar {
    *
    * @format color
    */
-  borderStyle?: 'black' | 'white' | HEXColor
+  borderStyle?: 'black' | 'white' | HEXColor | ThemeVar
 
   /**
    * iOS 高斯模糊效果，参考 [使用说明](https://ask.dcloud.net.cn/article/36617)

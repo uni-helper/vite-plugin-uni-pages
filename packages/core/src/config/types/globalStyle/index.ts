@@ -1,4 +1,4 @@
-import type { AnimationType, HEXColor } from '../common'
+import type { AnimationType, HEXColor, ThemeVar } from '../common'
 import type { H5 } from './h5'
 import type { AppPlus } from './appPlus'
 import type { MpAlipay } from './mpAlipay'
@@ -18,7 +18,7 @@ export interface GlobalStyle {
    *
    * @format color
    */
-  'navigationBarBackgroundColor'?: HEXColor
+  'navigationBarBackgroundColor'?: HEXColor | ThemeVar
 
   /**
    * 导航栏标题颜色及状态栏前景颜色，仅支持 "black" / "white"
@@ -27,7 +27,7 @@ export interface GlobalStyle {
    *
    * @desc 支付宝小程序不支持，请使用 my.setNavigationBar
    */
-  'navigationBarTextStyle'?: 'black' | 'white'
+  'navigationBarTextStyle'?: 'black' | 'white' | ThemeVar
 
   /**
    * 导航栏标题文字内容
@@ -64,7 +64,7 @@ export interface GlobalStyle {
    *
    * @format color
    */
-  'backgroundColor'?: HEXColor
+  'backgroundColor'?: HEXColor | ThemeVar
 
   /**
    * 下拉 loading 的样式，仅支持 "dark" / "light"
@@ -73,7 +73,7 @@ export interface GlobalStyle {
    *
    * @desc 微信小程序
    */
-  'backgroundTextStyle'?: 'dark' | 'light'
+  'backgroundTextStyle'?: 'dark' | 'light' | ThemeVar
 
   /**
    * 是否开启下拉刷新，详见 [页面生命周期](https://uniapp.dcloud.net.cn/tutorial/page.html#lifecycle)
@@ -98,7 +98,7 @@ export interface GlobalStyle {
    *
    * @format color
    */
-  'backgroundColorTop'?: HEXColor
+  'backgroundColorTop'?: HEXColor | ThemeVar
 
   /**
    * 底部窗口的背景色（bounce回弹区域）
@@ -109,7 +109,7 @@ export interface GlobalStyle {
    *
    * @format color
    */
-  'backgroundColorBottom'?: HEXColor
+  'backgroundColorBottom'?: HEXColor | ThemeVar
 
   /**
    * 导航栏图片地址（替换当前文字标题）
