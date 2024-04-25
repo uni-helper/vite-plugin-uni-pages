@@ -184,23 +184,23 @@ describe('generate routes', () => {
     expect(routes).toMatchInlineSnapshot(`
     "[
       {
-        "root": "home",
+        "root": "../packages/playground/src/pages-sub-more/home",
         "pages": [
           {
-            "path": "../../packages/playground/src/pages-sub-more/home/pages/index",
+            "path": "pages/index",
             "type": "page"
           },
           {
-            "path": "../../packages/playground/src/pages-sub-more/home/pages/about/index",
+            "path": "pages/about/index",
             "type": "page"
           }
         ]
       },
       {
-        "root": "user",
+        "root": "../packages/playground/src/pages-sub-more/user",
         "pages": [
           {
-            "path": "../../packages/playground/src/pages-sub-more/user/pages/index",
+            "path": "pages/index",
             "type": "page"
           }
         ]
