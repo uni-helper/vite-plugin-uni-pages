@@ -19,7 +19,7 @@ import {
   useCachedPages,
 } from './utils'
 import { resolveOptions } from './options'
-import { checkPagesJsonFile, getPageFiles, writeFileSync } from './files'
+import { checkPagesJsonFile, getPageFiles, getSubPageDirs, writeFileSync } from './files'
 import { getRouteBlock, getRouteSfcBlock } from './customBlock'
 import { OUTPUT_NAME } from './constant'
 
@@ -85,10 +85,14 @@ export class PageContext {
 
   async scanSubPages() {
     const subPagesPath: Record<string, PagePath[]> = {}
-    for (const dir of this.options.subPackages) {
-      const pagePaths = getPagePaths(dir, this.options)
-      subPagesPath[dir] = pagePaths
+    for (const dirs of this.options.subPackages) {
+      getSubPageDirs(dirs).forEach((dir) => {
+        const pagePaths = getPagePaths(dir, this.options)
+
+        subPagesPath[dir] = pagePaths
+      })
     }
+
     this.subPagesPath = subPagesPath
     debug.subPages(this.subPagesPath)
   }

@@ -22,6 +22,14 @@ export function getPageFiles(path: string, options: ResolvedOptions): string[] {
   return files
 }
 
+export function getSubPageDirs(path: string): string[] {
+  const dirs = fg.sync(path, {
+    onlyDirectories: true,
+  })
+
+  return dirs
+}
+
 export function checkPagesJsonFile(path: string) {
   if (!fs.existsSync(path)) {
     writeFileSync(path, JSON.stringify({ pages: [{ path: '' }] }, null, 2))

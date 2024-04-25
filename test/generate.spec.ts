@@ -1,4 +1,4 @@
-import { describe, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { UserPagesConfig } from '../packages/core/src'
 import { PageContext } from '../packages/core/src'
 
@@ -92,7 +92,7 @@ describe('generate routes', () => {
   })
 
   it('vue - not merge pages snapshot', async () => {
-    const ctx = new PageContext({ dir: 'packages/playground/src/pages', mergePages: false })
+    const ctx = new PageContext({ dir: 'packages/playground/src/pages' })
     await ctx.scanPages()
     ctx.pagesGlobConfig = pagesGlobConfig
     await ctx.mergePageMetaData()
@@ -170,6 +170,42 @@ describe('generate routes', () => {
           "style": {}
         }
       ]"
+    `)
+  })
+
+  it('support glob patterns in subPackage', async () => {
+    const ctx = new PageContext({
+      subPackages: ['packages/playground/src/pages-sub-more/*'],
+    })
+    await ctx.scanSubPages()
+    await ctx.mergeSubPageMetaData()
+    const routes = ctx.resolveSubRoutes()
+
+    expect(routes).toMatchInlineSnapshot(`
+    "[
+      {
+        "root": "home",
+        "pages": [
+          {
+            "path": "../../packages/playground/src/pages-sub-more/home/pages/index",
+            "type": "page"
+          },
+          {
+            "path": "../../packages/playground/src/pages-sub-more/home/pages/about/index",
+            "type": "page"
+          }
+        ]
+      },
+      {
+        "root": "user",
+        "pages": [
+          {
+            "path": "../../packages/playground/src/pages-sub-more/user/pages/index",
+            "type": "page"
+          }
+        ]
+      }
+    ]"
     `)
   })
 })
