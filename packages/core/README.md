@@ -49,7 +49,7 @@ Now all pages will be found automatically!
 Add route meta to the route by adding a `<route>` block to the SFC. This will be
 directly added to the route after it is generated, and will override it.
 
-You can specific a parser to use using `<route lang="yaml">`, or set a default
+You can specify a parser to use using `<route lang="yaml">`, or set a default
 parser using `routeBlockLang` option.
 
 - **Supported parser:** JSON, JSON5, YAML
