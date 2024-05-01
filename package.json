@@ -35,7 +35,7 @@
     "@types/node": "^20.11.24",
     "@uni-helper/volar-service-uni-pages": "workspace:*",
     "bumpp": "^9.4.0",
-    "eslint": "^8.57.0",
+    "eslint": "^9.0.0",
     "rimraf": "^5.0.5",
     "typescript": "^5.3.3",
     "unbuild": "^2.0.0",
