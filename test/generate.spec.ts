@@ -1,4 +1,4 @@
-import { describe, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { UserPagesConfig } from '../packages/core/src'
 import { PageContext } from '../packages/core/src'
 
@@ -170,6 +170,48 @@ describe('generate routes', () => {
           "style": {}
         }
       ]"
+    `)
+  })
+
+  it('fix subPackage cannot match the second-level dir', async () => {
+    const ctx = new PageContext({
+      subPackages: [
+        'packages/playground/src/pages-sub-pages/sub-activity',
+        'packages/playground/src/pages-sub-pages/sub-main',
+      ],
+    })
+    await ctx.scanSubPages()
+    await ctx.mergeSubPageMetaData()
+    const routes = ctx.resolveSubRoutes()
+    expect(routes).toMatchInlineSnapshot(`
+    "[
+      {
+        "root": "../packages/playground/src/pages-sub-pages/sub-activity",
+        "pages": [
+          {
+            "path": "pages/about/index",
+            "type": "page"
+          },
+          {
+            "path": "pages/home/index",
+            "type": "page"
+          }
+        ]
+      },
+      {
+        "root": "../packages/playground/src/pages-sub-pages/sub-main",
+        "pages": [
+          {
+            "path": "pages/about/index",
+            "type": "page"
+          },
+          {
+            "path": "pages/home/index",
+            "type": "page"
+          }
+        ]
+      }
+    ]"
     `)
   })
 })
