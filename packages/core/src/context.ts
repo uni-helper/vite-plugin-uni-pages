@@ -242,7 +242,7 @@ export class PageContext {
 
     for (const [dir, pages] of Object.entries(this.subPagesPath)) {
       const basePath = slash(path.join(this.options.root, this.options.outDir))
-      const root = slash(path.relative(basePath, dir))
+      const root = slash(path.relative(basePath, path.join(this.options.root, dir)))
 
       const globPackage = subPackages?.find(v => v.root === root)
       subPageMaps[root] = await this.parsePages(pages, 'sub', globPackage?.pages)
