@@ -26,7 +26,7 @@ export * from './customBlock'
 async function restart() {
   return new Promise((resolve) => {
     const build = spawn(process.argv.shift()!, process.argv, {
-      cwd: process.cwd(),
+      cwd: process.env.VITE_ROOT_DIR!,
       detached: true,
       env: process.env,
     })
@@ -43,7 +43,7 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
 
   // TODO: check if the pages.json file is valid
   const resolvedPagesJSONPath = path.join(
-    process.cwd(),
+    process.env.VITE_ROOT_DIR!,
     userOptions.outDir ?? 'src',
     OUTPUT_NAME,
   )
