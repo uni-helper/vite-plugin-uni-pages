@@ -1,7 +1,7 @@
 {
   "name": "@vite-plugin-uni-pages/monorepo",
   "type": "module",
-  "version": "0.2.20",
+  "version": "0.2.21",
   "private": true,
   "packageManager": "pnpm@9.1.0",
   "description": "Use TypeScript to write pages.json of uni-app",
