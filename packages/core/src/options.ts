@@ -31,7 +31,7 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
     onAfterWriteFile = () => {},
   } = userOptions
 
-  const root = viteRoot || slash(process.env.VITE_ROOT_DIR!) || slash(process.cwd())
+  const root = viteRoot || slash(process.env.VITE_ROOT_DIR || process.cwd())
   const resolvedDirs = resolvePageDirs(dir, root, exclude)
   const resolvedSubDirs = subPackages.map(dir => slash(dir))
   const resolvedHomePage = typeof homePage === 'string' ? [homePage] : homePage
