@@ -255,7 +255,9 @@ export class PageContext {
         subPageMaps[root] = pages || []
     }
 
-    const subPageMetaData = Object.keys(subPageMaps).map(root => ({ root, pages: subPageMaps[root] }))
+    const subPageMetaData = Object.keys(subPageMaps)
+      .map(root => ({ root, pages: subPageMaps[root] }))
+      .filter(meta => meta.pages.length > 0)
 
     this.subPageMetaData = subPageMetaData
     debug.subPages(this.subPageMetaData)
