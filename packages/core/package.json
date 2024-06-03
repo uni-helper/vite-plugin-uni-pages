@@ -44,6 +44,8 @@
     "@vue/compiler-sfc": "^3.4.27",
     "chokidar": "^3.6.0",
     "debug": "^4.3.4",
+    "detect-indent": "^7.0.1",
+    "detect-newline": "^4.0.1",
     "fast-glob": "^3.3.2",
     "json5": "^2.2.3",
     "lodash-unified": "^1.0.3",
