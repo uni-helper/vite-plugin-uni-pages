@@ -1,5 +1,5 @@
 import process from 'node:process'
-import { describe, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { getPageFiles, resolveOptions } from '../packages/core/src'
 
 const options = resolveOptions({}, process.cwd())
@@ -13,6 +13,7 @@ describe('get files', () => {
         "A-top.vue",
         "blog/index.vue",
         "blog/post.vue",
+        "i18n.vue",
         "index.vue",
         "test-json.vue",
         "test-yaml.vue",
