@@ -214,4 +214,34 @@ describe('generate routes', () => {
     ]"
     `)
   })
+
+  it('check pages is exist', async () => {
+    const ctx = new PageContext({
+      subPackages: [
+        'packages/playground/src/pages-sub-empty',
+        'packages/playground/src/pages-sub-pages/sub-main',
+      ],
+    })
+    await ctx.scanSubPages()
+    await ctx.mergeSubPageMetaData()
+    const routes = ctx.resolveSubRoutes()
+
+    expect(routes).toMatchInlineSnapshot(`
+    "[
+      {
+        "root": "../packages/playground/src/pages-sub-pages/sub-main",
+        "pages": [
+          {
+            "path": "pages/about/index",
+            "type": "page"
+          },
+          {
+            "path": "pages/home/index",
+            "type": "page"
+          }
+        ]
+      }
+    ]"
+    `)
+  })
 })
