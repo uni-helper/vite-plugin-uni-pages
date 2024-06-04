@@ -67,7 +67,7 @@ export class PageContext {
     const resolvedPagesJSONContent = readFileSync(this.resolvedPagesJSONPath)
     this.resolvedPagesJSONIndent = detectIndent(resolvedPagesJSONContent).indent || '  '
     this.resolvedPagesJSONNewline = detectNewline(resolvedPagesJSONContent) || '\n'
-    this.resolvedPagesJSONEofNewline = resolvedPagesJSONContent.at(-1) === this.resolvedPagesJSONNewline
+    this.resolvedPagesJSONEofNewline = (resolvedPagesJSONContent.at(-1) ?? '\n') === this.resolvedPagesJSONNewline
     debug.options(this.options)
   }
 
