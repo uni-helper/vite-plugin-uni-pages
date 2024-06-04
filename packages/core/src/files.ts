@@ -31,7 +31,12 @@ export function checkPagesJsonFile(path: string) {
 }
 
 export function readFileSync(path: string) {
-  return fs.readFileSync(path, { encoding: 'utf-8' })
+  try {
+    return fs.readFileSync(path, { encoding: 'utf-8' })
+  }
+  catch {
+    return ''
+  }
 }
 
 export function writeFileSync(path: string, content: string) {
