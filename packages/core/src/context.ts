@@ -7,6 +7,8 @@ import { loadConfig } from 'unconfig'
 import { slash } from '@antfu/utils'
 import dbg from 'debug'
 import { platform } from '@uni-helper/uni-env'
+import detectIndent from 'detect-indent'
+import detectNewline from 'detect-newline'
 import type { PagesConfig } from './config/types'
 import type { PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
 import { writeDeclaration } from './declaration'
@@ -19,7 +21,7 @@ import {
   useCachedPages,
 } from './utils'
 import { resolveOptions } from './options'
-import { checkPagesJsonFile, getPageFiles, writeFileSync } from './files'
+import { checkPagesJsonFile, getPageFiles, readFileSync, writeFileSync } from './files'
 import { getRouteBlock, getRouteSfcBlock } from './customBlock'
 import { OUTPUT_NAME } from './constant'
 
@@ -38,6 +40,9 @@ export class PageContext {
   subPageMetaData: SubPageMetaDatum[] = []
 
   resolvedPagesJSONPath = ''
+  resolvedPagesJSONIndent = '  '
+  resolvedPagesJSONNewline = '\n'
+  resolvedPagesJSONEofNewline = true
 
   rawOptions: UserOptions
   root: string
@@ -59,6 +64,10 @@ export class PageContext {
       dbg.enable(`${prefix}${suffix}`)
     }
     this.resolvedPagesJSONPath = path.join(this.root, this.options.outDir, OUTPUT_NAME)
+    const resolvedPagesJSONContent = readFileSync(this.resolvedPagesJSONPath)
+    this.resolvedPagesJSONIndent = detectIndent(resolvedPagesJSONContent).indent || '  '
+    this.resolvedPagesJSONNewline = detectNewline(resolvedPagesJSONContent) || '\n'
+    this.resolvedPagesJSONEofNewline = (resolvedPagesJSONContent.at(-1) ?? '\n') === this.resolvedPagesJSONNewline
     debug.options(this.options)
   }
 
@@ -303,7 +312,13 @@ export class PageContext {
       subPackages: this.subPageMetaData,
     }
 
-    const pagesJson = JSON.stringify(data, null, this.options.minify ? undefined : 2)
+    const pagesJson = JSON.stringify(
+      data,
+      null,
+      this.options.minify ? undefined : this.resolvedPagesJSONIndent,
+    ) + (
+      this.resolvedPagesJSONEofNewline ? this.resolvedPagesJSONNewline : ''
+    )
     this.generateDeclaration()
     if (lsatPagesJson === pagesJson) {
       debug.pages('PagesJson Not have change')

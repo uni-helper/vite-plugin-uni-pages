@@ -41,10 +41,9 @@
   },
   "dependencies": {
     "@uni-helper/pages-json-schema": "workspace:^",
-    "ts-json-schema-generator": "^2.1.1",
-    "vscode-json-languageservice": "^5.3.11",
+    "vscode-json-languageservice": "^5.4.0",
     "vscode-languageserver-textdocument": "^1.0.11",
-    "yaml-language-server": "^1.14.0"
+    "yaml-language-server": "^1.15.0"
   },
   "devDependencies": {
     "@types/json-schema": "^7.0.15",
