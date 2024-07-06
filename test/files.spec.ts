@@ -14,6 +14,7 @@ describe('get files', () => {
         "blog/index.vue",
         "blog/post.vue",
         "i18n.vue",
+        "index.nvue",
         "index.vue",
         "test-json.vue",
         "test-yaml.vue",
