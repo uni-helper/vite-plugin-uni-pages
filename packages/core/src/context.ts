@@ -244,10 +244,7 @@ export class PageContext {
   }
 
   async mergePageMetaData() {
-    const parsePageData = await this.parsePages(this.pagesPath, 'main', this.pagesGlobConfig?.pages)
-    const pageMetaData = parsePageData.filter((page, index, self) =>
-      self.findLastIndex(item => page.path === item.path) === index,
-    )
+    const pageMetaData = await this.parsePages(this.pagesPath, 'main', this.pagesGlobConfig?.pages)
 
     this.pageMetaData = pageMetaData
     debug.pages(this.pageMetaData)
