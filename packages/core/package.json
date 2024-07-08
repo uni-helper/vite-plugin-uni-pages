@@ -41,7 +41,7 @@
   },
   "dependencies": {
     "@uni-helper/uni-env": "^0.1.3",
-    "@vue/compiler-sfc": "^3.4.30",
+    "@vue/compiler-sfc": "^3.4.31",
     "chokidar": "^3.6.0",
     "debug": "^4.3.5",
     "detect-indent": "^6.1.0",
@@ -50,12 +50,12 @@
     "json5": "^2.2.3",
     "lodash-unified": "^1.0.3",
     "magic-string": "^0.30.10",
-    "unconfig": "^0.3.13",
+    "unconfig": "^0.4.5",
     "yaml": "^2.4.5"
   },
   "devDependencies": {
-    "@antfu/utils": "^0.7.8",
+    "@antfu/utils": "^0.7.10",
     "@types/debug": "^4.1.12",
-    "@types/node": "^20.14.8"
+    "@types/node": "^20.14.10"
   }
 }
