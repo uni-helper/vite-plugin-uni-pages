@@ -208,7 +208,11 @@ export class PageContext {
       ? mergePageMetaDataArray(generatedPageMetaData.concat(customPageMetaData))
       : generatedPageMetaData
 
-    return type === 'main' ? this.setHomePage(result) : result
+    const parseMeta = result.filter((page, index, self) =>
+      self.findLastIndex(item => page.path === item.path) === index,
+    )
+
+    return type === 'main' ? this.setHomePage(parseMeta) : parseMeta
   }
 
   /**
@@ -241,6 +245,7 @@ export class PageContext {
 
   async mergePageMetaData() {
     const pageMetaData = await this.parsePages(this.pagesPath, 'main', this.pagesGlobConfig?.pages)
+
     this.pageMetaData = pageMetaData
     debug.pages(this.pageMetaData)
   }

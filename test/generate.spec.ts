@@ -123,11 +123,11 @@ describe('generate routes', () => {
         {
           "path": "../packages/playground/src/pages/index",
           "type": "page",
+          "style": {},
           "middlewares": [
             "auth",
             "test"
-          ],
-          "style": {}
+          ]
         },
         {
           "path": "../packages/playground/src/pages/test-json",
