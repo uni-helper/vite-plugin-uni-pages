@@ -78,7 +78,7 @@ export class PageContext {
   async loadUserPagesConfig() {
     const configSource = this.options.configSource
     const { config, sources } = await loadConfig<PagesConfig>({ cwd: this.root, sources: configSource, defaults: {} })
-    this.pagesGlobConfig = config?.default || config
+    this.pagesGlobConfig = config.default || config
     this.pagesConfigSourcePaths = sources
     debug.options(this.pagesGlobConfig)
   }
