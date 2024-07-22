@@ -156,8 +156,8 @@ importers:
         specifier: ^7.0.15
         version: 7.0.15
       '@volar/language-service':
-        specifier: 1.10.3
-        version: 1.10.3
+        specifier: 2.3.4
+        version: 2.3.4
       unbuild:
         specifier: ^2.0.0
         version: 2.0.0(typescript@5.5.3)
@@ -2162,14 +2162,14 @@ packages:
   '@vitest/utils@2.0.2':
     resolution: {integrity: sha512-pxCY1v7kmOCWYWjzc0zfjGTA3Wmn8PKnlPvSrsA643P1NHl1fOyXj2Q9SaNlrlFE+ivCsxM80Ov3AR82RmHCWQ==}
 
-  '@volar/language-core@1.10.3':
-    resolution: {integrity: sha512-7Qgwu9bWUHN+cLrOkCbIVBkL+RVPREhvY07wY89dGxi4mY9mQCsUVRRp64F61lX7Nc27meMnvy0sWlzY0x6oQQ==}
+  '@volar/language-core@2.3.4':
+    resolution: {integrity: sha512-wXBhY11qG6pCDAqDnbBRFIDSIwbqkWI7no+lj5+L7IlA7HRIjRP7YQLGzT0LF4lS6eHkMSsclXqy9DwYJasZTQ==}
 
-  '@volar/language-service@1.10.3':
-    resolution: {integrity: sha512-nz7Gh8bm+aLFuVxJ0wn18d7ihr2XEtJ9Ed8bD74m3IQlmdqNwSILh5jEMNXOI7DW0R5loxtBHN1HYiNJPXDcvA==}
+  '@volar/language-service@2.3.4':
+    resolution: {integrity: sha512-mtzvYb33l17VVRwmX7C39EjVHBU9LbBJeo1rLXFKoXOzbZCanm0XtPZEENsm05VUvse929y4ParujW7k4G5H0w==}
 
-  '@volar/source-map@1.10.3':
-    resolution: {integrity: sha512-QE9nwK3xsdBQGongHnC9SCR0itx7xUKQFsUDn5HbZY3pHpyXxdY1hSBG0eh9mE+aTKoM4KlqMvrb+19Tv9vS1Q==}
+  '@volar/source-map@2.3.4':
+    resolution: {integrity: sha512-C+t63nwcblqLIVTYXaVi/+gC8NukDaDIQI72J3R7aXGvtgaVB16c+J8Iz7/VfOy7kjYv7lf5GhBny6ACw9fTGQ==}
 
   '@vscode/l10n@0.0.18':
     resolution: {integrity: sha512-KYSIHVmslkaCDyw013pphY+d7x1qV8IZupYfeIfzNA+nsaWHbn5uPuQRvdRFsa9zFzGeudPuoGoZ1Op4jrJXIQ==}
@@ -4141,9 +4141,6 @@ packages:
 
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
-
-  muggle-string@0.3.1:
-    resolution: {integrity: sha512-ckmWDJjphvd/FvZawgygcUeQCxzvohjFO5RxTjj4eq8kw359gFF3E1brjfI+viLMxss5JrHTDRHZvu2/tuy0Qg==}
 
   nanoid@3.3.7:
     resolution: {integrity: sha512-eSRppjcPIatRIMC1U6UngP8XFcz8MQWGQdt1MTBQ7NaAmvXDfvNxbvWV3x2y6CdEUciCSsDHDQZbhYaB8QEo2g==}
@@ -8148,21 +8145,18 @@ snapshots:
       loupe: 3.1.1
       tinyrainbow: 1.2.0
 
-  '@volar/language-core@1.10.3':
+  '@volar/language-core@2.3.4':
     dependencies:
-      '@volar/source-map': 1.10.3
+      '@volar/source-map': 2.3.4
 
-  '@volar/language-service@1.10.3':
+  '@volar/language-service@2.3.4':
     dependencies:
-      '@volar/language-core': 1.10.3
-      '@volar/source-map': 1.10.3
+      '@volar/language-core': 2.3.4
       vscode-languageserver-protocol: 3.17.5
       vscode-languageserver-textdocument: 1.0.11
       vscode-uri: 3.0.8
 
-  '@volar/source-map@1.10.3':
-    dependencies:
-      muggle-string: 0.3.1
+  '@volar/source-map@2.3.4': {}
 
   '@vscode/l10n@0.0.18': {}
 
@@ -10601,8 +10595,6 @@ snapshots:
   ms@2.1.2: {}
 
   ms@2.1.3: {}
-
-  muggle-string@0.3.1: {}
 
   nanoid@3.3.7: {}
 
