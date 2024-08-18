@@ -1,6 +1,6 @@
 {
   "name": "@uni-helper/volar-service-uni-pages",
-  "version": "0.2.26",
+  "version": "0.2.27",
   "description": "Volar plugin for uni-pages route custom block in Vue SFC",
   "author": "KeJun",
   "license": "MIT",
@@ -42,7 +42,7 @@
   "dependencies": {
     "@uni-helper/pages-json-schema": "workspace:^",
     "vscode-json-languageservice": "^5.4.0",
-    "vscode-languageserver-textdocument": "^1.0.11",
+    "vscode-languageserver-textdocument": "^1.0.12",
     "yaml-language-server": "^1.15.0"
   },
   "devDependencies": {
