@@ -4,7 +4,18 @@
   "version": "0.2.27",
   "description": "File system based routing for uni-app applications using Vite",
   "author": "KeJun",
+  "maintainers": [
+    {
+      "email": "wurui.dev@gmail.com",
+      "name": "ModyQyW",
+      "url": "https://modyyw.top"
+    }
+  ],
   "license": "MIT",
+  "funding": [
+    "https://afdian.net/a/kejun",
+    "https://github.com/ModyQyW/sponsors"
+  ],
   "homepage": "https://github.com/uni-helper/vite-plugin-uni-pages#readme",
   "repository": {
     "type": "git",
@@ -37,7 +48,11 @@
   ],
   "scripts": {
     "build": "unbuild",
-    "stub": "unbuild --stub"
+    "stub": "unbuild --stub",
+    "prepublishOnly": "pnpm build"
+  },
+  "peerDependencies": {
+    "vite": "^5.0.0"
   },
   "dependencies": {
     "@uni-helper/uni-env": "^0.1.4",
@@ -57,6 +72,7 @@
     "@antfu/utils": "^0.7.10",
     "@types/debug": "^4.1.12",
     "@types/lodash.groupby": "^4.6.9",
-    "@types/node": "^20.15.0"
+    "@types/node": "^20.15.0",
+    "vite": "^5.4.1"
   }
 }

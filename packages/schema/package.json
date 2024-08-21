@@ -3,7 +3,18 @@
   "version": "0.2.27",
   "description": "Schema for uni-app pages.json",
   "author": "KeJun",
+  "maintainers": [
+    {
+      "email": "wurui.dev@gmail.com",
+      "name": "ModyQyW",
+      "url": "https://modyyw.top"
+    }
+  ],
   "license": "MIT",
+  "funding": [
+    "https://afdian.net/a/kejun",
+    "https://github.com/ModyQyW/sponsors"
+  ],
   "homepage": "https://github.com/uni-helper/vite-plugin-uni-pages#readme",
   "repository": {
     "type": "git",
@@ -14,8 +25,8 @@
     "jsonschema"
   ],
   "scripts": {
-    "generate": "ts-json-schema-generator -p \"../core/src/config/types/index.ts\" -t \"PagesConfig\" -o \"schema.json\" --no-type-check",
-    "prepublishOnly": "pnpm generate"
+    "build": "ts-json-schema-generator -p \"../core/src/config/types/index.ts\" -t \"PagesConfig\" -o \"schema.json\" --no-type-check",
+    "prepublishOnly": "pnpm build"
   },
   "devDependencies": {
     "ts-json-schema-generator": "^2.3.0"

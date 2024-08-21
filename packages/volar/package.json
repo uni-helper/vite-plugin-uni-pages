@@ -3,7 +3,18 @@
   "version": "0.2.27",
   "description": "Volar plugin for uni-pages route custom block in Vue SFC",
   "author": "KeJun",
+  "maintainers": [
+    {
+      "email": "wurui.dev@gmail.com",
+      "name": "ModyQyW",
+      "url": "https://modyyw.top"
+    }
+  ],
   "license": "MIT",
+  "funding": [
+    "https://afdian.net/a/kejun",
+    "https://github.com/ModyQyW/sponsors"
+  ],
   "homepage": "https://github.com/uni-helper/vite-plugin-uni-pages#readme",
   "repository": {
     "type": "git",
@@ -39,6 +50,14 @@
     "build": "unbuild",
     "prepublishOnly": "pnpm build"
   },
+  "peerDependencies": {
+    "@volar/language-service": "^1.11.1"
+  },
+  "peerDependenciesMeta": {
+    "@volar/language-service": {
+      "optional": true
+    }
+  },
   "dependencies": {
     "@uni-helper/pages-json-schema": "workspace:^",
     "vscode-json-languageservice": "^5.4.0",
@@ -47,7 +66,6 @@
   },
   "devDependencies": {
     "@types/json-schema": "^7.0.15",
-    "@volar/language-service": "1.10.3",
-    "unbuild": "^2.0.0"
+    "@volar/language-service": "^1.11.1"
   }
 }
