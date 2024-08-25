@@ -1,8 +1,8 @@
 import path from 'node:path'
 import process from 'node:process'
+import fs from 'node:fs'
 import type { FSWatcher } from 'chokidar'
 import type { Logger, ViteDevServer } from 'vite'
-import { normalizePath } from 'vite'
 import { loadConfig } from 'unconfig'
 import { slash } from '@antfu/utils'
 import dbg from 'debug'
@@ -13,21 +13,15 @@ import type { PagesConfig } from './config/types'
 import type { PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
 import { writeDeclaration } from './declaration'
 
-import {
-  debug,
-  invalidatePagesModule,
-  isTargetFile,
-  mergePageMetaDataArray,
-  useCachedPages,
-} from './utils'
+import { debug, invalidatePagesModule, isTargetFile, mergePageMetaDataArray, useCachedPages } from './utils'
 import { resolveOptions } from './options'
 import { checkPagesJsonFile, getPageFiles, readFileSync, writeFileSync } from './files'
-import { getRouteBlock, getRouteSfcBlock } from './customBlock'
+import { parseSFC } from './customBlock'
 import { OUTPUT_NAME } from './constant'
 
 let lsatPagesJson = ''
 
-const { setCache, hasChanged } = useCachedPages()
+const { setCache, hasChanged, parseData } = useCachedPages()
 export class PageContext {
   private _server: ViteDevServer | undefined
 
@@ -178,18 +172,11 @@ export class PageContext {
 
   async parsePage(page: PagePath): Promise<PageMetaDatum> {
     const { relativePath, absolutePath } = page
-    const routeSfcBlock = await getRouteSfcBlock(absolutePath)
-    const routeBlock = await getRouteBlock(absolutePath, routeSfcBlock, this.options)
-    setCache(absolutePath, routeSfcBlock)
     const relativePathWithFileName = relativePath.replace(path.extname(relativePath), '')
-    const pageMetaDatum: PageMetaDatum = {
-      path: normalizePath(relativePathWithFileName),
-      type: routeBlock?.attr.type ?? 'page',
-    }
-
-    if (routeBlock)
-      Object.assign(pageMetaDatum, routeBlock.content)
-
+    const content = fs.readFileSync(absolutePath, 'utf8')
+    const sfcDescriptor = await parseSFC(content)
+    const pageMetaDatum = await parseData(relativePathWithFileName, sfcDescriptor, this.options)
+    setCache(absolutePath, pageMetaDatum)
     return pageMetaDatum
   }
 
@@ -244,9 +231,7 @@ export class PageContext {
   }
 
   async mergePageMetaData() {
-    const pageMetaData = await this.parsePages(this.pagesPath, 'main', this.pagesGlobConfig?.pages)
-
-    this.pageMetaData = pageMetaData
+    this.pageMetaData = await this.parsePages(this.pagesPath, 'main', this.pagesGlobConfig?.pages)
     debug.pages(this.pageMetaData)
   }
 
@@ -279,7 +264,9 @@ export class PageContext {
 
   async updatePagesJSON(filepath?: string) {
     if (filepath) {
-      if (!await hasChanged(filepath)) {
+      const content = fs.readFileSync(filepath, 'utf8')
+      const sfcDescriptor = await parseSFC(content)
+      if (!await hasChanged(filepath, sfcDescriptor, this.options)) {
         debug.cache(`The route block on page ${filepath} did not send any changes, skipping`)
         return false
       }

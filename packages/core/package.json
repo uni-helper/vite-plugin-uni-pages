@@ -55,7 +55,10 @@
     "vite": "^5.0.0"
   },
   "dependencies": {
+    "@babel/generator": "^7.25.5",
+    "@babel/types": "^7.25.4",
     "@uni-helper/uni-env": "^0.1.4",
+    "@vue-macros/common": "^1.12.2",
     "@vue/compiler-sfc": "^3.4.38",
     "chokidar": "^3.6.0",
     "debug": "^4.3.6",
@@ -70,6 +73,7 @@
   },
   "devDependencies": {
     "@antfu/utils": "^0.7.10",
+    "@types/babel__generator": "^7.6.8",
     "@types/debug": "^4.1.12",
     "@types/lodash.groupby": "^4.6.9",
     "@types/node": "^20.15.0",

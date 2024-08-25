@@ -140,3 +140,8 @@ export interface SubPageMetaDatum {
   root: string
   pages: PageMetaDatum[]
 }
+
+export function definePage(_options: Partial<
+  PageMetaDatum
+>) {
+}

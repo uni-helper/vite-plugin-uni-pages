@@ -1,8 +1,7 @@
-import fs from 'node:fs'
 import JSON5 from 'json5'
 import { parse as YAMLParser } from 'yaml'
-import { parse as VueParser } from '@vue/compiler-sfc'
 import type { SFCBlock, SFCDescriptor } from '@vue/compiler-sfc'
+import { parse as VueParser } from '@vue/compiler-sfc'
 import { debug } from './utils'
 import type { CustomBlock, ResolvedOptions } from './types'
 
@@ -72,13 +71,8 @@ export function parseCustomBlock(
   }
 }
 
-export async function getRouteSfcBlock(path: string): Promise<SFCBlock | undefined> {
-  const content = fs.readFileSync(path, 'utf8')
-
-  const parsedSFC = await parseSFC(content)
-  const blockStr = parsedSFC?.customBlocks.find(b => b.type === 'route')
-
-  return blockStr
+export async function getRouteSfcBlock(parsedSFC: SFCDescriptor): Promise<SFCBlock | undefined> {
+  return parsedSFC?.customBlocks.find(b => b.type === 'route')
 }
 
 export async function getRouteBlock(path: string, blockStr: SFCBlock | undefined, options: ResolvedOptions): Promise<CustomBlock | undefined> {

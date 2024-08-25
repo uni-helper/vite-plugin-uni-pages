@@ -5,6 +5,7 @@ import type { Plugin } from 'vite'
 import { createLogger } from 'vite'
 import MagicString from 'magic-string'
 import chokidar from 'chokidar'
+import { parse as parseSFC } from '@vue/compiler-sfc'
 import type { UserOptions } from './types'
 import { PageContext } from './context'
 import {
@@ -13,6 +14,7 @@ import {
   RESOLVED_MODULE_ID_VIRTUAL,
 } from './constant'
 import { checkPagesJsonFile } from './files'
+import { findMacro } from './definePage'
 
 export * from './config'
 export * from './types'
@@ -89,6 +91,13 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
         const index = match.index!
         const length = match[0].length
         s.remove(index, index + length)
+      }
+
+      const { descriptor: sfc } = parseSFC(code, { filename: id })
+      const macro = findMacro(sfc.scriptSetup)
+      if (macro) {
+        const setupOffset = sfc.scriptSetup!.loc.start.offset
+        s.remove(setupOffset + macro.start!, setupOffset + macro.end!)
       }
 
       if (s.hasChanged()) {

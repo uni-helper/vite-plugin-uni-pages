@@ -1,10 +1,11 @@
 import Debug from 'debug'
 import { type ModuleNode, type ViteDevServer, normalizePath } from 'vite'
 import groupBy from 'lodash.groupby'
-import type { SFCBlock } from '@vue/compiler-sfc'
+import type { SFCDescriptor } from '@vue/compiler-sfc'
 import { FILE_EXTENSIONS, RESOLVED_MODULE_ID_VIRTUAL } from './constant'
-import type { PageMetaDatum } from './types'
-import { getRouteSfcBlock } from './customBlock'
+import type { PageMetaDatum, ResolvedOptions } from './types'
+import { getRouteBlock, getRouteSfcBlock } from './customBlock'
+import { readPageOptionsFromMacro } from './definePage'
 
 export function invalidatePagesModule(server: ViteDevServer) {
   const { moduleGraph } = server
@@ -60,26 +61,35 @@ export function mergePageMetaDataArray(pageMetaData: PageMetaDatum[]) {
 export function useCachedPages() {
   const pages = new Map<string, string>()
 
-  function parseData(block?: SFCBlock) {
-    return {
-      content: block?.loc.source.trim() ?? '',
-      attr: block?.attrs ?? '',
+  async function parseData(filePath: string, sfcDescriptor: SFCDescriptor, options: ResolvedOptions) {
+    const routeSfcBlock = await getRouteSfcBlock(sfcDescriptor)
+    const routeBlock = await getRouteBlock(filePath, routeSfcBlock, options)
+    const pageMetaDatum: PageMetaDatum = {
+      path: normalizePath(filePath),
+      type: routeBlock?.attr.type ?? 'page',
     }
+    const definePageData = await readPageOptionsFromMacro(sfcDescriptor)
+    Object.assign(pageMetaDatum, definePageData)
+    return pageMetaDatum
   }
 
-  function setCache(filePath: string, routeBlock?: SFCBlock) {
-    pages.set(filePath, JSON.stringify(parseData(routeBlock)))
+  function setCache(filePath: string, pageMetaDatum?: PageMetaDatum) {
+    debug.cache('filePath', filePath)
+    const { path, ...rest } = pageMetaDatum ?? {}
+    pages.set(filePath, JSON.stringify(rest))
   }
 
-  async function hasChanged(filePath: string, routeBlock?: SFCBlock) {
-    if (!routeBlock)
-      routeBlock = await getRouteSfcBlock(normalizePath(filePath))
-
-    return !pages.has(filePath) || JSON.stringify(parseData(routeBlock)) !== pages.get(filePath)
+  async function hasChanged(filePath: string, sfcDescriptor: SFCDescriptor, options: ResolvedOptions) {
+    const pageMetaDatum = await parseData(filePath, sfcDescriptor, options)
+    const { path, ...rest } = pageMetaDatum ?? {}
+    const changed = !pages.has(filePath) || JSON.stringify(rest) !== pages.get(filePath)
+    debug.cache('page changed', changed)
+    return changed
   }
 
   return {
     setCache,
     hasChanged,
+    parseData,
   }
 }

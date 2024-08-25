@@ -54,8 +54,22 @@ export default defineUniPages({
 
 现在所有的 page 都会被自动发现！
 
-### SFC 自定义块用于路由数据
+### 自定义路由数据
 
+#### 1、definePage 定义路由数据
+可以在setup中使用 definePage 来定义路由数据。 注意解析definePage是在编译期 不能使用运行期的变量
+
+```ts
+import { definePage } from '@uni-helper/vite-plugin-uni-pages'
+
+definePage({
+  style:{
+    navigationBarTitleText: 'test'
+  }
+})
+```
+
+#### 2、SFC 自定义块用于路由数据
 通过添加一个 `<route>` 块到 SFC 中来添加路由元数据。这将会在路由生成后直接添加到路由中，并且会覆盖。
 
 你可以使用 `<route lang="yaml">` 来指定一个解析器，或者使用 `routeBlockLang` 选项来设置一个默认的解析器。
