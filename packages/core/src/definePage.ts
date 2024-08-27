@@ -6,46 +6,50 @@ import { MACRO_DEFINE_PAGE } from './constant'
 import type { PageMetaDatum } from './types'
 
 function findMacroWithImports(scriptSetup: SFCScriptBlock | null) {
-  const empty = { imports: [], macro: undefined }
+  try {
+    const empty = { imports: [], macro: undefined }
 
-  if (!scriptSetup)
-    return empty
+    if (!scriptSetup)
+      return empty
 
-  const parsed = babelParse(scriptSetup.content, scriptSetup.lang || 'js', {
-    plugins: [['importAttributes', { deprecatedAssertSyntax: true }]],
-  })
-
-  const stmts = parsed.body
-
-  const nodes = stmts
-    .map((raw: t.Node) => {
-      let node = raw
-      if (raw.type === 'ExpressionStatement')
-        node = raw.expression
-      return isCallOf(node, MACRO_DEFINE_PAGE) ? node : undefined
+    const parsed = babelParse(scriptSetup.content, scriptSetup.lang || 'js', {
+      plugins: [['importAttributes', { deprecatedAssertSyntax: true }]],
     })
-    .filter((node): node is t.CallExpression => !!node)
 
-  if (!nodes.length)
-    return empty
+    const stmts = parsed.body
 
-  if (nodes.length > 1)
-    throw new Error(`duplicate ${MACRO_DEFINE_PAGE}() call`)
+    const nodes = stmts
+      .map((raw: t.Node) => {
+        let node = raw
+        if (raw.type === 'ExpressionStatement')
+          node = raw.expression
+        return isCallOf(node, MACRO_DEFINE_PAGE) ? node : undefined
+      })
+      .filter((node): node is t.CallExpression => !!node)
 
-  const macro = nodes[0]
+    if (!nodes.length)
+      return empty
 
-  const [arg] = macro.arguments
+    if (nodes.length > 1)
+      throw new Error(`duplicate ${MACRO_DEFINE_PAGE}() call`)
 
-  if (arg && !t.isFunctionExpression(arg) && !t.isArrowFunctionExpression(arg) && !t.isObjectExpression(arg))
-    throw new Error(`${MACRO_DEFINE_PAGE}() only accept argument in function or object`)
+    const macro = nodes[0]
 
-  const imports = stmts
-    .map((node: t.Node) => (node.type === 'ImportDeclaration') ? node : undefined)
-    .filter((node): node is t.ImportDeclaration => !!node)
+    const [arg] = macro.arguments
 
-  return {
-    imports,
-    macro,
+    if (arg && !t.isFunctionExpression(arg) && !t.isArrowFunctionExpression(arg) && !t.isObjectExpression(arg))
+      throw new Error(`${MACRO_DEFINE_PAGE}() only accept argument in function or object`)
+
+    const imports = stmts
+      .map((node: t.Node) => (node.type === 'ImportDeclaration') ? node : undefined)
+      .filter((node): node is t.ImportDeclaration => !!node)
+
+    return {
+      imports,
+      macro,
+    }
+  } catch (error) {
+    throw new Error(`Error parsing script setup content: ${error.message}`)
   }
 }
 
