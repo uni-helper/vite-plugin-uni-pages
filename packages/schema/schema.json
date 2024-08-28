@@ -2831,6 +2831,25 @@
           },
           "type": "array"
         },
+        "plugins": {
+          "additionalProperties": {
+            "properties": {
+              "provider": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "version",
+              "provider"
+            ],
+            "type": "object"
+          },
+          "description": "分包插件",
+          "type": "object"
+        },
         "root": {
           "description": "子包的根目录",
           "type": "string"
