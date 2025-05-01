@@ -73,8 +73,8 @@ importers:
         version: 2.5.0
     devDependencies:
       '@antfu/utils':
-        specifier: ^0.7.10
-        version: 0.7.10
+        specifier: ^9.0.0
+        version: 9.2.0
       '@types/debug':
         specifier: ^4.1.12
         version: 4.1.12
@@ -217,6 +217,9 @@ packages:
 
   '@antfu/utils@0.7.10':
     resolution: {integrity: sha512-+562v9k4aI80m1+VuMHehNJWLOFjBnXn3tdOitzD0il5b7smkSBal4+a3oKiQTbrwMmN/TBUMDvbdoWDehgOww==}
+
+  '@antfu/utils@9.2.0':
+    resolution: {integrity: sha512-Oq1d9BGZakE/FyoEtcNeSwM7MpDO2vUBi11RWBZXf75zPsbUVWmUs03EqkRFrcgbXyKTas0BdZWC1wcuSoqSAw==}
 
   '@babel/code-frame@7.24.2':
     resolution: {integrity: sha512-y5+tLQyV8pg3fsiln67BVLD1P13Eg4lh5RW9mF0zUuvLrv9uIQ4MCL+CRT+FTsBlBjcIan6PGsLcBN0m3ClUyQ==}
@@ -5091,6 +5094,8 @@ snapshots:
 
   '@antfu/utils@0.7.10': {}
 
+  '@antfu/utils@9.2.0': {}
+
   '@babel/code-frame@7.24.2':
     dependencies:
       '@babel/highlight': 7.24.5
@@ -6001,7 +6006,7 @@ snapshots:
       jest-util: 27.5.1
       jest-validate: 27.5.1
       jest-watcher: 27.5.1
-      micromatch: 4.0.5
+      micromatch: 4.0.8
       rimraf: 3.0.2
       slash: 3.0.0
       strip-ansi: 6.0.1
@@ -6098,7 +6103,7 @@ snapshots:
       jest-haste-map: 27.5.1
       jest-regex-util: 27.5.1
       jest-util: 27.5.1
-      micromatch: 4.0.5
+      micromatch: 4.0.8
       pirates: 4.0.6
       slash: 3.0.0
       source-map: 0.6.1
@@ -8632,7 +8637,7 @@ snapshots:
       jest-runner: 27.5.1
       jest-util: 27.5.1
       jest-validate: 27.5.1
-      micromatch: 4.0.5
+      micromatch: 4.0.8
       parse-json: 5.2.0
       pretty-format: 27.5.1
       slash: 3.0.0
@@ -8700,7 +8705,7 @@ snapshots:
       jest-serializer: 27.5.1
       jest-util: 27.5.1
       jest-worker: 27.5.1
-      micromatch: 4.0.5
+      micromatch: 4.0.8
       walker: 1.0.8
     optionalDependencies:
       fsevents: 2.3.3
@@ -8746,7 +8751,7 @@ snapshots:
       '@types/stack-utils': 2.0.3
       chalk: 4.1.2
       graceful-fs: 4.2.11
-      micromatch: 4.0.5
+      micromatch: 4.0.8
       pretty-format: 27.5.1
       slash: 3.0.0
       stack-utils: 2.0.6
@@ -8954,7 +8959,7 @@ snapshots:
   jsdom@16.7.0:
     dependencies:
       abab: 2.0.6
-      acorn: 8.12.1
+      acorn: 8.14.1
       acorn-globals: 6.0.0
       cssom: 0.4.4
       cssstyle: 2.3.0
@@ -10157,7 +10162,7 @@ snapshots:
   terser@5.28.1:
     dependencies:
       '@jridgewell/source-map': 0.3.5
-      acorn: 8.12.1
+      acorn: 8.14.1
       commander: 2.20.3
       source-map-support: 0.5.21
     optional: true
