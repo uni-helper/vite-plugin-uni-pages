@@ -1,8 +1,8 @@
 import fs from 'node:fs'
 import JSON5 from 'json5'
 import { parse as YAMLParser } from 'yaml'
-import { parse as VueParser } from 'vue/compiler-sfc'
-import type { SFCBlock, SFCDescriptor } from 'vue/compiler-sfc'
+import { parse as VueParser } from '@vue/compiler-sfc'
+import type { SFCBlock, SFCDescriptor } from '@vue/compiler-sfc'
 import { debug } from './utils'
 import type { CustomBlock, ResolvedOptions } from './types'
 
@@ -12,6 +12,10 @@ export async function parseSFC(code: string): Promise<SFCDescriptor> {
       VueParser(code, {
         pad: 'space',
       }).descriptor
+      // for @vue/compiler-sfc ^2.7
+      || (VueParser as any)({
+        source: code,
+      })
     )
   }
   catch (error) {

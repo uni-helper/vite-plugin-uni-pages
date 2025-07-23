@@ -1,7 +1,7 @@
 import Debug from 'debug'
 import { type ModuleNode, type ViteDevServer, normalizePath } from 'vite'
 import groupBy from 'lodash.groupby'
-import type { SFCBlock } from 'vue/compiler-sfc'
+import type { SFCBlock } from '@vue/compiler-sfc'
 import { FILE_EXTENSIONS, RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import type { PageMetaDatum } from './types'
 import { getRouteSfcBlock } from './customBlock'

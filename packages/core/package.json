@@ -57,6 +57,7 @@
   },
   "dependencies": {
     "@uni-helper/uni-env": "^0.1.4",
+    "@vue/compiler-sfc": "3.4.21",
     "chokidar": "^3.6.0",
     "debug": "^4.3.6",
     "detect-indent": "^6.1.0",
