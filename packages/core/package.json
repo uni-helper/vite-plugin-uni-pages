@@ -13,7 +13,7 @@
   ],
   "license": "MIT",
   "funding": [
-    "https://afdian.net/a/kejun",
+    "https://afdian.com/a/kejun",
     "https://github.com/ModyQyW/sponsors"
   ],
   "homepage": "https://github.com/uni-helper/vite-plugin-uni-pages#readme",
@@ -56,7 +56,7 @@
   },
   "dependencies": {
     "@uni-helper/uni-env": "^0.1.4",
-    "@vue/compiler-sfc": "^3.4.38",
+    "@vue/compiler-sfc": "3.4.21",
     "chokidar": "^3.6.0",
     "debug": "^4.3.6",
     "detect-indent": "^6.1.0",
