@@ -1,6 +1,6 @@
 {
   "name": "@uni-helper/pages-json-schema",
-  "version": "0.2.28",
+  "version": "0.2.29-beta.1",
   "description": "Schema for uni-app pages.json",
   "author": "KeJun",
   "maintainers": [
