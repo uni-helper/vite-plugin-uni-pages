@@ -56,7 +56,7 @@
   },
   "dependencies": {
     "@uni-helper/uni-env": "^0.1.4",
-    "@vue/compiler-sfc": "3.4.21",
+    "@vue/compiler-sfc": "3.5.18",
     "chokidar": "^3.6.0",
     "debug": "^4.3.6",
     "detect-indent": "^6.1.0",
@@ -65,7 +65,7 @@
     "json5": "^2.2.3",
     "lodash.groupby": "^4.6.0",
     "magic-string": "^0.30.11",
-    "unconfig": "^0.5.5",
+    "unconfig": "^0.6.0",
     "yaml": "^2.5.0"
   },
   "devDependencies": {
