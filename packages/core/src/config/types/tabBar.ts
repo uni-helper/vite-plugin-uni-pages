@@ -128,14 +128,14 @@ export interface TabBar {
    *
    * @format color
    */
-  color: HEXColor | ThemeVar
+  color?: HEXColor | ThemeVar
 
   /**
    * tab 上的文字选中时的颜色
    *
    * @format color
    */
-  selectedColor: HEXColor | ThemeVar
+  selectedColor?: HEXColor | ThemeVar
 
   /**
    * tab 的背景色
@@ -165,11 +165,11 @@ export interface TabBar {
   blurEffect?: 'dark' | 'extralight' | 'light' | 'none'
 
   /**
-   * tab 列表，最少 2个，最多 5 个
+   * tab 列表，最少 2个，最多 5 个，app 端没有该限制
    *
    * @type {TabBarItem[]}
    */
-  list: [TabBarItem, TabBarItem, TabBarItem?, TabBarItem?, TabBarItem?]
+  list: TabBarItem[]
 
   /**
    * tab 位置
