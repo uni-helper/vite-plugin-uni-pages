@@ -68,7 +68,7 @@ export interface Options {
    * Set the default route block parser, or use `<route lang="xxx">` in SFC route block
    * @default 'json5'
    */
-  routeBlockLang: 'json5' | 'json' | 'yaml' | 'yml'
+  routeBlockLang: 'json5' | 'json' | 'yaml' | 'yml' | 'jsonc'
 
   /**
    * minify the `pages.json`

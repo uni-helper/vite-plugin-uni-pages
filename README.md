@@ -149,7 +149,7 @@ export interface Options {
    * 自定义块语言
    * @default 'json5'
    */
-  routeBlockLang: 'json5' | 'json' | 'yaml' | 'yml'
+  routeBlockLang: 'json5' | 'json' | 'yaml' | 'yml' | 'jsonc'
 
   onBeforeLoadUserConfig: (ctx: PageContext) => void
   onAfterLoadUserConfig: (ctx: PageContext) => void
