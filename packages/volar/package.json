@@ -51,7 +51,7 @@
     "prepublishOnly": "pnpm build"
   },
   "peerDependencies": {
-    "@volar/language-service": "^1.11.1"
+    "@volar/language-service": "^2.0.0"
   },
   "peerDependenciesMeta": {
     "@volar/language-service": {
@@ -66,6 +66,6 @@
   },
   "devDependencies": {
     "@types/json-schema": "^7.0.15",
-    "@volar/language-service": "^1.11.1"
+    "@volar/language-service": "^2.0.0"
   }
 }
