@@ -3,7 +3,9 @@ import JSON5 from 'json5'
 import { parse as YAMLParser } from 'yaml'
 import { parse as VueParser } from '@vue/compiler-sfc'
 import type { SFCBlock, SFCDescriptor } from '@vue/compiler-sfc'
-import CommentJSON from 'comment-json'
+
+import { parse as cjParse } from 'comment-json'
+import type { CommentJSONValue } from 'comment-json'
 import { debug } from './utils'
 import type { CustomBlock, ResolvedOptions } from './types'
 
@@ -34,7 +36,7 @@ export function parseCustomBlock(
     type: 'page',
     ...block.attrs,
   }
-  let content: Record<string, any> | CommentJSON.CommentJSONValue | undefined
+  let content: Record<string, any> | CommentJSONValue | undefined
   debug.routeBlock(`use ${lang} parser`)
 
   if (lang === 'json5') {
@@ -49,7 +51,7 @@ export function parseCustomBlock(
   }
   else if (lang === 'jsonc') {
     try {
-      content = CommentJSON.parse(block.content)
+      content = cjParse(block.content)
     }
     catch (err: any) {
       throw new Error(

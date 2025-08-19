@@ -9,7 +9,7 @@ import dbg from 'debug'
 import { platform } from '@uni-helper/uni-env'
 import detectIndent from 'detect-indent'
 import detectNewline from 'detect-newline'
-import CommentJSON from 'comment-json'
+import { assign as cjAssign, stringify as cjStringify } from 'comment-json'
 import type { PagesConfig } from './config/types'
 import type { PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
 import { writeDeclaration } from './declaration'
@@ -189,7 +189,7 @@ export class PageContext {
     }
 
     if (routeBlock)
-      CommentJSON.assign(pageMetaDatum, routeBlock.content)
+      cjAssign(pageMetaDatum, routeBlock.content)
 
     return pageMetaDatum
   }
@@ -318,7 +318,7 @@ export class PageContext {
       subPackages: this.subPageMetaData,
     }
 
-    const pagesJson = CommentJSON.stringify(
+    const pagesJson = cjStringify(
       data,
       null,
       this.options.minify ? undefined : this.resolvedPagesJSONIndent,

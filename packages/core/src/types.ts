@@ -1,12 +1,12 @@
 import type { LoadConfigSource } from 'unconfig'
-import type CommentJSON from 'comment-json'
+import type { CommentJSONValue } from 'comment-json'
 import type { GlobalStyle, PagesConfig } from './config'
 import type { PageContext } from './context'
 import type { debug } from './utils'
 
 export interface CustomBlock {
   attr: Record<string, any>
-  content: Record<string, any> | CommentJSON.CommentJSONValue
+  content: Record<string, any> | CommentJSONValue
 }
 
 export type debugType = keyof typeof debug
