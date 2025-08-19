@@ -18,7 +18,7 @@ describe('parser', () => {
           "type": "page",
         },
         "content": {
-          "middlewares": [
+          "middlewares": CommentArray [
             "auth",
           ],
           "style": {
