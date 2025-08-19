@@ -305,7 +305,10 @@ export class PageContext {
 
     const pagesMap = new Map()
     const pages = this.withUniPlatform
-      ? this.pageMetaData.filter(v => !/\..*$/.test(v.path) || v.path.includes(platform)).map(v => ({ ...v, path: v.path.replace(/\..*$/, '') }))
+      ? this.pageMetaData.filter(v => !/\..*$/.test(v.path) || v.path.includes(platform)).map((v) => {
+        v.path = v.path.replace(/\..*$/, '')
+        return v
+      })
       : this.pageMetaData
     pages.forEach(v => pagesMap.set(v.path, v))
     this.pageMetaData = [...pagesMap.values()]
