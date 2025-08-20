@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import fg from 'fast-glob'
+import { stringify as cjStringify } from 'comment-json'
 import { extsToGlob } from './utils'
 
 import type { ResolvedOptions } from './types'
@@ -24,7 +25,7 @@ export function getPageFiles(path: string, options: ResolvedOptions): string[] {
 
 export function checkPagesJsonFile(path: string) {
   if (!fs.existsSync(path)) {
-    writeFileSync(path, JSON.stringify({ pages: [{ path: '' }] }, null, 2))
+    writeFileSync(path, cjStringify({ pages: [{ path: '' }] }, null, 2))
     return false
   }
   return true

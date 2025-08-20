@@ -348,11 +348,11 @@ export class PageContext {
   }
 
   resolveRoutes() {
-    return JSON.stringify(this.pageMetaData, null, 2)
+    return cjStringify(this.pageMetaData, null, 2)
   }
 
   resolveSubRoutes() {
-    return JSON.stringify(this.subPageMetaData, null, 2)
+    return cjStringify(this.subPageMetaData, null, 2)
   }
 
   generateDeclaration() {

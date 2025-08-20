@@ -17,6 +17,7 @@ describe('get files', () => {
         "index.nvue",
         "index.vue",
         "test-json.vue",
+        "test-jsonc-with-comment.vue",
         "test-yaml.vue",
         "test.vue",
       ]
