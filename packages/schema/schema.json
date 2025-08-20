@@ -2960,12 +2960,10 @@
           "type": "string"
         },
         "list": {
-          "description": "tab 列表，最少 2个，最多 5 个",
+          "description": "tab 列表，最少 2个，最多 5 个，app 端没有该限制",
           "items": {
             "$ref": "#/definitions/TabBarItem"
           },
-          "maxItems": 5,
-          "minItems": 2,
           "type": "array"
         },
         "midButton": {
@@ -3005,8 +3003,6 @@
         }
       },
       "required": [
-        "color",
-        "selectedColor",
         "list"
       ],
       "type": "object"
