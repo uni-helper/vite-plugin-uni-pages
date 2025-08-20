@@ -60,7 +60,7 @@ export default defineUniPages({
 
 你可以使用 `<route lang="yaml">` 来指定一个解析器，或者使用 `routeBlockLang` 选项来设置一个默认的解析器。
 
-- **解析器支持：** JSON, JSON5, YAML
+- **解析器支持：** JSON5, JSONC, JSON, YAML, YML
 - **默认：** JSON5
 
 ```html
