@@ -60,6 +60,18 @@ describe('generate routes', () => {
           ]
         },
         {
+          "path": "../packages/playground/src/pages/test-jsonc-with-comment",
+          "type": "page",
+          "style": {
+            // #ifdef APP
+            "navigationBarTitleText": "test jsonc page APP"
+            // #endif
+          },
+          // #ifdef APP
+          "enablePullDownRefresh": true
+          // #endif
+        },
+        {
           "path": "../packages/playground/src/pages/test-yaml",
           "type": "page",
           "style": {
@@ -138,6 +150,18 @@ describe('generate routes', () => {
           "middlewares": [
             "auth"
           ]
+        },
+        {
+          "path": "../packages/playground/src/pages/test-jsonc-with-comment",
+          "type": "page",
+          "style": {
+            // #ifdef APP
+            "navigationBarTitleText": "test jsonc page APP"
+            // #endif
+          },
+          // #ifdef APP
+          "enablePullDownRefresh": true
+          // #endif
         },
         {
           "path": "../packages/playground/src/pages/test-yaml",

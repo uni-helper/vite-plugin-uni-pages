@@ -2,6 +2,7 @@ import Debug from 'debug'
 import { type ModuleNode, type ViteDevServer, normalizePath } from 'vite'
 import groupBy from 'lodash.groupby'
 import type { SFCBlock } from '@vue/compiler-sfc'
+import { stringify as cjStringify } from 'comment-json'
 import { FILE_EXTENSIONS, RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import type { PageMetaDatum } from './types'
 import { getRouteSfcBlock } from './customBlock'
@@ -68,14 +69,14 @@ export function useCachedPages() {
   }
 
   function setCache(filePath: string, routeBlock?: SFCBlock) {
-    pages.set(filePath, JSON.stringify(parseData(routeBlock)))
+    pages.set(filePath, cjStringify(parseData(routeBlock)))
   }
 
   async function hasChanged(filePath: string, routeBlock?: SFCBlock) {
     if (!routeBlock)
       routeBlock = await getRouteSfcBlock(normalizePath(filePath))
 
-    return !pages.has(filePath) || JSON.stringify(parseData(routeBlock)) !== pages.get(filePath)
+    return !pages.has(filePath) || cjStringify(parseData(routeBlock)) !== pages.get(filePath)
   }
 
   return {

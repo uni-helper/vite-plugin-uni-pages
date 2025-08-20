@@ -9,6 +9,7 @@ import dbg from 'debug'
 import { platform } from '@uni-helper/uni-env'
 import detectIndent from 'detect-indent'
 import detectNewline from 'detect-newline'
+import { assign as cjAssign, stringify as cjStringify } from 'comment-json'
 import type { PagesConfig } from './config/types'
 import type { PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
 import { writeDeclaration } from './declaration'
@@ -188,7 +189,7 @@ export class PageContext {
     }
 
     if (routeBlock)
-      Object.assign(pageMetaDatum, routeBlock.content)
+      cjAssign(pageMetaDatum, routeBlock.content)
 
     return pageMetaDatum
   }
@@ -304,7 +305,10 @@ export class PageContext {
 
     const pagesMap = new Map()
     const pages = this.withUniPlatform
-      ? this.pageMetaData.filter(v => !/\..*$/.test(v.path) || v.path.includes(platform)).map(v => ({ ...v, path: v.path.replace(/\..*$/, '') }))
+      ? this.pageMetaData.filter(v => !/\..*$/.test(v.path) || v.path.includes(platform)).map((v) => {
+        v.path = v.path.replace(/\..*$/, '')
+        return v
+      })
       : this.pageMetaData
     pages.forEach(v => pagesMap.set(v.path, v))
     this.pageMetaData = [...pagesMap.values()]
@@ -317,7 +321,7 @@ export class PageContext {
       subPackages: this.subPageMetaData,
     }
 
-    const pagesJson = JSON.stringify(
+    const pagesJson = cjStringify(
       data,
       null,
       this.options.minify ? undefined : this.resolvedPagesJSONIndent,
@@ -344,11 +348,11 @@ export class PageContext {
   }
 
   resolveRoutes() {
-    return JSON.stringify(this.pageMetaData, null, 2)
+    return cjStringify(this.pageMetaData, null, 2)
   }
 
   resolveSubRoutes() {
-    return JSON.stringify(this.subPageMetaData, null, 2)
+    return cjStringify(this.subPageMetaData, null, 2)
   }
 
   generateDeclaration() {
