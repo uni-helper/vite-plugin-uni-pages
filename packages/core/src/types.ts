@@ -82,6 +82,13 @@ export interface Options {
    */
   debug: boolean | debugType
 
+  /**
+   * dup key regExp,
+   * if true, use `/"([^"]+)__dup__(\d+)":/g`
+   * @default false
+   */
+  dupKeyRegExp: RegExp | boolean
+
   onBeforeLoadUserConfig: (ctx: PageContext) => void
   onAfterLoadUserConfig: (ctx: PageContext) => void
   onBeforeScanPages: (ctx: PageContext) => void

@@ -321,7 +321,7 @@ export class PageContext {
       subPackages: this.subPageMetaData,
     }
 
-    const pagesJson = cjStringify(
+    let pagesJson = cjStringify(
       data,
       null,
       this.options.minify ? undefined : this.resolvedPagesJSONIndent,
@@ -333,6 +333,8 @@ export class PageContext {
       debug.pages('PagesJson Not have change')
       return false
     }
+
+    pagesJson = this.resolveDupKey(pagesJson)
 
     writeFileSync(this.resolvedPagesJSONPath, pagesJson)
     lsatPagesJson = pagesJson
@@ -361,6 +363,15 @@ export class PageContext {
 
     debug.declaration('generating')
     return writeDeclaration(this, this.options.dts)
+  }
+
+  resolveDupKey(pagesJson: string) {
+    if (!this.options.dupKeyRegExp)
+      return pagesJson
+    return pagesJson.replace(
+      this.options.dupKeyRegExp as RegExp,
+      '"$1":',
+    )
   }
 }
 

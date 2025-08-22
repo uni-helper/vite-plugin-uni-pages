@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { stringify as cjStringify } from 'comment-json'
 import type { UserPagesConfig } from '../packages/core/src'
 import { PageContext } from '../packages/core/src'
 
@@ -22,8 +23,140 @@ const pagesGlobConfig: UserPagesConfig = {
 }
 
 describe('generate routes', () => {
+  it('dup key', async () => {
+    const ctx = new PageContext({
+      dir: 'packages/playground/src/pages',
+      homePage: 'pages/index',
+      dupKeyRegExp: true,
+    })
+    await ctx.scanPages()
+    await ctx.scanSubPages()
+    await ctx.mergePageMetaData()
+    await ctx.mergeSubPageMetaData()
+    const pagesJson = ctx.resolveDupKey(
+      cjStringify(
+        {
+          ...ctx.pagesGlobConfig,
+          pages: ctx.pageMetaData,
+          subPackages: ctx.subPageMetaData,
+        },
+        null,
+        2,
+      ),
+    )
+    expect(pagesJson).toMatchInlineSnapshot(`
+    "{
+      "pages": [
+        {
+          "path": "../packages/playground/src/pages/A-top",
+          "type": "page"
+        },
+        {
+          "path": "../packages/playground/src/pages/i18n",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "%app.name%"
+          }
+        },
+        {
+          "path": "../packages/playground/src/pages/index",
+          "type": "page",
+          "middlewares": [
+            "auth",
+            "test"
+          ]
+        },
+        {
+          "path": "../packages/playground/src/pages/test-dup-key",
+          "type": "page",
+          "style": {
+            // #ifdef APP
+            "navigationBarTitleText": "[APP]test dup key page",
+            // endif
+            // #ifdef WEB
+            "navigationBarTitleText": "[WEB]test dup key page",
+            // endif
+            // #ifdef MP-WEIXIN
+            "navigationBarTitleText": "[MP-WEIXIN]test dup key page"
+            // endif
+          },
+          // #ifdef APP
+          "middlewares": [
+            "app"
+          ],
+          // endif
+          // #ifdef WEB
+          "middlewares": [
+            "web"
+          ],
+          // endif
+          // #ifdef MP-WEIXIN
+          "middlewares": [
+            "weixin"
+          ]
+          // endif
+        },
+        {
+          "path": "../packages/playground/src/pages/test-json",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "test json page"
+          },
+          "middlewares": [
+            "auth"
+          ]
+        },
+        {
+          "path": "../packages/playground/src/pages/test-jsonc-with-comment",
+          "type": "page",
+          "style": {
+            // #ifdef APP
+            "navigationBarTitleText": "test jsonc page APP"
+            // #endif
+          },
+          // #ifdef APP
+          "enablePullDownRefresh": true
+          // #endif
+        },
+        {
+          "path": "../packages/playground/src/pages/test-yaml",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "test yaml page"
+          },
+          "middlewares": [
+            "auth"
+          ]
+        },
+        {
+          "path": "../packages/playground/src/pages/test",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "test page"
+          },
+          "middlewares": [
+            "auth"
+          ]
+        },
+        {
+          "path": "../packages/playground/src/pages/blog/index",
+          "type": "page"
+        },
+        {
+          "path": "../packages/playground/src/pages/blog/post",
+          "type": "page"
+        }
+      ],
+      "subPackages": []
+    }"
+    `)
+  })
+
   it('vue - pages snapshot', async () => {
-    const ctx = new PageContext({ dir: 'packages/playground/src/pages', homePage: 'pages/index' })
+    const ctx = new PageContext({
+      dir: 'packages/playground/src/pages',
+      homePage: 'pages/index',
+    })
     await ctx.scanPages()
     await ctx.mergePageMetaData()
     const routes = ctx.resolveRoutes()
@@ -48,6 +181,36 @@ describe('generate routes', () => {
             "auth",
             "test"
           ]
+        },
+        {
+          "path": "../packages/playground/src/pages/test-dup-key",
+          "type": "page",
+          "style": {
+            // #ifdef APP
+            "navigationBarTitleText": "[APP]test dup key page",
+            // endif
+            // #ifdef WEB
+            "navigationBarTitleText__dup__1": "[WEB]test dup key page",
+            // endif
+            // #ifdef MP-WEIXIN
+            "navigationBarTitleText__dup__2": "[MP-WEIXIN]test dup key page"
+            // endif
+          },
+          // #ifdef APP
+          "middlewares": [
+            "app"
+          ],
+          // endif
+          // #ifdef WEB
+          "middlewares__dup__1": [
+            "web"
+          ],
+          // endif
+          // #ifdef MP-WEIXIN
+          "middlewares__dup__2": [
+            "weixin"
+          ]
+          // endif
         },
         {
           "path": "../packages/playground/src/pages/test-json",
@@ -104,7 +267,10 @@ describe('generate routes', () => {
   })
 
   it('vue - not merge pages snapshot', async () => {
-    const ctx = new PageContext({ dir: 'packages/playground/src/pages', mergePages: false })
+    const ctx = new PageContext({
+      dir: 'packages/playground/src/pages',
+      mergePages: false,
+    })
     await ctx.scanPages()
     ctx.pagesGlobConfig = pagesGlobConfig
     await ctx.mergePageMetaData()
@@ -140,6 +306,36 @@ describe('generate routes', () => {
             "auth",
             "test"
           ]
+        },
+        {
+          "path": "../packages/playground/src/pages/test-dup-key",
+          "type": "page",
+          "style": {
+            // #ifdef APP
+            "navigationBarTitleText": "[APP]test dup key page",
+            // endif
+            // #ifdef WEB
+            "navigationBarTitleText__dup__1": "[WEB]test dup key page",
+            // endif
+            // #ifdef MP-WEIXIN
+            "navigationBarTitleText__dup__2": "[MP-WEIXIN]test dup key page"
+            // endif
+          },
+          // #ifdef APP
+          "middlewares": [
+            "app"
+          ],
+          // endif
+          // #ifdef WEB
+          "middlewares__dup__1": [
+            "web"
+          ],
+          // endif
+          // #ifdef MP-WEIXIN
+          "middlewares__dup__2": [
+            "weixin"
+          ]
+          // endif
         },
         {
           "path": "../packages/playground/src/pages/test-json",

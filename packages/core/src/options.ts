@@ -21,6 +21,8 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
     minify = false,
     debug = false,
 
+    dupKeyRegExp = false,
+
     onBeforeLoadUserConfig = () => {},
     onAfterLoadUserConfig = () => {},
     onBeforeScanPages = () => {},
@@ -37,6 +39,7 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
   const resolvedHomePage = typeof homePage === 'string' ? [homePage] : homePage
   const resolvedConfigSource = typeof configSource === 'string' ? [{ files: configSource } as LoadConfigSource<PagesConfig>] : configSource
   const resolvedDts = !dts ? false : typeof dts === 'string' ? dts : resolve(viteRoot, 'uni-pages.d.ts')
+  const resolvedDupKeyRegExp = Object.prototype.toString.call(dupKeyRegExp) === '[object RegExp]' ? dupKeyRegExp as RegExp : dupKeyRegExp ? /"([^"]+)__dup__(\d+)":/g : false
 
   const resolvedOptions: ResolvedOptions = {
     dts: resolvedDts,
@@ -51,6 +54,7 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
     root,
     minify,
     debug,
+    dupKeyRegExp: resolvedDupKeyRegExp,
     onBeforeLoadUserConfig,
     onAfterLoadUserConfig,
     onBeforeScanPages,
