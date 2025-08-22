@@ -16,6 +16,7 @@ describe('get files', () => {
         "i18n.vue",
         "index.nvue",
         "index.vue",
+        "test-dup-key.vue",
         "test-json.vue",
         "test-jsonc-with-comment.vue",
         "test-yaml.vue",

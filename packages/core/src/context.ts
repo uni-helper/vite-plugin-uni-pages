@@ -334,12 +334,7 @@ export class PageContext {
       return false
     }
 
-    if (this.options.dupKeyRegExp) {
-      pagesJson = pagesJson.replace(
-        this.options.dupKeyRegExp as RegExp,
-        '"$1":',
-      )
-    }
+    pagesJson = this.resolveDupKey(pagesJson)
 
     writeFileSync(this.resolvedPagesJSONPath, pagesJson)
     lsatPagesJson = pagesJson
@@ -368,6 +363,15 @@ export class PageContext {
 
     debug.declaration('generating')
     return writeDeclaration(this, this.options.dts)
+  }
+
+  resolveDupKey(pagesJson: string) {
+    if (!this.options.dupKeyRegExp)
+      return pagesJson
+    return pagesJson.replace(
+      this.options.dupKeyRegExp as RegExp,
+      '"$1":',
+    )
   }
 }
 
