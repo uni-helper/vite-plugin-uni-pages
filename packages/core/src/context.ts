@@ -321,7 +321,7 @@ export class PageContext {
       subPackages: this.subPageMetaData,
     }
 
-    const pagesJson = cjStringify(
+    let pagesJson = cjStringify(
       data,
       null,
       this.options.minify ? undefined : this.resolvedPagesJSONIndent,
@@ -332,6 +332,13 @@ export class PageContext {
     if (lsatPagesJson === pagesJson) {
       debug.pages('PagesJson Not have change')
       return false
+    }
+
+    if (this.options.dupKeyRegExp) {
+      pagesJson = pagesJson.replace(
+        this.options.dupKeyRegExp as RegExp,
+        '"$1":',
+      )
     }
 
     writeFileSync(this.resolvedPagesJSONPath, pagesJson)
