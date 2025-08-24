@@ -14,7 +14,8 @@
     "@dcloudio/uni-h5": "3.0.0-4070520250711001",
     "@dcloudio/uni-mp-weixin": "3.0.0-4070520250711001",
     "vue": "^3.4.38",
-    "vue-i18n": "^9.14.0"
+    "vue-i18n": "^9.14.0",
+    "yaml": "^2.5.0"
   },
   "devDependencies": {
     "@dcloudio/types": "^3.4.12",
