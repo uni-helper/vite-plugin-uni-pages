@@ -1,14 +1,15 @@
 import { readFileSync } from 'node:fs'
 import { extname } from 'node:path'
-import { babelParse, isCallOf } from 'ast-kit'
-import * as t from '@babel/types'
-import { parse as parseJSON } from 'json5'
-import { parse as parseYAML } from 'yaml'
 import { normalizePath } from 'vite'
-import type { SFCDescriptor } from '@vue/compiler-sfc'
+import { assign as cjAssign } from 'comment-json'
+import * as t from '@babel/types'
+import { babelParse, isCallOf } from 'ast-kit'
+import type { SFCDescriptor, SFCParseOptions } from '@vue/compiler-sfc'
+import { parse as VueParser } from '@vue/compiler-sfc'
+import { babelGenerate, debug, execScript } from './utils'
+import type { PageMetaDatum, PagePath, RouteBlockLang, UserPageMeta } from './types'
 import type { PageContext } from './context'
-import type { PageMetaDatum, PagePath, UserPageMeta } from './types'
-import { babelGenerate, debug, execScript, parseSFC } from './utils'
+import { getRouteBlock, getRouteSfcBlock } from './customBlock'
 
 export class Page {
   ctx: PageContext
@@ -60,9 +61,9 @@ export class Page {
 
   private async readPageMetaFromFile(): Promise<UserPageMeta> {
     const content = readFileSync(this.path.absolutePath, 'utf-8')
-    const sfc = await parseSFC(content, { filename: this.path.absolutePath })
+    const sfc = parseSFC(content, { filename: this.path.absolutePath })
 
-    const meta = await parseMacro(sfc)
+    let meta = await tryPageMetaFromMacro(sfc)
     if (meta) {
       return meta
     }
@@ -72,39 +73,32 @@ export class Page {
       return {}
     }
 
-    const block = sfc.customBlocks.find(block => block.type === 'route')
-    if (block) {
-      const lang = block.lang ?? this.ctx.options.routeBlockLang
+    meta = await tryPageMetaFromCustomBlock(sfc, this.ctx.options.routeBlockLang)
 
-      debug.routeBlock(`use ${lang} parser`)
-
-      let options = {} as UserPageMeta
-      try {
-        if (['json5', 'jsonc', 'json'].includes(lang)) {
-          options = parseJSON(block.content)
-        }
-        else if (['yaml', 'yml'].includes(lang)) {
-          options = parseYAML(block.content)
-        }
-        else {
-          return {}
-        }
-      }
-      catch (err: any) {
-        debug.routeBlock(`Invalid ${lang.toUpperCase()} format of <${block.type}> content in ${this.path.relativePath}\n${err.message}`)
-      }
-
-      if (!options.type)
-        options.type = (typeof block.attrs.type === 'string') && block.attrs.type.length ? block.attrs.type : 'page'
-
-      return options
-    }
-
-    return {}
+    return meta || {}
   }
 }
 
-export async function parseMacro(sfc: SFCDescriptor): Promise<UserPageMeta | undefined> {
+export function parseSFC(code: string, options?: SFCParseOptions): SFCDescriptor {
+  try {
+    return (
+      VueParser(code, {
+        pad: 'space',
+        ...options,
+      }).descriptor
+      // for @vue/compiler-sfc ^2.7
+      || (VueParser as any)({
+        source: code,
+        ...options,
+      })
+    )
+  }
+  catch (error) {
+    throw new Error(`[vite-plugin-uni-pages] Vue3's "@vue/compiler-sfc" is required. \nOriginal error: \n${error}`)
+  }
+}
+
+export async function tryPageMetaFromMacro(sfc: SFCDescriptor): Promise<UserPageMeta | undefined> {
   const sfcScript = sfc.scriptSetup || sfc.script
 
   if (!sfcScript) {
@@ -128,6 +122,24 @@ export async function parseMacro(sfc: SFCDescriptor): Promise<UserPageMeta | und
     const result = await execScript(script, sfc.filename)
     return result as UserPageMeta
   }
+  return undefined
+}
+
+export async function tryPageMetaFromCustomBlock(sfc: SFCDescriptor, routeBlockLang: RouteBlockLang): Promise<UserPageMeta | undefined> {
+  const block = getRouteSfcBlock(sfc)
+
+  const routeBlock = getRouteBlock(sfc.filename, block, routeBlockLang)
+
+  if (routeBlock) {
+    const pageMeta: UserPageMeta = {
+      type: routeBlock?.attr.type ?? 'page',
+    }
+
+    cjAssign(pageMeta, routeBlock.content)
+
+    return pageMeta
+  }
+
   return undefined
 }
 

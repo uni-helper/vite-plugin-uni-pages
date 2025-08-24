@@ -3,13 +3,9 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import Debug from 'debug'
 import type { ModuleNode, ViteDevServer } from 'vite'
-import { isCallOf } from 'ast-kit'
 import groupBy from 'lodash.groupby'
-import type { SFCDescriptor, SFCParseOptions } from '@vue/compiler-sfc'
-import { parse as VueParser } from '@vue/compiler-sfc'
 import * as ts from 'typescript'
 import babelGenerator from '@babel/generator'
-import * as t from '@babel/types'
 import { FILE_EXTENSIONS, RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import type { PageMetaDatum } from './types'
 
@@ -63,25 +59,6 @@ export function mergePageMetaDataArray(pageMetaData: PageMetaDatum[]) {
     result.push(options)
   }
   return result
-}
-
-export async function parseSFC(code: string, options?: SFCParseOptions): Promise<SFCDescriptor> {
-  try {
-    return (
-      VueParser(code, {
-        pad: 'space',
-        ...options,
-      }).descriptor
-      // for @vue/compiler-sfc ^2.7
-      || (VueParser as any)({
-        source: code,
-        ...options,
-      })
-    )
-  }
-  catch (error) {
-    throw new Error(`[vite-plugin-uni-pages] Vue3's "@vue/compiler-sfc" is required. \nOriginal error: \n${error}`)
-  }
 }
 
 /**

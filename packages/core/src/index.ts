@@ -16,8 +16,7 @@ import {
   RESOLVED_MODULE_ID_VIRTUAL,
 } from './constant'
 import { checkPagesJsonFile } from './files'
-import { parseSFC } from './utils'
-import { findMacro } from './page'
+import { findMacro, parseSFC } from './page'
 
 export * from './config'
 export * from './types'
@@ -26,6 +25,7 @@ export * from './context'
 export * from './utils'
 export * from './files'
 export * from './options'
+export * from './customBlock'
 export * from './page'
 
 async function restart() {
@@ -87,7 +87,7 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
         return null
       }
 
-      const sfc = await parseSFC(code, { filename: id })
+      const sfc = parseSFC(code, { filename: id })
 
       let macro: CallExpression | undefined
       if (sfc.scriptSetup) {
