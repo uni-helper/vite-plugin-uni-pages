@@ -109,6 +109,15 @@ describe('generate routes', () => {
           ]
         },
         {
+          "path": "../packages/playground/src/pages/define-page/conditional-compilation",
+          "style": {
+            "navigationBarTitleText": "hello world"
+          },
+          "middlewares": [
+            "auth"
+          ]
+        },
+        {
           "path": "../packages/playground/src/pages/define-page/function",
           "style": {
             "navigationBarTitleText": "hello world"
@@ -250,6 +259,15 @@ describe('generate routes', () => {
         },
         {
           "path": "../packages/playground/src/pages/define-page/async-function",
+          "style": {
+            "navigationBarTitleText": "hello world"
+          },
+          "middlewares": [
+            "auth"
+          ]
+        },
+        {
+          "path": "../packages/playground/src/pages/define-page/conditional-compilation",
           "style": {
             "navigationBarTitleText": "hello world"
           },

@@ -27,6 +27,7 @@ export * from './files'
 export * from './options'
 export * from './customBlock'
 export * from './page'
+export * from './uni-platform'
 
 async function restart() {
   return new Promise((resolve) => {
