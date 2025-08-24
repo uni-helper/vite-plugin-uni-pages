@@ -1,13 +1,14 @@
 <script lang="ts" setup>
+import { currentUniPlatform, UniPlatform } from '@uni-helper/vite-plugin-uni-pages';
+
 definePage(async () => {
-  const randomTxt = await new Promise<string>((resolve) => {
-    const txt = Math.random().toString(36).slice(-8);
-    resolve(txt);
+  let title = await new Promise<string>((resolve) => {
+    resolve('hello world');
   });
 
   return {
     style: {
-      navigationBarTitleText: randomTxt,
+      navigationBarTitleText: title,
     },
     middlewares: [
       'auth',

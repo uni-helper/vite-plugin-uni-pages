@@ -63,19 +63,12 @@ export class Page {
     const content = readFileSync(this.path.absolutePath, 'utf-8')
     const sfc = parseSFC(content, { filename: this.path.absolutePath })
 
-    let meta = await tryPageMetaFromMacro(sfc)
+    const meta = await tryPageMetaFromMacro(sfc)
     if (meta) {
       return meta
     }
 
-    if (sfc.scriptSetup) {
-      // script setup 仅支持 macro 模式，不支持 route 自定义节点
-      return {}
-    }
-
-    meta = await tryPageMetaFromCustomBlock(sfc, this.ctx.options.routeBlockLang)
-
-    return meta || {}
+    return tryPageMetaFromCustomBlock(sfc, this.ctx.options.routeBlockLang)
   }
 }
 
@@ -125,22 +118,20 @@ export async function tryPageMetaFromMacro(sfc: SFCDescriptor): Promise<UserPage
   return undefined
 }
 
-export async function tryPageMetaFromCustomBlock(sfc: SFCDescriptor, routeBlockLang: RouteBlockLang): Promise<UserPageMeta | undefined> {
+export async function tryPageMetaFromCustomBlock(sfc: SFCDescriptor, routeBlockLang: RouteBlockLang): Promise<UserPageMeta > {
   const block = getRouteSfcBlock(sfc)
 
   const routeBlock = getRouteBlock(sfc.filename, block, routeBlockLang)
 
-  if (routeBlock) {
-    const pageMeta: UserPageMeta = {
-      type: routeBlock?.attr.type ?? 'page',
-    }
-
-    cjAssign(pageMeta, routeBlock.content)
-
-    return pageMeta
+  const pageMeta: UserPageMeta = {
+    type: routeBlock?.attr.type ?? 'page',
   }
 
-  return undefined
+  if (routeBlock) {
+    cjAssign(pageMeta, routeBlock.content)
+  }
+
+  return pageMeta
 }
 
 export function findMacro(stmts: t.Statement[], filename: string): t.CallExpression | undefined {
