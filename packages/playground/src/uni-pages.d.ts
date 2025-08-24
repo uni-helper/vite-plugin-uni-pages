@@ -14,6 +14,7 @@ interface NavigateToOptions {
        "/pages/blog/index" |
        "/pages/blog/post" |
        "/pages/define-page/async-function" |
+       "/pages/define-page/conditional-compilation" |
        "/pages/define-page/function" |
        "/pages/define-page/nested-function" |
        "/pages/define-page/object" |
