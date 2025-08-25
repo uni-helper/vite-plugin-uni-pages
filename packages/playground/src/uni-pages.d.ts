@@ -13,6 +13,14 @@ interface NavigateToOptions {
        "/pages/test" |
        "/pages/blog/index" |
        "/pages/blog/post" |
+       "/pages/define-page/async-function" |
+       "/pages/define-page/conditional-compilation" |
+       "/pages/define-page/function" |
+       "/pages/define-page/nested-function" |
+       "/pages/define-page/object" |
+       "/pages/define-page/option-api" |
+       "/pages/define-page/remove-console" |
+       "/pages/define-page/yaml" |
        "/pages-sub/index" |
        "/pages-sub/about/index" |
        "/pages-sub/about/your";

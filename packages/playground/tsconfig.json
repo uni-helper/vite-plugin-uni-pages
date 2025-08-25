@@ -7,7 +7,7 @@
     "module": "esnext",
     "moduleResolution": "node",
     "resolveJsonModule": true,
-    "types": ["@dcloudio/types"],
+    "types": ["@dcloudio/types", "@uni-helper/vite-plugin-uni-pages"],
     "strict": true,
     "sourceMap": true,
     "esModuleInterop": true

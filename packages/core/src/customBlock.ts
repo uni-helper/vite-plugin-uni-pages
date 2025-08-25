@@ -1,37 +1,18 @@
-import fs from 'node:fs'
 import JSON5 from 'json5'
 import { parse as YAMLParser } from 'yaml'
-import { parse as VueParser } from '@vue/compiler-sfc'
 import type { SFCBlock, SFCDescriptor } from '@vue/compiler-sfc'
 
 import { parse as cjParse } from 'comment-json'
 import type { CommentJSONValue } from 'comment-json'
 import { debug } from './utils'
-import type { CustomBlock, ResolvedOptions } from './types'
-
-export async function parseSFC(code: string): Promise<SFCDescriptor> {
-  try {
-    return (
-      VueParser(code, {
-        pad: 'space',
-      }).descriptor
-      // for @vue/compiler-sfc ^2.7
-      || (VueParser as any)({
-        source: code,
-      })
-    )
-  }
-  catch (error) {
-    throw new Error(`[vite-plugin-uni-pages] Vue3's "@vue/compiler-sfc" is required. \nOriginal error: \n${error}`)
-  }
-}
+import type { CustomBlock, RouteBlockLang } from './types'
 
 export function parseCustomBlock(
   block: SFCBlock,
   filePath: string,
-  options: ResolvedOptions,
+  routeBlockLang: RouteBlockLang,
 ): CustomBlock | undefined {
-  const lang = block.lang ?? options.routeBlockLang
+  const lang = block.lang ?? routeBlockLang
   const attr = {
     type: 'page',
     ...block.attrs,
@@ -85,17 +66,12 @@ export function parseCustomBlock(
   }
 }
 
-export async function getRouteSfcBlock(path: string): Promise<SFCBlock | undefined> {
-  const content = fs.readFileSync(path, 'utf8')
-
-  const parsedSFC = await parseSFC(content)
-  const blockStr = parsedSFC?.customBlocks.find(b => b.type === 'route')
-
-  return blockStr
+export function getRouteSfcBlock(sfc?: SFCDescriptor): SFCBlock | undefined {
+  return sfc?.customBlocks.find(b => b.type === 'route')
 }
 
-export async function getRouteBlock(path: string, blockStr: SFCBlock | undefined, options: ResolvedOptions): Promise<CustomBlock | undefined> {
+export function getRouteBlock(path: string, blockStr: SFCBlock | undefined, routeBlockLang: RouteBlockLang): CustomBlock | undefined {
   if (!blockStr)
     return
-  return parseCustomBlock(blockStr, path, options)
+  return parseCustomBlock(blockStr, path, routeBlockLang)
 }

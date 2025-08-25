@@ -27,11 +27,11 @@
   "exports": {
     ".": {
       "import": {
-        "types": "./dist/index.d.mts",
+        "types": "./index.d.ts",
         "default": "./dist/index.mjs"
       },
       "require": {
-        "types": "./dist/index.d.cts",
+        "types": "./index.d.ts",
         "default": "./dist/index.cjs"
       }
     },
@@ -41,39 +41,47 @@
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
+  "types": "./index.d.ts",
   "files": [
     "client.d.ts",
-    "dist"
+    "dist",
+    "index.d.ts"
   ],
   "scripts": {
     "build": "unbuild",
     "stub": "unbuild --stub",
+    "debug": "cross-env NODE_ENV=development unbuild",
     "prepublishOnly": "pnpm build"
   },
   "peerDependencies": {
     "vite": "^5.0.0"
   },
   "dependencies": {
+    "@babel/generator": "^7.28.3",
+    "@babel/types": "^7.28.2",
     "@uni-helper/uni-env": "^0.1.4",
     "@vue/compiler-sfc": "3.4.21",
+    "ast-kit": "^2.1.2",
     "chokidar": "^3.6.0",
+    "comment-json": "^4.2.5",
     "debug": "^4.3.6",
     "detect-indent": "^6.1.0",
     "detect-newline": "^3.1.0",
     "fast-glob": "^3.3.2",
     "json5": "^2.2.3",
+    "kolorist": "^1.8.0",
     "lodash.groupby": "^4.6.0",
     "magic-string": "^0.30.11",
     "unconfig": "^7.3.2",
-    "yaml": "^2.5.0",
-    "comment-json": "^4.2.5"
+    "yaml": "^2.5.0"
   },
   "devDependencies": {
     "@antfu/utils": "^0.7.10",
+    "@types/babel__generator": "^7.27.0",
     "@types/debug": "^4.1.12",
     "@types/lodash.groupby": "^4.6.9",
     "@types/node": "^20.15.0",
+    "cross-env": "^10.0.0",
     "vite": "^5.4.1"
   }
 }

@@ -31,14 +31,14 @@
     "lint:fix": "pnpm lint --fix"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "^2.26.0",
+    "@antfu/eslint-config": "^5.2.1",
     "@types/node": "^20.16.1",
     "bumpp": "^9.5.1",
-    "eslint": "^9.9.0",
+    "comment-json": "^4.2.5",
+    "eslint": "^9.34.0",
     "rimraf": "^6.0.1",
     "typescript": "^5.5.4",
     "unbuild": "^2.0.0",
-    "vitest": "^2.0.5",
-    "comment-json": "^4.2.5"
+    "vitest": "^2.0.5"
   }
 }

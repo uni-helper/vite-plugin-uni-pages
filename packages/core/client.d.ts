@@ -5,3 +5,7 @@ declare module 'virtual:uni-pages' {
   export const pages: PageMetaDatum[]
   export const subPackages: SubPackage[]
 }
+
+declare namespace globalThis{
+  export const definePage: import('.').DefinePage
+}
