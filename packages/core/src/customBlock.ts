@@ -5,7 +5,7 @@ import type { SFCBlock, SFCDescriptor } from '@vue/compiler-sfc'
 import { parse as cjParse } from 'comment-json'
 import type { CommentJSONValue } from 'comment-json'
 import { debug } from './utils'
-import type { CustomBlock, ResolvedOptions, RouteBlockLang } from './types'
+import type { CustomBlock, RouteBlockLang } from './types'
 
 export function parseCustomBlock(
   block: SFCBlock,

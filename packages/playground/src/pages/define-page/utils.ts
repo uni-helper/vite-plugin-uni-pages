@@ -1,4 +1,4 @@
 export interface HelloWorld {
-  hello: string;
-  world: string;
+  hello: string
+  world: string
 }

@@ -118,7 +118,7 @@ export async function tryPageMetaFromMacro(sfc: SFCDescriptor): Promise<UserPage
   return undefined
 }
 
-export async function tryPageMetaFromCustomBlock(sfc: SFCDescriptor, routeBlockLang: RouteBlockLang): Promise<UserPageMeta > {
+export async function tryPageMetaFromCustomBlock(sfc: SFCDescriptor, routeBlockLang: RouteBlockLang): Promise<UserPageMeta> {
   const block = getRouteSfcBlock(sfc)
 
   const routeBlock = getRouteBlock(sfc.filename, block, routeBlockLang)
