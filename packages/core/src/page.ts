@@ -147,8 +147,9 @@ export function findMacro(stmts: t.Statement[], filename: string): t.CallExpress
   if (!nodes.length)
     return
 
-  if (nodes.length > 1)
-    throw new Error(`duplicate definePage() call`)
+  if (nodes.length > 1) {
+    throw new Error(`每个文件只允许调用一次 definePage(): ${filename}`)
+  }
 
   // 仅第支持一个 definePage
   const macro = nodes[0]

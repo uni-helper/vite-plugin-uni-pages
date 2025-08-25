@@ -7,6 +7,7 @@ import { babelParse } from 'ast-kit'
 import MagicString from 'magic-string'
 import chokidar from 'chokidar'
 import type { CallExpression } from '@babel/types'
+import { lightYellow, link } from 'kolorist'
 import type { UserOptions } from './types'
 import { PageContext } from './context'
 import {
@@ -107,7 +108,7 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
         return null
 
       if (macro && routeBlock)
-        throw new Error(`mixed definePage() and <route/> is not allowed`)
+        throw new Error(`不支持混合使用 definePage() 和 <route/> `)
 
       const s = new MagicString(code)
       if (macro)
