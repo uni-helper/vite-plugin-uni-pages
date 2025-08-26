@@ -1,15 +1,15 @@
+import type { SFCDescriptor, SFCParseOptions } from '@vue/compiler-sfc'
+import type { PageContext } from './context'
+import type { PageMetaDatum, PagePath, RouteBlockLang, UserPageMeta } from './types'
 import { readFileSync } from 'node:fs'
 import { extname } from 'node:path'
-import { normalizePath } from 'vite'
-import { assign as cjAssign } from 'comment-json'
 import * as t from '@babel/types'
-import { babelParse, isCallOf } from 'ast-kit'
-import type { SFCDescriptor, SFCParseOptions } from '@vue/compiler-sfc'
 import { parse as VueParser } from '@vue/compiler-sfc'
-import { babelGenerate, debug, execScript } from './utils'
-import type { PageMetaDatum, PagePath, RouteBlockLang, UserPageMeta } from './types'
-import type { PageContext } from './context'
+import { babelParse, isCallOf } from 'ast-kit'
+import { assign as cjAssign } from 'comment-json'
+import { normalizePath } from 'vite'
 import { getRouteBlock, getRouteSfcBlock } from './customBlock'
+import { babelGenerate, debug, execScript } from './utils'
 
 export class Page {
   ctx: PageContext

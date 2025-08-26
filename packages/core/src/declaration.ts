@@ -1,9 +1,9 @@
+import type { PageContext } from './context'
 import { existsSync } from 'node:fs'
-import { dirname, join } from 'node:path'
 import { mkdir, readFile, writeFile as writeFile_ } from 'node:fs/promises'
 
+import { dirname, join } from 'node:path'
 import { normalizePath } from 'vite'
-import type { PageContext } from './context'
 
 export function getDeclaration(ctx: PageContext) {
   const subPagesPath = ctx.subPageMetaData.map((sub) => {

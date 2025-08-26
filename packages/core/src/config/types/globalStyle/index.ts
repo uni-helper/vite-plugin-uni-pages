@@ -1,14 +1,14 @@
 import type { AnimationType, HEXColor, ThemeVar } from '../common'
-import type { H5 } from './h5'
 import type { AppPlus } from './appPlus'
+import type { H5 } from './h5'
 import type { MpAlipay } from './mpAlipay'
-import type { MpWeixin } from './mpWeixin'
 import type { MpBaidu } from './mpBaidu'
-import type { MpToutiao } from './mpToutiao'
+import type { MpJd } from './mpJd'
+import type { MpKuaishou } from './mpKuaishou'
 import type { MpLark } from './mpLark'
 import type { MpQq } from './mpQq'
-import type { MpKuaishou } from './mpKuaishou'
-import type { MpJd } from './mpJd'
+import type { MpToutiao } from './mpToutiao'
+import type { MpWeixin } from './mpWeixin'
 
 export interface GlobalStyle {
   /**

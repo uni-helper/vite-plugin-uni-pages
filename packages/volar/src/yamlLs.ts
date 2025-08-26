@@ -1,5 +1,5 @@
-import { getLanguageService } from 'yaml-language-server'
 import type { ServiceContext } from '@volar/language-service'
+import { getLanguageService } from 'yaml-language-server'
 import { schema } from './schema'
 
 function noop(): undefined { }

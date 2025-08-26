@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
 import type { UserPagesConfig } from '../packages/core/src'
+import { describe, expect, it } from 'vitest'
 import { PageContext } from '../packages/core/src'
 
 const pagesGlobConfig: UserPagesConfig = {

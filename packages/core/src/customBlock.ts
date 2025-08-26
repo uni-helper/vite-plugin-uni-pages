@@ -1,11 +1,11 @@
-import JSON5 from 'json5'
-import { parse as YAMLParser } from 'yaml'
 import type { SFCBlock, SFCDescriptor } from '@vue/compiler-sfc'
+import type { CommentJSONValue } from 'comment-json'
+import type { CustomBlock, RouteBlockLang } from './types'
 
 import { parse as cjParse } from 'comment-json'
-import type { CommentJSONValue } from 'comment-json'
+import JSON5 from 'json5'
+import { parse as YAMLParser } from 'yaml'
 import { debug } from './utils'
-import type { CustomBlock, RouteBlockLang } from './types'
 
 export function parseCustomBlock(
   block: SFCBlock,

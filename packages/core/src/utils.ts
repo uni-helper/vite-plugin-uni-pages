@@ -1,13 +1,13 @@
-import vm from 'node:vm'
-import path from 'node:path'
-import { createRequire } from 'node:module'
-import Debug from 'debug'
 import type { ModuleNode, ViteDevServer } from 'vite'
+import type { PageMetaDatum } from './types'
+import { createRequire } from 'node:module'
+import path from 'node:path'
+import vm from 'node:vm'
+import babelGenerator from '@babel/generator'
+import Debug from 'debug'
 import groupBy from 'lodash.groupby'
 import * as ts from 'typescript'
-import babelGenerator from '@babel/generator'
 import { FILE_EXTENSIONS, RESOLVED_MODULE_ID_VIRTUAL } from './constant'
-import type { PageMetaDatum } from './types'
 
 export function invalidatePagesModule(server: ViteDevServer) {
   const { moduleGraph } = server

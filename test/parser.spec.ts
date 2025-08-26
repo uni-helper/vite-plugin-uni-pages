@@ -1,7 +1,7 @@
-import { resolve } from 'node:path'
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { resolve } from 'node:path'
 import { stringify as cjStringify } from 'comment-json'
+import { describe, expect, it } from 'vitest'
 import {
   getRouteBlock,
   getRouteSfcBlock,

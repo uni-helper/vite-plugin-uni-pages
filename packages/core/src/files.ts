@@ -1,10 +1,10 @@
-import fs from 'node:fs'
-import fg from 'fast-glob'
-import { stringify as cjStringify } from 'comment-json'
-import { extsToGlob } from './utils'
-
 import type { ResolvedOptions } from './types'
+import fs from 'node:fs'
+import { stringify as cjStringify } from 'comment-json'
+import fg from 'fast-glob'
+
 import { FILE_EXTENSIONS } from './constant'
+import { extsToGlob } from './utils'
 
 /**
  * Resolves the files that are valid pages for the given context.

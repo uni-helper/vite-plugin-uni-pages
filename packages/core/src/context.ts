@@ -1,28 +1,28 @@
-import path from 'node:path'
-import process from 'node:process'
 import type { FSWatcher } from 'chokidar'
 import type { Logger, ViteDevServer } from 'vite'
-import { loadConfig } from 'unconfig'
-import { slash } from '@antfu/utils'
-import dbg from 'debug'
-import { platform } from '@uni-helper/uni-env'
-import detectIndent from 'detect-indent'
-import detectNewline from 'detect-newline'
-import { stringify as cjStringify } from 'comment-json'
 import type { PagesConfig } from './config/types'
 import type { PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
-import { writeDeclaration } from './declaration'
+import path from 'node:path'
+import process from 'node:process'
+import { slash } from '@antfu/utils'
+import { platform } from '@uni-helper/uni-env'
+import { stringify as cjStringify } from 'comment-json'
+import dbg from 'debug'
+import detectIndent from 'detect-indent'
+import detectNewline from 'detect-newline'
+import { loadConfig } from 'unconfig'
+import { OUTPUT_NAME } from './constant'
 
+import { writeDeclaration } from './declaration'
+import { checkPagesJsonFile, getPageFiles, readFileSync, writeFileSync } from './files'
+import { resolveOptions } from './options'
+import { Page } from './page'
 import {
   debug,
   invalidatePagesModule,
   isTargetFile,
   mergePageMetaDataArray,
 } from './utils'
-import { resolveOptions } from './options'
-import { checkPagesJsonFile, getPageFiles, readFileSync, writeFileSync } from './files'
-import { OUTPUT_NAME } from './constant'
-import { Page } from './page'
 
 let lsatPagesJson = ''
 
@@ -318,9 +318,9 @@ export class PageContext {
     const pagesMap = new Map()
     const pages = this.withUniPlatform
       ? this.pageMetaData.filter(v => !/\..*$/.test(v.path) || v.path.includes(platform)).map((v) => {
-        v.path = v.path.replace(/\..*$/, '')
-        return v
-      })
+          v.path = v.path.replace(/\..*$/, '')
+          return v
+        })
       : this.pageMetaData
     pages.forEach(v => pagesMap.set(v.path, v))
     this.pageMetaData = [...pagesMap.values()]

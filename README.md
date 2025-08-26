@@ -5,7 +5,6 @@
 <a href="https://www.npmjs.com/package/@uni-helper/vite-plugin-uni-pages"><img src="https://img.shields.io/npm/dm/@uni-helper/vite-plugin-uni-pages?colorA=005947&colorB=eee&style=for-the-badge"></a>
 <a href="https://www.npmjs.com/package/@uni-helper/vite-plugin-uni-pages"><img src="https://img.shields.io/npm/v/@uni-helper/vite-plugin-uni-pages?colorA=005947&colorB=eee&style=for-the-badge"></a>
 
-
 在 Vite 驱动的 uni-app 上使用基于文件的路由系统。
 
 ## 安装
@@ -35,5 +34,3 @@ export default defineConfig({
 ## 感谢
 
 - [vite-plugin-pages](https://github.com/hannoeru/vite-plugin-pages.git)
-
-

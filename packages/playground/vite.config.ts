@@ -1,7 +1,7 @@
-import { defineConfig } from 'vite'
-import uni from '@dcloudio/vite-plugin-uni'
 import type { PagesConfig } from '@uni-helper/vite-plugin-uni-pages'
+import uni from '@dcloudio/vite-plugin-uni'
 import UniPages from '@uni-helper/vite-plugin-uni-pages'
+import { defineConfig } from 'vite'
 
 declare module 'vite' {
   interface UserConfig {

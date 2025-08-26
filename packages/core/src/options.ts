@@ -1,10 +1,10 @@
-import process from 'node:process'
+import type { LoadConfigSource } from 'unconfig'
+import type { PagesConfig } from './config'
+import type { ResolvedOptions, UserOptions } from './types'
 import { resolve } from 'node:path'
+import process from 'node:process'
 import { slash } from '@antfu/utils'
 import fg from 'fast-glob'
-import type { LoadConfigSource } from 'unconfig'
-import type { ResolvedOptions, UserOptions } from './types'
-import type { PagesConfig } from './config'
 
 export function resolveOptions(userOptions: UserOptions, viteRoot: string = process.cwd()): ResolvedOptions {
   const {

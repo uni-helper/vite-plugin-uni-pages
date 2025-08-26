@@ -1,10 +1,10 @@
 import type { Service } from '@volar/language-service'
-import type { LanguageService } from 'yaml-language-server'
 import type * as json from 'vscode-json-languageservice'
 import type { TextDocument } from 'vscode-languageserver-textdocument'
+import type { LanguageService } from 'yaml-language-server'
 import { createJsonLs } from './jsonLs'
-import { createYamlLs } from './yamlLs'
 import { isYaml } from './utils'
+import { createYamlLs } from './yamlLs'
 
 export interface Provide {
   'json/jsonDocument': (document: TextDocument) => json.JSONDocument | undefined

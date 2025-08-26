@@ -1,5 +1,5 @@
-import * as json from 'vscode-json-languageservice'
 import type { ServiceContext } from '@volar/language-service'
+import * as json from 'vscode-json-languageservice'
 import { schema } from './schema'
 
 export function createJsonLs(_context: ServiceContext) {

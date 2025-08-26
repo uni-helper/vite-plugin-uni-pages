@@ -1,5 +1,5 @@
-import type { LoadConfigSource } from 'unconfig'
 import type { CommentJSONValue } from 'comment-json'
+import type { LoadConfigSource } from 'unconfig'
 import type { GlobalStyle, PagesConfig } from './config'
 import type { PageContext } from './context'
 import type { debug } from './utils'

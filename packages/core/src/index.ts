@@ -1,34 +1,34 @@
-import path from 'node:path'
-import { spawn } from 'node:child_process'
-import process from 'node:process'
-import type { Plugin } from 'vite'
-import { createLogger } from 'vite'
-import { babelParse } from 'ast-kit'
-import MagicString from 'magic-string'
-import chokidar from 'chokidar'
 import type { CallExpression } from '@babel/types'
-import { bold, dim, lightYellow, link } from 'kolorist'
+import type { Plugin } from 'vite'
 import type { UserOptions } from './types'
-import { PageContext } from './context'
+import { spawn } from 'node:child_process'
+import path from 'node:path'
+import process from 'node:process'
+import { babelParse } from 'ast-kit'
+import chokidar from 'chokidar'
+import { bold, dim, lightYellow, link } from 'kolorist'
+import MagicString from 'magic-string'
+import { createLogger } from 'vite'
 import {
   FILE_EXTENSIONS,
   MODULE_ID_VIRTUAL,
   OUTPUT_NAME,
   RESOLVED_MODULE_ID_VIRTUAL,
 } from './constant'
+import { PageContext } from './context'
 import { checkPagesJsonFile } from './files'
 import { findMacro, parseSFC } from './page'
 
 export * from './config'
-export * from './types'
 export * from './constant'
 export * from './context'
-export * from './utils'
+export * from './customBlock'
 export * from './files'
 export * from './options'
-export * from './customBlock'
 export * from './page'
+export * from './types'
 export * from './uni-platform'
+export * from './utils'
 
 async function restart() {
   return new Promise((resolve) => {
