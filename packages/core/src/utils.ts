@@ -2,7 +2,6 @@ import type { ModuleNode, ViteDevServer } from 'vite'
 import type { PageMetaDatum } from './types'
 import { createRequire } from 'node:module'
 import path from 'node:path'
-import process from 'node:process'
 import vm from 'node:vm'
 import babelGenerator from '@babel/generator'
 import Debug from 'debug'
@@ -92,21 +91,7 @@ export async function execScript(imports: string[], code: string, filename: stri
       exports: {},
       __filename: filename,
       __dirname: dir,
-      require: (() => {
-        return (id: string) => {
-          if (process.env.VITEST && id === '@uni-helper/vite-plugin-uni-pages') {
-            const localPath = path.resolve(__dirname, '../dist/index.cjs')
-            // eslint-disable-next-line no-console
-            console.log(`REPLACE @uni-helper/vite-plugin-uni-pages WITH PATH: ${localPath}`)
-            // eslint-disable-next-line ts/no-require-imports
-            return require(localPath)
-          }
-
-          const requireFunc = createRequire(dir)
-
-          return requireFunc(id)
-        }
-      })(),
+      require: createRequire(dir),
       import: (id: string) => import(id),
     }
 
