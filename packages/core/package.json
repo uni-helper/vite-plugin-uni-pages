@@ -76,7 +76,7 @@
     "yaml": "^2.5.0"
   },
   "devDependencies": {
-    "@antfu/utils": "^0.7.10",
+    "@antfu/utils": "^9.0.0",
     "@types/babel__generator": "^7.27.0",
     "@types/debug": "^4.1.12",
     "@types/lodash.groupby": "^4.6.9",
