@@ -2,14 +2,13 @@ import path from 'node:path'
 import process from 'node:process'
 import type { FSWatcher } from 'chokidar'
 import type { Logger, ViteDevServer } from 'vite'
-import { normalizePath } from 'vite'
 import { loadConfig } from 'unconfig'
 import { slash } from '@antfu/utils'
 import dbg from 'debug'
 import { platform } from '@uni-helper/uni-env'
 import detectIndent from 'detect-indent'
 import detectNewline from 'detect-newline'
-import { assign as cjAssign, stringify as cjStringify } from 'comment-json'
+import { stringify as cjStringify } from 'comment-json'
 import type { PagesConfig } from './config/types'
 import type { PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
 import { writeDeclaration } from './declaration'
@@ -19,24 +18,22 @@ import {
   invalidatePagesModule,
   isTargetFile,
   mergePageMetaDataArray,
-  useCachedPages,
 } from './utils'
 import { resolveOptions } from './options'
 import { checkPagesJsonFile, getPageFiles, readFileSync, writeFileSync } from './files'
-import { getRouteBlock, getRouteSfcBlock } from './customBlock'
 import { OUTPUT_NAME } from './constant'
+import { Page } from './page'
 
 let lsatPagesJson = ''
 
-const { setCache, hasChanged } = useCachedPages()
 export class PageContext {
   private _server: ViteDevServer | undefined
 
   pagesGlobConfig: PagesConfig | undefined
   pagesConfigSourcePaths: string[] = []
 
-  pagesPath: PagePath[] = []
-  subPagesPath: Record<string, PagePath[]> = {}
+  pages = new Map<string, Page>() // abs path -> Page
+  subPages = new Map<string, Map<string, Page>>() // root -> abs path -> page
   pageMetaData: PageMetaDatum[] = []
   subPageMetaData: SubPageMetaDatum[] = []
 
@@ -89,18 +86,35 @@ export class PageContext {
       return { dir, files: getPagePaths(dir, this.options) }
     })
 
-    this.pagesPath = pageDirFiles.map(page => page.files).flat()
-    debug.pages(this.pagesPath)
+    const paths = pageDirFiles.map(page => page.files).flat()
+    debug.pages(paths)
+
+    const pages = new Map<string, Page>()
+    for (const path of paths) {
+      const page = this.pages.get(path.absolutePath) || new Page(this, path)
+      pages.set(path.absolutePath, page)
+    }
+
+    this.pages = pages
   }
 
   async scanSubPages() {
-    const subPagesPath: Record<string, PagePath[]> = {}
+    const paths: Record<string, PagePath[]> = {}
+    const subPages = new Map<string, Map<string, Page>>()
     for (const dir of this.options.subPackages) {
       const pagePaths = getPagePaths(dir, this.options)
-      subPagesPath[dir] = pagePaths
+      paths[dir] = pagePaths
+
+      const pages = new Map<string, Page>()
+      for (const path of pagePaths) {
+        const page = this.subPages.get(dir)?.get(path.absolutePath) || new Page(this, path)
+        pages.set(path.absolutePath, page)
+      }
+      subPages.set(dir, pages)
     }
-    this.subPagesPath = subPagesPath
-    debug.subPages(this.subPagesPath)
+    debug.subPages(JSON.stringify(paths, null, 2))
+
+    this.subPages = subPages
   }
 
   setupViteServer(server: ViteDevServer) {
@@ -177,23 +191,6 @@ export class PageContext {
     })
   }
 
-  async parsePage(page: PagePath): Promise<PageMetaDatum> {
-    const { relativePath, absolutePath } = page
-    const routeSfcBlock = await getRouteSfcBlock(absolutePath)
-    const routeBlock = await getRouteBlock(absolutePath, routeSfcBlock, this.options)
-    setCache(absolutePath, routeSfcBlock)
-    const relativePathWithFileName = relativePath.replace(path.extname(relativePath), '')
-    const pageMetaDatum: PageMetaDatum = {
-      path: normalizePath(relativePathWithFileName),
-      type: routeBlock?.attr.type ?? 'page',
-    }
-
-    if (routeBlock)
-      cjAssign(pageMetaDatum, routeBlock.content)
-
-    return pageMetaDatum
-  }
-
   /**
    * parse pages rules && set page type
    * @param pages page path array
@@ -201,8 +198,12 @@ export class PageContext {
    * @param overrides custom page config
    * @returns pages rules
    */
-  async parsePages(pages: PagePath[], type: 'main' | 'sub', overrides?: PageMetaDatum[]) {
-    const generatedPageMetaData = await Promise.all(pages.map(async page => await this.parsePage(page)))
+  async parsePages(pages: Map<string, Page>, type: 'main' | 'sub', overrides?: PageMetaDatum[]) {
+    const jobs: Promise<PageMetaDatum>[] = []
+    for (const [_, page] of pages) {
+      jobs.push(page.getPageMeta())
+    }
+    const generatedPageMetaData = await Promise.all(jobs)
     const customPageMetaData = overrides || []
 
     const result = customPageMetaData.length
@@ -245,7 +246,7 @@ export class PageContext {
   }
 
   async mergePageMetaData() {
-    const pageMetaData = await this.parsePages(this.pagesPath, 'main', this.pagesGlobConfig?.pages)
+    const pageMetaData = await this.parsePages(this.pages, 'main', this.pagesGlobConfig?.pages)
 
     this.pageMetaData = pageMetaData
     debug.pages(this.pageMetaData)
@@ -255,7 +256,7 @@ export class PageContext {
     const subPageMaps: Record<string, PageMetaDatum[]> = {}
     const subPackages = this.pagesGlobConfig?.subPackages || []
 
-    for (const [dir, pages] of Object.entries(this.subPagesPath)) {
+    for (const [dir, pages] of this.subPages) {
       const basePath = slash(path.join(this.options.root, this.options.outDir))
       const root = slash(path.relative(basePath, path.join(this.options.root, dir)))
 
@@ -280,7 +281,18 @@ export class PageContext {
 
   async updatePagesJSON(filepath?: string) {
     if (filepath) {
-      if (!await hasChanged(filepath)) {
+      let page = this.pages.get(filepath)
+      if (!page) {
+        let subPage: Page | undefined
+        for (const [_, pages] of this.subPages) {
+          subPage = pages.get(filepath)
+          if (subPage) {
+            break
+          }
+        }
+        page = subPage
+      }
+      if (page && !await page.hasChanged()) {
         debug.cache(`The route block on page ${filepath} did not send any changes, skipping`)
         return false
       }

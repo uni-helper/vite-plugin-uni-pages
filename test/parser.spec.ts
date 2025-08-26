@@ -1,9 +1,11 @@
 import { resolve } from 'node:path'
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { stringify as cjStringify } from 'comment-json'
 import {
   getRouteBlock,
   getRouteSfcBlock,
+  parseSFC,
   resolveOptions,
 } from '../packages/core/src/index'
 
@@ -15,8 +17,9 @@ const pagesYaml = 'packages/playground/src/pages/test-yaml.vue'
 describe('parser', () => {
   it('custom block', async () => {
     const path = resolve(pagesJson)
-    const str = await getRouteSfcBlock(path)
-    const routeBlock = await getRouteBlock(path, str, options)
+    const sfc = parseSFC(readFileSync(path, 'utf-8'), { filename: path })
+    const str = await getRouteSfcBlock(sfc)
+    const routeBlock = await getRouteBlock(path, str, options.routeBlockLang)
     expect(routeBlock).toMatchInlineSnapshot(`
       {
         "attr": {
@@ -37,8 +40,9 @@ describe('parser', () => {
 
   it('jsonc with comment', async () => {
     const path = resolve(pagesJsoncWithComment)
-    const str = await getRouteSfcBlock(path)
-    const routeBlock = await getRouteBlock(path, str, options)
+    const sfc = parseSFC(readFileSync(path, 'utf-8'), { filename: path })
+    const str = await getRouteSfcBlock(sfc)
+    const routeBlock = await getRouteBlock(path, str, options.routeBlockLang)
     expect(cjStringify(routeBlock, null, 2)).toMatchInlineSnapshot(`
       "{
         "attr": {
@@ -47,11 +51,11 @@ describe('parser', () => {
         },
         "content": {
           "style": {
-            // #ifdef APP
-            "navigationBarTitleText": "test jsonc page APP"
+            // #ifdef H5
+            "navigationBarTitleText": "test jsonc page H5"
             // #endif
           },
-          // #ifdef APP
+          // #ifdef H5
           "enablePullDownRefresh": true
           // #endif
         }
@@ -61,8 +65,9 @@ describe('parser', () => {
 
   it('yaml comment', async () => {
     const path = resolve(pagesYaml)
-    const str = await getRouteSfcBlock(path)
-    const routeBlock = await getRouteBlock(path, str, options)
+    const sfc = parseSFC(readFileSync(path, 'utf-8'), { filename: path })
+    const str = await getRouteSfcBlock(sfc)
+    const routeBlock = await getRouteBlock(path, str, options.routeBlockLang)
     expect(routeBlock).toMatchInlineSnapshot(`
       {
         "attr": {

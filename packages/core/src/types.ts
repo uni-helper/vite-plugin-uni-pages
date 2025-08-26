@@ -13,6 +13,8 @@ export type debugType = keyof typeof debug
 
 export type ConfigSource = string | LoadConfigSource<PagesConfig> | LoadConfigSource<PagesConfig>[]
 
+export type RouteBlockLang = 'json5' | 'jsonc' | 'json' | 'yaml' | 'yml'
+
 export interface Options {
 
   /**
@@ -69,7 +71,7 @@ export interface Options {
    * Set the default route block parser, or use `<route lang="xxx">` in SFC route block
    * @default 'json5'
    */
-  routeBlockLang: 'json5' | 'jsonc' | 'json' | 'yaml' | 'yml'
+  routeBlockLang: RouteBlockLang
 
   /**
    * minify the `pages.json`
@@ -141,3 +143,19 @@ export interface SubPageMetaDatum {
   root: string
   pages: PageMetaDatum[]
 }
+
+export interface UserPageMeta extends Partial<PageMetaDatum> {
+  /**
+   * 配置页面路径
+   * @deprecated 可选，将会根据文件路径自动生成
+   */
+  path?: string
+}
+
+export type MaybePromise<T> = T | Promise<T>
+export type MaybeCallable<T> = T | (() => T)
+export type MaybePromiseCallable<T> = T | (() => T) | (() => Promise<T>)
+
+export declare function definePage(options: MaybePromiseCallable<UserPageMeta>): void
+
+export type DefinePage = typeof definePage

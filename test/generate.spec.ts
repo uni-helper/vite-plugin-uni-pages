@@ -63,13 +63,11 @@ describe('generate routes', () => {
           "path": "../packages/playground/src/pages/test-jsonc-with-comment",
           "type": "page",
           "style": {
-            // #ifdef APP
-            "navigationBarTitleText": "test jsonc page APP"
+            // #ifdef H5
+            "navigationBarTitleText": "test jsonc page H5"
             // #endif
           },
-          // #ifdef APP
           "enablePullDownRefresh": true
-          // #endif
         },
         {
           "path": "../packages/playground/src/pages/test-yaml",
@@ -98,6 +96,70 @@ describe('generate routes', () => {
         {
           "path": "../packages/playground/src/pages/blog/post",
           "type": "page"
+        },
+        {
+          "path": "../packages/playground/src/pages/define-page/async-function",
+          "style": {
+            "navigationBarTitleText": "hello world"
+          },
+          "middlewares": [
+            "auth"
+          ]
+        },
+        {
+          "path": "../packages/playground/src/pages/define-page/conditional-compilation",
+          "style": {
+            "navigationBarTitleText": "hello world"
+          },
+          "middlewares": [
+            "auth"
+          ]
+        },
+        {
+          "path": "../packages/playground/src/pages/define-page/function",
+          "style": {
+            "navigationBarTitleText": "hello world"
+          },
+          "middlewares": [
+            "auth"
+          ]
+        },
+        {
+          "path": "../packages/playground/src/pages/define-page/nested-function",
+          "style": {
+            "navigationBarTitleText": "hello world"
+          },
+          "middlewares": [
+            "auth"
+          ]
+        },
+        {
+          "path": "../packages/playground/src/pages/define-page/object",
+          "style": {
+            "navigationBarTitleText": "hello world"
+          },
+          "middlewares": [
+            "auth"
+          ],
+          "tabbar": {}
+        },
+        {
+          "path": "../packages/playground/src/pages/define-page/option-api",
+          "style": {
+            "navigationBarTitleText": "Option API 内使用 definePage"
+          }
+        },
+        {
+          "path": "../packages/playground/src/pages/define-page/remove-console",
+          "style": {
+            "navigationBarTitleText": "this is a title"
+          }
+        },
+        {
+          "path": "../packages/playground/src/pages/define-page/yaml",
+          "style": {
+            "navigationBarTitleText": "yaml test"
+          }
         }
       ]"
     `)
@@ -155,13 +217,11 @@ describe('generate routes', () => {
           "path": "../packages/playground/src/pages/test-jsonc-with-comment",
           "type": "page",
           "style": {
-            // #ifdef APP
-            "navigationBarTitleText": "test jsonc page APP"
+            // #ifdef H5
+            "navigationBarTitleText": "test jsonc page H5"
             // #endif
           },
-          // #ifdef APP
           "enablePullDownRefresh": true
-          // #endif
         },
         {
           "path": "../packages/playground/src/pages/test-yaml",
@@ -192,6 +252,70 @@ describe('generate routes', () => {
           "path": "../packages/playground/src/pages/blog/post",
           "type": "page",
           "style": {}
+        },
+        {
+          "path": "../packages/playground/src/pages/define-page/async-function",
+          "style": {
+            "navigationBarTitleText": "hello world"
+          },
+          "middlewares": [
+            "auth"
+          ]
+        },
+        {
+          "path": "../packages/playground/src/pages/define-page/conditional-compilation",
+          "style": {
+            "navigationBarTitleText": "hello world"
+          },
+          "middlewares": [
+            "auth"
+          ]
+        },
+        {
+          "path": "../packages/playground/src/pages/define-page/function",
+          "style": {
+            "navigationBarTitleText": "hello world"
+          },
+          "middlewares": [
+            "auth"
+          ]
+        },
+        {
+          "path": "../packages/playground/src/pages/define-page/nested-function",
+          "style": {
+            "navigationBarTitleText": "hello world"
+          },
+          "middlewares": [
+            "auth"
+          ]
+        },
+        {
+          "path": "../packages/playground/src/pages/define-page/object",
+          "style": {
+            "navigationBarTitleText": "hello world"
+          },
+          "middlewares": [
+            "auth"
+          ],
+          "tabbar": {}
+        },
+        {
+          "path": "../packages/playground/src/pages/define-page/option-api",
+          "style": {
+            "navigationBarTitleText": "Option API 内使用 definePage"
+          }
+        },
+        {
+          "path": "../packages/playground/src/pages/define-page/remove-console",
+          "style": {
+            "navigationBarTitleText": "this is a title"
+          }
+        },
+        {
+          "path": "../packages/playground/src/pages/define-page/yaml",
+          "style": {
+            "navigationBarTitleText": "yaml test"
+          }
         }
       ]"
     `)

@@ -1,0 +1,33 @@
+{
+  // 使用 IntelliSense 了解相关属性。
+  // 悬停以查看现有属性的描述。
+  // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Uni App H5",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/packages/playground",
+      "preLaunchTask": "npm: debug - packages/core",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["run", "dev:h5"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "env": {
+        "NODE_ENV": "development"
+      }
+    },
+    {
+      "name": "Debug Uni App MP-Weixin",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/packages/playground",
+      "preLaunchTask": "npm: debug - packages/core",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["run", "dev:mp-weixin"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    }
+  ]
+}

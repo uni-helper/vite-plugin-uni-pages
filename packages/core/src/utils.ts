@@ -1,11 +1,13 @@
+import vm from 'node:vm'
+import path from 'node:path'
+import { createRequire } from 'node:module'
 import Debug from 'debug'
-import { type ModuleNode, type ViteDevServer, normalizePath } from 'vite'
+import type { ModuleNode, ViteDevServer } from 'vite'
 import groupBy from 'lodash.groupby'
-import type { SFCBlock } from '@vue/compiler-sfc'
-import { stringify as cjStringify } from 'comment-json'
+import * as ts from 'typescript'
+import babelGenerator from '@babel/generator'
 import { FILE_EXTENSIONS, RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import type { PageMetaDatum } from './types'
-import { getRouteSfcBlock } from './customBlock'
 
 export function invalidatePagesModule(server: ViteDevServer) {
   const { moduleGraph } = server
@@ -27,6 +29,7 @@ export const debug = {
   error: Debug('vite-plugin-uni-pages:error'),
   cache: Debug('vite-plugin-uni-pages:cache'),
   declaration: Debug('vite-plugin-uni-pages:declaration'),
+  definePage: Debug('vite-plugin-uni-pages:definePage'),
 }
 
 export function extsToGlob(extensions: string[]) {
@@ -58,29 +61,55 @@ export function mergePageMetaDataArray(pageMetaData: PageMetaDatum[]) {
   return result
 }
 
-export function useCachedPages() {
-  const pages = new Map<string, string>()
+/**
+ * 执行 TypeScript 代码字符串并返回其返回值
+ * @param code - TypeScript 代码字符串
+ * @returns 返回值
+ */
+export async function execScript(code: string, filename: string): Promise<any> {
+  // 编译 TypeScript 代码为 JavaScript
+  const jsCode = ts.transpileModule(code, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ESNext,
+    },
+  }).outputText
 
-  function parseData(block?: SFCBlock) {
-    return {
-      content: block?.loc.source.trim() ?? '',
-      attr: block?.attrs ?? '',
-    }
+  const dir = path.dirname(filename)
+
+  // 创建一个新的虚拟机上下文
+  const vmContext = {
+    require: createRequire(dir),
+    module: {},
+    exports: {},
+    __filename: filename,
+    __dirname: dir,
   }
 
-  function setCache(filePath: string, routeBlock?: SFCBlock) {
-    pages.set(filePath, cjStringify(parseData(routeBlock)))
+  // 使用 vm 模块执行 JavaScript 代码
+  const script = new vm.Script(jsCode)
+
+  try {
+    script.runInNewContext(vmContext)
+  }
+  catch (error: any) {
+    throw new Error(`${filename}: ${error.message}`)
   }
 
-  async function hasChanged(filePath: string, routeBlock?: SFCBlock) {
-    if (!routeBlock)
-      routeBlock = await getRouteSfcBlock(normalizePath(filePath))
+  // 获取导出的值
+  const result = (vmContext.exports as any).default || vmContext.exports
 
-    return !pages.has(filePath) || cjStringify(parseData(routeBlock)) !== pages.get(filePath)
+  // 如果是函数，执行函数并返回其返回值
+  if (typeof result === 'function') {
+    return Promise.resolve(result())
   }
 
-  return {
-    setCache,
-    hasChanged,
-  }
+  // 如果不是函数，返回结果
+  return Promise.resolve(result)
 }
+
+function getDefaultExport<T = any>(expr: T): T {
+  return (expr as any).default === undefined ? expr : (expr as any).default
+}
+
+export const babelGenerate = getDefaultExport(babelGenerator)
