@@ -62,7 +62,7 @@
     "@uni-helper/uni-env": "^0.1.4",
     "@vue/compiler-sfc": "3.4.21",
     "ast-kit": "^2.1.2",
-    "chokidar": "^3.6.0",
+    "chokidar": "^4.0.0",
     "comment-json": "^4.2.5",
     "debug": "^4.3.6",
     "detect-indent": "^6.1.0",
