@@ -71,8 +71,12 @@ export async function execScript(code: string, filename: string): Promise<any> {
   const jsCode = ts.transpileModule(code, {
     compilerOptions: {
       module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ESNext,
+      target: ts.ScriptTarget.ES2018, // 提高兼容性, 兼容 Node.js 10+
+      noEmit: true, // 不进行类型检查
+      strict: false, // 禁用严格模式
+      removeComments: true, // 移除注释
     },
+    jsDocParsingMode: ts.JSDocParsingMode.ParseNone, // 不解析 JSDoc
   }).outputText
 
   const dir = path.dirname(filename)
