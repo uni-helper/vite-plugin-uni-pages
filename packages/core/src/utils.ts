@@ -70,6 +70,11 @@ export function mergePageMetaDataArray(pageMetaData: PageMetaDatum[]) {
 export async function execScript(imports: string[], code: string, filename: string): Promise<any> {
   let jsCode: string = ''
   try {
+    if (process.env.VITEST) {
+      // eslint-disable-next-line no-console
+      console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VITEST !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+    }
+
     const tmpCode = `${imports.join('\n')}\n export default ${code}`
 
     // 编译 TypeScript 代码为 JavaScript
@@ -108,10 +113,7 @@ export async function execScript(imports: string[], code: string, filename: stri
     }
 
     // 使用 vm 模块执行 JavaScript 代码
-    const script = new vm.Script(jsCode, {
-      filename,
-      importModuleDynamically: vm.constants.USE_MAIN_CONTEXT_DEFAULT_LOADER,
-    })
+    const script = new vm.Script(jsCode, { filename })
 
     await script.runInNewContext(vmContext, {
       timeout: 1000, // 设置超时避免长时间运行
