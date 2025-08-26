@@ -7,7 +7,7 @@ import { babelParse } from 'ast-kit'
 import MagicString from 'magic-string'
 import chokidar from 'chokidar'
 import type { CallExpression } from '@babel/types'
-import { lightYellow, link } from 'kolorist'
+import { bold, dim, lightYellow, link } from 'kolorist'
 import type { UserOptions } from './types'
 import { PageContext } from './context'
 import {
@@ -108,13 +108,19 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
         return null
 
       if (macro && routeBlock)
-        throw new Error(`不支持混合使用 definePage() 和 <route/> `)
+        throw new Error(`不支持混合使用 definePage() 和 <route/> ${id}`)
 
       const s = new MagicString(code)
       if (macro)
         s.remove(macro.start!, macro.end!)
 
       if (routeBlock) {
+        // eslint-disable-next-line no-console
+        console.log(lightYellow('警告：'), `${bold('<route/>')} 标签已废弃，将在下一个版本中移除，请使用 definePage() 代替；${link('查看迁移指南', 'https://uni-helper.js.org/vite-plugin-uni-pages/definePage')}。`)
+        // eslint-disable-next-line no-console
+        console.log(dim(id))
+        // eslint-disable-next-line no-console
+        console.log()
         const routeBlockMatches = s.original.matchAll(
           /<route[^>]*>([\s\S]*?)<\/route>/g,
         )
