@@ -70,11 +70,6 @@ export function mergePageMetaDataArray(pageMetaData: PageMetaDatum[]) {
 export async function execScript(imports: string[], code: string, filename: string): Promise<any> {
   let jsCode: string = ''
   try {
-    if (process.env.VITEST) {
-      // eslint-disable-next-line no-console
-      console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VITEST !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-    }
-
     const tmpCode = `${imports.join('\n')}\n export default ${code}`
 
     // 编译 TypeScript 代码为 JavaScript
@@ -100,8 +95,11 @@ export async function execScript(imports: string[], code: string, filename: stri
       require: (() => {
         return (id: string) => {
           if (process.env.VITEST && id === '@uni-helper/vite-plugin-uni-pages') {
+            const localPath = path.resolve(__dirname, '..')
+            // eslint-disable-next-line no-console
+            console.log(`REPLACE @uni-helper/vite-plugin-uni-pages WITH PATH: ${localPath}`)
             // eslint-disable-next-line ts/no-require-imports
-            return require(path.resolve(__dirname, '..'))
+            return require(localPath)
           }
 
           const requireFunc = createRequire(dir)
