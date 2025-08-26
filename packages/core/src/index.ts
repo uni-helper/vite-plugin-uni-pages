@@ -4,11 +4,11 @@ import type { UserOptions } from './types'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 import process from 'node:process'
-import { babelParse } from 'ast-kit'
 import chokidar from 'chokidar'
 import { bold, dim, lightYellow, link } from 'kolorist'
 import MagicString from 'magic-string'
 import { createLogger } from 'vite'
+import { babelParse } from './ast-kit'
 import {
   FILE_EXTENSIONS,
   MODULE_ID_VIRTUAL,

@@ -58,10 +58,10 @@
   },
   "dependencies": {
     "@babel/generator": "^7.28.3",
+    "@babel/parser": "^7.28.3",
     "@babel/types": "^7.28.2",
     "@uni-helper/uni-env": "^0.1.4",
     "@vue/compiler-sfc": "3.4.21",
-    "ast-kit": "^2.1.2",
     "chokidar": "^3.6.0",
     "comment-json": "^4.2.5",
     "debug": "^4.3.6",
