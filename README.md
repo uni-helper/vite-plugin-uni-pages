@@ -5,21 +5,9 @@
 <a href="https://www.npmjs.com/package/@uni-helper/vite-plugin-uni-pages"><img src="https://img.shields.io/npm/dm/@uni-helper/vite-plugin-uni-pages?colorA=005947&colorB=fafafa&style=for-the-badge"></a>
 <a href="https://www.npmjs.com/package/@uni-helper/vite-plugin-uni-pages"><img src="https://img.shields.io/npm/v/@uni-helper/vite-plugin-uni-pages?colorA=005947&colorB=fafafa&style=for-the-badge"></a>
 
-***
 
 在 Vite 驱动的 uni-app 上使用基于文件的路由系统。
 
-## Packages
-
-- [vite-plugin-uni-pages](./packages/core/)
-
-  核心，提供基于文件的路由系统
-- [volar-service-uni-pages](./packages/volar/)
-
-  为 `<route>` 块 提供 IntelliSense
-- [pages-json-schema](./packages/schema/)
-
-  为 uni-app 的 `pages.json` 提供 schema
 
 ## 安装
 
@@ -166,6 +154,18 @@ export interface Options {
   onAfterWriteFile: (ctx: PageContext) => void
 }
 ```
+
+## Packages
+
+- [vite-plugin-uni-pages](./packages/core/)
+
+  核心，提供基于文件的路由系统
+- [volar-service-uni-pages](./packages/volar/)
+
+  为 `<route>` 块 提供 IntelliSense
+- [pages-json-schema](./packages/schema/)
+
+  为 uni-app 的 `pages.json` 提供 schema
 
 ## 感谢
 
