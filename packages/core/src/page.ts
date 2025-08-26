@@ -109,7 +109,7 @@ export async function tryPageMetaFromMacro(sfc: SFCDescriptor): Promise<UserPage
     const [macroOption] = macro.arguments
     const code = babelGenerate(macroOption).code
     let script = ''
-    const importScript = imports.join('')
+    const importScript = imports.join('\n')
     script += importScript
     script += `export default ${code}`
 

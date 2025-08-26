@@ -70,46 +70,65 @@ export async function execScript(code: string, filename: string): Promise<any> {
   // 编译 TypeScript 代码为 JavaScript
   const jsCode = ts.transpileModule(code, {
     compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2018, // 提高兼容性, 兼容 Node.js 10+
-      noEmit: true, // 不进行类型检查
-      strict: false, // 禁用严格模式
-      removeComments: true, // 移除注释
+      module: ts.ModuleKind.ESNext, // 改为 ESNext 以支持动态导入
+      target: ts.ScriptTarget.ES2018,
+      noEmit: true,
+      strict: false,
+      removeComments: true,
     },
-    jsDocParsingMode: ts.JSDocParsingMode.ParseNone, // 不解析 JSDoc
+    jsDocParsingMode: ts.JSDocParsingMode.ParseNone,
   }).outputText
 
   const dir = path.dirname(filename)
 
-  // 创建一个新的虚拟机上下文
+  // 创建一个新的虚拟机上下文，支持动态导入
   const vmContext = {
-    require: createRequire(dir),
-    module: {},
+    module: {
+      _compile: (code: string, _filename: string) => {
+        return new vm.Script(code).runInThisContext()
+      },
+    },
     exports: {},
     __filename: filename,
     __dirname: dir,
+    require: createRequire(dir),
+    // 提供一个 import 函数用于动态导入
+    import: (id: string) => import(id),
   }
 
-  // 使用 vm 模块执行 JavaScript 代码
-  const script = new vm.Script(jsCode)
+  // 包装代码以支持 ES 模块格式
+  const wrappedCode = `
+    (async () => {
+      const module = { exports: {} };
+      const exports = module.exports;
+      const __dirname = "${dir.replace(/\\/g, '\\\\')}";
+      const __filename = "${filename.replace(/\\/g, '\\\\')}";
+      
+      ${jsCode.replace(/require\(/g, 'await import(')}
+      
+      return module.exports;
+    })()
+  `
 
   try {
-    script.runInNewContext(vmContext)
+    const script = new vm.Script(wrappedCode, {
+      filename,
+    })
+
+    const result = await script.runInNewContext(vmContext, {
+      timeout: 1000, // 设置超时避免长时间运行
+    })
+
+    // 如果导出的是函数，执行它
+    if (typeof result === 'function') {
+      return Promise.resolve(result())
+    }
+
+    return Promise.resolve(result)
   }
   catch (error: any) {
     throw new Error(`${filename}: ${error.message}`)
   }
-
-  // 获取导出的值
-  const result = (vmContext.exports as any).default || vmContext.exports
-
-  // 如果是函数，执行函数并返回其返回值
-  if (typeof result === 'function') {
-    return Promise.resolve(result())
-  }
-
-  // 如果不是函数，返回结果
-  return Promise.resolve(result)
 }
 
 function getDefaultExport<T = any>(expr: T): T {
