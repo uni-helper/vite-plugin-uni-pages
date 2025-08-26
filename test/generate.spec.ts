@@ -63,13 +63,11 @@ describe('generate routes', () => {
           "path": "../packages/playground/src/pages/test-jsonc-with-comment",
           "type": "page",
           "style": {
-            // #ifdef APP
-            "navigationBarTitleText": "test jsonc page APP"
+            // #ifdef H5
+            "navigationBarTitleText": "test jsonc page H5"
             // #endif
           },
-          // #ifdef APP
           "enablePullDownRefresh": true
-          // #endif
         },
         {
           "path": "../packages/playground/src/pages/test-yaml",
@@ -219,13 +217,11 @@ describe('generate routes', () => {
           "path": "../packages/playground/src/pages/test-jsonc-with-comment",
           "type": "page",
           "style": {
-            // #ifdef APP
-            "navigationBarTitleText": "test jsonc page APP"
+            // #ifdef H5
+            "navigationBarTitleText": "test jsonc page H5"
             // #endif
           },
-          // #ifdef APP
           "enablePullDownRefresh": true
-          // #endif
         },
         {
           "path": "../packages/playground/src/pages/test-yaml",

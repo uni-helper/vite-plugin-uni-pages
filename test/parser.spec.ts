@@ -51,11 +51,11 @@ describe('parser', () => {
         },
         "content": {
           "style": {
-            // #ifdef APP
-            "navigationBarTitleText": "test jsonc page APP"
+            // #ifdef H5
+            "navigationBarTitleText": "test jsonc page H5"
             // #endif
           },
-          // #ifdef APP
+          // #ifdef H5
           "enablePullDownRefresh": true
           // #endif
         }
