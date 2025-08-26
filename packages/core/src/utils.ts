@@ -76,7 +76,7 @@ export async function execScript(imports: string[], code: string, filename: stri
     jsCode = ts.transpileModule(tmpCode, {
       compilerOptions: {
         module: ts.ModuleKind.CommonJS,
-        target: ts.ScriptTarget.ES2018,
+        target: ts.ScriptTarget.ESNext,
         noEmit: true,
         strict: false,
         removeComments: true,
@@ -95,7 +95,7 @@ export async function execScript(imports: string[], code: string, filename: stri
       require: (() => {
         return (id: string) => {
           if (process.env.VITEST && id === '@uni-helper/vite-plugin-uni-pages') {
-            const localPath = path.resolve(__dirname, '..')
+            const localPath = path.resolve(__dirname, '../dist/index.cjs')
             // eslint-disable-next-line no-console
             console.log(`REPLACE @uni-helper/vite-plugin-uni-pages WITH PATH: ${localPath}`)
             // eslint-disable-next-line ts/no-require-imports

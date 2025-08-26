@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "es2018",
     "lib": ["ESNext"],
-    "module": "ESNext",
+    "module": "commonjs",
     "moduleResolution": "Bundler",
     "paths": {
       "@uni-helper/vite-plugin-uni-pages": ["./packages/core/src/index.ts"]
