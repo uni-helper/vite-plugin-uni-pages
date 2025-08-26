@@ -6,6 +6,9 @@
     "useDefineForClassFields": true,
     "module": "esnext",
     "moduleResolution": "node",
+    "paths": {
+      "@uni-helper/vite-plugin-uni-pages": ["./packages/core/src/index.ts"]
+    },
     "resolveJsonModule": true,
     "types": ["@dcloudio/types", "@uni-helper/vite-plugin-uni-pages"],
     "strict": true,

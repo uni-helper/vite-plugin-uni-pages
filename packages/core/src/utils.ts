@@ -66,68 +66,53 @@ export function mergePageMetaDataArray(pageMetaData: PageMetaDatum[]) {
  * @param code - TypeScript 代码字符串
  * @returns 返回值
  */
-export async function execScript(code: string, filename: string): Promise<any> {
-  // 编译 TypeScript 代码为 JavaScript
-  const jsCode = ts.transpileModule(code, {
-    compilerOptions: {
-      module: ts.ModuleKind.ESNext, // 改为 ESNext 以支持动态导入
-      target: ts.ScriptTarget.ES2018,
-      noEmit: true,
-      strict: false,
-      removeComments: true,
-    },
-    jsDocParsingMode: ts.JSDocParsingMode.ParseNone,
-  }).outputText
-
-  const dir = path.dirname(filename)
-
-  // 创建一个新的虚拟机上下文，支持动态导入
-  const vmContext = {
-    module: {
-      _compile: (code: string, _filename: string) => {
-        return new vm.Script(code).runInThisContext()
-      },
-    },
-    exports: {},
-    __filename: filename,
-    __dirname: dir,
-    require: createRequire(dir),
-    // 提供一个 import 函数用于动态导入
-    import: (id: string) => import(id),
-  }
-
-  // 包装代码以支持 ES 模块格式
-  const wrappedCode = `
-    (async () => {
-      const module = { exports: {} };
-      const exports = module.exports;
-      const __dirname = "${dir.replace(/\\/g, '\\\\')}";
-      const __filename = "${filename.replace(/\\/g, '\\\\')}";
-      
-      ${jsCode.replace(/require\(/g, 'await import(')}
-      
-      return module.exports;
-    })()
-  `
-
+export async function execScript(imports: string[], code: string, filename: string): Promise<any> {
   try {
-    const script = new vm.Script(wrappedCode, {
-      filename,
-    })
+    const tmpCode = `${imports.join('\n')}\nexport default ${code}`
 
-    const result = await script.runInNewContext(vmContext, {
+    // 编译 TypeScript 代码为 JavaScript
+    const jsCode = ts.transpileModule(tmpCode, {
+      compilerOptions: {
+        module: ts.ModuleKind.CommonJS, // 改为 ESNext 以支持动态导入
+        target: ts.ScriptTarget.ES2018,
+        noEmit: true,
+        strict: false,
+        removeComments: true,
+      },
+      jsDocParsingMode: ts.JSDocParsingMode.ParseNone, // 不解析 JSDoc
+    }).outputText
+
+    const dir = path.dirname(filename)
+
+    // 创建一个新的虚拟机上下文，支持动态导入
+    const vmContext = {
+      module: {},
+      exports: {},
+      __filename: filename,
+      __dirname: dir,
+      require: createRequire(dir),
+    }
+
+    // 使用 vm 模块执行 JavaScript 代码
+    const script = new vm.Script(jsCode, { filename })
+
+    await script.runInNewContext(vmContext, {
       timeout: 1000, // 设置超时避免长时间运行
     })
 
-    // 如果导出的是函数，执行它
+    // 获取导出的值
+    const result = (vmContext.exports as any).default || vmContext.exports
+
+    // 如果是函数，执行函数并返回其返回值
     if (typeof result === 'function') {
       return Promise.resolve(result())
     }
 
+    // 如果不是函数，返回结果
     return Promise.resolve(result)
   }
   catch (error: any) {
-    throw new Error(`${filename}: ${error.message}`)
+    throw new Error(`EXEC SCRIPT FAIL IN ${filename}: ${error.message}`)
   }
 }
 
