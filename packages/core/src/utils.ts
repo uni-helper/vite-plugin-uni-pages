@@ -2,6 +2,7 @@ import type { ModuleNode, ViteDevServer } from 'vite'
 import type { PageMetaDatum } from './types'
 import { createRequire } from 'node:module'
 import path from 'node:path'
+import process from 'node:process'
 import vm from 'node:vm'
 import babelGenerator from '@babel/generator'
 import Debug from 'debug'
@@ -67,13 +68,14 @@ export function mergePageMetaDataArray(pageMetaData: PageMetaDatum[]) {
  * @returns 返回值
  */
 export async function execScript(imports: string[], code: string, filename: string): Promise<any> {
+  let jsCode: string = ''
   try {
-    const tmpCode = `${imports.join('\n')}\nexport default ${code}`
+    const tmpCode = `${imports.join('\n')}\n export default ${code}`
 
     // 编译 TypeScript 代码为 JavaScript
-    const jsCode = ts.transpileModule(tmpCode, {
+    jsCode = ts.transpileModule(tmpCode, {
       compilerOptions: {
-        module: ts.ModuleKind.CommonJS, // 改为 ESNext 以支持动态导入
+        module: ts.ModuleKind.CommonJS,
         target: ts.ScriptTarget.ES2018,
         noEmit: true,
         strict: false,
@@ -90,11 +92,26 @@ export async function execScript(imports: string[], code: string, filename: stri
       exports: {},
       __filename: filename,
       __dirname: dir,
-      require: createRequire(dir),
+      require: (() => {
+        return (id: string) => {
+          if (process.env.VITEST && id === '@uni-helper/vite-plugin-uni-pages') {
+            // eslint-disable-next-line ts/no-require-imports
+            return require(path.resolve(__dirname, '..'))
+          }
+
+          const requireFunc = createRequire(dir)
+
+          return requireFunc(id)
+        }
+      })(),
+      import: (id: string) => import(id),
     }
 
     // 使用 vm 模块执行 JavaScript 代码
-    const script = new vm.Script(jsCode, { filename })
+    const script = new vm.Script(jsCode, {
+      filename,
+      importModuleDynamically: vm.constants.USE_MAIN_CONTEXT_DEFAULT_LOADER,
+    })
 
     await script.runInNewContext(vmContext, {
       timeout: 1000, // 设置超时避免长时间运行
@@ -112,7 +129,7 @@ export async function execScript(imports: string[], code: string, filename: stri
     return Promise.resolve(result)
   }
   catch (error: any) {
-    throw new Error(`EXEC SCRIPT FAIL IN ${filename}: ${error.message}`)
+    throw new Error(`EXEC SCRIPT FAIL IN ${filename}: ${error.message} \n\n${jsCode}\n\n`)
   }
 }
 

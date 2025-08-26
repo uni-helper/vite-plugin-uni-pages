@@ -11,8 +11,8 @@ import dbg from 'debug'
 import detectIndent from 'detect-indent'
 import detectNewline from 'detect-newline'
 import { loadConfig } from 'unconfig'
-import { OUTPUT_NAME } from './constant'
 
+import { OUTPUT_NAME } from './constant'
 import { writeDeclaration } from './declaration'
 import { checkPagesJsonFile, getPageFiles, readFileSync, writeFileSync } from './files'
 import { resolveOptions } from './options'
@@ -276,7 +276,7 @@ export class PageContext {
       .filter(meta => meta.pages.length > 0)
 
     this.subPageMetaData = subPageMetaData
-    debug.subPages(this.subPageMetaData)
+    debug.subPages(JSON.stringify(this.subPageMetaData, null, 2))
   }
 
   async updatePagesJSON(filepath?: string) {
