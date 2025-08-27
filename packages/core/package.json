@@ -72,6 +72,7 @@
     "kolorist": "^1.8.0",
     "lodash.groupby": "^4.6.0",
     "magic-string": "^0.30.11",
+    "typescript": "link:typescript",
     "unconfig": "^7.3.2",
     "yaml": "^2.5.0"
   },
