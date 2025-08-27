@@ -86,7 +86,7 @@ export async function execScript(options: { imports: string[], code: string, fil
         noEmit: true, // 不生成输出文件
         strict: false, // 关闭所有严格类型检查选项
         noImplicitAny: false, // 允许表达式和 any 类型
-        strictNullChecks: false, // 关闭严格的 null 和 undefined 检声明隐式地具有查
+        strictNullChecks: false, // 关闭严格的 null 和 undefined 检查
         strictFunctionTypes: false, // 关闭函数参数的严格逆变比较
         strictBindCallApply: false, // 关闭对 bind、call 和 apply 方法的严格类型检查
         strictPropertyInitialization: false, // 关闭类属性初始化的严格检查
