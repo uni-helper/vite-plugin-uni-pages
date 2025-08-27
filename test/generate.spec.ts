@@ -99,6 +99,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../packages/playground/src/pages/define-page/async-function",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -108,6 +109,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../packages/playground/src/pages/define-page/conditional-compilation",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -117,6 +119,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../packages/playground/src/pages/define-page/function",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -126,6 +129,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../packages/playground/src/pages/define-page/nested-function",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -135,6 +139,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../packages/playground/src/pages/define-page/object",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -145,18 +150,21 @@ describe('generate routes', () => {
         },
         {
           "path": "../packages/playground/src/pages/define-page/option-api",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "Option API 内使用 definePage"
           }
         },
         {
           "path": "../packages/playground/src/pages/define-page/remove-console",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "this is a title"
           }
         },
         {
           "path": "../packages/playground/src/pages/define-page/yaml",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "yaml test"
           }
@@ -255,6 +263,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../packages/playground/src/pages/define-page/async-function",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -264,6 +273,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../packages/playground/src/pages/define-page/conditional-compilation",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -273,6 +283,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../packages/playground/src/pages/define-page/function",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -282,6 +293,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../packages/playground/src/pages/define-page/nested-function",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -291,6 +303,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../packages/playground/src/pages/define-page/object",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -301,18 +314,21 @@ describe('generate routes', () => {
         },
         {
           "path": "../packages/playground/src/pages/define-page/option-api",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "Option API 内使用 definePage"
           }
         },
         {
           "path": "../packages/playground/src/pages/define-page/remove-console",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "this is a title"
           }
         },
         {
           "path": "../packages/playground/src/pages/define-page/yaml",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "yaml test"
           }

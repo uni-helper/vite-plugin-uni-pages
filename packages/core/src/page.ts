@@ -113,7 +113,10 @@ export async function tryPageMetaFromMacro(sfc: SFCDescriptor): Promise<UserPage
       code,
       filename: sfc.filename,
     })
-    return result as UserPageMeta
+    return {
+      type: 'page',
+      ...result,
+    }
   }
   return undefined
 }
