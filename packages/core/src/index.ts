@@ -27,7 +27,6 @@ export * from './files'
 export * from './options'
 export * from './page'
 export * from './types'
-export * from './uni-platform'
 export * from './utils'
 
 async function restart() {

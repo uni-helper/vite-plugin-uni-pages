@@ -126,6 +126,9 @@ importers:
       '@dcloudio/uni-mp-weixin':
         specifier: 3.0.0-4070520250711001
         version: 3.0.0-4070520250711001(postcss@8.5.6)(rollup@4.45.1)(vue@3.4.38(typescript@5.8.3))
+      '@uni-helper/uni-env':
+        specifier: ^0.1.4
+        version: 0.1.4
       vue:
         specifier: ^3.4.21
         version: 3.4.38(typescript@5.8.3)

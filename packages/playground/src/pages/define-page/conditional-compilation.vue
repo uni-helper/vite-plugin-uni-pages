@@ -1,14 +1,15 @@
 <script lang="ts" setup>
-import { currentUniPlatform, UniPlatform } from '@uni-helper/vite-plugin-uni-pages';
-
+import { isMpAlipay, isH5 } from '@uni-helper/uni-env'
 
 definePage(() => {
     let title = 'hello world';
 
-
     // 条件编译
-    if (currentUniPlatform(UniPlatform.MpAlipay)) {
+    if (isMpAlipay) {
         title += ': MP Alipay';
+    }
+    if (isH5) {
+        title += ': H5';
     }
 
     return {
