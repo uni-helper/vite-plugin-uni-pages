@@ -6,6 +6,8 @@ declare module 'virtual:uni-pages' {
   export const subPackages: SubPackage[]
 }
 
-declare namespace globalThis {
-  export const definePage: import('.').DefinePage
+declare global {
+  const definePage: import('.').DefinePage
 }
+
+export {}
