@@ -138,31 +138,28 @@ export async function tryPageMetaFromCustomBlock(sfc: SFCDescriptor, routeBlockL
 }
 
 export function findMacro(stmts: t.Statement[], filename: string): t.CallExpression | undefined {
-  const nodes = stmts
-    .map((raw: t.Node) => {
-      let node = raw
-      if (raw.type === 'ExpressionStatement')
-        node = raw.expression
-      return isCallOf(node, 'definePage') ? node : undefined
-    })
-    .filter((node): node is t.CallExpression => !!node)
+  let macro: t.CallExpression | undefined
 
-  if (!nodes.length)
-    return
+  for (const stmt of stmts) {
+    let node: t.Node = stmt
+    if (stmt.type === 'ExpressionStatement')
+      node = stmt.expression
 
-  if (nodes.length > 1) {
-    throw new Error(`每个文件只允许调用一次 definePage(): ${filename}`)
+    if (isCallOf(node, 'definePage')) {
+      macro = node
+      break
+    }
   }
 
-  // 仅第支持一个 definePage
-  const macro = nodes[0]
+  if (!macro)
+    return
 
   // 提取 macro function 内的第一个参数
   const [opt] = macro.arguments
 
   // 检查 macro 的参数是否正确
   if (opt && !t.isFunctionExpression(opt) && !t.isArrowFunctionExpression(opt) && !t.isObjectExpression(opt)) {
-    debug.definePage(`definePage() only accept argument in function or object: ${filename}`)
+    debug.definePage(`definePage() 参数仅支持函数或对象: ${filename}`)
     return
   }
 
