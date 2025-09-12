@@ -55,7 +55,7 @@ export class Page {
 
     return {
       ...tabBar,
-      pagePath: tabBar.pathPath || this.uri,
+      pagePath: tabBar.pagePath || this.uri,
       index: tabBar.index || 0,
     }
   }
