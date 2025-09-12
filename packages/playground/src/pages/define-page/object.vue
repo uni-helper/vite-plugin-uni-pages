@@ -6,7 +6,7 @@ definePage({
   middlewares: [
     'auth',
   ],
-  tabbar: {},
+  tabBar: {},
 });
 </script>
 

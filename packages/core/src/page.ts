@@ -1,4 +1,5 @@
 import type { SFCDescriptor, SFCParseOptions } from '@vue/compiler-sfc'
+import type { TabBarItem } from './config'
 import type { PageContext } from './context'
 import type { PageMetaDatum, PagePath, RouteBlockLang, UserPageMeta } from './types'
 import { readFileSync } from 'node:fs'
@@ -15,60 +16,76 @@ export class Page {
   ctx: PageContext
 
   path: PagePath
+  uri: string
 
-  private rawOptions: string = ''
-  private options: PageMetaDatum | undefined
+  changed: boolean = true
+
+  private raw: string = ''
+  private meta: UserPageMeta | undefined
 
   constructor(ctx: PageContext, path: PagePath) {
     this.ctx = ctx
     this.path = path
+    this.uri = normalizePath(path.relativePath.replace(extname(path.relativePath), ''))
   }
 
-  public async getPageMeta(forceUpdate = false) {
-    if (forceUpdate || !this.options) {
-      await this.readPageMeta()
+  public async getPageMeta(forceUpdate = false): Promise<PageMetaDatum> {
+    if (forceUpdate || !this.meta) {
+      await this.read()
     }
-    return this.options!
+
+    const { path, tabBar: _, ...others } = this.meta!
+
+    return {
+      path: path ?? this.uri,
+      ...others,
+    }
+  }
+
+  public async getTabBar(forceUpdate = false): Promise<TabBarItem & { index: number } | undefined> {
+    if (forceUpdate || !this.meta) {
+      await this.read()
+    }
+
+    const { tabBar } = this.meta!
+
+    if (tabBar === undefined) {
+      return undefined
+    }
+
+    return {
+      ...tabBar,
+      pagePath: tabBar.pathPath || this.uri,
+      index: tabBar.index || 0,
+    }
   }
 
   public async hasChanged() {
-    const { hasChanged } = await this.readPageMeta()
-    return hasChanged
+    return this.changed
   }
 
-  public async readPageMeta() {
-    try {
-      const { relativePath } = this.path
-
-      const { path, ...others } = await this.readPageMetaFromFile()
-      this.options = {
-        path: path ?? normalizePath(relativePath.replace(extname(relativePath), '')),
-        ...others,
-      }
-
-      const raw = (this.options ? JSON.stringify(this.options) : '')
-      const hasChanged = this.rawOptions !== raw
-      this.rawOptions = raw
-      return {
-        options: this.options,
-        hasChanged,
-      }
-    }
-    catch (err: any) {
-      throw new Error(`Read page options fail in ${this.path.relativePath}\n${err.message}`)
-    }
+  public async read() {
+    this.meta = await this.readPageMetaFromFile()
+    const raw = (this.meta ? JSON.stringify(this.meta) : '')
+    this.changed = this.raw !== raw
+    this.raw = raw
   }
 
   private async readPageMetaFromFile(): Promise<UserPageMeta> {
-    const content = readFileSync(this.path.absolutePath, 'utf-8')
-    const sfc = parseSFC(content, { filename: this.path.absolutePath })
+    try {
+      const content = readFileSync(this.path.absolutePath, 'utf-8')
+      const sfc = parseSFC(content, { filename: this.path.absolutePath })
 
-    const meta = await tryPageMetaFromMacro(sfc)
-    if (meta) {
-      return meta
+      const meta = await tryPageMetaFromMacro(sfc)
+      if (meta) {
+        return meta
+      }
+
+      return tryPageMetaFromCustomBlock(sfc, this.ctx.options.routeBlockLang)
     }
-
-    return tryPageMetaFromCustomBlock(sfc, this.ctx.options.routeBlockLang)
+    catch (err: any) {
+      throw new Error(`Read page meta fail in ${this.path.relativePath}\n${err.message}`)
+    }
   }
 }
 

@@ -145,8 +145,7 @@ describe('generate routes', () => {
           },
           "middlewares": [
             "auth"
-          ],
-          "tabbar": {}
+          ]
         },
         {
           "path": "../packages/playground/src/pages/define-page/option-api",
@@ -309,8 +308,7 @@ describe('generate routes', () => {
           },
           "middlewares": [
             "auth"
-          ],
-          "tabbar": {}
+          ]
         },
         {
           "path": "../packages/playground/src/pages/define-page/option-api",

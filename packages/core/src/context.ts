@@ -1,5 +1,6 @@
 import type { FSWatcher } from 'chokidar'
 import type { Logger, ViteDevServer } from 'vite'
+import type { TabBar, TabBarItem } from './config'
 import type { PagesConfig } from './config/types'
 import type { PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
 import path from 'node:path'
@@ -11,8 +12,8 @@ import dbg from 'debug'
 import detectIndent from 'detect-indent'
 import detectNewline from 'detect-newline'
 import { loadConfig } from 'unconfig'
-import { OUTPUT_NAME } from './constant'
 
+import { OUTPUT_NAME } from './constant'
 import { writeDeclaration } from './declaration'
 import { checkPagesJsonFile, getPageFiles, readFileSync, writeFileSync } from './files'
 import { resolveOptions } from './options'
@@ -279,6 +280,30 @@ export class PageContext {
     debug.subPages(this.subPageMetaData)
   }
 
+  private async getTabBarMerged(): Promise<TabBar> {
+    const tabBar = {
+      ...this.pagesGlobConfig?.tabBar,
+      list: this.pagesGlobConfig?.tabBar?.list || [],
+    }
+
+    const tabBarItems: (TabBarItem & { index: number })[] = []
+    for (const [_, page] of this.pages) {
+      const tabbar = await page.getTabBar()
+      if (tabbar) {
+        tabBarItems.push(tabbar)
+      }
+    }
+    const newTabbarItems = tabBarItems.sort((a, b) => a.index - b.index)
+      .filter(tabbar => tabBar.list.findIndex(item => item.pagePath === tabbar.pagePath) === -1)
+      .map((tabbar) => {
+        const { index: _, ...others } = tabbar
+        return others
+      })
+    tabBar.list = [...tabBar.list, ...newTabbarItems]
+
+    return tabBar
+  }
+
   async updatePagesJSON(filepath?: string) {
     if (filepath) {
       let page = this.pages.get(filepath)
@@ -331,6 +356,7 @@ export class PageContext {
       ...this.pagesGlobConfig,
       pages: this.pageMetaData,
       subPackages: this.subPageMetaData,
+      tabBar: await this.getTabBarMerged(),
     }
 
     const pagesJson = cjStringify(
