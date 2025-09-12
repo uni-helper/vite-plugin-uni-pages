@@ -159,7 +159,7 @@ export function findMacro(stmts: t.Statement[], filename: string): t.CallExpress
 
   // 检查 macro 的参数是否正确
   if (opt && !t.isFunctionExpression(opt) && !t.isArrowFunctionExpression(opt) && !t.isObjectExpression(opt)) {
-    debug.definePage(`definePage() 参数仅支持函数或对象: ${filename}`)
+    debug.definePage(`definePage() 参数仅支持函数或对象：${filename}`)
     return
   }
 
