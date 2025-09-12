@@ -317,9 +317,12 @@ export class PageContext {
         }
         page = subPage
       }
-      if (page && !await page.hasChanged()) {
-        debug.cache(`The route block on page ${filepath} did not send any changes, skipping`)
-        return false
+      if (page) {
+        await page.read()
+        if (!page.hasChanged()) {
+          debug.cache(`The route block on page ${filepath} did not send any changes, skipping`)
+          return false
+        }
       }
     }
 

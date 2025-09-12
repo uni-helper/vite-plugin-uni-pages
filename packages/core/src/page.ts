@@ -60,7 +60,7 @@ export class Page {
     }
   }
 
-  public async hasChanged() {
+  public hasChanged() {
     return this.changed
   }
 
