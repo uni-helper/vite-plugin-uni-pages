@@ -286,6 +286,11 @@ export class PageContext {
       list: this.pagesGlobConfig?.tabBar?.list || [],
     }
 
+    const pagePaths = new Map<string, boolean>()
+    for (const item of tabBar.list) {
+      pagePaths.set(item.pagePath, true)
+    }
+
     const tabBarItems: (TabBarItem & { index: number })[] = []
     for (const [_, page] of this.pages) {
       const tabbar = await page.getTabBar()
@@ -293,13 +298,15 @@ export class PageContext {
         tabBarItems.push(tabbar)
       }
     }
-    const newTabbarItems = tabBarItems.sort((a, b) => a.index - b.index)
-      .filter(tabbar => tabBar.list.findIndex(item => item.pagePath === tabbar.pagePath) === -1)
-      .map((tabbar) => {
-        const { index: _, ...others } = tabbar
-        return others
-      })
-    tabBar.list = [...tabBar.list, ...newTabbarItems]
+
+    tabBarItems.sort((a, b) => a.index - b.index)
+
+    for (const item of tabBarItems) {
+      if (!pagePaths.has(item.pagePath)) {
+        const { index: _, ...tabbar } = item
+        tabBar.list.push(tabbar)
+      }
+    }
 
     return tabBar
   }
