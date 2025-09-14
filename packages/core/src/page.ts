@@ -169,10 +169,9 @@ export function findMacro(stmts: t.Statement[], filename: string): t.CallExpress
 export function findImports(stmts: t.Statement[]): t.ImportDeclaration[] {
   const imports: t.ImportDeclaration[] = []
   for (const stmt of stmts) {
-    if (stmt.type !== 'ImportDeclaration') {
-      continue
+    if (t.isImportDeclaration(stmt)) {
+      imports.push(stmt)
     }
-    imports.push(stmt)
   }
   return imports
 }
