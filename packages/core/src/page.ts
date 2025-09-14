@@ -103,7 +103,7 @@ export async function tryPageMetaFromMacro(sfc: SFCDescriptor): Promise<UserPage
   })
   const macro = findMacro(ast.body, sfc.filename)
   if (macro) {
-    const imports = findImports(ast.body).map(imp => babelGenerate(imp).code)
+    const imports = findImports(ast.body).filter(imp => !!imp.specifiers.length).map(imp => babelGenerate(imp).code)
 
     const [macroOption] = macro.arguments
     const code = babelGenerate(macroOption).code
