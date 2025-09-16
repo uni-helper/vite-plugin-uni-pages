@@ -1,7 +1,7 @@
 {
   "name": "@uni-helper/vite-plugin-uni-pages",
   "type": "module",
-  "version": "0.3.12",
+  "version": "0.3.13",
   "description": "File system based routing for uni-app applications using Vite",
   "author": "KeJun",
   "maintainers": [
