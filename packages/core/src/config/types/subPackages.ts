@@ -20,6 +20,8 @@ export interface SubPackage {
 
       provider: string
 
+      export?: string
+
       [key: string]: any
     }
   }

@@ -2839,6 +2839,9 @@
               },
               "version": {
                 "type": "string"
+              },
+              "export": {
+                "type": "string"
               }
             },
             "required": [
