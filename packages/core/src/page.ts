@@ -65,9 +65,25 @@ export class Page {
   }
 
   public async read() {
-    this.meta = await this.readPageMetaFromFile()
-    const raw = (this.meta ? JSON.stringify(this.meta) : '')
+    let meta: UserPageMeta
+    try {
+      meta = await this.readPageMetaFromFile()
+    }
+    catch (err: any) {
+      debug.error(err)
+      return // break if read fail
+    }
+
+    let raw = ''
+    try {
+      raw = JSON.stringify(meta)
+    }
+    catch {
+      // ignore stringify error
+    }
+
     this.changed = this.raw !== raw
+    this.meta = meta
     this.raw = raw
   }
 
@@ -90,22 +106,17 @@ export class Page {
 }
 
 export function parseSFC(code: string, options?: SFCParseOptions): SFCDescriptor {
-  try {
-    return (
-      VueParser(code, {
-        pad: 'space',
-        ...options,
-      }).descriptor
-      // for @vue/compiler-sfc ^2.7
-      || (VueParser as any)({
-        source: code,
-        ...options,
-      })
-    )
-  }
-  catch (error) {
-    throw new Error(`[vite-plugin-uni-pages] Vue3's "@vue/compiler-sfc" is required. \nOriginal error: \n${error}`)
-  }
+  return (
+    VueParser(code, {
+      pad: 'space',
+      ...options,
+    }).descriptor
+    // for @vue/compiler-sfc ^2.7
+    || (VueParser as any)({
+      source: code,
+      ...options,
+    })
+  )
 }
 
 export async function tryPageMetaFromMacro(sfc: SFCDescriptor): Promise<UserPageMeta | undefined> {
@@ -148,7 +159,12 @@ export async function tryPageMetaFromCustomBlock(sfc: SFCDescriptor, routeBlockL
   }
 
   if (routeBlock) {
-    cjAssign(pageMeta, routeBlock.content)
+    try {
+      cjAssign(pageMeta, routeBlock.content)
+    }
+    catch {
+      // ignore parse error
+    }
   }
 
   return pageMeta
