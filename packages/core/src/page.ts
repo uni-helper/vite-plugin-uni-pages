@@ -120,7 +120,7 @@ export async function tryPageMetaFromMacro(sfc: SFCDescriptor): Promise<UserPage
   })
   const macro = findMacro(ast.body, sfc.filename)
   if (macro) {
-    const imports = findImports(ast.body).map(imp => babelGenerate(imp).code)
+    const imports = findImports(ast.body).filter(imp => !!imp.specifiers.length).map(imp => babelGenerate(imp).code)
 
     const [macroOption] = macro.arguments
     const code = babelGenerate(macroOption).code
@@ -184,7 +184,11 @@ export function findMacro(stmts: t.Statement[], filename: string): t.CallExpress
 }
 
 export function findImports(stmts: t.Statement[]): t.ImportDeclaration[] {
-  return stmts
-    .map((node: t.Node) => (node.type === 'ImportDeclaration') ? node : undefined)
-    .filter((node): node is t.ImportDeclaration => !!node)
+  const imports: t.ImportDeclaration[] = []
+  for (const stmt of stmts) {
+    if (t.isImportDeclaration(stmt)) {
+      imports.push(stmt)
+    }
+  }
+  return imports
 }
