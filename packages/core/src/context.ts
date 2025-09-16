@@ -1,5 +1,6 @@
 import type { FSWatcher } from 'chokidar'
 import type { Logger, ViteDevServer } from 'vite'
+import type { TabBar, TabBarItem } from './config'
 import type { PagesConfig } from './config/types'
 import type { PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
 import path from 'node:path'
@@ -11,8 +12,8 @@ import dbg from 'debug'
 import detectIndent from 'detect-indent'
 import detectNewline from 'detect-newline'
 import { loadConfig } from 'unconfig'
-import { OUTPUT_NAME } from './constant'
 
+import { OUTPUT_NAME } from './constant'
 import { writeDeclaration } from './declaration'
 import { checkPagesJsonFile, getPageFiles, readFileSync, writeFileSync } from './files'
 import { resolveOptions } from './options'
@@ -279,6 +280,37 @@ export class PageContext {
     debug.subPages(this.subPageMetaData)
   }
 
+  private async getTabBarMerged(): Promise<TabBar> {
+    const tabBar = {
+      ...this.pagesGlobConfig?.tabBar,
+      list: this.pagesGlobConfig?.tabBar?.list || [],
+    }
+
+    const pagePaths = new Map<string, boolean>()
+    for (const item of tabBar.list) {
+      pagePaths.set(item.pagePath, true)
+    }
+
+    const tabBarItems: (TabBarItem & { index: number })[] = []
+    for (const [_, page] of this.pages) {
+      const tabbar = await page.getTabBar()
+      if (tabbar) {
+        tabBarItems.push(tabbar)
+      }
+    }
+
+    tabBarItems.sort((a, b) => a.index - b.index)
+
+    for (const item of tabBarItems) {
+      if (!pagePaths.has(item.pagePath)) {
+        const { index: _, ...tabbar } = item
+        tabBar.list.push(tabbar)
+      }
+    }
+
+    return tabBar
+  }
+
   async updatePagesJSON(filepath?: string) {
     if (filepath) {
       let page = this.pages.get(filepath)
@@ -292,9 +324,12 @@ export class PageContext {
         }
         page = subPage
       }
-      if (page && !await page.hasChanged()) {
-        debug.cache(`The route block on page ${filepath} did not send any changes, skipping`)
-        return false
+      if (page) {
+        await page.read()
+        if (!page.hasChanged()) {
+          debug.cache(`The route block on page ${filepath} did not send any changes, skipping`)
+          return false
+        }
       }
     }
 
@@ -331,6 +366,7 @@ export class PageContext {
       ...this.pagesGlobConfig,
       pages: this.pageMetaData,
       subPackages: this.subPageMetaData,
+      tabBar: await this.getTabBarMerged(),
     }
 
     const pagesJson = cjStringify(
