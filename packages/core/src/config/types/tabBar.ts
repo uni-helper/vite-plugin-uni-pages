@@ -169,7 +169,7 @@ export interface TabBar {
    *
    * @type {TabBarItem[]}
    */
-  list: TabBarItem[]
+  list?: TabBarItem[]
 
   /**
    * tab 位置
