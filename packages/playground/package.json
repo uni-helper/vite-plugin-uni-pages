@@ -1,6 +1,6 @@
 {
   "name": "playground",
-  "version": "0.3.13",
+  "version": "0.3.14",
   "private": true,
   "scripts": {
     "dev:h5": "uni",
