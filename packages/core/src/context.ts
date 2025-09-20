@@ -280,7 +280,19 @@ export class PageContext {
     debug.subPages(this.subPageMetaData)
   }
 
-  private async getTabBarMerged(): Promise<TabBar> {
+  private async getTabBarMerged(): Promise<TabBar | undefined> {
+    const tabBarItems: (TabBarItem & { index: number })[] = []
+    for (const [_, page] of this.pages) {
+      const tabbar = await page.getTabBar()
+      if (tabbar) {
+        tabBarItems.push(tabbar)
+      }
+    }
+
+    if (tabBarItems.length === 0) {
+      return this.pagesGlobConfig?.tabBar
+    }
+
     const tabBar = {
       ...this.pagesGlobConfig?.tabBar,
       list: this.pagesGlobConfig?.tabBar?.list || [],
@@ -289,14 +301,6 @@ export class PageContext {
     const pagePaths = new Map<string, boolean>()
     for (const item of tabBar.list) {
       pagePaths.set(item.pagePath, true)
-    }
-
-    const tabBarItems: (TabBarItem & { index: number })[] = []
-    for (const [_, page] of this.pages) {
-      const tabbar = await page.getTabBar()
-      if (tabbar) {
-        tabBarItems.push(tabbar)
-      }
     }
 
     tabBarItems.sort((a, b) => a.index - b.index)
