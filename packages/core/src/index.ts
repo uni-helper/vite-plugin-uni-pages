@@ -1,7 +1,6 @@
 import type { CallExpression } from '@babel/types'
 import type { Plugin } from 'vite'
 import type { UserOptions } from './types'
-import { spawn } from 'node:child_process'
 import path from 'node:path'
 import process from 'node:process'
 import { babelParse } from 'ast-kit'
@@ -29,22 +28,7 @@ export * from './page'
 export * from './types'
 export * from './utils'
 
-async function restart() {
-  return new Promise((resolve) => {
-    const build = spawn(process.argv.shift()!, process.argv, {
-      cwd: process.env.VITE_ROOT_DIR || process.cwd(),
-      detached: true,
-      env: process.env,
-    })
-    build.stdout?.pipe(process.stdout)
-    build.stderr?.pipe(process.stderr)
-    build.on('close', (code) => {
-      resolve(process.exit(code!))
-    })
-  })
-}
-
-export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
+export async function VitePluginUniPages(userOptions: UserOptions = {}): Promise<Plugin> {
   let ctx: PageContext
 
   // TODO: check if the pages.json file is valid
@@ -53,7 +37,7 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
     userOptions.outDir ?? 'src',
     OUTPUT_NAME,
   )
-  const isValidated = checkPagesJsonFile(resolvedPagesJSONPath)
+  await checkPagesJsonFile(resolvedPagesJSONPath)
 
   return {
     name: 'vite-plugin-uni-pages',
@@ -71,13 +55,6 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
       await ctx.updatePagesJSON()
 
       if (config.command === 'build') {
-        if (!isValidated) {
-          ctx.logger?.warn('In build mode, if `pages.json` does not exist, the plugin cannot create the complete `pages.json` before the uni-app, so it restarts the build.', {
-            timestamp: true,
-          })
-          await restart()
-        }
-
         if (config.build.watch)
           ctx.setupWatcher(chokidar.watch([...ctx.options.dirs, ...ctx.options.subPackages]))
       }

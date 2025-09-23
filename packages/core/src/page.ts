@@ -2,7 +2,7 @@ import type { SFCDescriptor, SFCParseOptions } from '@vue/compiler-sfc'
 import type { TabBarItem } from './config'
 import type { PageContext } from './context'
 import type { PageMetaDatum, PagePath, RouteBlockLang, UserPageMeta } from './types'
-import { readFileSync } from 'node:fs'
+import fs from 'node:fs'
 import { extname } from 'node:path'
 import * as t from '@babel/types'
 import { parse as VueParser } from '@vue/compiler-sfc'
@@ -89,7 +89,7 @@ export class Page {
 
   private async readPageMetaFromFile(): Promise<UserPageMeta> {
     try {
-      const content = readFileSync(this.path.absolutePath, 'utf-8')
+      const content = await fs.promises.readFile(this.path.absolutePath, { encoding: 'utf-8' })
       const sfc = parseSFC(content, { filename: this.path.absolutePath })
 
       const meta = await tryPageMetaFromMacro(sfc)

@@ -3,6 +3,7 @@ import type { Logger, ViteDevServer } from 'vite'
 import type { TabBar, TabBarItem } from './config'
 import type { PagesConfig } from './config/types'
 import type { PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
+import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { slash } from '@antfu/utils'
@@ -11,11 +12,12 @@ import { stringify as cjStringify } from 'comment-json'
 import dbg from 'debug'
 import detectIndent from 'detect-indent'
 import detectNewline from 'detect-newline'
-import { loadConfig } from 'unconfig'
+import lockfile from 'proper-lockfile'
 
+import { loadConfig } from 'unconfig'
 import { OUTPUT_NAME } from './constant'
 import { writeDeclaration } from './declaration'
-import { checkPagesJsonFile, getPageFiles, readFileSync, writeFileSync } from './files'
+import { checkPagesJsonFile, getPageFiles } from './files'
 import { resolveOptions } from './options'
 import { Page } from './page'
 import {
@@ -39,9 +41,9 @@ export class PageContext {
   subPageMetaData: SubPageMetaDatum[] = []
 
   resolvedPagesJSONPath = ''
-  resolvedPagesJSONIndent = '  '
-  resolvedPagesJSONNewline = '\n'
-  resolvedPagesJSONEofNewline = true
+  private resolvedPagesJSONIndent?: string // '  '
+  private resolvedPagesJSONNewline?: string // '\n'
+  private resolvedPagesJSONEofNewline?: boolean // true
 
   rawOptions: UserOptions
   root: string
@@ -63,10 +65,6 @@ export class PageContext {
       dbg.enable(`${prefix}${suffix}`)
     }
     this.resolvedPagesJSONPath = path.join(this.root, this.options.outDir, OUTPUT_NAME)
-    const resolvedPagesJSONContent = readFileSync(this.resolvedPagesJSONPath)
-    this.resolvedPagesJSONIndent = detectIndent(resolvedPagesJSONContent).indent || '  '
-    this.resolvedPagesJSONNewline = detectNewline(resolvedPagesJSONContent) || '\n'
-    this.resolvedPagesJSONEofNewline = (resolvedPagesJSONContent.at(-1) ?? '\n') === this.resolvedPagesJSONNewline
     debug.options(this.options)
   }
 
@@ -337,7 +335,7 @@ export class PageContext {
       }
     }
 
-    checkPagesJsonFile(this.resolvedPagesJSONPath)
+    await checkPagesJsonFile(this.resolvedPagesJSONPath)
     this.options.onBeforeLoadUserConfig(this)
     await this.loadUserPagesConfig()
     this.options.onAfterLoadUserConfig(this)
@@ -376,9 +374,9 @@ export class PageContext {
     const pagesJson = cjStringify(
       data,
       null,
-      this.options.minify ? undefined : this.resolvedPagesJSONIndent,
+      this.options.minify ? undefined : await this.getIndent(),
     ) + (
-      this.resolvedPagesJSONEofNewline ? this.resolvedPagesJSONNewline : ''
+      await this.getEndOfLine() ? await this.getNewline() : ''
     )
     this.generateDeclaration()
     if (lsatPagesJson === pagesJson) {
@@ -386,7 +384,16 @@ export class PageContext {
       return false
     }
 
-    writeFileSync(this.resolvedPagesJSONPath, pagesJson)
+    // 获取文件锁，如果文件不存在则创建
+    const relase = await lockfile.lock(this.resolvedPagesJSONPath, { realpath: false })
+
+    try {
+      await fs.promises.writeFile(this.resolvedPagesJSONPath, pagesJson, { encoding: 'utf-8' }) // 执行写入操作
+    }
+    finally {
+      await relase() // 释放文件锁
+    }
+
     lsatPagesJson = pagesJson
 
     this.options.onAfterWriteFile(this)
@@ -413,6 +420,37 @@ export class PageContext {
 
     debug.declaration('generating')
     return writeDeclaration(this, this.options.dts)
+  }
+
+  private async readInfoFromPagesJSON(): Promise<void> {
+    const resolvedPagesJSONContent = await fs.promises.readFile(this.resolvedPagesJSONPath, { encoding: 'utf-8' }).catch(() => '')
+    this.resolvedPagesJSONIndent = detectIndent(resolvedPagesJSONContent).indent || '  '
+    this.resolvedPagesJSONNewline = detectNewline(resolvedPagesJSONContent) || '\n'
+    this.resolvedPagesJSONEofNewline = (resolvedPagesJSONContent.at(-1) ?? '\n') === this.resolvedPagesJSONNewline
+  }
+
+  private async getIndent() {
+    if (!this.resolvedPagesJSONIndent) {
+      await this.readInfoFromPagesJSON()
+    }
+
+    return this.resolvedPagesJSONIndent!
+  }
+
+  private async getNewline() {
+    if (!this.resolvedPagesJSONNewline) {
+      await this.readInfoFromPagesJSON()
+    }
+
+    return this.resolvedPagesJSONNewline!
+  }
+
+  private async getEndOfLine() {
+    if (!this.resolvedPagesJSONEofNewline) {
+      await this.readInfoFromPagesJSON()
+    }
+
+    return this.resolvedPagesJSONEofNewline!
   }
 }
 
