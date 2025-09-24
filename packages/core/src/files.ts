@@ -72,9 +72,16 @@ export function setupPagesJsonFile(path: string) {
   fs.readFileSync = new Proxy(fs.readFileSync, {
     apply(target, thisArg, argArray) {
       if (typeof argArray[0] === 'string' && normalizePath(argArray[0]) === normalizePath(path)) {
-        checkPagesJsonFile(path).then(() => {
+        try {
+          const data = _readFileSync.apply(thisArg, argArray as any)
           fs.readFileSync = _readFileSync
-        })
+          return data
+        }
+        catch {
+          checkPagesJsonFile(path).then(() => {
+            fs.readFileSync = _readFileSync
+          })
+        }
         return EMPTY_PAGES_JSON_CONTENTS
       }
       return Reflect.apply(target, thisArg, argArray)
