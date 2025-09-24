@@ -3,6 +3,7 @@ import type { Plugin } from 'vite'
 import type { UserOptions } from './types'
 import path from 'node:path'
 import process from 'node:process'
+import { isH5 } from '@uni-helper/uni-env'
 import { babelParse } from 'ast-kit'
 import chokidar from 'chokidar'
 import { bold, dim, lightYellow, link } from 'kolorist'
@@ -15,7 +16,7 @@ import {
   RESOLVED_MODULE_ID_VIRTUAL,
 } from './constant'
 import { PageContext } from './context'
-import { checkPagesJsonFile } from './files'
+import { setupPagesJsonFile } from './files'
 import { findMacro, parseSFC } from './page'
 
 export * from './config'
@@ -37,7 +38,9 @@ export async function VitePluginUniPages(userOptions: UserOptions = {}): Promise
     userOptions.outDir ?? 'src',
     OUTPUT_NAME,
   )
-  await checkPagesJsonFile(resolvedPagesJSONPath)
+  if (isH5) {
+    setupPagesJsonFile(resolvedPagesJSONPath)
+  }
 
   return {
     name: 'vite-plugin-uni-pages',

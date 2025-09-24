@@ -2,7 +2,8 @@ import type { ResolvedOptions } from './types'
 import fs from 'node:fs'
 import fg from 'fast-glob'
 
-import { FILE_EXTENSIONS } from './constant'
+import { normalizePath } from 'vite'
+import { EMPTY_PAGES_JSON_CONTENTS, FILE_EXTENSIONS } from './constant'
 import { extsToGlob } from './utils'
 
 /**
@@ -27,9 +28,9 @@ export function getPageFiles(path: string, options: ResolvedOptions): string[] {
  * @param path - 要检查的文件路径
  * @returns Promise<void> - 无返回值的异步函数
  */
-export async function checkPagesJsonFile(path: fs.PathLike): Promise<boolean> {
+export async function checkPagesJsonFile(path: fs.PathLike, contents: string = EMPTY_PAGES_JSON_CONTENTS): Promise<boolean> {
   const createEmptyFile = (path: fs.PathLike) => {
-    return fs.promises.writeFile(path, JSON.stringify({ pages: [{ path: '' }] }, null, 2), { encoding: 'utf-8' }).then(() => true).catch(() => false)
+    return fs.promises.writeFile(path, contents, { encoding: 'utf-8' }).then(() => true).catch(() => false)
   }
 
   const unlink = (path: fs.PathLike) => {
@@ -64,4 +65,19 @@ export async function checkPagesJsonFile(path: fs.PathLike): Promise<boolean> {
     // stat 出错，证明没此文件
     return createEmptyFile(path) // 创建空文件
   }
+}
+
+export function setupPagesJsonFile(path: string) {
+  const _readFileSync = fs.readFileSync
+  fs.readFileSync = new Proxy(fs.readFileSync, {
+    apply(target, thisArg, argArray) {
+      if (typeof argArray[0] === 'string' && normalizePath(argArray[0]) === normalizePath(path)) {
+        checkPagesJsonFile(path).then(() => {
+          fs.readFileSync = _readFileSync
+        })
+        return EMPTY_PAGES_JSON_CONTENTS
+      }
+      return Reflect.apply(target, thisArg, argArray)
+    },
+  })
 }
