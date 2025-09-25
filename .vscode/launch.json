@@ -27,7 +27,10 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["run", "dev:mp-weixin"],
       "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen"
+      "internalConsoleOptions": "neverOpen",
+      "env": {
+        "NODE_ENV": "development"
+      }
     }
   ]
 }

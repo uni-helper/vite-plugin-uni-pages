@@ -15,7 +15,7 @@ import {
   RESOLVED_MODULE_ID_VIRTUAL,
 } from './constant'
 import { PageContext } from './context'
-import { checkPagesJsonFile } from './files'
+import { checkPagesJsonFileSync } from './files'
 import { findMacro, parseSFC } from './page'
 
 export * from './config'
@@ -28,7 +28,7 @@ export * from './page'
 export * from './types'
 export * from './utils'
 
-export async function VitePluginUniPages(userOptions: UserOptions = {}): Promise<Plugin> {
+export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
   let ctx: PageContext
 
   // TODO: check if the pages.json file is valid
@@ -37,7 +37,7 @@ export async function VitePluginUniPages(userOptions: UserOptions = {}): Promise
     userOptions.outDir ?? 'src',
     OUTPUT_NAME,
   )
-  await checkPagesJsonFile(resolvedPagesJSONPath)
+  checkPagesJsonFileSync(resolvedPagesJSONPath)
 
   return {
     name: 'vite-plugin-uni-pages',

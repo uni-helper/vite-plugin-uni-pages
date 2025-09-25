@@ -137,6 +137,10 @@ export async function execScript(options: { imports: string[], code: string, fil
   }
 }
 
+export function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
 function getDefaultExport<T = any>(expr: T): T {
   return (expr as any).default === undefined ? expr : (expr as any).default
 }
