@@ -1,23 +1,25 @@
 import type { FSWatcher } from 'chokidar'
+import type { CommentObject, CommentSymbol } from 'comment-json'
 import type { Logger, ViteDevServer } from 'vite'
 import type { TabBar, TabBarItem } from './config'
 import type { PagesConfig } from './config/types'
 import type { PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
+
 import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { slash } from '@antfu/utils'
 import { platform } from '@uni-helper/uni-env'
-import { stringify as cjStringify } from 'comment-json'
+import { parse as cjParse, stringify as cjStringify, CommentArray } from 'comment-json'
 import dbg from 'debug'
 import detectIndent from 'detect-indent'
+
 import detectNewline from 'detect-newline'
 import lockfile from 'proper-lockfile'
-
 import { loadConfig } from 'unconfig'
 import { OUTPUT_NAME } from './constant'
 import { writeDeclaration } from './declaration'
-import { checkPagesJsonFile, getPageFiles } from './files'
+import { checkPagesJsonFileSync, getPageFiles, writeFileWithLock } from './files'
 import { resolveOptions } from './options'
 import { Page } from './page'
 import {
@@ -26,8 +28,6 @@ import {
   isTargetFile,
   mergePageMetaDataArray,
 } from './utils'
-
-let lsatPagesJson = ''
 
 export class PageContext {
   private _server: ViteDevServer | undefined
@@ -51,6 +51,8 @@ export class PageContext {
   logger?: Logger
 
   withUniPlatform = false
+
+  private lastPagesJson = ''
 
   constructor(userOptions: UserOptions, viteRoot: string = process.cwd()) {
     this.rawOptions = userOptions
@@ -335,7 +337,7 @@ export class PageContext {
       }
     }
 
-    await checkPagesJsonFile(this.resolvedPagesJSONPath)
+    checkPagesJsonFileSync(this.resolvedPagesJSONPath)
     this.options.onBeforeLoadUserConfig(this)
     await this.loadUserPagesConfig()
     this.options.onAfterLoadUserConfig(this)
@@ -364,12 +366,7 @@ export class PageContext {
 
     this.options.onBeforeWriteFile(this)
 
-    const data = {
-      ...this.pagesGlobConfig,
-      pages: this.pageMetaData,
-      subPackages: this.subPageMetaData,
-      tabBar: await this.getTabBarMerged(),
-    }
+    const data = await this.genratePagesJSON()
 
     const pagesJson = cjStringify(
       data,
@@ -379,22 +376,14 @@ export class PageContext {
       await this.getEndOfLine() ? await this.getNewline() : ''
     )
     this.generateDeclaration()
-    if (lsatPagesJson === pagesJson) {
+    if (this.lastPagesJson === pagesJson) {
       debug.pages('PagesJson Not have change')
       return false
     }
 
-    // 获取文件锁，如果文件不存在则创建
-    const relase = await lockfile.lock(this.resolvedPagesJSONPath, { realpath: false })
+    await writeFileWithLock(this.resolvedPagesJSONPath, pagesJson)
 
-    try {
-      await fs.promises.writeFile(this.resolvedPagesJSONPath, pagesJson, { encoding: 'utf-8' }) // 执行写入操作
-    }
-    finally {
-      await relase() // 释放文件锁
-    }
-
-    lsatPagesJson = pagesJson
+    this.lastPagesJson = pagesJson
 
     this.options.onAfterWriteFile(this)
     return true
@@ -420,6 +409,87 @@ export class PageContext {
 
     debug.declaration('generating')
     return writeDeclaration(this, this.options.dts)
+  }
+
+  private async writePagesJSONFile(pagesJson: string, retry = 3): Promise<void> {
+    if (retry <= 0) {
+      debug.error(`${this.resolvedPagesJSONPath} 获取文件锁失败，写入失败`)
+      return
+    }
+
+    let relase: () => Promise<void> | undefined
+
+    try {
+      try {
+        // 获取文件锁
+        relase = await lockfile.lock(this.resolvedPagesJSONPath, { realpath: false })
+      }
+      catch {
+        // 获取文件锁失败
+        return this.writePagesJSONFile(pagesJson, retry - 1)
+      }
+      await fs.promises.writeFile(this.resolvedPagesJSONPath, pagesJson, { encoding: 'utf-8' }) // 执行写入操作
+    }
+    finally {
+      // eslint-disable-next-line ts/ban-ts-comment
+      // @ts-expect-error'
+      if (relase) {
+        await relase() // 释放文件锁
+      }
+    }
+  }
+
+  private async genratePagesJSON() {
+    const content = await fs.promises.readFile(this.resolvedPagesJSONPath, { encoding: 'utf-8' }).catch(() => '')
+
+    let pageJson = cjParse(content || '{}') as CommentObject
+
+    const { pages: _, subPackages: __, tabBar: ___, ...others } = this.pagesGlobConfig || {}
+
+    pageJson = Object.assign(pageJson, {
+      ...others,
+    })
+
+    const currentPlatform = platform.toUpperCase()
+
+    // pages
+    pageJson.pages = mergePlatformItems(pageJson?.pages as any, currentPlatform, this.pageMetaData, 'path')
+
+    // subPackages
+    pageJson.subPackages = pageJson?.subPackages || new CommentArray<CommentObject>()
+    const newSubPackages = new Map<string, SubPageMetaDatum>()
+    for (const item of this.subPageMetaData) {
+      newSubPackages.set(item.root, item)
+    }
+    for (const existing of pageJson.subPackages as unknown as SubPageMetaDatum[]) {
+      const sub = newSubPackages.get(existing.root)
+      if (sub) {
+        existing.pages = mergePlatformItems(existing.pages as unknown as CommentArray<CommentObject>, currentPlatform, sub.pages, 'path') as any
+        newSubPackages.delete(existing.root)
+      }
+    }
+    for (const [_, newSub] of newSubPackages) {
+      (pageJson.subPackages as unknown as Array<any>).push({
+        root: newSub.root,
+        pages: mergePlatformItems(undefined, currentPlatform, newSub.pages, 'path'),
+      })
+    }
+
+    // tabbar
+    const tabBar = await this.getTabBarMerged()
+    if (tabBar) {
+      const list = mergePlatformItems((pageJson?.tabBar as any)?.list as any, currentPlatform, tabBar.list!, 'pagePath')
+
+      if ((pageJson?.tabBar as any)?.list) {
+        (pageJson!.tabBar as any)!.list = list
+      }
+      else {
+        (pageJson as any).tabBar = (pageJson as any).tabBar || {};
+        (pageJson as any).tabBar.list = list
+      }
+    }
+
+    return pageJson
   }
 
   private async readInfoFromPagesJSON(): Promise<void> {
@@ -467,4 +537,155 @@ function getPagePaths(dir: string, options: ResolvedOptions) {
     }))
 
   return pagePaths
+}
+
+function mergePlatformItems<T = any>(source: CommentArray<CommentObject> | undefined, currentPlatform: string, items: T[], uniqueKeyName: keyof T): CommentArray<CommentObject> {
+  const src = source || new CommentArray<CommentObject>()
+  currentPlatform = currentPlatform.toUpperCase()
+
+  // 1. 从 CommentArray 里抽取第一个注释并获取 platforms 作为 lastPlatforms
+  let lastPlatforms: string[] = []
+  for (const comment of (src[Symbol.for('before:0') as CommentSymbol] || [])) {
+    const trimed = comment.value.trim()
+    if (trimed.startsWith('GENERATED BY UNI-PAGES, PLATFORM:')) {
+      // 移除当前 platform
+      lastPlatforms = trimed.split(':')[1].split('||').map(s => s.trim()).filter(s => s !== currentPlatform).sort()
+    }
+  }
+
+  // 2. 遍历 source，对每个元素进行判断，然后以 uniqueKey 元素的值作为 key 添加到新的 tmpMap 中
+  const tmpMap = new Map<string, Array<{
+    item: CommentObject
+    platforms: string[]
+    platformStr: string
+  }>>()
+
+  for (let i = 0; i < src.length; i++) {
+    const item = src[i] as CommentObject
+    const uniqueKey = (item as any)[uniqueKeyName]
+
+    if (!uniqueKey) {
+      continue
+    }
+
+    // 检查是否有条件编译注释
+    const beforeComments = src[Symbol.for(`before:${i}`) as CommentSymbol]
+    // const afterComments = src[Symbol.for(`after:${i}`) as CommentSymbol]
+
+    const ifdefComment = beforeComments?.find(c => c.value.trim().startsWith('#ifdef'))
+    // const endifComment = afterComments?.find(c => c.value.trim().startsWith('#endif'))
+
+    let platforms: string[] = [...lastPlatforms]
+
+    if (ifdefComment) {
+      const match = ifdefComment.value.match(/#ifdef\s+(.+)/)
+      if (match) {
+        // 移除当前 platform
+        platforms = match[1].split('||').map(p => p.trim()).filter(s => s !== currentPlatform).sort()
+      }
+    }
+
+    // 如果 platforms 除了当前 platform 外为空，则跳过
+    if (platforms.length === 0) {
+      continue
+    }
+
+    const existing = tmpMap.get(uniqueKey) || []
+    existing.push({ item, platforms, platformStr: platforms.join(' || ') })
+    tmpMap.set(uniqueKey, existing)
+  }
+
+  // 3. 将 items 合并到 tmpMap 中
+  for (const item of items) {
+    const newItem = item as any
+    const uniqueKey = item[uniqueKeyName] as string
+
+    if (!uniqueKey) {
+      continue
+    }
+
+    if (!tmpMap.has(uniqueKey)) {
+      // 如果不存在，则添加到 newMap 中
+      tmpMap.set(uniqueKey, [{
+        item: newItem,
+        platforms: [currentPlatform],
+        platformStr: currentPlatform,
+      }])
+      continue
+    }
+
+    // 如果存在，判断元素是否相等
+    const existing = tmpMap.get(uniqueKey)!
+
+    const newItemStr = JSON.stringify(newItem)
+    const equalObj = existing.find(val => JSON.stringify(val.item) === newItemStr)
+    if (equalObj) {
+      equalObj.platforms.push(currentPlatform)
+      equalObj.platformStr = equalObj.platforms.join(' || ')
+    }
+    else {
+      existing.push({
+        item: newItem,
+        platforms: [currentPlatform],
+        platformStr: currentPlatform,
+      })
+    }
+  }
+
+  // 4. 遍历 tmpMap，生成 result:CommentArray<CommentObject>
+  const result = new CommentArray<CommentObject>()
+
+  // 检查平台的使用频率，将使用频率高的平台作为默认平台
+  const platformUsage: Record<string, number> = {}
+  tmpMap.forEach((val) => {
+    Object.values(val).forEach((v) => {
+      platformUsage[v.platformStr] = (platformUsage[v.platformStr] || 0) + 1
+    })
+  })
+  const defaultPlatformStr = Object.keys(platformUsage).reduce((a, b) => platformUsage[a] > platformUsage[b] ? a : b)
+
+  // 为 result 添加 Symbol.for(`before:0`) 添加生成标识注释
+  result[Symbol.for('before:0') as CommentSymbol] = [{
+    type: 'LineComment',
+    value: ` GENERATED BY UNI-PAGES, PLATFORM: ${defaultPlatformStr}`,
+    inline: false,
+    loc: {
+      start: { line: 0, column: 0 },
+      end: { line: 0, column: 0 },
+    },
+  }]
+
+  // 按照插入顺序处理元素
+  for (const [_, list] of tmpMap) {
+    for (const { item, platformStr } of list) {
+      result.push(item)
+
+      // 检查 platforms 是否和 defaultPlatformStr 一致。（platforms、defaultPlatforms 已预先排序）
+      if (platformStr !== defaultPlatformStr) {
+      // 存在平台信息且与默认平台不同，添加条件编译注释
+        result[Symbol.for(`before:${result.length - 1}`) as CommentSymbol] = [{
+          type: 'LineComment',
+          value: ` #ifdef ${platformStr}`,
+          inline: false,
+          loc: {
+            start: { line: 0, column: 0 },
+            end: { line: 0, column: 0 },
+          },
+        }]
+
+        result[Symbol.for(`after:${result.length - 1}`) as CommentSymbol] = [{
+          type: 'LineComment',
+          value: ' #endif',
+          inline: false,
+          loc: {
+            start: { line: 0, column: 0 },
+            end: { line: 0, column: 0 },
+          },
+        }]
+      }
+    }
+  }
+
+  // 5. 返回 result:CommentArray<CommentObject>
+  return result
 }
