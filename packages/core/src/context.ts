@@ -642,7 +642,10 @@ function mergePlatformItems<T = any>(source: CommentArray<CommentObject> | undef
       platformUsage[v.platformStr] = (platformUsage[v.platformStr] || 0) + 1
     })
   })
-  const defaultPlatformStr = Object.keys(platformUsage).reduce((a, b) => platformUsage[a] > platformUsage[b] ? a : b)
+  const usageKeys = Object.keys(platformUsage)
+  const defaultPlatformStr = usageKeys.length
+    ? usageKeys.reduce((a, b) => (platformUsage[a] > platformUsage[b] ? a : b))
+    : currentPlatform
 
   // 为 result 添加 Symbol.for(`before:0`) 添加生成标识注释
   result[Symbol.for('before:0') as CommentSymbol] = [{
