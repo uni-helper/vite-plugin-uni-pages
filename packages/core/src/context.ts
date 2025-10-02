@@ -487,6 +487,13 @@ export class PageContext {
         (pageJson as any).tabBar = (pageJson as any).tabBar || {};
         (pageJson as any).tabBar.list = list
       }
+
+      const { list: __, ...restTabBarProps } = tabBar
+      Object.keys(restTabBarProps).forEach((key) => {
+        if (!(key in (pageJson.tabBar as any))) {
+          (pageJson.tabBar as any)[key] = restTabBarProps[key]
+        }
+      })
     }
 
     return pageJson
