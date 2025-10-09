@@ -34,7 +34,7 @@ export class Page {
       await this.read()
     }
 
-    const { path, tabBar: _, ...others } = this.meta!
+    const { path, tabBar: _, ...others } = this.meta || {}
 
     return {
       path: path ?? this.uri,

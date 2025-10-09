@@ -112,6 +112,28 @@ export async function execScript(options: { imports: string[], code: string, fil
       __dirname: dir,
       require: createRequire(dir),
       import: (id: string) => import(id),
+
+      // 定时器相关
+      setTimeout,
+      clearTimeout,
+      setInterval,
+      clearInterval,
+      setImmediate,
+      clearImmediate,
+
+      // 控制台相关
+      console,
+
+      // URL 处理
+      URL,
+      URLSearchParams,
+
+      // 进程和性能相关
+      performance,
+
+      // 全局对象引用
+      global: globalThis,
+      globalThis,
     }
 
     // 使用 vm 模块执行 JavaScript 代码

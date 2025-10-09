@@ -1,7 +1,9 @@
 <script lang="ts" setup>
 definePage(async () => {
   let title = await new Promise<string>((resolve) => {
-    resolve('hello world');
+    setTimeout(() => {
+      resolve('hello world');
+    }, 100);
   });
 
   return {
