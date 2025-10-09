@@ -15,7 +15,6 @@ import dbg from 'debug'
 import detectIndent from 'detect-indent'
 
 import detectNewline from 'detect-newline'
-import lockfile from 'proper-lockfile'
 import { loadConfig } from 'unconfig'
 import { OUTPUT_NAME } from './constant'
 import { writeDeclaration } from './declaration'
