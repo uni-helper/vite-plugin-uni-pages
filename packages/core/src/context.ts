@@ -446,21 +446,19 @@ export class PageContext {
   private async genratePagesJSON() {
     const content = await fs.promises.readFile(this.resolvedPagesJSONPath, { encoding: 'utf-8' }).catch(() => '')
 
-    let pageJson = cjParse(content || '{}') as CommentObject
+    const { pages: oldPages, subPackages: oldSubPackages, tabBar: oldTabBar } = cjParse(content || '{}') as CommentObject
 
     const { pages: _, subPackages: __, tabBar: ___, ...others } = this.pagesGlobConfig || {}
 
-    pageJson = Object.assign(pageJson, {
-      ...others,
-    })
+    const pageJson = { ...others }
 
     const currentPlatform = platform.toUpperCase()
 
     // pages
-    pageJson.pages = mergePlatformItems(pageJson?.pages as any, currentPlatform, this.pageMetaData, 'path')
+    pageJson.pages = mergePlatformItems(oldPages as any, currentPlatform, this.pageMetaData, 'path')
 
     // subPackages
-    pageJson.subPackages = pageJson?.subPackages || new CommentArray<CommentObject>()
+    pageJson.subPackages = oldSubPackages || new CommentArray<CommentObject>()
     const newSubPackages = new Map<string, SubPageMetaDatum>()
     for (const item of this.subPageMetaData) {
       newSubPackages.set(item.root, item)
@@ -480,17 +478,17 @@ export class PageContext {
     }
 
     // tabbar
-    const tabBar = await this.getTabBarMerged()
-    if (tabBar) {
-      const list = mergePlatformItems((pageJson?.tabBar as any)?.list as any, currentPlatform, tabBar.list!, 'pagePath')
-
-      if ((pageJson?.tabBar as any)?.list) {
-        (pageJson!.tabBar as any)!.list = list
+    const { list, ...tabBarOthers } = (await this.getTabBarMerged()) || {}
+    if (list) {
+      const { list: oldList } = (oldTabBar as any) || {}
+      const newList = mergePlatformItems(oldList, currentPlatform, list, 'pagePath')
+      pageJson.tabBar = {
+        ...tabBarOthers, // 每次都直接更新除 list 外的其他属性
+        list: newList,
       }
-      else {
-        (pageJson as any).tabBar = (pageJson as any).tabBar || {};
-        (pageJson as any).tabBar.list = list
-      }
+    }
+    else {
+      pageJson.tabBar = undefined // 直接清空，暂不支持 A 平台有 tabBar， B 平台无 tabBar 的情况。
     }
 
     return pageJson
