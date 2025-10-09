@@ -211,8 +211,12 @@ export class PageContext {
       ? mergePageMetaDataArray(generatedPageMetaData.concat(customPageMetaData))
       : generatedPageMetaData
 
-    const parseMeta = result.filter((page, index, self) =>
-      self.findLastIndex(item => page.path === item.path) === index,
+    // 使用 Map 去重，保留每个 path 的最后一个元素，同时保持较好的性能
+    const parseMeta = Array.from(
+      result.reduce((map, page) => {
+        map.set(page.path, page)
+        return map
+      }, new Map<string, PageMetaDatum>()).values(),
     )
 
     return type === 'main' ? this.setHomePage(parseMeta) : parseMeta
