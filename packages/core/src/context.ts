@@ -415,34 +415,6 @@ export class PageContext {
     return writeDeclaration(this, this.options.dts)
   }
 
-  private async writePagesJSONFile(pagesJson: string, retry = 3): Promise<void> {
-    if (retry <= 0) {
-      debug.error(`${this.resolvedPagesJSONPath} 获取文件锁失败，写入失败`)
-      return
-    }
-
-    let relase: () => Promise<void> | undefined
-
-    try {
-      try {
-        // 获取文件锁
-        relase = await lockfile.lock(this.resolvedPagesJSONPath, { realpath: false })
-      }
-      catch {
-        // 获取文件锁失败
-        return this.writePagesJSONFile(pagesJson, retry - 1)
-      }
-      await fs.promises.writeFile(this.resolvedPagesJSONPath, pagesJson, { encoding: 'utf-8' }) // 执行写入操作
-    }
-    finally {
-      // eslint-disable-next-line ts/ban-ts-comment
-      // @ts-expect-error'
-      if (relase) {
-        await relase() // 释放文件锁
-      }
-    }
-  }
-
   private async genratePagesJSON() {
     const content = await fs.promises.readFile(this.resolvedPagesJSONPath, { encoding: 'utf-8' }).catch(() => '')
 
