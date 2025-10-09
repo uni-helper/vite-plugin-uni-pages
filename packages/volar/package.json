@@ -1,6 +1,6 @@
 {
   "name": "@uni-helper/volar-service-uni-pages",
-  "version": "0.3.17",
+  "version": "0.3.18",
   "description": "Volar plugin for uni-pages route custom block in Vue SFC",
   "author": "KeJun",
   "maintainers": [
