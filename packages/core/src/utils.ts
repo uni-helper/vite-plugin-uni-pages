@@ -62,7 +62,7 @@ export function mergePageMetaDataArray(pageMetaData: PageMetaDatum[]) {
 }
 
 /**
- * 执行一段 TypeScript / JavaScript 脚本代码，并返回执行结果
+ * 将 TypeScript / JavaScript 脚本代码，转换为对象/函数
  *
  * @param options - 执行脚本所需的配置项
  * @param options.imports - 需要引入的模块导入语句列表
@@ -70,7 +70,7 @@ export function mergePageMetaDataArray(pageMetaData: PageMetaDatum[]) {
  * @param options.filename - 脚本文件名，用于错误定位和上下文环境
  * @returns 返回脚本执行后的结果，若导出的是函数则执行后返回其返回值
  */
-export async function execScript(options: { imports: string[], code: string, filename: string }): Promise<any> {
+export async function parseCode(options: { imports: string[], code: string, filename: string }): Promise<any> {
   const { imports = [], code, filename } = options
 
   let jsCode: string = ''
@@ -146,13 +146,8 @@ export async function execScript(options: { imports: string[], code: string, fil
     // 获取导出的值
     const result = (vmContext.exports as any).default || vmContext.exports
 
-    // 如果是函数，执行函数并返回其返回值
-    if (typeof result === 'function') {
-      return Promise.resolve(result())
-    }
-
-    // 如果不是函数，返回结果
-    return Promise.resolve(result)
+    // 返回结果
+    return result
   }
   catch (error: any) {
     throw new Error(`EXEC SCRIPT FAIL IN ${filename}: ${error.message} \n\n${jsCode}\n\n`)

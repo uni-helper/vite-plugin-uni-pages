@@ -10,7 +10,7 @@ import { babelParse, isCallOf } from 'ast-kit'
 import { assign as cjAssign } from 'comment-json'
 import { normalizePath } from 'vite'
 import { getRouteBlock, getRouteSfcBlock } from './customBlock'
-import { babelGenerate, debug, execScript } from './utils'
+import { babelGenerate, debug, parseCode } from './utils'
 
 export class Page {
   ctx: PageContext
@@ -136,14 +136,19 @@ export async function tryPageMetaFromMacro(sfc: SFCDescriptor): Promise<UserPage
     const [macroOption] = macro.arguments
     const code = babelGenerate(macroOption).code
 
-    const result = await execScript({
+    const parsed = await parseCode({
       imports,
       code,
       filename: sfc.filename,
     })
+
+    const res = typeof parsed === 'function'
+      ? await Promise.resolve(parsed())
+      : await Promise.resolve(parsed)
+
     return {
       type: 'page',
-      ...result,
+      ...res,
     }
   }
   return undefined
