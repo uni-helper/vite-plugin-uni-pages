@@ -419,9 +419,7 @@ export class PageContext {
 
     const { pages: oldPages, subPackages: oldSubPackages, tabBar: oldTabBar } = cjParse(content || '{}') as CommentObject
 
-    const { pages: _, subPackages: __, tabBar: ___, ...others } = this.pagesGlobConfig || {}
-
-    const pageJson = { ...others }
+    const { pages: _, subPackages: __, tabBar: ___, pageJson } = this.pagesGlobConfig || {}
 
     const currentPlatform = platform.toUpperCase()
 
