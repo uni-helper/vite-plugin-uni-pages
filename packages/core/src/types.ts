@@ -139,6 +139,10 @@ export interface PageMetaDatum {
   [x: string]: any
 }
 
+export type ExcludeIndexSignature<T> = {
+  [K in keyof T as string extends K ? never : number extends K ? never : K]: T[K]
+}
+
 export interface SubPageMetaDatum {
   root: string
   pages: PageMetaDatum[]

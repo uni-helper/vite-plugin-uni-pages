@@ -3,7 +3,7 @@ import type { CommentObject, CommentSymbol } from 'comment-json'
 import type { Logger, ViteDevServer } from 'vite'
 import type { TabBar, TabBarItem } from './config'
 import type { PagesConfig } from './config/types'
-import type { PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
+import type { ExcludeIndexSignature, PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -437,7 +437,7 @@ export class PageContext {
     for (const existing of pageJson.subPackages as unknown as SubPageMetaDatum[]) {
       const sub = newSubPackages.get(existing.root)
       if (sub) {
-        existing.pages = mergePlatformItems(existing.pages as unknown as CommentArray<CommentObject>, currentPlatform, sub.pages, 'path') as any
+        existing.pages = mergePlatformItems(existing.pages as any, currentPlatform, sub.pages, 'path') as any
         newSubPackages.delete(existing.root)
       }
     }
@@ -512,7 +512,7 @@ function getPagePaths(dir: string, options: ResolvedOptions) {
   return pagePaths
 }
 
-function mergePlatformItems<T = any>(source: CommentArray<CommentObject> | undefined, currentPlatform: string, items: T[], uniqueKeyName: keyof T): CommentArray<CommentObject> {
+function mergePlatformItems<T = any>(source: CommentArray<CommentObject> | undefined, currentPlatform: string, items: T[], uniqueKeyName: keyof ExcludeIndexSignature<T>): CommentArray<CommentObject> {
   const src = source || new CommentArray<CommentObject>()
   currentPlatform = currentPlatform.toUpperCase()
 
