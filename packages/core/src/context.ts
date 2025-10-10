@@ -419,7 +419,7 @@ export class PageContext {
 
     const { pages: oldPages, subPackages: oldSubPackages, tabBar: oldTabBar } = cjParse(content || '{}') as CommentObject
 
-    const { pages: _, subPackages: __, tabBar: ___, pageJson } = this.pagesGlobConfig || {}
+    const { pages: _, subPackages: __, tabBar: ___, ...pageJson } = this.pagesGlobConfig || {}
 
     const currentPlatform = platform.toUpperCase()
 
@@ -435,7 +435,7 @@ export class PageContext {
     for (const existing of pageJson.subPackages as unknown as SubPageMetaDatum[]) {
       const sub = newSubPackages.get(existing.root)
       if (sub) {
-        existing.pages = mergePlatformItems(existing.pages as any, currentPlatform, sub.pages, 'path') as any
+        existing.pages = mergePlatformItems(existing.pages, currentPlatform, sub.pages, 'path') as any
         newSubPackages.delete(existing.root)
       }
     }
@@ -510,8 +510,8 @@ function getPagePaths(dir: string, options: ResolvedOptions) {
   return pagePaths
 }
 
-function mergePlatformItems<T = any>(source: CommentArray<CommentObject> | undefined, currentPlatform: string, items: T[], uniqueKeyName: keyof ExcludeIndexSignature<T>): CommentArray<CommentObject> {
-  const src = source || new CommentArray<CommentObject>()
+function mergePlatformItems<T = any>(source: any[] | undefined, currentPlatform: string, items: T[], uniqueKeyName: keyof ExcludeIndexSignature<T>): CommentArray<CommentObject> {
+  const src = (source as CommentArray<CommentObject>) || new CommentArray<CommentObject>()
   currentPlatform = currentPlatform.toUpperCase()
 
   // 1. 从 CommentArray 里抽取第一个注释并获取 platforms 作为 lastPlatforms
@@ -525,14 +525,16 @@ function mergePlatformItems<T = any>(source: CommentArray<CommentObject> | undef
   }
 
   // 2. 遍历 source，对每个元素进行判断，然后以 uniqueKey 元素的值作为 key 添加到新的 tmpMap 中
-  const tmpMap = new Map<string, Array<{
-    item: CommentObject
+  interface MultiPlatformItem {
+    item: T
+    itemStr: string
     platforms: string[]
     platformStr: string
-  }>>()
+  }
+  const tmpMap = new Map<string, MultiPlatformItem[]>()
 
   for (let i = 0; i < src.length; i++) {
-    const item = src[i] as CommentObject
+    const item = src[i] as T
     const uniqueKey = (item as any)[uniqueKeyName]
 
     if (!uniqueKey) {
@@ -562,13 +564,13 @@ function mergePlatformItems<T = any>(source: CommentArray<CommentObject> | undef
     }
 
     const existing = tmpMap.get(uniqueKey) || []
-    existing.push({ item, platforms, platformStr: platforms.join(' || ') })
+    existing.push({ item, itemStr: JSON.stringify(item), platforms, platformStr: platforms.join(' || ') })
     tmpMap.set(uniqueKey, existing)
   }
 
   // 3. 将 items 合并到 tmpMap 中
   for (const item of items) {
-    const newItem = item as any
+    const newItem = item
     const uniqueKey = item[uniqueKeyName] as string
 
     if (!uniqueKey) {
@@ -579,6 +581,7 @@ function mergePlatformItems<T = any>(source: CommentArray<CommentObject> | undef
       // 如果不存在，则添加到 newMap 中
       tmpMap.set(uniqueKey, [{
         item: newItem,
+        itemStr: JSON.stringify(newItem),
         platforms: [currentPlatform],
         platformStr: currentPlatform,
       }])
@@ -589,7 +592,7 @@ function mergePlatformItems<T = any>(source: CommentArray<CommentObject> | undef
     const existing = tmpMap.get(uniqueKey)!
 
     const newItemStr = JSON.stringify(newItem)
-    const equalObj = existing.find(val => JSON.stringify(val.item) === newItemStr)
+    const equalObj = existing.find(val => val.itemStr === newItemStr)
     if (equalObj) {
       equalObj.platforms.push(currentPlatform)
       equalObj.platformStr = equalObj.platforms.join(' || ')
@@ -597,6 +600,7 @@ function mergePlatformItems<T = any>(source: CommentArray<CommentObject> | undef
     else {
       existing.push({
         item: newItem,
+        itemStr: newItemStr,
         platforms: [currentPlatform],
         platformStr: currentPlatform,
       })
@@ -632,7 +636,7 @@ function mergePlatformItems<T = any>(source: CommentArray<CommentObject> | undef
   // 按照插入顺序处理元素
   for (const [_, list] of tmpMap) {
     for (const { item, platformStr } of list) {
-      result.push(item)
+      result.push(item as CommentObject)
 
       // 检查 platforms 是否和 defaultPlatformStr 一致。（platforms、defaultPlatforms 已预先排序）
       if (platformStr !== defaultPlatformStr) {
