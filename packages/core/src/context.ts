@@ -18,7 +18,7 @@ import { OUTPUT_NAME } from './constant'
 import { writeDeclaration } from './declaration'
 import { checkPagesJsonFileSync, getPathSets, writeFileWithLock } from './files'
 import { resolveOptions } from './options'
-import { PAGE_TYPE_KEY, PageFile } from './pageFile'
+import { PAGE_TYPE_KEY, PageFile, TABBAR_INDEX_KEY } from './pageFile'
 import {
   debug,
   invalidatePagesModule,
@@ -278,7 +278,7 @@ export class Context {
   }
 
   private async getTabBarMerged(): Promise<TabBar | undefined> {
-    const tabBarItems: (TabBarItem & { index: number })[] = []
+    const tabBarItems: (TabBarItem)[] = []
     for (const [_, pf] of this.pageFiles) {
       const tabbar = await pf.getTabBar()
       if (tabbar) {
@@ -300,12 +300,15 @@ export class Context {
       pagePaths.set(item.pagePath, true)
     }
 
-    tabBarItems.sort((a, b) => a.index - b.index)
+    tabBarItems.sort((a, b) => {
+      const aIdx = (a as any)[TABBAR_INDEX_KEY] || 0
+      const bIdx = (b as any)[TABBAR_INDEX_KEY] || 0
+      return aIdx - bIdx
+    })
 
     for (const item of tabBarItems) {
       if (!pagePaths.has(item.pagePath)) {
-        const { index: _, ...tabbar } = item
-        tabBar.list.push(tabbar)
+        tabBar.list.push(item)
       }
     }
 

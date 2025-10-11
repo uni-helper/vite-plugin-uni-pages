@@ -12,6 +12,7 @@ import { getRouteBlock, getRouteSfcBlock } from './customBlock'
 import { babelGenerate, debug, parseCode } from './utils'
 
 export const PAGE_TYPE_KEY = Symbol.for('type')
+export const TABBAR_INDEX_KEY = Symbol.for('index')
 
 export class PageFile {
   ctx: Context
@@ -44,7 +45,7 @@ export class PageFile {
     }
   }
 
-  public async getTabBar(forceUpdate = false): Promise<TabBarItem & { index: number } | undefined> {
+  public async getTabBar(forceUpdate = false): Promise<TabBarItem | undefined> {
     if (forceUpdate || !this.meta) {
       await this.read()
     }
@@ -58,7 +59,7 @@ export class PageFile {
     return {
       ...tabBar,
       pagePath: tabBar.pagePath || this.uri,
-      index: tabBar.index || 0,
+      [TABBAR_INDEX_KEY]: tabBar.index || 0,
     }
   }
 
