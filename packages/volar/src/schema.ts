@@ -1,6 +1,6 @@
 import pagesJsonSchema from '@uni-helper/pages-json-schema/schema.json'
 
-pagesJsonSchema.$ref = '#/definitions/PageMetaDatum'
-pagesJsonSchema.definitions.PageMetaDatum.required = []
+pagesJsonSchema.$ref = '#/definitions/Page'
+pagesJsonSchema.definitions.Page.required = []
 
 export const schema = pagesJsonSchema

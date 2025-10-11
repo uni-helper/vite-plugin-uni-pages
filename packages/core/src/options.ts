@@ -1,6 +1,5 @@
 import type { LoadConfigSource } from 'unconfig'
-import type { PagesConfig } from './config'
-import type { ResolvedOptions, UserOptions } from './types'
+import type { PagesJson, ResolvedOptions, UserOptions } from './types'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { slash } from '@antfu/utils'
@@ -35,7 +34,7 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
   const resolvedDirs = resolvePageDirs(dir, root, exclude)
   const resolvedSubDirs = subPackages.map(dir => slash(dir))
   const resolvedHomePage = typeof homePage === 'string' ? [homePage] : homePage
-  const resolvedConfigSource = typeof configSource === 'string' ? [{ files: configSource } as LoadConfigSource<PagesConfig>] : configSource
+  const resolvedConfigSource = typeof configSource === 'string' ? [{ files: configSource } as LoadConfigSource<PagesJson>] : configSource
   const resolvedDts = !dts ? false : typeof dts === 'string' ? dts : resolve(viteRoot, 'uni-pages.d.ts')
 
   const resolvedOptions: ResolvedOptions = {

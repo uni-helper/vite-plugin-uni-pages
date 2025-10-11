@@ -1,8 +1,7 @@
 declare module 'virtual:uni-pages' {
-  import type { SubPackage } from './src/config/types/index'
-  import type { PageMetaDatum } from './src/types'
+  import type { Page, SubPackage } from '.'
 
-  export const pages: PageMetaDatum[]
+  export const pages: Page[]
   export const subPackages: SubPackage[]
 }
 

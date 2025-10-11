@@ -1,5 +1,5 @@
 {
-  "$ref": "#/definitions/PagesConfig",
+  "$ref": "#/definitions/PagesJson",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
     "AnimationType": {
@@ -2680,7 +2680,10 @@
       },
       "type": "object"
     },
-    "PageMetaDatum": {
+    "Page": {
+      "additionalProperties": {
+        "description": "自定义属性"
+      },
       "properties": {
         "needLogin": {
           "description": "当前页面是否需要登录才可以访问，此配置优先级高于 uniIdRouter 下的 needLogin",
@@ -2693,9 +2696,6 @@
         "style": {
           "$ref": "#/definitions/GlobalStyle",
           "description": "配置页面窗口表现，配置项参考下方 pageStyle"
-        },
-        "type": {
-          "type": "string"
         }
       },
       "required": [
@@ -2703,7 +2703,13 @@
       ],
       "type": "object"
     },
-    "PagesConfig": {
+    "Pages": {
+      "items": {
+        "$ref": "#/definitions/Page"
+      },
+      "type": "array"
+    },
+    "PagesJson": {
       "description": "对 uni-app 进行全局配置，决定页面文件的路径、窗口样式、原生的导航栏、底部的原生 tabBar 等，类似微信小程序中 app.json 的页面管理部分\n\n注意定位权限申请等原属于 app.json 的内容，需要在 manifest 中配置",
       "properties": {
         "condition": {
@@ -2727,11 +2733,8 @@
           "description": "大屏左侧窗口"
         },
         "pages": {
-          "description": "设置页面路径及窗口表现",
-          "items": {
-            "$ref": "#/definitions/PageMetaDatum"
-          },
-          "type": "array"
+          "$ref": "#/definitions/Pages",
+          "description": "设置页面路径及窗口表现"
         },
         "preloadRule": {
           "additionalProperties": {
@@ -2825,22 +2828,19 @@
       "additionalProperties": false,
       "properties": {
         "pages": {
-          "description": "子包由哪些页面组成，参数同 pages",
-          "items": {
-            "$ref": "#/definitions/PageMetaDatum"
-          },
-          "type": "array"
+          "$ref": "#/definitions/Pages",
+          "description": "子包由哪些页面组成，参数同 pages"
         },
         "plugins": {
           "additionalProperties": {
             "properties": {
+              "export": {
+                "type": "string"
+              },
               "provider": {
                 "type": "string"
               },
               "version": {
-                "type": "string"
-              },
-              "export": {
                 "type": "string"
               }
             },
@@ -3005,9 +3005,6 @@
           "type": "string"
         }
       },
-      "required": [
-        "list"
-      ],
       "type": "object"
     },
     "TabBarIconFont": {

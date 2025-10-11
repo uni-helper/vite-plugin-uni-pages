@@ -1,7 +1,6 @@
 import type { SFCDescriptor, SFCParseOptions } from '@vue/compiler-sfc'
-import type { TabBarItem } from './config'
-import type { PageContext } from './context'
-import type { PageMetaDatum, PagePath, RouteBlockLang, UserPageMeta } from './types'
+import type { Context } from './context'
+import type { Page, PathSet, RouteBlockLang, TabBarItem, UserPageMeta } from './types'
 import fs from 'node:fs'
 import { extname } from 'node:path'
 import * as t from '@babel/types'
@@ -12,10 +11,12 @@ import { normalizePath } from 'vite'
 import { getRouteBlock, getRouteSfcBlock } from './customBlock'
 import { babelGenerate, debug, parseCode } from './utils'
 
-export class Page {
-  ctx: PageContext
+export const PAGE_TYPE_KEY = Symbol.for('type')
 
-  path: PagePath
+export class PageFile {
+  ctx: Context
+
+  path: PathSet
   uri: string
 
   changed: boolean = true
@@ -23,22 +24,23 @@ export class Page {
   private raw: string = ''
   private meta: UserPageMeta | undefined
 
-  constructor(ctx: PageContext, path: PagePath) {
+  constructor(ctx: Context, path: PathSet) {
     this.ctx = ctx
     this.path = path
-    this.uri = normalizePath(path.relativePath.replace(extname(path.relativePath), ''))
+    this.uri = normalizePath(path.rel.replace(extname(path.rel), ''))
   }
 
-  public async getPageMeta(forceUpdate = false): Promise<PageMetaDatum> {
+  public async getPageMeta(forceUpdate = false): Promise<Page> {
     if (forceUpdate || !this.meta) {
       await this.read()
     }
 
-    const { path, tabBar: _, ...others } = this.meta || {}
+    const { path, type, tabBar: _, ...others } = this.meta || {}
 
     return {
       path: path ?? this.uri,
       ...others,
+      [PAGE_TYPE_KEY]: type, // 既标注了 page 的 类型，又避免序列化时会多个 key
     }
   }
 
@@ -89,8 +91,8 @@ export class Page {
 
   private async readPageMetaFromFile(): Promise<UserPageMeta> {
     try {
-      const content = await fs.promises.readFile(this.path.absolutePath, { encoding: 'utf-8' })
-      const sfc = parseSFC(content, { filename: this.path.absolutePath })
+      const content = await fs.promises.readFile(this.path.abs, { encoding: 'utf-8' })
+      const sfc = parseSFC(content, { filename: this.path.abs })
 
       const meta = await tryPageMetaFromMacro(sfc)
       if (meta) {
@@ -100,7 +102,7 @@ export class Page {
       return tryPageMetaFromCustomBlock(sfc, this.ctx.options.routeBlockLang)
     }
     catch (err: any) {
-      throw new Error(`Read page meta fail in ${this.path.relativePath}\n${err.message}`)
+      throw new Error(`Read page meta fail in ${this.path.rel}\n${err.message}`)
     }
   }
 }
