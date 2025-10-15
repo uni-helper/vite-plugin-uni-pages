@@ -1,6 +1,6 @@
 import type { SFCDescriptor, SFCParseOptions } from '@vue/compiler-sfc'
 import type { Context } from './context'
-import type { Page, PathSet, RouteBlockLang, TabBarItem, UserPageMeta } from './types'
+import type { PagesJSON, PathSet, RouteBlockLang, UserPageMeta } from './types'
 import fs from 'node:fs'
 import { extname } from 'node:path'
 import * as t from '@babel/types'
@@ -31,7 +31,7 @@ export class PageFile {
     this.uri = normalizePath(path.rel.replace(extname(path.rel), ''))
   }
 
-  public async getPageMeta(forceUpdate = false): Promise<Page> {
+  public async getPageMeta(forceUpdate = false): Promise<PagesJSON.Page> {
     if (forceUpdate || !this.meta) {
       await this.read()
     }
@@ -45,7 +45,7 @@ export class PageFile {
     }
   }
 
-  public async getTabBar(forceUpdate = false): Promise<TabBarItem | undefined> {
+  public async getTabBar(forceUpdate = false): Promise<PagesJSON.TabBarItem | undefined> {
     if (forceUpdate || !this.meta) {
       await this.read()
     }

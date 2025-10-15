@@ -1,7 +1,7 @@
 import type { FSWatcher } from 'chokidar'
 import type { CommentObject, CommentSymbol } from 'comment-json'
 import type { Logger, ViteDevServer } from 'vite'
-import type { KnownKeys, Page, PagesJson, PathSet, ResolvedOptions, SubPackage, TabBar, TabBarItem, UserOptions } from './types'
+import type { KnownKeys, PagesJSON, PathSet, ResolvedOptions, UserOptions } from './types'
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -29,13 +29,13 @@ import {
 export class Context {
   private _server: ViteDevServer | undefined
 
-  pagesGlobConfig: PagesJson | undefined
+  pagesGlobConfig: PagesJSON.PagesJson | undefined
   pagesConfigSourcePaths: string[] = []
 
   pageFiles = new Map<string, PageFile>() // abs path -> PageFile
   subPageFiles = new Map<string, Map<string, PageFile>>() // root -> abs path -> page
-  pages: Page[] = []
-  subPackages: SubPackage[] = []
+  pages: PagesJSON.Page[] = []
+  subPackages: PagesJSON.SubPackage[] = []
 
   resolvedPagesJSONPath = ''
   private resolvedPagesJSONIndent?: string // '  '
@@ -73,7 +73,7 @@ export class Context {
 
   async loadUserPagesConfig() {
     const configSource = this.options.configSource
-    const { config, sources } = await loadConfig<PagesJson>({ cwd: this.root, sources: configSource, defaults: {} })
+    const { config, sources } = await loadConfig<PagesJSON.PagesJson>({ cwd: this.root, sources: configSource, defaults: {} })
     this.pagesGlobConfig = config.default || config
     this.pagesConfigSourcePaths = sources
     debug.options(this.pagesGlobConfig)
@@ -196,8 +196,8 @@ export class Context {
    * @param overrides custom page config
    * @returns pages rules
    */
-  async parsePages(pages: Map<string, PageFile>, type: 'main' | 'sub', overrides?: Page[]) {
-    const jobs: Promise<Page>[] = []
+  async parsePages(pages: Map<string, PageFile>, type: 'main' | 'sub', overrides?: PagesJSON.Page[]) {
+    const jobs: Promise<PagesJSON.Page>[] = []
     for (const [_, page] of pages) {
       jobs.push(page.getPageMeta())
     }
@@ -209,11 +209,11 @@ export class Context {
       : generatedPageMetaData
 
     // 使用 Map 去重，保留每个 path 的最后一个元素，同时保持较好的性能
-    const parseMeta = Array.from(
+    const parseMeta: PagesJSON.Page[] = Array.from(
       result.reduce((map, page) => {
         map.set(page.path, page)
         return map
-      }, new Map<string, Page>()).values(),
+      }, new Map<string, PagesJSON.Page>()).values(),
     )
 
     return type === 'main' ? this.setHomePage(parseMeta) : parseMeta
@@ -224,7 +224,7 @@ export class Context {
    * @param result pages rules array
    * @returns pages rules
    */
-  setHomePage(result: Page[]): Page[] {
+  setHomePage(result: PagesJSON.Page[]): PagesJSON.Page[] {
     const hasHome = result.some(p => (p as any)[PAGE_TYPE_KEY] === 'home')
     if (!hasHome) {
       const isFoundHome = result.some((item) => {
@@ -260,7 +260,7 @@ export class Context {
         map[item.root] = item
         return map
       },
-      {} as Record<string, SubPackage>,
+      {} as Record<string, PagesJSON.SubPackage>,
     )
 
     for (const [dir, pfiles] of this.subPageFiles) {
@@ -277,8 +277,8 @@ export class Context {
     debug.subPages(this.subPackages)
   }
 
-  private async getTabBarMerged(): Promise<TabBar | undefined> {
-    const tabBarItems: (TabBarItem)[] = []
+  private async getTabBarMerged(): Promise<PagesJSON.TabBar | undefined> {
+    const tabBarItems: (PagesJSON.TabBarItem)[] = []
     for (const [_, pf] of this.pageFiles) {
       const tabbar = await pf.getTabBar()
       if (tabbar) {
@@ -425,11 +425,11 @@ export class Context {
 
     // subPackages
     pageJson.subPackages = oldSubPackages || new CommentArray<CommentObject>()
-    const newSubPackages = new Map<string, SubPackage>()
+    const newSubPackages = new Map<string, PagesJSON.SubPackage>()
     for (const item of this.subPackages) {
       newSubPackages.set(item.root, item)
     }
-    for (const existing of pageJson.subPackages as unknown as SubPackage[]) {
+    for (const existing of pageJson.subPackages as unknown as PagesJSON.SubPackage[]) {
       const sub = newSubPackages.get(existing.root)
       if (sub) {
         existing.pages = mergePlatformItems(existing.pages, currentPlatform, sub.pages, 'path') as any

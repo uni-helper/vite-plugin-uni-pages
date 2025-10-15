@@ -1,8 +1,8 @@
 declare module 'virtual:uni-pages' {
-  import type { Page, SubPackage } from '.'
+  import type { PagesJSON } from '.'
 
-  export const pages: Page[]
-  export const subPackages: SubPackage[]
+  export const pages: PagesJSON.Page[]
+  export const subPackages: PagesJSON.SubPackage[]
 }
 
 declare global {

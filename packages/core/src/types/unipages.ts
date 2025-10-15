@@ -2,7 +2,7 @@ import type { CommentJSONValue } from 'comment-json'
 import type { LoadConfigSource } from 'unconfig'
 import type { Context } from '../context'
 import type { debug } from '../utils'
-import type { Page, PagesJson, TabBarItem } from './uniapp'
+import type * as PagesJSON from './uniapp'
 import type { DeepPartial, MaybePromiseCallable } from './utils'
 
 export interface CustomBlock {
@@ -12,7 +12,7 @@ export interface CustomBlock {
 
 export type RouteBlockLang = 'json5' | 'jsonc' | 'json' | 'yaml' | 'yml'
 
-export type ConfigSource = string | LoadConfigSource<PagesJson> | LoadConfigSource<PagesJson>[]
+export type ConfigSource = string | LoadConfigSource<PagesJSON.PagesJson> | LoadConfigSource<PagesJSON.PagesJson>[]
 
 export interface Options {
 
@@ -113,7 +113,7 @@ export interface ResolvedOptions extends Omit<Options, 'dir' | 'homePage' | 'con
    */
   homePage: string[]
 
-  configSource: LoadConfigSource<PagesJson>[]
+  configSource: LoadConfigSource<PagesJSON.PagesJson>[]
 }
 
 export interface PathSet {
@@ -121,7 +121,7 @@ export interface PathSet {
   abs: string
 }
 
-export interface UserTabBarItem extends Partial<TabBarItem> {
+export interface UserTabBarItem extends Partial<PagesJSON.TabBarItem> {
   /**
    * 配置页面路径
    * @deprecated 可选，将会根据文件路径自动生成
@@ -134,7 +134,7 @@ export interface UserTabBarItem extends Partial<TabBarItem> {
   index?: number
 }
 
-export interface UserPageMeta extends Partial<Page> {
+export interface UserPageMeta extends Partial<PagesJSON.Page> {
 
   /**
    * 标识 page 类型
@@ -153,7 +153,7 @@ export interface UserPageMeta extends Partial<Page> {
   tabBar?: UserTabBarItem
 }
 
-export type UserPagesJson = DeepPartial<PagesJson>
+export type UserPagesJson = DeepPartial<PagesJSON.PagesJson>
 
 export declare function definePage(options: MaybePromiseCallable<UserPageMeta>): void
 
