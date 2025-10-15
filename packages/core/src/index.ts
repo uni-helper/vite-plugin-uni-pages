@@ -14,9 +14,9 @@ import {
   OUTPUT_NAME,
   RESOLVED_MODULE_ID_VIRTUAL,
 } from './constant'
-import { PageContext } from './context'
+import { Context } from './context'
 import { checkPagesJsonFileSync } from './files'
-import { findMacro, parseSFC } from './page'
+import { findMacro, parseSFC } from './pageFile'
 
 export * from './config'
 export * from './constant'
@@ -24,12 +24,12 @@ export * from './context'
 export * from './customBlock'
 export * from './files'
 export * from './options'
-export * from './page'
+export * from './pageFile'
 export * from './types'
 export * from './utils'
 
 export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
-  let ctx: PageContext
+  let ctx: Context
 
   // TODO: check if the pages.json file is valid
   const resolvedPagesJSONPath = path.join(
@@ -43,7 +43,7 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
     name: 'vite-plugin-uni-pages',
     enforce: 'pre',
     async configResolved(config) {
-      ctx = new PageContext(userOptions, config.root)
+      ctx = new Context(userOptions, config.root)
 
       if (config.plugins.some(v => v.name === 'vite-plugin-uni-platform'))
         ctx.withUniPlatform = true

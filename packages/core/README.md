@@ -114,14 +114,14 @@ export interface Options {
    */
   routeBlockLang: 'json5' | 'jsonc' | 'json' | 'yaml' | 'yml'
 
-  onBeforeLoadUserConfig: (ctx: PageContext) => void
-  onAfterLoadUserConfig: (ctx: PageContext) => void
-  onBeforeScanPages: (ctx: PageContext) => void
-  onAfterScanPages: (ctx: PageContext) => void
-  onBeforeMergePageMetaData: (ctx: PageContext) => void
-  onAfterMergePageMetaData: (ctx: PageContext) => void
-  onBeforeWriteFile: (ctx: PageContext) => void
-  onAfterWriteFile: (ctx: PageContext) => void
+  onBeforeLoadUserConfig: (ctx: Context) => void
+  onAfterLoadUserConfig: (ctx: Context) => void
+  onBeforeScanPages: (ctx: Context) => void
+  onAfterScanPages: (ctx: Context) => void
+  onBeforeMergePageMetaData: (ctx: Context) => void
+  onAfterMergePageMetaData: (ctx: Context) => void
+  onBeforeWriteFile: (ctx: Context) => void
+  onAfterWriteFile: (ctx: Context) => void
 }
 ```
 

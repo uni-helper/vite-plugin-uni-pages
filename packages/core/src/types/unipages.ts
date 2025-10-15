@@ -1,19 +1,18 @@
 import type { CommentJSONValue } from 'comment-json'
 import type { LoadConfigSource } from 'unconfig'
-import type { GlobalStyle, PagesConfig, TabBarItem } from './config'
-import type { PageContext } from './context'
-import type { debug } from './utils'
+import type { Context } from '../context'
+import type { debug } from '../utils'
+import type * as PagesJSON from './uniapp'
+import type { DeepPartial, MaybePromiseCallable } from './utils'
 
 export interface CustomBlock {
   attr: Record<string, any>
   content: Record<string, any> | CommentJSONValue
 }
 
-export type debugType = keyof typeof debug
-
-export type ConfigSource = string | LoadConfigSource<PagesConfig> | LoadConfigSource<PagesConfig>[]
-
 export type RouteBlockLang = 'json5' | 'jsonc' | 'json' | 'yaml' | 'yml'
+
+export type ConfigSource = string | LoadConfigSource<PagesJSON.PagesJson> | LoadConfigSource<PagesJSON.PagesJson>[]
 
 export interface Options {
 
@@ -82,16 +81,16 @@ export interface Options {
   /**
    * enable debug log
    */
-  debug: boolean | debugType
+  debug: boolean | keyof typeof debug
 
-  onBeforeLoadUserConfig: (ctx: PageContext) => void
-  onAfterLoadUserConfig: (ctx: PageContext) => void
-  onBeforeScanPages: (ctx: PageContext) => void
-  onAfterScanPages: (ctx: PageContext) => void
-  onBeforeMergePageMetaData: (ctx: PageContext) => void
-  onAfterMergePageMetaData: (ctx: PageContext) => void
-  onBeforeWriteFile: (ctx: PageContext) => void
-  onAfterWriteFile: (ctx: PageContext) => void
+  onBeforeLoadUserConfig: (ctx: Context) => void
+  onAfterLoadUserConfig: (ctx: Context) => void
+  onBeforeScanPages: (ctx: Context) => void
+  onAfterScanPages: (ctx: Context) => void
+  onBeforeMergePageMetaData: (ctx: Context) => void
+  onAfterMergePageMetaData: (ctx: Context) => void
+  onBeforeWriteFile: (ctx: Context) => void
+  onAfterWriteFile: (ctx: Context) => void
 }
 
 export type UserOptions = Partial<Options>
@@ -114,41 +113,15 @@ export interface ResolvedOptions extends Omit<Options, 'dir' | 'homePage' | 'con
    */
   homePage: string[]
 
-  configSource: LoadConfigSource<PagesConfig>[]
+  configSource: LoadConfigSource<PagesJSON.PagesJson>[]
 }
 
-export interface PagePath {
-  relativePath: string
-  absolutePath: string
+export interface PathSet {
+  rel: string
+  abs: string
 }
 
-export interface PageMetaDatum {
-  /**
-   * 配置页面路径
-   */
-  path: string
-  type?: string
-  /**
-   * 配置页面窗口表现，配置项参考下方 pageStyle
-   */
-  style?: GlobalStyle
-  /**
-   * 当前页面是否需要登录才可以访问，此配置优先级高于 uniIdRouter 下的 needLogin
-   */
-  needLogin?: boolean
-  [x: string]: any
-}
-
-export type ExcludeIndexSignature<T> = {
-  [K in keyof T as string extends K ? never : number extends K ? never : K]: T[K]
-}
-
-export interface SubPageMetaDatum {
-  root: string
-  pages: PageMetaDatum[]
-}
-
-export interface UserTabBarItem extends Partial<TabBarItem> {
+export interface UserTabBarItem extends Partial<PagesJSON.TabBarItem> {
   /**
    * 配置页面路径
    * @deprecated 可选，将会根据文件路径自动生成
@@ -161,7 +134,13 @@ export interface UserTabBarItem extends Partial<TabBarItem> {
   index?: number
 }
 
-export interface UserPageMeta extends Partial<PageMetaDatum> {
+export interface UserPageMeta extends Partial<PagesJSON.Page> {
+
+  /**
+   * 标识 page 类型
+   */
+  type?: 'page' | 'home'
+
   /**
    * 配置页面路径
    * @deprecated 可选，将会根据文件路径自动生成
@@ -174,9 +153,7 @@ export interface UserPageMeta extends Partial<PageMetaDatum> {
   tabBar?: UserTabBarItem
 }
 
-export type MaybePromise<T> = T | Promise<T>
-export type MaybeCallable<T> = T | (() => T)
-export type MaybePromiseCallable<T> = T | (() => T) | (() => Promise<T>)
+export type UserPagesJson = DeepPartial<PagesJSON.PagesJson>
 
 export declare function definePage(options: MaybePromiseCallable<UserPageMeta>): void
 

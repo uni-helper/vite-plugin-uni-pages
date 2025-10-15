@@ -1,5 +1,5 @@
 import type { ModuleNode, ViteDevServer } from 'vite'
-import type { PageMetaDatum } from './types'
+import type { PagesJSON } from './types'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import vm from 'node:vm'
@@ -46,9 +46,9 @@ export function isTargetFile(path: string) {
  * @param pageMetaData  page meta data array
  * TODO: support merge middleware
  */
-export function mergePageMetaDataArray(pageMetaData: PageMetaDatum[]) {
+export function mergePageMetaDataArray(pageMetaData: PagesJSON.Page[]) {
   const pageMetaDataObj = groupBy(pageMetaData, 'path')
-  const result: PageMetaDatum[] = []
+  const result: PagesJSON.Page[] = []
   for (const path in pageMetaDataObj) {
     const _pageMetaData = pageMetaDataObj[path]
     const options = _pageMetaData[0]

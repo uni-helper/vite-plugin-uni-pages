@@ -1,15 +1,17 @@
-import type { PageMetaDatum } from '../../types'
 import type { Condition } from './condition'
 import type { EasyCom } from './easycom'
 import type { GlobalStyle } from './globalStyle'
+import type { Pages } from './pages'
 import type { SubPackages } from './subPackages'
 import type { TabBar } from './tabBar'
 import type { TheWindow } from './theWindow'
 import type { UniIdRouter } from './uniIdRouter'
 
+export * from './common'
 export * from './condition'
 export * from './easycom'
 export * from './globalStyle'
+export * from './pages'
 export * from './subPackages'
 export * from './tabBar'
 export * from './theWindow'
@@ -20,7 +22,7 @@ export * from './uniIdRouter'
  *
  * 注意定位权限申请等原属于 app.json 的内容，需要在 manifest 中配置
  */
-export interface PagesConfig {
+export interface PagesJson {
   /**
    * 设置默认页面的窗口表现
    */
@@ -29,7 +31,7 @@ export interface PagesConfig {
   /**
    * 设置页面路径及窗口表现
    */
-  pages?: PageMetaDatum[]
+  pages?: Pages
 
   /**
    * 组件自动引入规则
@@ -143,5 +145,3 @@ export interface PagesConfig {
 
   [x: string]: any
 }
-
-export interface UserPagesConfig extends PagesConfig {}
