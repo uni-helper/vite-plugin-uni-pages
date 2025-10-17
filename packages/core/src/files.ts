@@ -108,12 +108,12 @@ export async function writeFileWithLock(path: string, content: string, retry = 3
     return
   }
 
-  let relase: () => Promise<void> | undefined
+  let release: () => Promise<void> | undefined
 
   try {
     try {
       // 获取文件锁
-      relase = await lockfile.lock(path, { realpath: false })
+      release = await lockfile.lock(path, { realpath: false })
     }
     catch {
       // 获取文件锁失败
@@ -125,8 +125,8 @@ export async function writeFileWithLock(path: string, content: string, retry = 3
   finally {
     // eslint-disable-next-line ts/ban-ts-comment
     // @ts-expect-error'
-    if (relase) {
-      await relase() // 释放文件锁
+    if (release) {
+      await release() // 释放文件锁
     }
   }
 }
