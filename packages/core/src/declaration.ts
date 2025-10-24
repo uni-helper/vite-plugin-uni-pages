@@ -1,18 +1,18 @@
-import type { PageContext } from './context'
+import type { Context } from './context'
 import { existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile as writeFile_ } from 'node:fs/promises'
 
 import { dirname, join } from 'node:path'
 import { normalizePath } from 'vite'
 
-export function getDeclaration(ctx: PageContext) {
-  const subPagesPath = ctx.subPageMetaData.map((sub) => {
+export function getDeclaration(ctx: Context) {
+  const subPagesPath = ctx.subPackages.map((sub) => {
     return sub.pages.map(v => (`"/${normalizePath(join(sub.root, v.path))}"`))
   }).flat()
   const tabsPagesPath = ctx.pagesGlobConfig?.tabBar?.list?.map((v) => {
     return `"/${v!.pagePath}"`
   }) ?? []
-  const allPagesPath = [...ctx.pageMetaData.filter(page => !tabsPagesPath.includes(page.path)).map(v => `"/${v.path}"`), ...subPagesPath]
+  const allPagesPath = [...ctx.pages.filter(page => !tabsPagesPath.includes(page.path)).map(v => `"/${v.path}"`), ...subPagesPath]
   const code = `/* eslint-disable */
 /* prettier-ignore */
 // @ts-nocheck
@@ -51,7 +51,7 @@ async function writeFile(filePath: string, content: string) {
   return await writeFile_(filePath, content, 'utf-8')
 }
 
-export async function writeDeclaration(ctx: PageContext, filepath: string) {
+export async function writeDeclaration(ctx: Context, filepath: string) {
   const originalContent = existsSync(filepath) ? await readFile(filepath, 'utf-8') : ''
 
   const code = getDeclaration(ctx)

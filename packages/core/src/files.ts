@@ -1,5 +1,7 @@
-import type { ResolvedOptions } from './types'
+import type { PathSet, ResolvedOptions } from './types'
 import fs from 'node:fs'
+import path from 'node:path'
+import { slash } from '@antfu/utils'
 import fg from 'fast-glob'
 import lockfile from 'proper-lockfile'
 import { FILE_EXTENSIONS } from './constant'
@@ -20,6 +22,21 @@ export function getPageFiles(path: string, options: ResolvedOptions): string[] {
   })
 
   return files
+}
+
+export function getPathSets(dir: string, options: ResolvedOptions): PathSet[] {
+  const pagesDirPath = slash(path.resolve(options.root, dir))
+  const basePath = slash(path.join(options.root, options.outDir))
+  const files = getPageFiles(pagesDirPath, options)
+  debug.pages(dir, files)
+  const pagePaths = files
+    .map(file => slash(file))
+    .map(file => ({
+      rel: path.relative(basePath, slash(path.resolve(pagesDirPath, file))),
+      abs: slash(path.resolve(pagesDirPath, file)),
+    }))
+
+  return pagePaths
 }
 
 /**

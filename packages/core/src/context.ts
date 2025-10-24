@@ -1,9 +1,7 @@
 import type { FSWatcher } from 'chokidar'
 import type { CommentObject, CommentSymbol } from 'comment-json'
 import type { Logger, ViteDevServer } from 'vite'
-import type { TabBar, TabBarItem } from './config'
-import type { PagesConfig } from './config/types'
-import type { ExcludeIndexSignature, PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
+import type { KnownKeys, PagesJSON, PathSet, ResolvedOptions, UserOptions } from './types'
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -18,9 +16,9 @@ import detectNewline from 'detect-newline'
 import { loadConfig } from 'unconfig'
 import { OUTPUT_NAME } from './constant'
 import { writeDeclaration } from './declaration'
-import { checkPagesJsonFileSync, getPageFiles, writeFileWithLock } from './files'
+import { checkPagesJsonFileSync, getPathSets, writeFileWithLock } from './files'
 import { resolveOptions } from './options'
-import { Page } from './page'
+import { PAGE_TYPE_KEY, PageFile, TABBAR_INDEX_KEY } from './pageFile'
 import {
   debug,
   invalidatePagesModule,
@@ -28,16 +26,16 @@ import {
   mergePageMetaDataArray,
 } from './utils'
 
-export class PageContext {
+export class Context {
   private _server: ViteDevServer | undefined
 
-  pagesGlobConfig: PagesConfig | undefined
+  pagesGlobConfig: PagesJSON.PagesJson | undefined
   pagesConfigSourcePaths: string[] = []
 
-  pages = new Map<string, Page>() // abs path -> Page
-  subPages = new Map<string, Map<string, Page>>() // root -> abs path -> page
-  pageMetaData: PageMetaDatum[] = []
-  subPageMetaData: SubPageMetaDatum[] = []
+  pageFiles = new Map<string, PageFile>() // abs path -> PageFile
+  subPageFiles = new Map<string, Map<string, PageFile>>() // root -> abs path -> page
+  pages: PagesJSON.Page[] = []
+  subPackages: PagesJSON.SubPackage[] = []
 
   resolvedPagesJSONPath = ''
   private resolvedPagesJSONIndent?: string // '  '
@@ -75,7 +73,7 @@ export class PageContext {
 
   async loadUserPagesConfig() {
     const configSource = this.options.configSource
-    const { config, sources } = await loadConfig<PagesConfig>({ cwd: this.root, sources: configSource, defaults: {} })
+    const { config, sources } = await loadConfig<PagesJSON.PagesJson>({ cwd: this.root, sources: configSource, defaults: {} })
     this.pagesGlobConfig = config.default || config
     this.pagesConfigSourcePaths = sources
     debug.options(this.pagesGlobConfig)
@@ -83,38 +81,38 @@ export class PageContext {
 
   async scanPages() {
     const pageDirFiles = this.options.dirs.map((dir) => {
-      return { dir, files: getPagePaths(dir, this.options) }
+      return { dir, files: getPathSets(dir, this.options) }
     })
 
     const paths = pageDirFiles.map(page => page.files).flat()
     debug.pages(paths)
 
-    const pages = new Map<string, Page>()
+    const pageFiles = new Map<string, PageFile>()
     for (const path of paths) {
-      const page = this.pages.get(path.absolutePath) || new Page(this, path)
-      pages.set(path.absolutePath, page)
+      const page = this.pageFiles.get(path.abs) || new PageFile(this, path)
+      pageFiles.set(path.abs, page)
     }
 
-    this.pages = pages
+    this.pageFiles = pageFiles
   }
 
   async scanSubPages() {
-    const paths: Record<string, PagePath[]> = {}
-    const subPages = new Map<string, Map<string, Page>>()
+    const paths: Record<string, PathSet[]> = {}
+    const subPageFiles = new Map<string, Map<string, PageFile>>()
     for (const dir of this.options.subPackages) {
-      const pagePaths = getPagePaths(dir, this.options)
+      const pagePaths = getPathSets(dir, this.options)
       paths[dir] = pagePaths
 
-      const pages = new Map<string, Page>()
+      const pageFiles = new Map<string, PageFile>()
       for (const path of pagePaths) {
-        const page = this.subPages.get(dir)?.get(path.absolutePath) || new Page(this, path)
-        pages.set(path.absolutePath, page)
+        const page = this.subPageFiles.get(dir)?.get(path.abs) || new PageFile(this, path)
+        pageFiles.set(path.abs, page)
       }
-      subPages.set(dir, pages)
+      subPageFiles.set(dir, pageFiles)
     }
     debug.subPages(JSON.stringify(paths, null, 2))
 
-    this.subPages = subPages
+    this.subPageFiles = subPageFiles
   }
 
   setupViteServer(server: ViteDevServer) {
@@ -198,8 +196,8 @@ export class PageContext {
    * @param overrides custom page config
    * @returns pages rules
    */
-  async parsePages(pages: Map<string, Page>, type: 'main' | 'sub', overrides?: PageMetaDatum[]) {
-    const jobs: Promise<PageMetaDatum>[] = []
+  async parsePages(pages: Map<string, PageFile>, type: 'main' | 'sub', overrides?: PagesJSON.Page[]) {
+    const jobs: Promise<PagesJSON.Page>[] = []
     for (const [_, page] of pages) {
       jobs.push(page.getPageMeta())
     }
@@ -211,11 +209,11 @@ export class PageContext {
       : generatedPageMetaData
 
     // 使用 Map 去重，保留每个 path 的最后一个元素，同时保持较好的性能
-    const parseMeta = Array.from(
+    const parseMeta: PagesJSON.Page[] = Array.from(
       result.reduce((map, page) => {
         map.set(page.path, page)
         return map
-      }, new Map<string, PageMetaDatum>()).values(),
+      }, new Map<string, PagesJSON.Page>()).values(),
     )
 
     return type === 'main' ? this.setHomePage(parseMeta) : parseMeta
@@ -226,13 +224,13 @@ export class PageContext {
    * @param result pages rules array
    * @returns pages rules
    */
-  setHomePage(result: PageMetaDatum[]): PageMetaDatum[] {
-    const hasHome = result.some(({ type }) => type === 'home')
+  setHomePage(result: PagesJSON.Page[]): PagesJSON.Page[] {
+    const hasHome = result.some(p => (p as any)[PAGE_TYPE_KEY] === 'home')
     if (!hasHome) {
       const isFoundHome = result.some((item) => {
         const isFound = this.options.homePage.find(v => (v === item.path))
         if (isFound)
-          item.type = 'home'
+          (item as any)[PAGE_TYPE_KEY] = 'home'
 
         return isFound
       })
@@ -244,49 +242,45 @@ export class PageContext {
       }
     }
 
-    result.sort(page => (page.type === 'home' ? -1 : 0))
+    result.sort(page => ((page as any)[PAGE_TYPE_KEY] === 'home' ? -1 : 0))
 
     return result
   }
 
   async mergePageMetaData() {
-    const pageMetaData = await this.parsePages(this.pages, 'main', this.pagesGlobConfig?.pages)
+    const pages = await this.parsePages(this.pageFiles, 'main', this.pagesGlobConfig?.pages)
 
-    this.pageMetaData = pageMetaData
-    debug.pages(this.pageMetaData)
+    this.pages = pages
+    debug.pages(this.pages)
   }
 
   async mergeSubPageMetaData() {
-    const subPageMaps: Record<string, PageMetaDatum[]> = {}
-    const subPackages = this.pagesGlobConfig?.subPackages || []
+    const subPageMaps = (this.pagesGlobConfig?.subPackages || []).reduce(
+      (map, item) => {
+        map[item.root] = item
+        return map
+      },
+      {} as Record<string, PagesJSON.SubPackage>,
+    )
 
-    for (const [dir, pages] of this.subPages) {
+    for (const [dir, pfiles] of this.subPageFiles) {
       const basePath = slash(path.join(this.options.root, this.options.outDir))
       const root = slash(path.relative(basePath, path.join(this.options.root, dir)))
 
-      const globPackage = subPackages?.find(v => v.root === root)
-      subPageMaps[root] = await this.parsePages(pages, 'sub', globPackage?.pages)
-      subPageMaps[root] = subPageMaps[root].map(page => ({ ...page, path: slash(path.relative(root, page.path)) }))
+      const pkg = subPageMaps[root] || { root }
+      const pages = await this.parsePages(pfiles, 'sub', pkg.pages)
+      pkg.pages = pages.map(page => ({ ...page, path: slash(path.relative(root, page.path)) }))
+      subPageMaps[root] = pkg
     }
 
-    // Inherit subPackages that do not exist in the config
-    for (const { root, pages } of subPackages) {
-      if (root && !subPageMaps[root])
-        subPageMaps[root] = pages || []
-    }
-
-    const subPageMetaData = Object.keys(subPageMaps)
-      .map(root => ({ root, pages: subPageMaps[root] }))
-      .filter(meta => meta.pages.length > 0)
-
-    this.subPageMetaData = subPageMetaData
-    debug.subPages(this.subPageMetaData)
+    this.subPackages = Object.values(subPageMaps).filter(pkg => pkg.pages.length > 0)
+    debug.subPages(this.subPackages)
   }
 
-  private async getTabBarMerged(): Promise<TabBar | undefined> {
-    const tabBarItems: (TabBarItem & { index: number })[] = []
-    for (const [_, page] of this.pages) {
-      const tabbar = await page.getTabBar()
+  private async getTabBarMerged(): Promise<PagesJSON.TabBar | undefined> {
+    const tabBarItems: (PagesJSON.TabBarItem)[] = []
+    for (const [_, pf] of this.pageFiles) {
+      const tabbar = await pf.getTabBar()
       if (tabbar) {
         tabBarItems.push(tabbar)
       }
@@ -306,12 +300,15 @@ export class PageContext {
       pagePaths.set(item.pagePath, true)
     }
 
-    tabBarItems.sort((a, b) => a.index - b.index)
+    tabBarItems.sort((a, b) => {
+      const aIdx = (a as any)[TABBAR_INDEX_KEY] || 0
+      const bIdx = (b as any)[TABBAR_INDEX_KEY] || 0
+      return aIdx - bIdx
+    })
 
     for (const item of tabBarItems) {
       if (!pagePaths.has(item.pagePath)) {
-        const { index: _, ...tabbar } = item
-        tabBar.list.push(tabbar)
+        tabBar.list.push(item)
       }
     }
 
@@ -320,20 +317,20 @@ export class PageContext {
 
   async updatePagesJSON(filepath?: string) {
     if (filepath) {
-      let page = this.pages.get(filepath)
-      if (!page) {
-        let subPage: Page | undefined
-        for (const [_, pages] of this.subPages) {
-          subPage = pages.get(filepath)
-          if (subPage) {
+      let pageFile = this.pageFiles.get(filepath)
+      if (!pageFile) {
+        let subPageFile: PageFile | undefined
+        for (const [_, pageFiles] of this.subPageFiles) {
+          subPageFile = pageFiles.get(filepath)
+          if (subPageFile) {
             break
           }
         }
-        page = subPage
+        pageFile = subPageFile
       }
-      if (page) {
-        await page.read()
-        if (!page.hasChanged()) {
+      if (pageFile) {
+        await pageFile.read()
+        if (!pageFile.hasChanged()) {
           debug.cache(`The route block on page ${filepath} did not send any changes, skipping`)
           return false
         }
@@ -359,13 +356,13 @@ export class PageContext {
 
     const pagesMap = new Map()
     const pages = this.withUniPlatform
-      ? this.pageMetaData.filter(v => !/\..*$/.test(v.path) || v.path.includes(platform)).map((v) => {
+      ? this.pages.filter(v => !/\..*$/.test(v.path) || v.path.includes(platform)).map((v) => {
           v.path = v.path.replace(/\..*$/, '')
           return v
         })
-      : this.pageMetaData
+      : this.pages
     pages.forEach(v => pagesMap.set(v.path, v))
-    this.pageMetaData = [...pagesMap.values()]
+    this.pages = [...pagesMap.values()]
 
     this.options.onBeforeWriteFile(this)
 
@@ -399,11 +396,11 @@ export class PageContext {
   }
 
   resolveRoutes() {
-    return cjStringify(this.pageMetaData, null, 2)
+    return cjStringify(this.pages, null, 2)
   }
 
   resolveSubRoutes() {
-    return cjStringify(this.subPageMetaData, null, 2)
+    return cjStringify(this.subPackages, null, 2)
   }
 
   generateDeclaration() {
@@ -424,15 +421,15 @@ export class PageContext {
     const currentPlatform = platform.toUpperCase()
 
     // pages
-    pageJson.pages = mergePlatformItems(oldPages as any, currentPlatform, this.pageMetaData, 'path')
+    pageJson.pages = mergePlatformItems(oldPages as any, currentPlatform, this.pages, 'path')
 
     // subPackages
     pageJson.subPackages = oldSubPackages || new CommentArray<CommentObject>()
-    const newSubPackages = new Map<string, SubPageMetaDatum>()
-    for (const item of this.subPageMetaData) {
+    const newSubPackages = new Map<string, PagesJSON.SubPackage>()
+    for (const item of this.subPackages) {
       newSubPackages.set(item.root, item)
     }
-    for (const existing of pageJson.subPackages as unknown as SubPageMetaDatum[]) {
+    for (const existing of pageJson.subPackages as unknown as PagesJSON.SubPackage[]) {
       const sub = newSubPackages.get(existing.root)
       if (sub) {
         existing.pages = mergePlatformItems(existing.pages, currentPlatform, sub.pages, 'path') as any
@@ -495,22 +492,7 @@ export class PageContext {
   }
 }
 
-function getPagePaths(dir: string, options: ResolvedOptions) {
-  const pagesDirPath = slash(path.resolve(options.root, dir))
-  const basePath = slash(path.join(options.root, options.outDir))
-  const files = getPageFiles(pagesDirPath, options)
-  debug.pages(dir, files)
-  const pagePaths = files
-    .map(file => slash(file))
-    .map(file => ({
-      relativePath: path.relative(basePath, slash(path.resolve(pagesDirPath, file))),
-      absolutePath: slash(path.resolve(pagesDirPath, file)),
-    }))
-
-  return pagePaths
-}
-
-function mergePlatformItems<T = any>(source: any[] | undefined, currentPlatform: string, items: T[], uniqueKeyName: keyof ExcludeIndexSignature<T>): CommentArray<CommentObject> {
+function mergePlatformItems<T = any>(source: any[] | undefined, currentPlatform: string, items: T[], uniqueKeyName: KnownKeys<T>): CommentArray<CommentObject> {
   const src = (source as CommentArray<CommentObject>) || new CommentArray<CommentObject>()
   currentPlatform = currentPlatform.toUpperCase()
 

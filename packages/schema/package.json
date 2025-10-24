@@ -25,7 +25,7 @@
     "jsonschema"
   ],
   "scripts": {
-    "build": "ts-json-schema-generator -p \"../core/src/config/types/index.ts\" -t \"PagesConfig\" -o \"schema.json\" --no-type-check",
+    "build": "ts-json-schema-generator -p \"../core/src/types/index.ts\" -t \"PagesJson\" -o \"schema.json\" --no-type-check",
     "prepublishOnly": "pnpm build"
   },
   "devDependencies": {

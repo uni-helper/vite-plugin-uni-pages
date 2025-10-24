@@ -1,4 +1,4 @@
-import type { PageMetaDatum } from '../../types'
+import type { Pages } from './pages'
 
 export interface SubPackage {
   /**
@@ -9,7 +9,7 @@ export interface SubPackage {
   /**
    * 子包由哪些页面组成，参数同 pages
    */
-  pages: PageMetaDatum[]
+  pages: Pages
 
   /**
    * 分包插件
