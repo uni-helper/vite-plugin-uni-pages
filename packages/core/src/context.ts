@@ -595,6 +595,7 @@ function mergePlatformItems<T = any>(source: any[] | undefined, currentPlatform:
     const equalObj = existing.find(val => val.itemStr === newItemStr)
     if (equalObj) {
       equalObj.platforms.push(currentPlatform)
+      equalObj.platforms.sort()
       equalObj.platformStr = equalObj.platforms.join(' || ')
     }
     else {
