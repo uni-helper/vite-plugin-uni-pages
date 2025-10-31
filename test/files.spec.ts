@@ -24,6 +24,7 @@ describe('get files', () => {
         "i18n.vue",
         "index.nvue",
         "index.vue",
+        "pages-internal-sub/index.vue",
         "test-json.vue",
         "test-jsonc-with-comment.vue",
         "test-yaml.vue",
