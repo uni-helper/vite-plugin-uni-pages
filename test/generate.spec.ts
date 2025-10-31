@@ -28,7 +28,6 @@ describe('generate routes', () => {
     await ctx.scanSubPages()
     await ctx.mergePageMetaData()
 
-    // console.log(ctx.pages)
     const routes = ctx.resolveRoutes()
 
     expect(routes).toMatchInlineSnapshot(`
