@@ -251,7 +251,7 @@ export class PageContext {
 
   async mergePageMetaData() {
     // 收集所有子包中的页面绝对路径
-    const subPageAbsolutePaths = [...this.subPages.values().flatMap(v => Array.from(v.keys()))]
+    const subPageAbsolutePaths = Array.from(this.subPages.values()).flatMap(v => Array.from(v.keys()))
 
     // 过滤掉属于子包的页面
     for (const subPageAbsolutePath of subPageAbsolutePaths)
