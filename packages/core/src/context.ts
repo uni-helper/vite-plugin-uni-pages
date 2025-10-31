@@ -250,18 +250,14 @@ export class PageContext {
   }
 
   async mergePageMetaData() {
-    const subPages = [...this.subPages.keys()].map(v => v.replace('src/', ''))
+    // 收集所有子包中的页面绝对路径
+    const subPageAbsolutePaths = [...this.subPages.values().flatMap(v => Array.from(v.keys()))]
 
-    // 过滤掉属于子包的页面，创建新的 pages Map
-    const filteredPages = new Map<string, Page>()
-    for (const [path, page] of this.pages) {
-      if (subPages.some(v => page.uri.startsWith(v))) {
-        continue
-      }
-      filteredPages.set(path, page)
-    }
+    // 过滤掉属于子包的页面
+    for (const subPageAbsolutePath of subPageAbsolutePaths)
+      this.pages.delete(subPageAbsolutePath)
 
-    const pageMetaData = await this.parsePages(filteredPages, 'main', this.pagesGlobConfig?.pages)
+    const pageMetaData = await this.parsePages(this.pages, 'main', this.pagesGlobConfig?.pages)
 
     this.pageMetaData = pageMetaData
     debug.pages(this.pageMetaData)
