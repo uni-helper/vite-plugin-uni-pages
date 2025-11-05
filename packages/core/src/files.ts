@@ -13,11 +13,30 @@ export function getPageFiles(path: string, options: ResolvedOptions): string[] {
 
   const ext = extsToGlob(FILE_EXTENSIONS)
 
-  const files = fg.sync(`**/*.${ext}`, {
-    ignore: exclude,
+  // 分离排除规则中的否定模式（以!开头的规则）
+  const positivePatterns = exclude.filter(pattern => !pattern.startsWith('!'))
+  const negativePatterns = exclude.filter(pattern => pattern.startsWith('!'))
+    .map(pattern => pattern.slice(1)) // 移除!前缀
+
+  // 先获取所有匹配的文件
+  let files = fg.sync(`**/*.${ext}`, {
+    ignore: positivePatterns, // 只使用肯定模式进行初始过滤
     onlyFiles: true,
     cwd: path,
   })
+
+  // 如果有否定模式（即应该包含的模式），需要特殊处理
+  if (negativePatterns.length > 0) {
+    // 获取所有应该包含的文件
+    const includedFiles = fg.sync(negativePatterns.map(pattern => `${pattern}`), {
+      onlyFiles: true,
+      cwd: path,
+    })
+
+    // 将应该包含的文件添加回结果集，确保不重复
+    const filesSet = new Set([...files, ...includedFiles])
+    files = Array.from(filesSet)
+  }
 
   return files
 }
