@@ -17,6 +17,10 @@ export default defineConfig({
       homePage: 'pages/index',
       debug: true,
       subPackages: ['src/pages-sub', 'src/pages-sub2'],
+      exclude: [
+        'pages*/**/components/**/*.*', // 排除所有pages 里面的 components 文件夹
+        '!pages-sub2/**/components/**/*.*', // 不排除 pages-sub2/**/components
+      ],
       // configSource: [
       //   {
       //     files: 'vite.config',
