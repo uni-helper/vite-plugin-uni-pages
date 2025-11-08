@@ -23,7 +23,8 @@ type _LocationUrl =
   "/pages/define-page/yaml" |
   "/pages-sub/index" |
   "/pages-sub/about/index" |
-  "/pages-sub/about/your";
+  "/pages-sub/about/your" |
+  "/pages/pages-internal-sub/index";
 
 interface NavigateToOptions {
   url: _LocationUrl;

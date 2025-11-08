@@ -23,9 +23,11 @@ const pagesGlobConfig: UserPagesConfig = {
 
 describe('generate routes', () => {
   it('vue - pages snapshot', async () => {
-    const ctx = new PageContext({ dir: 'packages/playground/src/pages', homePage: 'pages/index' })
+    const ctx = new PageContext({ dir: 'packages/playground/src/pages', homePage: 'pages/index', subPackages: ['packages/playground/src/pages/pages-internal-sub'] })
     await ctx.scanPages()
+    await ctx.scanSubPages()
     await ctx.mergePageMetaData()
+
     const routes = ctx.resolveRoutes()
 
     expect(routes).toMatchInlineSnapshot(`
@@ -173,9 +175,10 @@ describe('generate routes', () => {
   })
 
   it('vue - not merge pages snapshot', async () => {
-    const ctx = new PageContext({ dir: 'packages/playground/src/pages', mergePages: false })
+    const ctx = new PageContext({ dir: 'packages/playground/src/pages', mergePages: false, subPackages: ['packages/playground/src/pages/pages-internal-sub'] })
     await ctx.scanPages()
     ctx.pagesGlobConfig = pagesGlobConfig
+    await ctx.scanSubPages()
     await ctx.mergePageMetaData()
     const routes = ctx.resolveRoutes()
 

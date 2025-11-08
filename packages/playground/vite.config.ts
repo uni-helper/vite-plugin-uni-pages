@@ -16,7 +16,7 @@ export default defineConfig({
       dts: 'src/uni-pages.d.ts',
       homePage: 'pages/index',
       debug: true,
-      subPackages: ['src/pages-sub', 'src/pages-sub2'],
+      subPackages: ['src/pages-sub', 'src/pages-sub2', 'src/pages/pages-internal-sub'],
       // configSource: [
       //   {
       //     files: 'vite.config',
