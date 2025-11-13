@@ -45,6 +45,7 @@
   "files": [
     "client.d.ts",
     "dist",
+    "global.d.ts",
     "index.d.ts"
   ],
   "scripts": {
