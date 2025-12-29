@@ -120,7 +120,10 @@ export async function writeFileWithLock(path: string, content: string, retry = 3
       await sleep(500)
       return writeFileWithLock(path, content, retry - 1)
     }
-    await fs.promises.writeFile(path, content, { encoding: 'utf-8' }) // 执行写入操作
+    // Use atomic write: write to temp file first, then rename
+    const tempPath = `${path}.${Date.now()}.tmp`
+    await fs.promises.writeFile(tempPath, content, { encoding: 'utf-8' })
+    await fs.promises.rename(tempPath, path)
   }
   finally {
     // eslint-disable-next-line ts/ban-ts-comment
