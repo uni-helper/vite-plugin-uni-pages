@@ -2,9 +2,9 @@ import type { ResolvedOptions } from './types'
 import fs from 'node:fs'
 import fg from 'fast-glob'
 import lockfile from 'proper-lockfile'
+import writeFileAtomic from 'write-file-atomic'
 import { FILE_EXTENSIONS } from './constant'
 import { debug, extsToGlob, sleep } from './utils'
-
 /**
  * Resolves the files that are valid pages for the given context.
  */
@@ -120,10 +120,8 @@ export async function writeFileWithLock(path: string, content: string, retry = 3
       await sleep(500)
       return writeFileWithLock(path, content, retry - 1)
     }
-    // Use atomic write: write to temp file first, then rename
-    const tempPath = `${path}.${Date.now()}.tmp`
-    await fs.promises.writeFile(tempPath, content, { encoding: 'utf-8' })
-    await fs.promises.rename(tempPath, path)
+    // Use atomic write
+    await writeFileAtomic(path, content)
   }
   finally {
     // eslint-disable-next-line ts/ban-ts-comment

@@ -1,5 +1,6 @@
 import type { PagesConfig } from '@uni-helper/vite-plugin-uni-pages'
 import uni from '@dcloudio/vite-plugin-uni'
+import UniLayouts from '@uni-helper/vite-plugin-uni-layouts'
 import UniPages from '@uni-helper/vite-plugin-uni-pages'
 import { defineConfig } from 'vite'
 
@@ -27,6 +28,7 @@ export default defineConfig({
       //   },
       // ],
     }),
+    UniLayouts(),
     uni(),
   ],
   UniPages: {
