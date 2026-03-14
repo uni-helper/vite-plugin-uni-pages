@@ -47,7 +47,7 @@ export class Page {
       await this.read()
     }
 
-    const { tabBar } = this.meta!
+    const { tabBar } = this.meta || {}
 
     if (tabBar === undefined) {
       return undefined
