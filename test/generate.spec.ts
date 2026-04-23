@@ -33,6 +33,14 @@ describe('generate routes', () => {
     expect(routes).toMatchInlineSnapshot(`
       "[
         {
+          "path": "../packages/playground/src/pages/index",
+          "type": "home",
+          "middlewares": [
+            "auth",
+            "test"
+          ]
+        },
+        {
           "path": "../packages/playground/src/pages/A-top",
           "type": "page"
         },
@@ -42,14 +50,6 @@ describe('generate routes', () => {
           "style": {
             "navigationBarTitleText": "%app.name%"
           }
-        },
-        {
-          "path": "../packages/playground/src/pages/index",
-          "type": "page",
-          "middlewares": [
-            "auth",
-            "test"
-          ]
         },
         {
           "path": "../packages/playground/src/pages/test-json",

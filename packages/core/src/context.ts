@@ -230,7 +230,22 @@ export class PageContext {
     const hasHome = result.some(({ type }) => type === 'home')
     if (!hasHome) {
       const isFoundHome = result.some((item) => {
-        const isFound = this.options.homePage.find(v => (v === item.path))
+        const isFound = this.options.homePage.find(v => {
+          if (v === item.path)
+            return true
+
+          const normalizedItemPath = item.path.replace(/\\/g, '/')
+          const normalizedConfigPath = v.replace(/\\/g, '/')
+
+          if (normalizedItemPath.endsWith(normalizedConfigPath) || normalizedItemPath.endsWith(`/${normalizedConfigPath}`))
+            return true
+
+          const pathWithoutExt = normalizedItemPath.replace(/\.[^.]+$/, '')
+          if (pathWithoutExt === normalizedConfigPath || pathWithoutExt.endsWith(`/${normalizedConfigPath}`))
+            return true
+
+          return false
+        })
         if (isFound)
           item.type = 'home'
 
@@ -432,6 +447,16 @@ export class PageContext {
 
     // pages
     pageJson.pages = mergePlatformItems(oldPages as any, currentPlatform, this.pageMetaData, 'path')
+
+    // 确保首页排在第一位
+    if (pageJson.pages && pageJson.pages.length > 0) {
+      const pagesArray = pageJson.pages as unknown as PageMetaDatum[]
+      const homeIndex = pagesArray.findIndex((page: any) => page.type === 'home')
+      if (homeIndex > 0) {
+        const homePage = pagesArray.splice(homeIndex, 1)[0]
+        pagesArray.unshift(homePage)
+      }
+    }
 
     // subPackages
     pageJson.subPackages = oldSubPackages || new CommentArray<CommentObject>()
