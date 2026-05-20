@@ -1,2 +1,63 @@
+shellEmulator: true
+
+trustPolicy: off
+
 packages:
   - 'packages/*'
+
+catalog:
+  '@antfu/eslint-config': ^8.3.0
+  '@antfu/utils': ^9.3.0
+  '@babel/generator': ^7.29.1
+  '@babel/types': ^7.29.0
+  '@dcloudio/types': ^3.4.31
+  '@dcloudio/uni-app': 3.0.0-5000720260410001
+  '@dcloudio/uni-automator': 3.0.0-5000720260410001
+  '@dcloudio/uni-cli-shared': 3.0.0-5000720260410001
+  '@dcloudio/uni-components': 3.0.0-5000720260410001
+  '@dcloudio/uni-h5': 3.0.0-5000720260410001
+  '@dcloudio/uni-mp-weixin': 3.0.0-5000720260410001
+  '@dcloudio/vite-plugin-uni': 3.0.0-5000720260410001
+  '@types/babel__generator': ^7.27.0
+  '@types/debug': ^4.1.13
+  '@types/json-schema': ^7.0.15
+  '@types/lodash.groupby': ^4.6.9
+  '@types/node': ^24.12.4
+  '@types/proper-lockfile': ^4.1.4
+  '@types/write-file-atomic': ^4.0.3
+  '@uni-helper/uni-env': ^0.2.2
+  '@uni-helper/vite-plugin-uni-layouts': ^0.1.11
+  '@volar/language-service': ^1.11.1
+  '@vue/compiler-sfc': ~3.4.38
+  ast-kit: ^1.4.3
+  bumpp: ^11.1.0
+  chokidar: ^3.6.0
+  comment-json: ^4.6.2
+  cross-env: ^10.1.0
+  debug: ^4.4.3
+  detect-indent: ^6.1.0
+  detect-newline: ^3.1.0
+  eslint: ^10.4.0
+  fast-glob: ^3.3.3
+  json5: ^2.2.3
+  kolorist: ^1.8.0
+  lodash.groupby: ^4.6.0
+  magic-string: ^0.30.21
+  proper-lockfile: ^4.1.2
+  rimraf: ^6.1.3
+  ts-json-schema-generator: ^2.9.0
+  typescript: ^5.9.3
+  unbuild: ^2.0.0
+  unconfig: ^7.5.0
+  vite: ^5.4.21
+  vitest: ^3.2.4
+  vscode-json-languageservice: ^5.7.2
+  vscode-languageserver-textdocument: ^1.0.12
+  vue: ~3.4.38
+  vue-i18n: ^9.14.0
+  write-file-atomic: ^7.0.1
+  yaml: ^2.9.0
+  yaml-language-server: ^1.23.0
+
+configDependencies:
+  '@pnpm/plugin-trusted-deps': 0.2.2+sha512-+ZupiXKJhW2fbSilfyRp+wrAY54MKg+c0JWSFGdeb/y9bUoYN5u4XLOZ0Txk7O2bBa6NMhWrX5mwmsHP3/nm9Q==

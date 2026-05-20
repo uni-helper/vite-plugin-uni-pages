@@ -12,7 +12,6 @@ export function createYamlLs(context: ServiceContext) {
       sendError: noop,
       sendTrack: noop,
     },
-    // @ts-expect-error https://github.com/redhat-developer/yaml-language-server/pull/910
     clientCapabilities: context?.env?.clientCapabilities,
     workspaceContext: {
       resolveRelativePath(relativePath, resource) {

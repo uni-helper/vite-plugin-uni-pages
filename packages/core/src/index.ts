@@ -61,7 +61,7 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
     },
     // Applet do not support custom route block, so we need to remove the route block here
     async transform(code: string, id: string) {
-      if (!FILE_EXTENSIONS.find(ext => id.endsWith(ext))) {
+      if (!FILE_EXTENSIONS.some(ext => id.endsWith(ext))) {
         return null
       }
 

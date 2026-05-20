@@ -3,7 +3,7 @@
   "type": "module",
   "version": "0.3.24",
   "private": true,
-  "packageManager": "pnpm@9.7.1",
+  "packageManager": "pnpm@10.33.4",
   "description": "Use TypeScript to write pages.json of uni-app",
   "author": "KeJun",
   "license": "MIT",
@@ -31,14 +31,14 @@
     "lint:fix": "pnpm lint --fix"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "^5.2.1",
-    "@types/node": "^20.16.1",
-    "bumpp": "^9.5.1",
-    "comment-json": "^4.2.5",
-    "eslint": "^9.34.0",
-    "rimraf": "^6.0.1",
-    "typescript": "^5.5.4",
-    "unbuild": "^2.0.0",
-    "vitest": "^2.0.5"
+    "@antfu/eslint-config": "catalog:",
+    "@types/node": "catalog:",
+    "bumpp": "catalog:",
+    "comment-json": "catalog:",
+    "eslint": "catalog:",
+    "rimraf": "catalog:",
+    "typescript": "catalog:",
+    "unbuild": "catalog:",
+    "vitest": "catalog:"
   }
 }

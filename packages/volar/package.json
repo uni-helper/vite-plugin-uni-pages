@@ -60,12 +60,12 @@
   },
   "dependencies": {
     "@uni-helper/pages-json-schema": "workspace:^",
-    "vscode-json-languageservice": "^5.4.0",
-    "vscode-languageserver-textdocument": "^1.0.12",
-    "yaml-language-server": "^1.15.0"
+    "vscode-json-languageservice": "catalog:",
+    "vscode-languageserver-textdocument": "catalog:",
+    "yaml-language-server": "catalog:"
   },
   "devDependencies": {
-    "@types/json-schema": "^7.0.15",
-    "@volar/language-service": "^1.11.1"
+    "@types/json-schema": "catalog:",
+    "@volar/language-service": "catalog:"
   }
 }
