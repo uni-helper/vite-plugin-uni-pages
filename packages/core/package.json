@@ -49,9 +49,10 @@
     "index.d.ts"
   ],
   "scripts": {
-    "build": "unbuild",
-    "stub": "unbuild --stub",
-    "debug": "cross-env NODE_ENV=development unbuild --sourcemap",
+    "build": "tsdown",
+    "build-post": "exit 0",
+    "dev": "tsdown --watch",
+    "debug": "tsdown --sourcemap",
     "prepublishOnly": "pnpm build"
   },
   "peerDependencies": {
@@ -87,7 +88,6 @@
     "@types/lodash.groupby": "catalog:",
     "@types/node": "catalog:",
     "@types/write-file-atomic": "catalog:",
-    "cross-env": "catalog:",
     "vite": "catalog:"
   }
 }

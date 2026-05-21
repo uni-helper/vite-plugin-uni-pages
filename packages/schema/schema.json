@@ -2834,13 +2834,13 @@
         "plugins": {
           "additionalProperties": {
             "properties": {
+              "export": {
+                "type": "string"
+              },
               "provider": {
                 "type": "string"
               },
               "version": {
-                "type": "string"
-              },
-              "export": {
                 "type": "string"
               }
             },
@@ -3005,9 +3005,6 @@
           "type": "string"
         }
       },
-      "required": [
-        "list"
-      ],
       "type": "object"
     },
     "TabBarIconFont": {

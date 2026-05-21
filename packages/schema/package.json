@@ -26,6 +26,8 @@
   ],
   "scripts": {
     "build": "ts-json-schema-generator -p \"../core/src/config/types/index.ts\" -t \"PagesConfig\" -o \"schema.json\" --no-type-check",
+    "build-post": "exit 0",
+    "dev": "pnpm build",
     "prepublishOnly": "pnpm build"
   },
   "devDependencies": {

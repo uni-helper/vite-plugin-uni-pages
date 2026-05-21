@@ -41,13 +41,14 @@
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
+  "types": "./dist/index.d.mts",
   "files": [
     "dist"
   ],
   "scripts": {
-    "dev": "unbuild --stub",
-    "build": "unbuild",
+    "build": "tsdown",
+    "build-post": "exit 0",
+    "dev": "tsdown --watch",
     "prepublishOnly": "pnpm build"
   },
   "peerDependencies": {
