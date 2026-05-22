@@ -99,9 +99,6 @@ catalogs:
     json5:
       specifier: ^2.2.3
       version: 2.2.3
-    kolorist:
-      specifier: ^1.8.0
-      version: 1.8.0
     lodash.groupby:
       specifier: ^4.6.0
       version: 4.6.0
@@ -220,9 +217,6 @@ importers:
       json5:
         specifier: 'catalog:'
         version: 2.2.3
-      kolorist:
-        specifier: 'catalog:'
-        version: 1.8.0
       lodash.groupby:
         specifier: 'catalog:'
         version: 4.6.0
@@ -4140,9 +4134,6 @@ packages:
   kleur@3.0.3:
     resolution: {integrity: sha512-eTIzlVOSUR+JxdDFepEYcBMtZ9Qqdef+rnzWdRZuMbOywu5tO2w2N7rqjoANZ5k9vywhL6Br1VRjUIgTQx4E8w==}
     engines: {node: '>=6'}
-
-  kolorist@1.8.0:
-    resolution: {integrity: sha512-Y+60/zizpJ3HRH8DCss+q95yr6145JXZo46OTpFvDZWLfRCE4qChOyk1b26nMaNpfHHgxagk9dXT5OP0Tfe+dQ==}
 
   lcid@3.1.1:
     resolution: {integrity: sha512-M6T051+5QCGLBQb8id3hdvIW8+zeFV2FyBGFS9IEK5H9Wt4MueD4bW1eWikpHgZp+5xR3l5c8pZUkQsIA0BFZg==}
@@ -10469,8 +10460,6 @@ snapshots:
       json-buffer: 3.0.1
 
   kleur@3.0.3: {}
-
-  kolorist@1.8.0: {}
 
   lcid@3.1.1:
     dependencies:
