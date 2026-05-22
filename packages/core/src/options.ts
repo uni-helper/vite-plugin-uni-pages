@@ -17,7 +17,6 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
 
     outDir = 'src',
     exclude = ['node_modules', '.git', '**/__*__/**'],
-    routeBlockLang = 'json5',
     minify = false,
     debug = false,
 
@@ -47,7 +46,6 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
     subPackages: resolvedSubDirs,
     outDir,
     exclude,
-    routeBlockLang,
     root,
     minify,
     debug,

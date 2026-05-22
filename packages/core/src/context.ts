@@ -238,7 +238,7 @@ export class PageContext {
       })
 
       if (!isFoundHome) {
-        this.logger?.warn('No home page found, check the configuration of pages.config.ts, or add the `homePage` option to UniPages in vite.config.js, or add `type="home"` to the routeBlock of your vue page.', {
+        this.logger?.warn('No home page found, check the configuration of pages.config.ts, or add the `homePage` option to UniPages in vite.config.js, or add `type="home"` to definePage() in your vue page.', {
           timestamp: true,
         })
       }
@@ -341,7 +341,7 @@ export class PageContext {
       if (page) {
         await page.read()
         if (!page.hasChanged()) {
-          debug.cache(`The route block on page ${filepath} did not send any changes, skipping`)
+          debug.cache(`The page meta on page ${filepath} did not send any changes, skipping`)
           return false
         }
       }

@@ -8,6 +8,13 @@ function nav() {
     url: '/pages/test',
   })
 }
+
+definePage({
+  middlewares: [
+    'auth',
+    'test',
+  ],
+})
 </script>
 
 <template>
@@ -52,9 +59,3 @@ function nav() {
   color: #8f8f94;
 }
 </style>
-
-<route lang="yaml">
-middlewares:
-  - auth
-  - test
-</route>

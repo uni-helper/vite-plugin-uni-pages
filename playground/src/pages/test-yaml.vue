@@ -1,12 +1,14 @@
-<script lang="ts" setup></script>
+<script lang="ts" setup>
+definePage({
+  style: {
+    navigationBarTitleText: 'test yaml page',
+  },
+  middlewares: [
+    'auth',
+  ],
+})
+</script>
 
 <template>
   <div>test</div>
 </template>
-
-<route lang="yaml">
-style:
-  navigationBarTitleText: test yaml page
-middlewares:
-  - auth
-</route>

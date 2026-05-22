@@ -1,11 +1,11 @@
+<script setup>
+definePage({
+  style: {
+    navigationBarTitleText: '%app.name%',
+  },
+})
+</script>
+
 <template>
   i18n
 </template>
-
-<route lang="json">
-{
-  "style": {
-    "navigationBarTitleText": "%app.name%"
-  }
-}
-</route>

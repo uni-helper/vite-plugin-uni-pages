@@ -13,8 +13,6 @@ export type debugType = keyof typeof debug
 
 export type ConfigSource = string | LoadConfigSource<PagesConfig> | LoadConfigSource<PagesConfig>[]
 
-export type RouteBlockLang = 'json5' | 'jsonc' | 'json' | 'yaml' | 'yml'
-
 export interface Options {
 
   /**
@@ -66,12 +64,6 @@ export interface Options {
    * @default []
    */
   exclude: string[]
-
-  /**
-   * Set the default route block parser, or use `<route lang="xxx">` in SFC route block
-   * @default 'json5'
-   */
-  routeBlockLang: RouteBlockLang
 
   /**
    * minify the `pages.json`

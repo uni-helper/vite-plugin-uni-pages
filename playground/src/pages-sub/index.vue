@@ -7,6 +7,12 @@ function nav() {
     url: '/pages/about/index',
   })
 }
+
+definePage({
+  style: {
+    navigationBarTitleText: 'test json sub page',
+  },
+})
 </script>
 
 <template>
@@ -50,11 +56,3 @@ function nav() {
   color: #8f8f94;
 }
 </style>
-
-<route lang="jsonc">
-{
-  "style": {
-    "navigationBarTitleText": "test json sub page"
-  }
-}
-</route>
