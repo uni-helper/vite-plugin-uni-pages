@@ -1,4 +1,4 @@
-import type { PageMetaDatum } from '../../types'
+import type { PageMetaDatum } from './page-meta'
 
 export interface SubPackage {
   /**

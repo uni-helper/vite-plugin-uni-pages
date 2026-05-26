@@ -63,6 +63,7 @@
     "@babel/types": "catalog:",
     "@types/proper-lockfile": "catalog:",
     "@uni-helper/uni-env": "catalog:",
+    "@uni-helper/uni-pages-types": "workspace:*",
     "@vue/compiler-sfc": "catalog:",
     "ast-kit": "catalog:",
     "chokidar": "catalog:",

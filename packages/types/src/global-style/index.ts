@@ -1,14 +1,31 @@
 import type { AnimationType, HEXColor, ThemeVar } from '../common'
-import type { AppPlus } from './appPlus'
+import type { AppHarmony } from './app-harmony'
+import type { AppPlus } from './app-plus'
 import type { H5 } from './h5'
-import type { MpAlipay } from './mpAlipay'
-import type { MpBaidu } from './mpBaidu'
-import type { MpJd } from './mpJd'
-import type { MpKuaishou } from './mpKuaishou'
-import type { MpLark } from './mpLark'
-import type { MpQq } from './mpQq'
-import type { MpToutiao } from './mpToutiao'
-import type { MpWeixin } from './mpWeixin'
+import type { MpAlipay } from './mp-alipay'
+import type { MpBaidu } from './mp-baidu'
+import type { MpHarmony } from './mp-harmony'
+import type { MpJd } from './mp-jd'
+import type { MpKuaishou } from './mp-kuaishou'
+import type { MpLark } from './mp-lark'
+import type { MpQq } from './mp-qq'
+import type { MpToutiao } from './mp-toutiao'
+import type { MpWeixin } from './mp-weixin'
+import type { MpXhs } from './mp-xhs'
+
+export type { AppHarmony } from './app-harmony'
+export type { AppPlus } from './app-plus'
+export type { H5 } from './h5'
+export type { MpAlipay } from './mp-alipay'
+export type { MpBaidu } from './mp-baidu'
+export type { MpHarmony } from './mp-harmony'
+export type { MpJd } from './mp-jd'
+export type { MpKuaishou } from './mp-kuaishou'
+export type { MpLark } from './mp-lark'
+export type { MpQq } from './mp-qq'
+export type { MpToutiao } from './mp-toutiao'
+export type { MpWeixin } from './mp-weixin'
+export type { MpXhs } from './mp-xhs'
 
 export interface GlobalStyle {
   /**
@@ -145,6 +162,15 @@ export interface GlobalStyle {
   'titlePenetrate'?: 'YES' | 'NO'
 
   /**
+   * 是否允许向下拉拽
+   *
+   * @default "YES"
+   *
+   * @desc 支付宝小程序
+   */
+  'allowsBounceVertical'?: 'YES' | 'NO'
+
+  /**
    * 横屏配置，屏幕旋转设置，仅支持 "auto" / "portrait" / "landscape"，详见 [响应显示区域变化](https://developers.weixin.qq.com/miniprogram/dev/framework/view/resizable.html)
    *
    * "auto" 自动
@@ -178,6 +204,24 @@ export interface GlobalStyle {
   'animationDuration'?: number
 
   /**
+   * 设置为 true 则页面整体不能上下滚动（bounce 效果），只在页面配置中有效，在 globalStyle 中设置无效
+   *
+   * @default false
+   *
+   * @desc 微信小程序（iOS）、百度小程序（iOS）
+   */
+  'disableScroll'?: boolean
+
+  /**
+   * 是否禁用滑动返回
+   *
+   * @default false
+   *
+   * @desc App-iOS（3.4.0+）
+   */
+  'disableSwipeBack'?: boolean
+
+  /**
    * 设置编译到 App 平台的特定样式，配置项参考 [app-plus](https://uniapp.dcloud.net.cn/collocation/pages#app-plus)
    *
    * 相应的类型是 AppPlus
@@ -185,6 +229,15 @@ export interface GlobalStyle {
    * @desc App
    */
   'app-plus'?: AppPlus
+
+  /**
+   * 设置编译到 App（Harmony）平台的特定样式，配置项参考 [app-harmony](https://uniapp.dcloud.net.cn/collocation/pages#app-harmony)
+   *
+   * 相应的类型是 AppHarmony
+   *
+   * @desc App（Harmony）
+   */
+  'app-harmony'?: AppHarmony
 
   /**
    * 设置编译到 H5 平台的特定样式，配置项参考 [H5](https://uniapp.dcloud.net.cn/collocation/pages#h5)
@@ -266,6 +319,24 @@ export interface GlobalStyle {
    * @desc 京东小程序
    */
   'mp-jd'?: MpJd
+
+  /**
+   * 设置编译到 mp-xhs 平台的特定样式
+   *
+   * 相应的类型是 MpXhs
+   *
+   * @desc 小红书小程序
+   */
+  'mp-xhs'?: MpXhs
+
+  /**
+   * 设置编译到 mp-harmony 平台的特定样式
+   *
+   * 相应的类型是 MpHarmony
+   *
+   * @desc 鸿蒙元服务
+   */
+  'mp-harmony'?: MpHarmony
 
   /**
    * 引用小程序组件，详见 [小程序组件](https://uniapp.dcloud.net.cn/tutorial/miniprogram-subject.html#%E5%B0%8F%E7%A8%8B%E5%BA%8F%E8%87%AA%E5%AE%9A%E4%B9%89%E7%BB%84%E4%BB%B6%E6%94%AF%E6%8C%81)

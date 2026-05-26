@@ -1,19 +1,11 @@
-import type { PageMetaDatum } from '../../types'
 import type { Condition } from './condition'
 import type { EasyCom } from './easycom'
-import type { GlobalStyle } from './globalStyle'
-import type { SubPackages } from './subPackages'
-import type { TabBar } from './tabBar'
-import type { TheWindow } from './theWindow'
-import type { UniIdRouter } from './uniIdRouter'
-
-export * from './condition'
-export * from './easycom'
-export * from './globalStyle'
-export * from './subPackages'
-export * from './tabBar'
-export * from './theWindow'
-export * from './uniIdRouter'
+import type { GlobalStyle } from './global-style'
+import type { PageMetaDatum } from './page-meta'
+import type { SubPackages } from './sub-packages'
+import type { TabBar } from './tab-bar'
+import type { TheWindow } from './the-window'
+import type { UniIdRouter } from './uni-id-router'
 
 /**
  * 对 uni-app 进行全局配置，决定页面文件的路径、窗口样式、原生的导航栏、底部的原生 tabBar 等，类似微信小程序中 app.json 的页面管理部分
@@ -137,7 +129,7 @@ export interface PagesConfig {
   /**
    * 默认启动首页，新增于 HBuilderX 3.7.0
    *
-   * @desc 微信小程序、支付宝小程序
+   * @desc 微信小程序、支付宝小程序、抖音小程序、鸿蒙元服务
    */
   entryPagePath?: string
 

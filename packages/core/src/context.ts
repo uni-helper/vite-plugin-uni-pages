@@ -1,8 +1,7 @@
 import type { FSWatcher } from 'chokidar'
 import type { CommentObject, CommentSymbol } from 'comment-json'
 import type { Logger, ViteDevServer } from 'vite'
-import type { TabBar, TabBarItem } from './config'
-import type { PagesConfig } from './config/types'
+import type { PagesConfig, TabBar, TabBarItem } from './config'
 import type { ExcludeIndexSignature, PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
 
 import fs from 'node:fs'

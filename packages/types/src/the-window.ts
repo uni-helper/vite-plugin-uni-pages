@@ -1,4 +1,4 @@
-import type { GlobalStyle } from './globalStyle'
+import type { GlobalStyle } from './global-style'
 
 export interface TheWindow {
   /**

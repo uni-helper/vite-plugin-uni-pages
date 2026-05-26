@@ -1,6 +1,6 @@
-import type { UserPagesConfig } from './types'
+import type { UserPagesConfig } from '@uni-helper/uni-pages-types'
 
-export * from './types'
+export * from '@uni-helper/uni-pages-types'
 
 export function defineUniPages(config: UserPagesConfig) {
   return config

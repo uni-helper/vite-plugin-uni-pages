@@ -257,5 +257,26 @@ export interface TabBar {
    */
   redDotColor?: string
 
+  /**
+   * 是否启用自定义 tabBar
+   *
+   * @desc 微信小程序、抖音小程序
+   */
+  custom?: boolean
+
+  /**
+   * 是否启用自定义 tabBar，启用后需要在项目根目录创建 custom-tab-bar 目录，参考 https://opendocs.alipay.com/mini/03jry7
+   *
+   * @desc 支付宝小程序
+   */
+  customize?: boolean
+
+  /**
+   * 是否以 Native 模式渲染自定义 tabBar
+   *
+   * @desc 支付宝小程序
+   */
+  overlay?: boolean
+
   [x: string]: any
 }
