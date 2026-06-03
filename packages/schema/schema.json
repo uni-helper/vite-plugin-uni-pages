@@ -17,6 +17,21 @@
       ],
       "type": "string"
     },
+    "AppHarmony": {
+      "description": "设置编译到 App（Harmony）平台的特定样式\n\n相应的类型是 AppHarmony",
+      "properties": {
+        "softInputMode": {
+          "default": "adjustPan",
+          "description": "软键盘弹出模式，仅支持 \"adjustResize\" / \"adjustPan\"",
+          "enum": [
+            "adjustResize",
+            "adjustPan"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "AppPlus": {
       "properties": {
         "animationDuration": {
@@ -1178,6 +1193,15 @@
     },
     "GlobalStyle": {
       "properties": {
+        "allowsBounceVertical": {
+          "default": "YES",
+          "description": "是否允许向下拉拽",
+          "enum": [
+            "YES",
+            "NO"
+          ],
+          "type": "string"
+        },
         "animationDuration": {
           "default": 300,
           "description": "窗口显示动画的持续时间，单位为 ms",
@@ -1187,6 +1211,10 @@
           "$ref": "#/definitions/AnimationType",
           "default": "pop-in",
           "description": "窗口显示的动画效果，详见 [窗口动画](https://uniapp.dcloud.net.cn/api/router#animation)"
+        },
+        "app-harmony": {
+          "$ref": "#/definitions/AppHarmony",
+          "description": "设置编译到 App（Harmony）平台的特定样式，配置项参考 [app-harmony](https://uniapp.dcloud.net.cn/collocation/pages#app-harmony)\n\n相应的类型是 AppHarmony"
         },
         "app-plus": {
           "$ref": "#/definitions/AppPlus",
@@ -1248,6 +1276,16 @@
           "default": "dark",
           "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\""
         },
+        "disableScroll": {
+          "default": false,
+          "description": "设置为 true 则页面整体不能上下滚动（bounce 效果），只在页面配置中有效，在 globalStyle 中设置无效",
+          "type": "boolean"
+        },
+        "disableSwipeBack": {
+          "default": false,
+          "description": "是否禁用滑动返回",
+          "type": "boolean"
+        },
         "dynamicRpx": {
           "default": false,
           "description": "是否使用动态 rpx，屏幕大小变化会重新渲染 rpx",
@@ -1279,6 +1317,10 @@
           "$ref": "#/definitions/MpBaidu",
           "description": "设置编译到 mp-baidu 平台的特定样式，配置项参考 [MP-BAIDU](https://uniapp.dcloud.net.cn/collocation/pages.html#mp-baidu) 和 <https://smartprogram.baidu.com/docs/develop/framework/process/#window>\n\n相应的类型是 MpBaidu"
         },
+        "mp-harmony": {
+          "$ref": "#/definitions/MpHarmony",
+          "description": "设置编译到 mp-harmony 平台的特定样式\n\n相应的类型是 MpHarmony"
+        },
         "mp-jd": {
           "$ref": "#/definitions/MpJd",
           "description": "设置编译到 mp-jd 平台的特定样式\n\n相应的类型是 MpJd"
@@ -1302,6 +1344,10 @@
         "mp-weixin": {
           "$ref": "#/definitions/MpWeixin",
           "description": "设置编译到 mp-weixin 平台的特定样式，配置项参考 [MP-WEIXIN](https://uniapp.dcloud.net.cn/collocation/pages#mp-weixin) 和 <https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html#window>\n\n相应的类型是 MpWeixin"
+        },
+        "mp-xhs": {
+          "$ref": "#/definitions/MpXhs",
+          "description": "设置编译到 mp-xhs 平台的特定样式\n\n相应的类型是 MpXhs"
         },
         "navigationBarBackgroundColor": {
           "anyOf": [
@@ -1818,8 +1864,87 @@
       },
       "type": "object"
     },
+    "MpHarmony": {
+      "description": "设置编译到 mp-harmony 平台的特定样式，配置项参考 <https://developer.huawei.com/consumer/cn/doc/SPPartnerCenter-develop-Guides/extjson-description-0000002554249601>\n\n相应的类型是 MpHarmony",
+      "properties": {
+        "backgroundColor": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "default": "#FFFFFF",
+          "description": "窗口的背景色，支持 HEX 颜色"
+        },
+        "backgroundTextStyle": {
+          "anyOf": [
+            {
+              "const": "dark",
+              "type": "string"
+            },
+            {
+              "const": "light",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "default": "dark",
+          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\""
+        },
+        "enablePullDownRefresh": {
+          "default": false,
+          "description": "是否开启全局的下拉刷新",
+          "type": "boolean"
+        },
+        "navigationBarBackgroundColor": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "default": "#000000",
+          "description": "导航栏背景颜色，支持 HEX 颜色",
+          "format": "color"
+        },
+        "navigationBarTextStyle": {
+          "anyOf": [
+            {
+              "const": "black",
+              "type": "string"
+            },
+            {
+              "const": "white",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "default": "white",
+          "description": "导航栏标题、状态栏颜色"
+        },
+        "navigationBarTitleText": {
+          "description": "导航栏标题文字内容",
+          "type": "string"
+        },
+        "onReachBottomDistance": {
+          "default": 50,
+          "description": "页面上拉触底事件触发时距页面底部距离，单位为 px",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
     "MpJd": {
-      "description": "设置编译到 mp-jd 平台的特定样式，配置项参考 <https://mp-docs.jd.com/doc/dev/framework/504#heading-3>\n\n相应的类型是 MpJd",
+      "description": "设置编译到 mp-jd 平台的特定样式，配置项参考 <https://mp-docs.jd.com/doc/miniapp/dev/reference/2595#heading-3>\n\n相应的类型是 MpJd",
       "properties": {
         "backgroundColor": {
           "anyOf": [
@@ -2680,6 +2805,77 @@
       },
       "type": "object"
     },
+    "MpXhs": {
+      "description": "设置编译到 mp-xhs 平台的特定样式，配置项参考 <https://miniapp.xiaohongshu.com/doc/DC813994>\n\n相应的类型是 MpXhs",
+      "properties": {
+        "backgroundColor": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "default": "#FFFFFF",
+          "description": "窗口的背景色，支持 HEX 颜色"
+        },
+        "enablePullDownRefresh": {
+          "default": false,
+          "description": "是否开启全局的下拉刷新",
+          "type": "boolean"
+        },
+        "navigationBarBackgroundColor": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "default": "#000000",
+          "description": "导航栏背景颜色，支持 HEX 颜色",
+          "format": "color"
+        },
+        "navigationBarTextStyle": {
+          "anyOf": [
+            {
+              "const": "black",
+              "type": "string"
+            },
+            {
+              "const": "white",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "default": "white",
+          "description": "导航栏标题、状态栏颜色"
+        },
+        "navigationBarTitleText": {
+          "description": "导航栏标题文字内容",
+          "type": "string"
+        },
+        "navigationStyle": {
+          "default": "default",
+          "description": "导航栏样式\n\n\"default\" 默认样式\n\n\"custom\" 自定义导航栏，只保留右上角胶囊按钮",
+          "enum": [
+            "default",
+            "custom"
+          ],
+          "type": "string"
+        },
+        "onReachBottomDistance": {
+          "default": 50,
+          "description": "页面上拉触底事件触发时距页面底部距离，单位为 px",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
     "PageMetaDatum": {
       "properties": {
         "needLogin": {
@@ -2834,13 +3030,13 @@
         "plugins": {
           "additionalProperties": {
             "properties": {
+              "export": {
+                "type": "string"
+              },
               "provider": {
                 "type": "string"
               },
               "version": {
-                "type": "string"
-              },
-              "export": {
                 "type": "string"
               }
             },
@@ -2943,6 +3139,14 @@
           "description": "tab 上的文字默认颜色",
           "format": "color"
         },
+        "custom": {
+          "description": "是否启用自定义 tabBar",
+          "type": "boolean"
+        },
+        "customize": {
+          "description": "是否启用自定义 tabBar，启用后需要在项目根目录创建 custom-tab-bar 目录，参考 https://opendocs.alipay.com/mini/03jry7",
+          "type": "boolean"
+        },
         "fontSize": {
           "default": "10px",
           "description": "文字默认大小",
@@ -2972,6 +3176,10 @@
         "midButton": {
           "$ref": "#/definitions/TabBarMidButton",
           "description": "中间按钮 仅在 list 项为偶数时有效"
+        },
+        "overlay": {
+          "description": "是否以 Native 模式渲染自定义 tabBar",
+          "type": "boolean"
         },
         "position": {
           "default": "bottom",
@@ -3005,9 +3213,6 @@
           "type": "string"
         }
       },
-      "required": [
-        "list"
-      ],
       "type": "object"
     },
     "TabBarIconFont": {

@@ -5,7 +5,6 @@ import path from 'node:path'
 import process from 'node:process'
 import { babelParse } from 'ast-kit'
 import chokidar from 'chokidar'
-import { bold, dim, lightYellow, link } from 'kolorist'
 import MagicString from 'magic-string'
 import { createLogger } from 'vite'
 import {
@@ -21,7 +20,6 @@ import { findMacro, parseSFC } from './page'
 export * from './config'
 export * from './constant'
 export * from './context'
-export * from './customBlock'
 export * from './files'
 export * from './options'
 export * from './page'
@@ -59,9 +57,8 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
           ctx.setupWatcher(chokidar.watch([...ctx.options.dirs, ...ctx.options.subPackages]))
       }
     },
-    // Applet do not support custom route block, so we need to remove the route block here
     async transform(code: string, id: string) {
-      if (!FILE_EXTENSIONS.find(ext => id.endsWith(ext))) {
+      if (!FILE_EXTENSIONS.some(ext => id.endsWith(ext))) {
         return null
       }
 
@@ -78,34 +75,11 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
         macro = findMacro(ast.body, sfc.filename)
       }
 
-      const routeBlock = sfc.customBlocks.find(block => block.type === 'route')
-
-      if (!macro && !routeBlock)
+      if (!macro)
         return null
 
-      if (macro && routeBlock)
-        throw new Error(`不支持混合使用 definePage() 和 <route/> ${id}`)
-
       const s = new MagicString(code)
-      if (macro)
-        s.remove(macro.start!, macro.end!)
-
-      if (routeBlock) {
-        // eslint-disable-next-line no-console
-        console.log(lightYellow('警告：'), `${bold('<route/>')} 标签已废弃，将在下一个版本中移除，请使用 definePage() 代替；${link('查看迁移指南', 'https://uni-helper.js.org/vite-plugin-uni-pages/definePage')}。`)
-        // eslint-disable-next-line no-console
-        console.log(dim(id))
-        // eslint-disable-next-line no-console
-        console.log()
-        const routeBlockMatches = s.original.matchAll(
-          /<route[^>]*>([\s\S]*?)<\/route>/g,
-        )
-        for (const match of routeBlockMatches) {
-          const index = match.index!
-          const length = match[0].length
-          s.remove(index, index + length)
-        }
-      }
+      s.remove(macro.start!, macro.end!)
 
       if (s.hasChanged()) {
         return {

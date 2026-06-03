@@ -1,15 +1,13 @@
 import type { SFCDescriptor, SFCParseOptions } from '@vue/compiler-sfc'
 import type { TabBarItem } from './config'
 import type { PageContext } from './context'
-import type { PageMetaDatum, PagePath, RouteBlockLang, UserPageMeta } from './types'
+import type { PageMetaDatum, PagePath, UserPageMeta } from './types'
 import fs from 'node:fs'
 import { extname } from 'node:path'
 import * as t from '@babel/types'
 import { parse as VueParser } from '@vue/compiler-sfc'
 import { babelParse, isCallOf } from 'ast-kit'
-import { assign as cjAssign } from 'comment-json'
 import { normalizePath } from 'vite'
-import { getRouteBlock, getRouteSfcBlock } from './customBlock'
 import { babelGenerate, debug, parseCode } from './utils'
 
 export class Page {
@@ -97,7 +95,7 @@ export class Page {
         return meta
       }
 
-      return tryPageMetaFromCustomBlock(sfc, this.ctx.options.routeBlockLang)
+      return { type: 'page' }
     }
     catch (err: any) {
       throw new Error(`Read page meta fail in ${this.path.relativePath}\n${err.message}`)
@@ -152,27 +150,6 @@ export async function tryPageMetaFromMacro(sfc: SFCDescriptor): Promise<UserPage
     }
   }
   return undefined
-}
-
-export async function tryPageMetaFromCustomBlock(sfc: SFCDescriptor, routeBlockLang: RouteBlockLang): Promise<UserPageMeta> {
-  const block = getRouteSfcBlock(sfc)
-
-  const routeBlock = getRouteBlock(sfc.filename, block, routeBlockLang)
-
-  const pageMeta: UserPageMeta = {
-    type: routeBlock?.attr.type ?? 'page',
-  }
-
-  if (routeBlock) {
-    try {
-      cjAssign(pageMeta, routeBlock.content)
-    }
-    catch {
-      // ignore parse error
-    }
-  }
-
-  return pageMeta
 }
 
 export function findMacro(stmts: t.Statement[], filename: string): t.CallExpression | undefined {

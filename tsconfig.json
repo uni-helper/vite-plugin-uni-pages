@@ -5,7 +5,8 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "paths": {
-      "@uni-helper/vite-plugin-uni-pages": ["./packages/core/src/index.ts"]
+      "@uni-helper/vite-plugin-uni-pages": ["./packages/core/src/index.ts"],
+      "@uni-helper/uni-pages-types": ["./packages/types/src/index.ts"]
     },
     "resolveJsonModule": true,
     "types": [

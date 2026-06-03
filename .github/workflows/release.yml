@@ -17,12 +17,12 @@ jobs:
           fetch-depth: 0
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Set node
         uses: actions/setup-node@v6
         with:
-          node-version-file: .nvmrc
+          node-version-file: .node-version
           cache: pnpm
           registry-url: https://registry.npmjs.org
 

@@ -6,6 +6,5 @@ export default defineConfig({
     'packages/core/package.json',
     'packages/playground/package.json',
     'packages/schema/package.json',
-    'packages/volar/package.json',
   ],
 })

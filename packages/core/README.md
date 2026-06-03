@@ -44,33 +44,6 @@ export default defineUniPages({
 
 Now all pages will be found automatically!
 
-### SFC custom block for Route Data
-
-Add route meta to the route by adding a `<route>` block to the SFC. This will be
-directly added to the route after it is generated, and will override it.
-
-You can specify a parser to use using `<route lang="yaml">`, or set a default
-parser using `routeBlockLang` option.
-
-- **Supported parser:** JSON, JSON5, YAML
-- **Default:** JSON5
-
-```html
-<!-- index.vue -->
-<!-- use type to set index -->
-<route type="home">
-{
-  "style": { "navigationBarTitleText": "@uni-helper" }
-}
-</route>
-
-<!-- other.vue -->
-<route lang="yaml">
-style:
-  navigationBarTitleText: "@uni-helper"
-</route>
-```
-
 Import the virtual module to access the metadata of all pages
 
 ```ts
@@ -107,12 +80,6 @@ export interface Options {
    * @default []
    */
   exclude: string[]
-
-  /**
-   * Set the default route block parser, or use `<route lang="xxx">` in SFC route block
-   * @default 'json5'
-   */
-  routeBlockLang: 'json5' | 'jsonc' | 'json' | 'yaml' | 'yml'
 
   onBeforeLoadUserConfig: (ctx: PageContext) => void
   onAfterLoadUserConfig: (ctx: PageContext) => void

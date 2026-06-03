@@ -1,8 +1,7 @@
 import type { FSWatcher } from 'chokidar'
 import type { CommentObject, CommentSymbol } from 'comment-json'
 import type { Logger, ViteDevServer } from 'vite'
-import type { TabBar, TabBarItem } from './config'
-import type { PagesConfig } from './config/types'
+import type { PagesConfig, TabBar, TabBarItem } from './config'
 import type { ExcludeIndexSignature, PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
 
 import fs from 'node:fs'
@@ -238,7 +237,7 @@ export class PageContext {
       })
 
       if (!isFoundHome) {
-        this.logger?.warn('No home page found, check the configuration of pages.config.ts, or add the `homePage` option to UniPages in vite.config.js, or add `type="home"` to the routeBlock of your vue page.', {
+        this.logger?.warn('No home page found, check the configuration of pages.config.ts, or add the `homePage` option to UniPages in vite.config.js, or add `definePage({ type: "home" })` in your vue page.', {
           timestamp: true,
         })
       }
@@ -341,7 +340,7 @@ export class PageContext {
       if (page) {
         await page.read()
         if (!page.hasChanged()) {
-          debug.cache(`The route block on page ${filepath} did not send any changes, skipping`)
+          debug.cache(`The page meta on page ${filepath} did not send any changes, skipping`)
           return false
         }
       }

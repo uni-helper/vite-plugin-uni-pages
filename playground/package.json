@@ -1,0 +1,30 @@
+{
+  "name": "playground",
+  "version": "0.3.24",
+  "private": true,
+  "scripts": {
+    "dev:h5": "uni",
+    "dev:mp-weixin": "uni -p mp-weixin",
+    "build:h5": "uni build",
+    "build:mp-weixin": "uni build -p mp-weixin"
+  },
+  "dependencies": {
+    "@dcloudio/uni-app": "catalog:",
+    "@dcloudio/uni-components": "catalog:",
+    "@dcloudio/uni-h5": "catalog:",
+    "@dcloudio/uni-mp-weixin": "catalog:",
+    "@uni-helper/uni-env": "catalog:",
+    "vue": "catalog:",
+    "vue-i18n": "catalog:",
+    "yaml": "catalog:"
+  },
+  "devDependencies": {
+    "@dcloudio/types": "catalog:",
+    "@dcloudio/uni-automator": "catalog:",
+    "@dcloudio/uni-cli-shared": "catalog:",
+    "@dcloudio/vite-plugin-uni": "catalog:",
+    "@uni-helper/vite-plugin-uni-layouts": "catalog:",
+    "@uni-helper/vite-plugin-uni-pages": "workspace:*",
+    "vite": "catalog:"
+  }
+}
