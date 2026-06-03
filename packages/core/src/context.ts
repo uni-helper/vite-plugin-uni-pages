@@ -237,7 +237,7 @@ export class PageContext {
       })
 
       if (!isFoundHome) {
-        this.logger?.warn('No home page found, check the configuration of pages.config.ts, or add the `homePage` option to UniPages in vite.config.js, or add `type="home"` to definePage() in your vue page.', {
+        this.logger?.warn('No home page found, check the configuration of pages.config.ts, or add the `homePage` option to UniPages in vite.config.js, or add `definePage({ type: "home" })` in your vue page.', {
           timestamp: true,
         })
       }
