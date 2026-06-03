@@ -23,7 +23,7 @@ const pagesGlobConfig: UserPagesConfig = {
 
 describe('generate routes', () => {
   it('vue - pages snapshot', async () => {
-    const ctx = new PageContext({ dir: 'packages/playground/src/pages', homePage: 'pages/index', subPackages: ['packages/playground/src/pages/pages-internal-sub'] })
+    const ctx = new PageContext({ dir: 'playground/src/pages', homePage: 'pages/index', subPackages: ['playground/src/pages/pages-internal-sub'] })
     await ctx.scanPages()
     await ctx.scanSubPages()
     await ctx.mergePageMetaData()
@@ -33,18 +33,18 @@ describe('generate routes', () => {
     expect(routes).toMatchInlineSnapshot(`
       "[
         {
-          "path": "../packages/playground/src/pages/A-top",
+          "path": "../playground/src/pages/A-top",
           "type": "page"
         },
         {
-          "path": "../packages/playground/src/pages/i18n",
+          "path": "../playground/src/pages/i18n",
           "type": "page",
           "style": {
             "navigationBarTitleText": "%app.name%"
           }
         },
         {
-          "path": "../packages/playground/src/pages/index",
+          "path": "../playground/src/pages/index",
           "type": "page",
           "middlewares": [
             "auth",
@@ -52,7 +52,7 @@ describe('generate routes', () => {
           ]
         },
         {
-          "path": "../packages/playground/src/pages/test-json",
+          "path": "../playground/src/pages/test-json",
           "type": "page",
           "style": {
             "navigationBarTitleText": "test json page"
@@ -62,7 +62,7 @@ describe('generate routes', () => {
           ]
         },
         {
-          "path": "../packages/playground/src/pages/test-jsonc-with-comment",
+          "path": "../playground/src/pages/test-jsonc-with-comment",
           "type": "page",
           "style": {
             // #ifdef H5
@@ -72,7 +72,7 @@ describe('generate routes', () => {
           "enablePullDownRefresh": true
         },
         {
-          "path": "../packages/playground/src/pages/test-yaml",
+          "path": "../playground/src/pages/test-yaml",
           "type": "page",
           "style": {
             "navigationBarTitleText": "test yaml page"
@@ -82,7 +82,7 @@ describe('generate routes', () => {
           ]
         },
         {
-          "path": "../packages/playground/src/pages/test",
+          "path": "../playground/src/pages/test",
           "type": "page",
           "style": {
             "navigationBarTitleText": "test page"
@@ -92,15 +92,15 @@ describe('generate routes', () => {
           ]
         },
         {
-          "path": "../packages/playground/src/pages/blog/index",
+          "path": "../playground/src/pages/blog/index",
           "type": "page"
         },
         {
-          "path": "../packages/playground/src/pages/blog/post",
+          "path": "../playground/src/pages/blog/post",
           "type": "page"
         },
         {
-          "path": "../packages/playground/src/pages/define-page/async-function",
+          "path": "../playground/src/pages/define-page/async-function",
           "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
@@ -110,7 +110,7 @@ describe('generate routes', () => {
           ]
         },
         {
-          "path": "../packages/playground/src/pages/define-page/conditional-compilation",
+          "path": "../playground/src/pages/define-page/conditional-compilation",
           "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
@@ -120,7 +120,7 @@ describe('generate routes', () => {
           ]
         },
         {
-          "path": "../packages/playground/src/pages/define-page/function",
+          "path": "../playground/src/pages/define-page/function",
           "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
@@ -130,7 +130,7 @@ describe('generate routes', () => {
           ]
         },
         {
-          "path": "../packages/playground/src/pages/define-page/nested-function",
+          "path": "../playground/src/pages/define-page/nested-function",
           "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
@@ -140,7 +140,7 @@ describe('generate routes', () => {
           ]
         },
         {
-          "path": "../packages/playground/src/pages/define-page/object",
+          "path": "../playground/src/pages/define-page/object",
           "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
@@ -150,21 +150,21 @@ describe('generate routes', () => {
           ]
         },
         {
-          "path": "../packages/playground/src/pages/define-page/option-api",
+          "path": "../playground/src/pages/define-page/option-api",
           "type": "page",
           "style": {
             "navigationBarTitleText": "Option API 内使用 definePage"
           }
         },
         {
-          "path": "../packages/playground/src/pages/define-page/remove-console",
+          "path": "../playground/src/pages/define-page/remove-console",
           "type": "page",
           "style": {
             "navigationBarTitleText": "this is a title"
           }
         },
         {
-          "path": "../packages/playground/src/pages/define-page/yaml",
+          "path": "../playground/src/pages/define-page/yaml",
           "type": "page",
           "style": {
             "navigationBarTitleText": "yaml test"
@@ -175,7 +175,7 @@ describe('generate routes', () => {
   })
 
   it('vue - not merge pages snapshot', async () => {
-    const ctx = new PageContext({ dir: 'packages/playground/src/pages', mergePages: false, subPackages: ['packages/playground/src/pages/pages-internal-sub'] })
+    const ctx = new PageContext({ dir: 'playground/src/pages', mergePages: false, subPackages: ['playground/src/pages/pages-internal-sub'] })
     await ctx.scanPages()
     ctx.pagesGlobConfig = pagesGlobConfig
     await ctx.scanSubPages()
@@ -193,19 +193,19 @@ describe('generate routes', () => {
           "type": "home"
         },
         {
-          "path": "../packages/playground/src/pages/A-top",
+          "path": "../playground/src/pages/A-top",
           "type": "page",
           "style": {}
         },
         {
-          "path": "../packages/playground/src/pages/i18n",
+          "path": "../playground/src/pages/i18n",
           "type": "page",
           "style": {
             "navigationBarTitleText": "%app.name%"
           }
         },
         {
-          "path": "../packages/playground/src/pages/index",
+          "path": "../playground/src/pages/index",
           "type": "page",
           "style": {},
           "middlewares": [
@@ -214,7 +214,7 @@ describe('generate routes', () => {
           ]
         },
         {
-          "path": "../packages/playground/src/pages/test-json",
+          "path": "../playground/src/pages/test-json",
           "type": "page",
           "style": {
             "navigationBarTitleText": "test json page"
@@ -224,7 +224,7 @@ describe('generate routes', () => {
           ]
         },
         {
-          "path": "../packages/playground/src/pages/test-jsonc-with-comment",
+          "path": "../playground/src/pages/test-jsonc-with-comment",
           "type": "page",
           "style": {
             // #ifdef H5
@@ -234,7 +234,7 @@ describe('generate routes', () => {
           "enablePullDownRefresh": true
         },
         {
-          "path": "../packages/playground/src/pages/test-yaml",
+          "path": "../playground/src/pages/test-yaml",
           "type": "page",
           "style": {
             "navigationBarTitleText": "test yaml page"
@@ -244,7 +244,7 @@ describe('generate routes', () => {
           ]
         },
         {
-          "path": "../packages/playground/src/pages/test",
+          "path": "../playground/src/pages/test",
           "type": "page",
           "style": {
             "navigationBarTitleText": "test page"
@@ -254,17 +254,17 @@ describe('generate routes', () => {
           ]
         },
         {
-          "path": "../packages/playground/src/pages/blog/index",
+          "path": "../playground/src/pages/blog/index",
           "type": "page",
           "style": {}
         },
         {
-          "path": "../packages/playground/src/pages/blog/post",
+          "path": "../playground/src/pages/blog/post",
           "type": "page",
           "style": {}
         },
         {
-          "path": "../packages/playground/src/pages/define-page/async-function",
+          "path": "../playground/src/pages/define-page/async-function",
           "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
@@ -274,7 +274,7 @@ describe('generate routes', () => {
           ]
         },
         {
-          "path": "../packages/playground/src/pages/define-page/conditional-compilation",
+          "path": "../playground/src/pages/define-page/conditional-compilation",
           "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
@@ -284,7 +284,7 @@ describe('generate routes', () => {
           ]
         },
         {
-          "path": "../packages/playground/src/pages/define-page/function",
+          "path": "../playground/src/pages/define-page/function",
           "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
@@ -294,7 +294,7 @@ describe('generate routes', () => {
           ]
         },
         {
-          "path": "../packages/playground/src/pages/define-page/nested-function",
+          "path": "../playground/src/pages/define-page/nested-function",
           "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
@@ -304,7 +304,7 @@ describe('generate routes', () => {
           ]
         },
         {
-          "path": "../packages/playground/src/pages/define-page/object",
+          "path": "../playground/src/pages/define-page/object",
           "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
@@ -314,21 +314,21 @@ describe('generate routes', () => {
           ]
         },
         {
-          "path": "../packages/playground/src/pages/define-page/option-api",
+          "path": "../playground/src/pages/define-page/option-api",
           "type": "page",
           "style": {
             "navigationBarTitleText": "Option API 内使用 definePage"
           }
         },
         {
-          "path": "../packages/playground/src/pages/define-page/remove-console",
+          "path": "../playground/src/pages/define-page/remove-console",
           "type": "page",
           "style": {
             "navigationBarTitleText": "this is a title"
           }
         },
         {
-          "path": "../packages/playground/src/pages/define-page/yaml",
+          "path": "../playground/src/pages/define-page/yaml",
           "type": "page",
           "style": {
             "navigationBarTitleText": "yaml test"
@@ -341,8 +341,8 @@ describe('generate routes', () => {
   it('fix subPackage cannot match the second-level dir', async () => {
     const ctx = new PageContext({
       subPackages: [
-        'packages/playground/src/pages-sub-pages/sub-activity',
-        'packages/playground/src/pages-sub-pages/sub-main',
+        'playground/src/pages-sub-pages/sub-activity',
+        'playground/src/pages-sub-pages/sub-main',
       ],
     })
     await ctx.scanSubPages()
@@ -351,7 +351,7 @@ describe('generate routes', () => {
     expect(routes).toMatchInlineSnapshot(`
     "[
       {
-        "root": "../packages/playground/src/pages-sub-pages/sub-activity",
+        "root": "../playground/src/pages-sub-pages/sub-activity",
         "pages": [
           {
             "path": "pages/about/index",
@@ -364,7 +364,7 @@ describe('generate routes', () => {
         ]
       },
       {
-        "root": "../packages/playground/src/pages-sub-pages/sub-main",
+        "root": "../playground/src/pages-sub-pages/sub-main",
         "pages": [
           {
             "path": "pages/about/index",
@@ -383,8 +383,8 @@ describe('generate routes', () => {
   it('check pages is exist', async () => {
     const ctx = new PageContext({
       subPackages: [
-        'packages/playground/src/pages-sub-empty',
-        'packages/playground/src/pages-sub-pages/sub-main',
+        'playground/src/pages-sub-empty',
+        'playground/src/pages-sub-pages/sub-main',
       ],
     })
     await ctx.scanSubPages()
@@ -394,7 +394,7 @@ describe('generate routes', () => {
     expect(routes).toMatchInlineSnapshot(`
     "[
       {
-        "root": "../packages/playground/src/pages-sub-pages/sub-main",
+        "root": "../playground/src/pages-sub-pages/sub-main",
         "pages": [
           {
             "path": "pages/about/index",

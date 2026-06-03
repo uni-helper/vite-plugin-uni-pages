@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { getPageFiles, resolveOptions } from '../packages/core/src'
 
 const options = resolveOptions({}, process.cwd())
-const pages = 'packages/playground/src/pages'
+const pages = 'playground/src/pages'
 
 describe('get files', () => {
   it('pages', async () => {
