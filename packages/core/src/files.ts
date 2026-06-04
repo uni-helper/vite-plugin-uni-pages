@@ -1,7 +1,7 @@
 import type { ResolvedOptions } from './types'
 import fs from 'node:fs'
-import fg from 'fast-glob'
 import lockfile from 'proper-lockfile'
+import { globSync } from 'tinyglobby'
 import writeFileAtomic from 'write-file-atomic'
 import { FILE_EXTENSIONS } from './constant'
 import { debug, extsToGlob, sleep } from './utils'
@@ -13,7 +13,7 @@ export function getPageFiles(path: string, options: ResolvedOptions): string[] {
 
   const ext = extsToGlob(FILE_EXTENSIONS)
 
-  const files = fg.sync(`**/*.${ext}`, {
+  const files = globSync(`**/*.${ext}`, {
     ignore: exclude,
     onlyFiles: true,
     cwd: path,

@@ -63,7 +63,7 @@ export interface Options {
   outDir: string
 
   /**
-   * exclude page
+   * pages to be excluded, based on [tinyglobby ignore option](https://superchupu.dev/tinyglobby/documentation#ignore)
    * @default []
    */
   exclude: string[]

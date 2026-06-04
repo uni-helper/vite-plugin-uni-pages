@@ -4,7 +4,7 @@ import type { ResolvedOptions, UserOptions } from './types'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { slash } from '@antfu/utils'
-import fg from 'fast-glob'
+import { globSync } from 'tinyglobby'
 
 /**
  * Resolve user configuration options
@@ -74,11 +74,11 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
  * Resolves the page dirs for its for its given globs
  */
 export function resolvePageDirs(dir: string, root: string, exclude: string[]): string[] {
-  const dirs = fg.sync(slash(dir), {
+  const dirs = globSync(slash(dir), {
     ignore: exclude,
     onlyDirectories: true,
+    expandDirectories: false,
     dot: true,
-    unique: true,
     cwd: root,
   })
   return dirs
