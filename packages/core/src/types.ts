@@ -6,10 +6,16 @@ import type { debug } from './utils'
 export type { DefinePage, ExcludeIndexSignature, MaybeCallable, MaybePromise, MaybePromiseCallable, PageMetaDatum, SubPageMetaDatum, UserPageMeta, UserTabBarItem } from '@uni-helper/uni-pages-types'
 export { definePage } from '@uni-helper/uni-pages-types'
 
+/** Debug log type, corresponding to methods in the debug object */
 export type debugType = keyof typeof debug
 
+/** Configuration source type, supports string path or unconfig LoadConfigSource object */
 export type ConfigSource = string | LoadConfigSource<PagesConfig> | LoadConfigSource<PagesConfig>[]
 
+/**
+ * Plugin configuration options interface
+ * Defines all configuration options that users can pass in
+ */
 export interface Options {
 
   /**
@@ -83,8 +89,13 @@ export interface Options {
   onAfterWriteFile: (ctx: PageContext) => void
 }
 
+/** User configuration options type, all options are optional */
 export type UserOptions = Partial<Options>
 
+/**
+ * Resolved configuration options interface
+ * Configuration processed by resolveOptions, all paths resolved to absolute paths
+ */
 export interface ResolvedOptions extends Omit<Options, 'dir' | 'homePage' | 'configSource' | 'dts'> {
   /**
    * Resolves to the `root` value from Vite config.
@@ -106,7 +117,13 @@ export interface ResolvedOptions extends Omit<Options, 'dir' | 'homePage' | 'con
   configSource: LoadConfigSource<PagesConfig>[]
 }
 
+/**
+ * Page path information interface
+ * Contains relative and absolute paths of page files
+ */
 export interface PagePath {
+  /** Path relative to the output directory */
   relativePath: string
+  /** Absolute path of the page file */
   absolutePath: string
 }

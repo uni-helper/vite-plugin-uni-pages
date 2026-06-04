@@ -9,6 +9,12 @@ import groupBy from 'lodash.groupby'
 import * as ts from 'typescript'
 import { FILE_EXTENSIONS, RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 
+/**
+ * Invalidate virtual module to trigger HMR update
+ * When page configuration changes, the virtual module needs to be invalidated to regenerate content
+ *
+ * @param server - Vite dev server instance
+ */
 export function invalidatePagesModule(server: ViteDevServer) {
   const { moduleGraph } = server
   const mods = moduleGraph.getModulesByFile(RESOLVED_MODULE_ID_VIRTUAL)
@@ -20,21 +26,46 @@ export function invalidatePagesModule(server: ViteDevServer) {
   }
 }
 
+/**
+ * Debug logging utility
+ * Uses debug package for leveled log output
+ * Enable via environment variable DEBUG=vite-plugin-uni-pages:*
+ */
 export const debug = {
+  /** HMR related logs */
   hmr: Debug('vite-plugin-uni-pages:hmr'),
+  /** Configuration options related logs */
   options: Debug('vite-plugin-uni-pages:options'),
+  /** Main package page scanning logs */
   pages: Debug('vite-plugin-uni-pages:pages'),
+  /** Sub-package page scanning logs */
   subPages: Debug('vite-plugin-uni-pages:subPages'),
+  /** Error logs */
   error: Debug('vite-plugin-uni-pages:error'),
+  /** Cache related logs */
   cache: Debug('vite-plugin-uni-pages:cache'),
+  /** Declaration file generation logs */
   declaration: Debug('vite-plugin-uni-pages:declaration'),
+  /** definePage macro parsing logs */
   definePage: Debug('vite-plugin-uni-pages:definePage'),
 }
 
+/**
+ * Convert file extensions array to glob pattern
+ * @param extensions - File extensions array
+ * @returns Glob pattern string
+ */
 export function extsToGlob(extensions: string[]) {
   return extensions.length > 1 ? `{${extensions.join(',')}}` : (extensions[0] || '')
 }
 
+/**
+ * Check if file is a target page file
+ * Determine if the file extension is in the supported page file types list
+ *
+ * @param path - File path
+ * @returns Whether it's a target file
+ */
 export function isTargetFile(path: string) {
   const ext = path.split('.').pop()
   return FILE_EXTENSIONS.includes(ext!)
@@ -61,13 +92,13 @@ export function mergePageMetaDataArray(pageMetaData: PageMetaDatum[]) {
 }
 
 /**
- * 将 TypeScript / JavaScript 脚本代码，转换为对象/函数
+ * Convert TypeScript / JavaScript script code to object/function
  *
- * @param options - 执行脚本所需的配置项
- * @param options.imports - 需要引入的模块导入语句列表
- * @param options.code - 实际要执行的 TypeScript 代码内容
- * @param options.filename - 脚本文件名，用于错误定位和上下文环境
- * @returns 返回脚本执行后的结果，若导出的是函数则执行后返回其返回值
+ * @param options - Configuration required for script execution
+ * @param options.imports - List of module import statements to include
+ * @param options.code - TypeScript code content to execute
+ * @param options.filename - Script filename for error location and context
+ * @returns Script execution result, if export is a function then execute and return its return value
  */
 export async function parseCode(options: { imports: string[], code: string, filename: string }): Promise<any> {
   const { imports = [], code, filename } = options
@@ -76,34 +107,34 @@ export async function parseCode(options: { imports: string[], code: string, file
   try {
     const tmpCode = `${imports.join('\n')}\n export default ${code}`
 
-    // 编译 TypeScript 代码为 JavaScript
+    // Compile TypeScript code to JavaScript
     jsCode = ts.transpileModule(tmpCode, {
       compilerOptions: {
-        module: ts.ModuleKind.CommonJS, // 生成的模块格式为 CommonJS（Node.js 默认格式）
-        target: ts.ScriptTarget.ES2022, // 编译后的 JavaScript 目标版本
+        module: ts.ModuleKind.CommonJS, // Generated module format is CommonJS (Node.js default)
+        target: ts.ScriptTarget.ES2022, // Target JavaScript version after compilation
 
-        noEmit: true, // 不生成输出文件
-        strict: false, // 关闭所有严格类型检查选项
-        noImplicitAny: false, // 允许表达式和 any 类型
-        strictNullChecks: false, // 关闭严格的 null 和 undefined 检查
-        strictFunctionTypes: false, // 关闭函数参数的严格逆变比较
-        strictBindCallApply: false, // 关闭对 bind、call 和 apply 方法的严格类型检查
-        strictPropertyInitialization: false, // 关闭类属性初始化的严格检查
-        noImplicitThis: false, // 允许 this 表达式具有隐式的 any 类型
-        alwaysStrict: false, // 不以严格模式解析并为每个源文件生成 "use strict" 指令
+        noEmit: true, // Don't generate output files
+        strict: false, // Disable all strict type checking options
+        noImplicitAny: false, // Allow expressions with any type
+        strictNullChecks: false, // Disable strict null and undefined checks
+        strictFunctionTypes: false, // Disable strict contravariant comparison of function parameters
+        strictBindCallApply: false, // Disable strict type checking for bind, call and apply methods
+        strictPropertyInitialization: false, // Disable strict checking of class property initialization
+        noImplicitThis: false, // Allow this expressions to have implicit any type
+        alwaysStrict: false, // Don't parse in strict mode or generate "use strict" directive for each source file
 
-        allowJs: true, // 允许编译 JavaScript 文件
-        checkJs: false, // 不检查 JavaScript 文件中的类型
-        skipLibCheck: true, // 跳过对 TypeScript 声明文件 (*.d.ts) 的类型检查
-        esModuleInterop: true, // 启用 ES 模块互操作性，允许使用 import 导入 CommonJS 模块
-        removeComments: true, // 删除注释
+        allowJs: true, // Allow compiling JavaScript files
+        checkJs: false, // Don't check types in JavaScript files
+        skipLibCheck: true, // Skip type checking of TypeScript declaration files (*.d.ts)
+        esModuleInterop: true, // Enable ES module interoperability, allow importing CommonJS modules with import
+        removeComments: true, // Remove comments
       },
-      jsDocParsingMode: ts.JSDocParsingMode.ParseNone, // 不解析 JSDoc
+      jsDocParsingMode: ts.JSDocParsingMode.ParseNone, // Don't parse JSDoc
     }).outputText
 
     const dir = path.dirname(filename)
 
-    // 创建一个新的虚拟机上下文，支持动态导入
+    // Create a new VM context with dynamic import support
     const vmContext = {
       module: {},
       exports: {},
@@ -112,7 +143,7 @@ export async function parseCode(options: { imports: string[], code: string, file
       require: createRequire(dir),
       import: (id: string) => import(id),
 
-      // 定时器相关
+      // Timer related
       setTimeout,
       clearTimeout,
       setInterval,
@@ -120,32 +151,32 @@ export async function parseCode(options: { imports: string[], code: string, file
       setImmediate,
       clearImmediate,
 
-      // 控制台相关
+      // Console related
       console,
 
-      // URL 处理
+      // URL handling
       URL,
       URLSearchParams,
 
-      // 进程和性能相关
+      // Process and performance related
       performance,
 
-      // 全局对象引用
+      // Global object references
       global: globalThis,
       globalThis,
     }
 
-    // 使用 vm 模块执行 JavaScript 代码
+    // Execute JavaScript code using vm module
     const script = new vm.Script(jsCode, { filename })
 
     await script.runInNewContext(vmContext, {
-      timeout: 1000, // 设置超时避免长时间运行
+      timeout: 1000, // Set timeout to avoid long-running scripts
     })
 
-    // 获取导出的值
+    // Get exported value
     const result = (vmContext.exports as any).default || vmContext.exports
 
-    // 返回结果
+    // Return result
     return result
   }
   catch (error: any) {
@@ -153,12 +184,25 @@ export async function parseCode(options: { imports: string[], code: string, file
   }
 }
 
+/**
+ * Async sleep function
+ * @param ms - Sleep duration in milliseconds
+ * @returns Promise object
+ */
 export function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+/**
+ * Get default export of a module
+ * Compatible with CommonJS and ES Module export styles
+ *
+ * @param expr - Module object
+ * @returns Default export value
+ */
 function getDefaultExport<T = any>(expr: T): T {
   return (expr as any).default === undefined ? expr : (expr as any).default
 }
 
+/** Babel code generator for converting AST back to code */
 export const babelGenerate = getDefaultExport(babelGenerator)

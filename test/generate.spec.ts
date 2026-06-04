@@ -1,5 +1,5 @@
 import type { UserPagesConfig } from '../packages/core/src'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PageContext } from '../packages/core/src'
 
 const pagesGlobConfig: UserPagesConfig = {
@@ -22,6 +22,10 @@ const pagesGlobConfig: UserPagesConfig = {
 }
 
 describe('generate routes', () => {
+  beforeEach(() => {
+    vi.stubEnv('UNI_PLATFORM', 'web')
+  })
+
   it('vue - pages snapshot', async () => {
     const ctx = new PageContext({ dir: 'playground/src/pages', homePage: 'pages/index', subPackages: ['playground/src/pages/pages-internal-sub'] })
     await ctx.scanPages()
@@ -33,6 +37,14 @@ describe('generate routes', () => {
     expect(routes).toMatchInlineSnapshot(`
       "[
         {
+          "path": "../playground/src/pages/index",
+          "type": "home",
+          "middlewares": [
+            "auth",
+            "test"
+          ]
+        },
+        {
           "path": "../playground/src/pages/A-top",
           "type": "page"
         },
@@ -42,14 +54,6 @@ describe('generate routes', () => {
           "style": {
             "navigationBarTitleText": "%app.name%"
           }
-        },
-        {
-          "path": "../playground/src/pages/index",
-          "type": "page",
-          "middlewares": [
-            "auth",
-            "test"
-          ]
         },
         {
           "path": "../playground/src/pages/test-json",
@@ -65,9 +69,7 @@ describe('generate routes', () => {
           "path": "../playground/src/pages/test-jsonc-with-comment",
           "type": "page",
           "style": {
-            // #ifdef H5
             "navigationBarTitleText": "test jsonc page H5"
-            // #endif
           },
           "enablePullDownRefresh": true
         },
@@ -113,7 +115,7 @@ describe('generate routes', () => {
           "path": "../playground/src/pages/define-page/conditional-compilation",
           "type": "page",
           "style": {
-            "navigationBarTitleText": "hello world"
+            "navigationBarTitleText": "hello world: H5"
           },
           "middlewares": [
             "auth"
@@ -227,9 +229,7 @@ describe('generate routes', () => {
           "path": "../playground/src/pages/test-jsonc-with-comment",
           "type": "page",
           "style": {
-            // #ifdef H5
             "navigationBarTitleText": "test jsonc page H5"
-            // #endif
           },
           "enablePullDownRefresh": true
         },
@@ -277,7 +277,7 @@ describe('generate routes', () => {
           "path": "../playground/src/pages/define-page/conditional-compilation",
           "type": "page",
           "style": {
-            "navigationBarTitleText": "hello world"
+            "navigationBarTitleText": "hello world: H5"
           },
           "middlewares": [
             "auth"

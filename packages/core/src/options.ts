@@ -6,6 +6,14 @@ import process from 'node:process'
 import { slash } from '@antfu/utils'
 import fg from 'fast-glob'
 
+/**
+ * Resolve user configuration options
+ * Merge user-provided configuration with default values and handle path resolution
+ *
+ * @param userOptions - User configuration options
+ * @param viteRoot - Vite project root directory
+ * @returns Resolved configuration options
+ */
 export function resolveOptions(userOptions: UserOptions, viteRoot: string = process.cwd()): ResolvedOptions {
   const {
     dts = true,

@@ -23,15 +23,15 @@ export function getPageFiles(path: string, options: ResolvedOptions): string[] {
 }
 
 /**
- * 检查指定路径的 pages.json 文件，如果文件不存在或不是有效文件则创建一个空的 pages.json 文件
- * @param path - 要检查的文件路径
- * @returns boolean - 返回操作是否成功
+ * Check the pages.json file at the specified path, create an empty pages.json file if it doesn't exist or is not a valid file
+ * @param path - File path to check
+ * @returns boolean - Whether the operation was successful
  */
 export function checkPagesJsonFileSync(path: fs.PathLike): boolean {
   /**
-   * 创建空的 pages.json 文件
-   * @param path - 文件路径
-   * @returns boolean - 返回创建是否成功
+   * Create an empty pages.json file
+   * @param path - File path
+   * @returns boolean - Whether the creation was successful
    */
   const createEmptyFile = (path: fs.PathLike): boolean => {
     try {
@@ -48,9 +48,9 @@ export function checkPagesJsonFileSync(path: fs.PathLike): boolean {
   }
 
   /**
-   * 删除指定路径的文件
-   * @param path - 文件路径
-   * @returns boolean - 返回删除是否成功
+   * Delete the file at the specified path
+   * @param path - File path
+   * @returns boolean - Whether the deletion was successful
    */
   const unlinkFile = (path: fs.PathLike): boolean => {
     try {
@@ -63,33 +63,33 @@ export function checkPagesJsonFileSync(path: fs.PathLike): boolean {
   }
 
   try {
-    // 检查文件是否存在
+    // Check if file exists
     try {
       fs.accessSync(path, fs.constants.F_OK)
     }
     catch {
-      // 文件不存在，创建新文件
+      // File does not exist, create new file
       return createEmptyFile(path)
     }
 
-    // 检查是否为文件
+    // Check if it's a file
     const stat = fs.statSync(path)
     if (!stat.isFile()) {
-      // 不是文件，尝试删除并重新创建
+      // Not a file, try to delete and recreate
       if (!unlinkFile(path)) {
         return false
       }
       return createEmptyFile(path)
     }
 
-    // 检查读写权限
+    // Check read/write permissions
     try {
       fs.accessSync(path, fs.constants.R_OK | fs.constants.W_OK)
 
       return true
     }
     catch {
-      // 权限不足，尝试删除并重新创建
+      // Insufficient permissions, try to delete and recreate
       if (!unlinkFile(path)) {
         return false
       }
@@ -97,14 +97,23 @@ export function checkPagesJsonFileSync(path: fs.PathLike): boolean {
     }
   }
   catch {
-    // 发生其他错误，尝试创建文件
+    // Other errors occurred, try to create file
     return createEmptyFile(path)
   }
 }
 
+/**
+ * Safely write file using file lock
+ * Avoid data corruption caused by concurrent writes through file lock
+ * Use atomic write to ensure file write integrity
+ *
+ * @param path - File path
+ * @param content - File content
+ * @param retry - Number of retries when lock acquisition fails, defaults to 3
+ */
 export async function writeFileWithLock(path: string, content: string, retry = 3) {
   if (retry <= 0) {
-    debug.error(`${path} 获取文件锁失败，写入失败`)
+    debug.error(`${path} Failed to acquire file lock, write failed`)
     return
   }
 
@@ -112,11 +121,11 @@ export async function writeFileWithLock(path: string, content: string, retry = 3
 
   try {
     try {
-      // 获取文件锁
+      // Acquire file lock
       release = await lockfile.lock(path, { realpath: false })
     }
     catch {
-      // 获取文件锁失败
+      // Failed to acquire file lock
       await sleep(500)
       return writeFileWithLock(path, content, retry - 1)
     }
@@ -127,7 +136,7 @@ export async function writeFileWithLock(path: string, content: string, retry = 3
     // eslint-disable-next-line ts/ban-ts-comment
     // @ts-expect-error'
     if (release) {
-      await release() // 释放文件锁
+      await release() // Release file lock
     }
   }
 }

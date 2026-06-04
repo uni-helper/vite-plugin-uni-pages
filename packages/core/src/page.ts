@@ -10,23 +10,50 @@ import { babelParse, isCallOf } from 'ast-kit'
 import { normalizePath } from 'vite'
 import { babelGenerate, debug, parseCode } from './utils'
 
+/**
+ * Page class representing a Vue page file
+ *
+ * Responsibilities:
+ * 1. Read page file content
+ * 2. Parse page metadata defined by definePage macro
+ * 3. Provide tabBar configuration information
+ * 4. Track page file change status
+ */
 export class Page {
+  /** Page context instance */
   ctx: PageContext
 
+  /** Page path information containing relative and absolute paths */
   path: PagePath
+  /** Page URI used for pages.json path field */
   uri: string
 
+  /** Whether the page has changed, used for incremental update judgment */
   changed: boolean = true
 
+  /** Raw JSON string of page metadata for change detection */
   private raw: string = ''
+  /** Parsed page metadata */
   private meta: UserPageMeta | undefined
 
+  /**
+   * Create a page instance
+   * @param ctx - Page context instance
+   * @param path - Page path information
+   */
   constructor(ctx: PageContext, path: PagePath) {
     this.ctx = ctx
     this.path = path
     this.uri = normalizePath(path.relativePath.replace(extname(path.relativePath), ''))
   }
 
+  /**
+   * Get page metadata
+   * Parse configuration defined by definePage macro and return metadata for pages.json
+   *
+   * @param forceUpdate - Whether to force update, ignoring cache
+   * @returns Page metadata object
+   */
   public async getPageMeta(forceUpdate = false): Promise<PageMetaDatum> {
     if (forceUpdate || !this.meta) {
       await this.read()
@@ -40,6 +67,13 @@ export class Page {
     }
   }
 
+  /**
+   * Get page tabBar configuration
+   * Extract tabBar related configuration from definePage macro
+   *
+   * @param forceUpdate - Whether to force update, ignoring cache
+   * @returns tabBar configuration object, or undefined if page doesn't define tabBar
+   */
   public async getTabBar(forceUpdate = false): Promise<TabBarItem & { index: number } | undefined> {
     if (forceUpdate || !this.meta) {
       await this.read()
@@ -58,10 +92,18 @@ export class Page {
     }
   }
 
+  /**
+   * Check if the page has changed
+   * @returns Whether the page has changed
+   */
   public hasChanged() {
     return this.changed
   }
 
+  /**
+   * Read page file and parse metadata
+   * Extract configuration defined by definePage macro from Vue SFC
+   */
   public async read() {
     let meta: UserPageMeta
     try {
@@ -103,6 +145,14 @@ export class Page {
   }
 }
 
+/**
+ * Parse Vue Single File Component (SFC)
+ * Compatible with different versions of @vue/compiler-sfc
+ *
+ * @param code - Vue SFC source code
+ * @param options - Parse options
+ * @returns SFC descriptor object
+ */
 export function parseSFC(code: string, options?: SFCParseOptions): SFCDescriptor {
   return (
     VueParser(code, {
@@ -117,6 +167,13 @@ export function parseSFC(code: string, options?: SFCParseOptions): SFCDescriptor
   )
 }
 
+/**
+ * Try to extract page metadata defined by definePage macro from SFC
+ * Support using definePage in script setup or regular script
+ *
+ * @param sfc - Vue SFC descriptor
+ * @returns Page metadata object, or undefined if definePage is not found
+ */
 export async function tryPageMetaFromMacro(sfc: SFCDescriptor): Promise<UserPageMeta | undefined> {
   const sfcScript = sfc.scriptSetup || sfc.script
 
@@ -152,6 +209,14 @@ export async function tryPageMetaFromMacro(sfc: SFCDescriptor): Promise<UserPage
   return undefined
 }
 
+/**
+ * Find definePage macro call in AST
+ * Support function expressions, arrow functions and object expressions as arguments
+ *
+ * @param stmts - AST statement array
+ * @param filename - Filename for error reporting
+ * @returns definePage call expression, or undefined if not found
+ */
 export function findMacro(stmts: t.Statement[], filename: string): t.CallExpression | undefined {
   let macro: t.CallExpression | undefined
 
@@ -181,6 +246,13 @@ export function findMacro(stmts: t.Statement[], filename: string): t.CallExpress
   return macro
 }
 
+/**
+ * Extract all import declarations from AST
+ * Used to provide necessary imports when executing definePage arguments
+ *
+ * @param stmts - AST statement array
+ * @returns Import declaration array
+ */
 export function findImports(stmts: t.Statement[]): t.ImportDeclaration[] {
   const imports: t.ImportDeclaration[] = []
   for (const stmt of stmts) {

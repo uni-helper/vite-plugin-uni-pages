@@ -26,6 +26,18 @@ export * from './page'
 export * from './types'
 export * from './utils'
 
+/**
+ * vite-plugin-uni-pages plugin main entry
+ *
+ * Automatically scan page directories and generate pages.json configuration file
+ * Support definePage macro for defining page metadata
+ * Support multi-platform conditional compilation
+ * Support sub-package configuration
+ * Support TypeScript declaration file generation
+ *
+ * @param userOptions - User configuration options
+ * @returns Vite plugin instance
+ */
 export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
   let ctx: PageContext
 
@@ -40,6 +52,10 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
   return {
     name: 'vite-plugin-uni-pages',
     enforce: 'pre',
+    /**
+     * Vite configResolved hook
+     * Initialize PageContext, set logger, generate initial pages.json
+     */
     async configResolved(config) {
       ctx = new PageContext(userOptions, config.root)
 
@@ -57,6 +73,10 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
           ctx.setupWatcher(chokidar.watch([...ctx.options.dirs, ...ctx.options.subPackages]))
       }
     },
+    /**
+     * Code transform hook
+     * Remove definePage macro calls from Vue SFC to avoid runtime errors
+     */
     async transform(code: string, id: string) {
       if (!FILE_EXTENSIONS.some(ext => id.endsWith(ext))) {
         return null
@@ -92,13 +112,25 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
         }
       }
     },
+    /**
+     * Configure server hook
+     * Set up file watching and HMR support
+     */
     configureServer(server) {
       ctx.setupViteServer(server)
     },
+    /**
+     * Module resolution hook
+     * Resolve virtual module identifier to internal path
+     */
     resolveId(id) {
       if (id === MODULE_ID_VIRTUAL)
         return RESOLVED_MODULE_ID_VIRTUAL
     },
+    /**
+     * Module load hook
+     * Return the code content of the virtual module
+     */
     load(id) {
       if (id === RESOLVED_MODULE_ID_VIRTUAL)
         return ctx.virtualModule()

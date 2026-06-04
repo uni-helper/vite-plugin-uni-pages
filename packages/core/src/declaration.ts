@@ -5,6 +5,14 @@ import { mkdir, readFile, writeFile as writeFile_ } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { normalizePath } from 'vite'
 
+/**
+ * Generate TypeScript declaration file content
+ * Provide type hints for uni-app navigation APIs (navigateTo, redirectTo, switchTab, reLaunch)
+ * Ensure page paths get type checking at compile time
+ *
+ * @param ctx - Page context instance
+ * @returns Declaration file code string
+ */
 export function getDeclaration(ctx: PageContext) {
   const subPagesPath = ctx.subPageMetaData.map((sub) => {
     return sub.pages.map(v => (`"/${normalizePath(join(sub.root, v.path))}"`))
@@ -46,11 +54,23 @@ declare module "virtual:uni-pages" {
   return code
 }
 
+/**
+ * Write file, automatically create directories
+ * @param filePath - File path
+ * @param content - File content
+ */
 async function writeFile(filePath: string, content: string) {
   await mkdir(dirname(filePath), { recursive: true })
   return await writeFile_(filePath, content, 'utf-8')
 }
 
+/**
+ * Write declaration file to disk
+ * Only writes when content changes to avoid unnecessary file operations
+ *
+ * @param ctx - Page context instance
+ * @param filepath - Declaration file output path
+ */
 export async function writeDeclaration(ctx: PageContext, filepath: string) {
   const originalContent = existsSync(filepath) ? await readFile(filepath, 'utf-8') : ''
 
