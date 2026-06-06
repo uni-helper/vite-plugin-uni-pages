@@ -206,3 +206,8 @@ function getDefaultExport<T = any>(expr: T): T {
 
 /** Babel code generator for converting AST back to code */
 export const babelGenerate = getDefaultExport(babelGenerator)
+
+export const stripType = <T extends { type?: unknown }>(item: T): Omit<T, 'type'> => {
+  const { type, ...rest } = item
+  return rest
+}

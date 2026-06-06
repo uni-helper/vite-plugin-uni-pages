@@ -88,7 +88,7 @@ export class Page {
     return {
       ...tabBar,
       pagePath: tabBar.pagePath || this.uri,
-      index: tabBar.index || 0,
+      index: tabBar.index ?? 0,
     }
   }
 

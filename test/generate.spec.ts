@@ -38,27 +38,22 @@ describe('generate routes', () => {
       "[
         {
           "path": "../playground/src/pages/index",
-          "type": "home",
           "middlewares": [
             "auth",
             "test"
           ]
         },
         {
-          "path": "../playground/src/pages/A-top",
-          "type": "page"
+          "path": "../playground/src/pages/A-top"
         },
         {
-          "path": "../playground/src/pages/blog/index",
-          "type": "page"
+          "path": "../playground/src/pages/blog/index"
         },
         {
-          "path": "../playground/src/pages/blog/post",
-          "type": "page"
+          "path": "../playground/src/pages/blog/post"
         },
         {
           "path": "../playground/src/pages/define-page/async-function",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -68,7 +63,6 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/define-page/conditional-compilation",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world: H5"
           },
@@ -78,7 +72,6 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/define-page/function",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -88,7 +81,6 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/define-page/nested-function",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -98,7 +90,6 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/define-page/object",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -108,35 +99,54 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/define-page/option-api",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "Option API 内使用 definePage"
           }
         },
         {
           "path": "../playground/src/pages/define-page/remove-console",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "this is a title"
           }
         },
         {
           "path": "../playground/src/pages/define-page/yaml",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "yaml test"
           }
         },
         {
           "path": "../playground/src/pages/i18n",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "%app.name%"
           }
         },
         {
+          "path": "../playground/src/pages/tabbar-index-zero",
+          "style": {
+            "navigationBarTitleText": "零索引"
+          }
+        },
+        {
+          "path": "../playground/src/pages/tabbar-list",
+          "style": {
+            "navigationBarTitleText": "列表"
+          }
+        },
+        {
+          "path": "../playground/src/pages/tabbar-no-index",
+          "style": {
+            "navigationBarTitleText": "无索引"
+          }
+        },
+        {
+          "path": "../playground/src/pages/tabbar-profile",
+          "style": {
+            "navigationBarTitleText": "我的"
+          }
+        },
+        {
           "path": "../playground/src/pages/test-json",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "test json page"
           },
@@ -146,7 +156,6 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/test-jsonc-with-comment",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "test jsonc page H5"
           },
@@ -154,7 +163,6 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/test-yaml",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "test yaml page"
           },
@@ -164,7 +172,6 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/test",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "test page"
           },
@@ -191,27 +198,22 @@ describe('generate routes', () => {
           "style": {
             "navigationBarTextStyle": "black",
             "navigationBarTitleText": "uni-helper"
-          },
-          "type": "home"
+          }
         },
         {
           "path": "../playground/src/pages/A-top",
-          "type": "page",
           "style": {}
         },
         {
           "path": "../playground/src/pages/blog/index",
-          "type": "page",
           "style": {}
         },
         {
           "path": "../playground/src/pages/blog/post",
-          "type": "page",
           "style": {}
         },
         {
           "path": "../playground/src/pages/define-page/async-function",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -221,7 +223,6 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/define-page/conditional-compilation",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world: H5"
           },
@@ -231,7 +232,6 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/define-page/function",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -241,7 +241,6 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/define-page/nested-function",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -251,7 +250,6 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/define-page/object",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -261,35 +259,30 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/define-page/option-api",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "Option API 内使用 definePage"
           }
         },
         {
           "path": "../playground/src/pages/define-page/remove-console",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "this is a title"
           }
         },
         {
           "path": "../playground/src/pages/define-page/yaml",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "yaml test"
           }
         },
         {
           "path": "../playground/src/pages/i18n",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "%app.name%"
           }
         },
         {
           "path": "../playground/src/pages/index",
-          "type": "page",
           "style": {},
           "middlewares": [
             "auth",
@@ -297,8 +290,31 @@ describe('generate routes', () => {
           ]
         },
         {
+          "path": "../playground/src/pages/tabbar-index-zero",
+          "style": {
+            "navigationBarTitleText": "零索引"
+          }
+        },
+        {
+          "path": "../playground/src/pages/tabbar-list",
+          "style": {
+            "navigationBarTitleText": "列表"
+          }
+        },
+        {
+          "path": "../playground/src/pages/tabbar-no-index",
+          "style": {
+            "navigationBarTitleText": "无索引"
+          }
+        },
+        {
+          "path": "../playground/src/pages/tabbar-profile",
+          "style": {
+            "navigationBarTitleText": "我的"
+          }
+        },
+        {
           "path": "../playground/src/pages/test-json",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "test json page"
           },
@@ -308,7 +324,6 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/test-jsonc-with-comment",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "test jsonc page H5"
           },
@@ -316,7 +331,6 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/test-yaml",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "test yaml page"
           },
@@ -326,7 +340,6 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/test",
-          "type": "page",
           "style": {
             "navigationBarTitleText": "test page"
           },
@@ -349,34 +362,30 @@ describe('generate routes', () => {
     await ctx.mergeSubPageMetaData()
     const routes = ctx.resolveSubRoutes()
     expect(routes).toMatchInlineSnapshot(`
-    "[
-      {
-        "root": "../playground/src/pages-sub-pages/sub-activity",
-        "pages": [
-          {
-            "path": "pages/about/index",
-            "type": "page"
-          },
-          {
-            "path": "pages/home/index",
-            "type": "page"
-          }
-        ]
-      },
-      {
-        "root": "../playground/src/pages-sub-pages/sub-main",
-        "pages": [
-          {
-            "path": "pages/about/index",
-            "type": "page"
-          },
-          {
-            "path": "pages/home/index",
-            "type": "page"
-          }
-        ]
-      }
-    ]"
+      "[
+        {
+          "root": "../playground/src/pages-sub-pages/sub-activity",
+          "pages": [
+            {
+              "path": "pages/about/index"
+            },
+            {
+              "path": "pages/home/index"
+            }
+          ]
+        },
+        {
+          "root": "../playground/src/pages-sub-pages/sub-main",
+          "pages": [
+            {
+              "path": "pages/about/index"
+            },
+            {
+              "path": "pages/home/index"
+            }
+          ]
+        }
+      ]"
     `)
   })
 
@@ -392,21 +401,138 @@ describe('generate routes', () => {
     const routes = ctx.resolveSubRoutes()
 
     expect(routes).toMatchInlineSnapshot(`
-    "[
-      {
-        "root": "../playground/src/pages-sub-pages/sub-main",
-        "pages": [
-          {
-            "path": "pages/about/index",
-            "type": "page"
-          },
-          {
-            "path": "pages/home/index",
-            "type": "page"
-          }
-        ]
-      }
-    ]"
+      "[
+        {
+          "root": "../playground/src/pages-sub-pages/sub-main",
+          "pages": [
+            {
+              "path": "pages/about/index"
+            },
+            {
+              "path": "pages/home/index"
+            }
+          ]
+        }
+      ]"
     `)
+  })
+})
+
+describe('generate tabBar', () => {
+  beforeEach(() => {
+    vi.stubEnv('UNI_PLATFORM', 'web')
+  })
+
+  it('tabBar items should not contain index field', async () => {
+    const ctx = new PageContext({ dir: 'playground/src/pages' })
+    await ctx.scanPages()
+    await ctx.mergePageMetaData()
+
+    const tabBar = await ctx.resolveTabBar()
+
+    expect(tabBar).toBeDefined()
+    expect(tabBar?.list).toBeDefined()
+
+    for (const item of tabBar?.list || []) {
+      expect(item).not.toHaveProperty('index')
+    }
+  })
+
+  it('tabBar items should be sorted by index', async () => {
+    const ctx = new PageContext({ dir: 'playground/src/pages' })
+    await ctx.scanPages()
+    await ctx.mergePageMetaData()
+
+    const tabBar = await ctx.resolveTabBar()
+
+    expect(tabBar).toBeDefined()
+    expect(tabBar?.list).toBeDefined()
+
+    const list = tabBar?.list || []
+    expect(list.length).toBeGreaterThanOrEqual(2)
+
+    const listItem = list.find(item => item.pagePath?.includes('tabbar-list'))
+    const profileItem = list.find(item => item.pagePath?.includes('tabbar-profile'))
+
+    expect(listItem).toBeDefined()
+    expect(profileItem).toBeDefined()
+    expect(listItem?.text).toBe('列表')
+    expect(profileItem?.text).toBe('我的')
+
+    const listIndex = list.indexOf(listItem!)
+    const profileIndex = list.indexOf(profileItem!)
+    expect(listIndex).toBeLessThan(profileIndex)
+  })
+
+  it('tabBar should merge with config-defined tabBar', async () => {
+    const ctx = new PageContext({ dir: 'playground/src/pages' })
+    await ctx.scanPages()
+    ctx.pagesGlobConfig = {
+      tabBar: {
+        color: '#999999',
+        selectedColor: '#1890ff',
+        backgroundColor: '#ffffff',
+        list: [
+          {
+            pagePath: 'playground/src/pages/tabbar-list',
+            text: '列表(配置)',
+            iconPath: 'static/config-list.png',
+            selectedIconPath: 'static/config-list-active.png',
+          },
+        ],
+      },
+    }
+    await ctx.mergePageMetaData()
+
+    const tabBar = await ctx.resolveTabBar()
+
+    expect(tabBar).toBeDefined()
+    expect(tabBar?.color).toBe('#999999')
+    expect(tabBar?.selectedColor).toBe('#1890ff')
+    expect(tabBar?.backgroundColor).toBe('#ffffff')
+    expect(tabBar?.list).toBeDefined()
+    expect(tabBar?.list!.length).toBeGreaterThanOrEqual(2)
+
+    const configItem = tabBar?.list?.find(item => item.pagePath?.includes('tabbar-list') && item.text === '列表(配置)')
+    expect(configItem).toBeDefined()
+    expect(configItem?.iconPath).toBe('static/config-list.png')
+
+    const profileItem = tabBar?.list?.find(item => item.pagePath?.includes('tabbar-profile'))
+    expect(profileItem).toBeDefined()
+    expect(profileItem?.text).toBe('我的')
+  })
+
+  it('tabBar should return undefined when no tabBar items exist', async () => {
+    const ctx = new PageContext({ dir: 'playground/src/pages/blog' })
+    await ctx.scanPages()
+    await ctx.mergePageMetaData()
+
+    const tabBar = await ctx.resolveTabBar()
+
+    expect(tabBar).toBeUndefined()
+  })
+
+  it('tabBar items without index should default to index 0', async () => {
+    const ctx = new PageContext({ dir: 'playground/src/pages' })
+    await ctx.scanPages()
+    await ctx.mergePageMetaData()
+
+    const noIndexPage = Array.from(ctx.pages.values()).find(p => p.path.relativePath.includes('tabbar-no-index'))
+    expect(noIndexPage).toBeDefined()
+    const tabBar = await noIndexPage!.getTabBar()
+    expect(tabBar).toBeDefined()
+    expect(tabBar!.index).toBe(0)
+  })
+
+  it('tabBar items with index: 0 should remain 0', async () => {
+    const ctx = new PageContext({ dir: 'playground/src/pages' })
+    await ctx.scanPages()
+    await ctx.mergePageMetaData()
+
+    const zeroIndexPage = Array.from(ctx.pages.values()).find(p => p.path.relativePath.includes('tabbar-index-zero'))
+    expect(zeroIndexPage).toBeDefined()
+    const tabBar = await zeroIndexPage!.getTabBar()
+    expect(tabBar).toBeDefined()
+    expect(tabBar!.index).toBe(0)
   })
 })

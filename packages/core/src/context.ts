@@ -25,6 +25,7 @@ import {
   invalidatePagesModule,
   isTargetFile,
   mergePageMetaDataArray,
+  stripType,
 } from './utils'
 
 /**
@@ -370,46 +371,6 @@ export class PageContext {
   }
 
   /**
-   * Get merged tabBar configuration
-   * Merge tabBar configuration defined in pages via definePage with tabBar configuration in user config file
-   * @returns Merged tabBar configuration, or undefined if no tabBar configuration exists
-   */
-  private async getTabBarMerged(): Promise<TabBar | undefined> {
-    const tabBarItems: (TabBarItem & { index: number })[] = []
-    for (const [_, page] of this.pages) {
-      const tabbar = await page.getTabBar()
-      if (tabbar) {
-        tabBarItems.push(tabbar)
-      }
-    }
-
-    if (tabBarItems.length === 0) {
-      return this.pagesGlobConfig?.tabBar
-    }
-
-    const tabBar = {
-      ...this.pagesGlobConfig?.tabBar,
-      list: this.pagesGlobConfig?.tabBar?.list || [],
-    }
-
-    const pagePaths = new Map<string, boolean>()
-    for (const item of tabBar.list) {
-      pagePaths.set(item.pagePath, true)
-    }
-
-    tabBarItems.sort((a, b) => a.index - b.index)
-
-    for (const item of tabBarItems) {
-      if (!pagePaths.has(item.pagePath)) {
-        const { index: _, ...tabbar } = item
-        tabBar.list.push(tabbar)
-      }
-    }
-
-    return tabBar
-  }
-
-  /**
    * Update pages.json file
    * This is the core method responsible for coordinating the entire page configuration generation flow:
    * 1. Check file changes (if filepath is specified)
@@ -510,7 +471,8 @@ export class PageContext {
    * @returns JSON string of main package page metadata
    */
   resolveRoutes() {
-    return cjStringify(this.pageMetaData, null, 2)
+    const routes = this.pageMetaData.map(stripType)
+    return cjStringify(routes, null, 2)
   }
 
   /**
@@ -518,7 +480,51 @@ export class PageContext {
    * @returns JSON string of sub-package page metadata
    */
   resolveSubRoutes() {
-    return cjStringify(this.subPageMetaData, null, 2)
+    const routes = this.subPageMetaData.map(({ pages, ...rest }) => ({
+      ...rest,
+      pages: pages.map(stripType),
+    }))
+    return cjStringify(routes, null, 2)
+  }
+
+  /**
+   * Resolve tabBar configuration
+   * Merges page-defined tabBar items with config-defined tabBar
+   * @returns Merged tabBar configuration object, or undefined if no tabBar exists
+   */
+  async resolveTabBar(): Promise<TabBar | undefined> {
+    const tabBarItems: (TabBarItem & { index: number })[] = []
+    for (const [_, page] of this.pages) {
+      const tabbar = await page.getTabBar()
+      if (tabbar) {
+        tabBarItems.push(tabbar)
+      }
+    }
+
+    if (tabBarItems.length === 0) {
+      return this.pagesGlobConfig?.tabBar
+    }
+
+    const tabBar = {
+      ...this.pagesGlobConfig?.tabBar,
+      list: this.pagesGlobConfig?.tabBar?.list || [],
+    }
+
+    const pagePaths = new Map<string, boolean>()
+    for (const item of tabBar.list) {
+      pagePaths.set(item.pagePath, true)
+    }
+
+    tabBarItems.sort((a, b) => a.index - b.index)
+
+    for (const item of tabBarItems) {
+      if (!pagePaths.has(item.pagePath)) {
+        const { index: _, ...tabbar } = item
+        tabBar.list.push(tabbar)
+      }
+    }
+
+    return tabBar
   }
 
   /**
@@ -538,12 +544,12 @@ export class PageContext {
 
     const { pages: oldPages, subPackages: oldSubPackages, tabBar: oldTabBar } = cjParse(content || '{}') as CommentObject
 
-    const { pages: _, subPackages: __, tabBar: ___, ...pageJson } = this.pagesGlobConfig || {}
+    const { pages: _pages, subPackages: _subPackages, tabBar: _tabBar, ...pageJson } = this.pagesGlobConfig || {}
 
     const currentPlatform = platform.toUpperCase()
 
     // pages
-    pageJson.pages = mergePlatformItems(oldPages as any, currentPlatform, this.pageMetaData, 'path')
+    pageJson.pages = mergePlatformItems(oldPages as any, currentPlatform, this.pageMetaData, 'path').map(stripType) as any
 
     // mergePlatformItems uses a Map internally which may lose the ordering from setHomePage,
     // so we need to ensure the home page is placed first after the merge
@@ -565,19 +571,19 @@ export class PageContext {
     for (const existing of pageJson.subPackages as unknown as SubPageMetaDatum[]) {
       const sub = newSubPackages.get(existing.root)
       if (sub) {
-        existing.pages = mergePlatformItems(existing.pages, currentPlatform, sub.pages, 'path') as any
+        existing.pages = mergePlatformItems(existing.pages, currentPlatform, sub.pages, 'path').map(stripType) as any
         newSubPackages.delete(existing.root)
       }
     }
     for (const [_, newSub] of newSubPackages) {
       (pageJson.subPackages as unknown as Array<any>).push({
         root: newSub.root,
-        pages: mergePlatformItems(undefined, currentPlatform, newSub.pages, 'path'),
+        pages: mergePlatformItems(undefined, currentPlatform, newSub.pages, 'path').map(stripType),
       })
     }
 
     // tabbar
-    const { list, ...tabBarOthers } = (await this.getTabBarMerged()) || {}
+    const { list, ...tabBarOthers } = (await this.resolveTabBar()) || {}
     if (list) {
       const { list: oldList } = (oldTabBar as any) || {}
       const newList = mergePlatformItems(oldList, currentPlatform, list, 'pagePath')

@@ -5,7 +5,7 @@
     "lib": ["esnext", "dom"],
     "useDefineForClassFields": true,
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "types": ["@dcloudio/types", "@uni-helper/vite-plugin-uni-pages"],
     "strict": true,

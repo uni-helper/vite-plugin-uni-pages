@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "target": "es2018",
+    "target": "esnext",
     "lib": ["ESNext"],
-    "module": "ESNext",
+    "module": "esnext",
     "moduleResolution": "Bundler",
     "paths": {
       "@uni-helper/vite-plugin-uni-pages": ["./packages/core/src/index.ts"],
