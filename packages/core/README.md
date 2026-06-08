@@ -196,6 +196,11 @@ export default defineConfig({
 
 请使用 [@uni-helper/unh](https://uni-helper.cn/unh/auto-generate)，或自行编写脚本处理。
 
+### 支持 JSX/TSX 吗？
+
+不支持，只支持 vue/nvue/uvue 文件。
+
 ## 感谢
 
-- [vite-plugin-pages](https://github.com/hannoeru/vite-plugin-pages.git)
+- [hannoeru/vite-plugin-pages](https://github.com/hannoeru/vite-plugin-pages)
+- [uni-ku/pages-json](https://github.com/uni-ku/pages-json)
