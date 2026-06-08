@@ -564,13 +564,14 @@ export class PageContext {
     const currentPlatform = platform.toUpperCase()
 
     // pages
-    pageJson.pages = mergePlatformItems(oldPages as any, currentPlatform, this.pageMetaData, 'path').map(stripType) as any
+    const oldPagesArray = oldPages as unknown as CommentArray<CommentObject> | undefined
+    pageJson.pages = mergePlatformItems(oldPagesArray, currentPlatform, this.pageMetaData, 'path').map(stripType) as unknown as PageMetaDatum[]
 
     // mergePlatformItems uses a Map internally which may lose the ordering from setHomePage,
     // so we need to ensure the home page is placed first after the merge
     if (pageJson.pages && pageJson.pages.length > 0) {
       const pagesArray = pageJson.pages as unknown as PageMetaDatum[]
-      const homeIndex = pagesArray.findIndex((page: any) => page.type === 'home')
+      const homeIndex = pagesArray.findIndex((page: PageMetaDatum) => page.type === 'home')
       if (homeIndex > 0) {
         const [homePage] = pagesArray.splice(homeIndex, 1)
         pagesArray.unshift(homePage)
@@ -587,7 +588,7 @@ export class PageContext {
     for (const existing of pageJson.subPackages as unknown as SubPageMetaDatum[]) {
       const sub = newSubPackages.get(existing.root)
       if (sub) {
-        existing.pages = mergePlatformItems(existing.pages, currentPlatform, sub.pages, 'path').map(stripType) as any
+        existing.pages = mergePlatformItems(existing.pages as unknown as CommentArray<CommentObject>, currentPlatform, sub.pages, 'path').map(stripType) as unknown as PageMetaDatum[]
         // Preserve plugins property from user config
         if (sub.plugins) {
           existing.plugins = sub.plugins
@@ -597,21 +598,22 @@ export class PageContext {
     }
     // Add new sub-packages that don't exist in pages.json yet
     for (const [_, newSub] of newSubPackages) {
-      const subPackage: Record<string, any> = {
+      const subPackage: SubPageMetaDatum = {
         root: newSub.root,
-        pages: mergePlatformItems(undefined, currentPlatform, newSub.pages, 'path').map(stripType),
+        pages: mergePlatformItems(undefined, currentPlatform, newSub.pages, 'path').map(stripType) as unknown as PageMetaDatum[],
       }
       // Include plugins property if configured
       if (newSub.plugins) {
         subPackage.plugins = newSub.plugins
       }
-      (pageJson.subPackages as unknown as Array<any>).push(subPackage)
+      (pageJson.subPackages as unknown as SubPageMetaDatum[]).push(subPackage)
     }
 
     // tabbar
     const { list, ...tabBarOthers } = (await this.resolveTabBar()) || {}
     if (list) {
-      const { list: oldList } = (oldTabBar as any) || {}
+      const oldTabBarObj = oldTabBar as unknown as { list?: CommentArray<CommentObject> } | undefined
+      const { list: oldList } = oldTabBarObj || {}
       const newList = mergePlatformItems(oldList, currentPlatform, list, 'pagePath')
       pageJson.tabBar = {
         ...tabBarOthers, // Always update properties other than list directly
@@ -689,8 +691,8 @@ function getPagePaths(dir: string, options: ResolvedOptions) {
  * @param uniqueKeyName - Field name used to identify configuration item uniqueness (e.g. 'path' or 'pagePath')
  * @returns Merged configuration item array with conditional compilation comments
  */
-function mergePlatformItems<T = any>(source: any[] | undefined, currentPlatform: string, items: T[], uniqueKeyName: keyof ExcludeIndexSignature<T>): CommentArray<CommentObject> {
-  const src = (source as CommentArray<CommentObject>) || new CommentArray<CommentObject>()
+function mergePlatformItems<T extends Record<string, unknown> = Record<string, unknown>>(source: CommentArray<CommentObject> | undefined, currentPlatform: string, items: T[], uniqueKeyName: keyof ExcludeIndexSignature<T>): CommentArray<CommentObject> {
+  const src = source || new CommentArray<CommentObject>()
   currentPlatform = currentPlatform.toUpperCase()
 
   // 1. Extract the first comment from CommentArray and get platforms as lastPlatforms
@@ -713,8 +715,8 @@ function mergePlatformItems<T = any>(source: any[] | undefined, currentPlatform:
   const tmpMap = new Map<string, MultiPlatformItem[]>()
 
   for (let i = 0; i < src.length; i++) {
-    const item = src[i] as T
-    const uniqueKey = (item as any)[uniqueKeyName]
+    const item = src[i] as unknown as T
+    const uniqueKey = (item as Record<string, unknown>)[uniqueKeyName as string] as string
 
     if (!uniqueKey) {
       continue
@@ -816,7 +818,7 @@ function mergePlatformItems<T = any>(source: any[] | undefined, currentPlatform:
   // Process elements in insertion order
   for (const [_, list] of tmpMap) {
     for (const { item, platformStr } of list) {
-      result.push(item as CommentObject)
+      result.push(item as unknown as CommentObject)
 
       // Check if platforms matches defaultPlatformStr (platforms and defaultPlatforms are pre-sorted)
       if (platformStr !== defaultPlatformStr) {
