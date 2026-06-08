@@ -17,7 +17,7 @@
   "sideEffects": false,
   "scripts": {
     "dev": "pnpm -r --filter='./packages/*' --parallel run dev",
-    "build": "rimraf --glob packages/*/dist && pnpm -r --filter='./packages/*' run build && pnpm -r run build-post",
+    "build": "rimraf --glob 'packages/*/dist' && pnpm -r --filter='./packages/*' run build && pnpm -r run build-post",
     "play:mp-weixin": "pnpm -C playground run dev:mp-weixin",
     "build:mp-weixin": "pnpm -C playground run build:mp-weixin",
     "play:h5": "pnpm -C playground run dev:h5",

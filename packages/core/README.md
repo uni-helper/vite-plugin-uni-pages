@@ -94,7 +94,7 @@ interface UserOptions {
   mergePages?: boolean
 
   /**
-   * 主包页面组件的搜索目录
+   * 主包页面的搜索目录
    * 支持 glob 模式，如 'src/{pages,views}'
    * 最终结果由 tinyglobby 解析为匹配的目录列表
    * @default 'src/pages'
