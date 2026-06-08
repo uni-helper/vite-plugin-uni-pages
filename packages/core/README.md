@@ -198,7 +198,11 @@ export default defineConfig({
 
 ### 支持 JSX/TSX 吗？
 
-不支持，只支持 vue/nvue/uvue 文件。
+不支持，只支持 vue/nvue/uvue 文件
+
+### 文件名有限制吗？
+
+文件名内不能带有额外的 `.` 分隔符，如 `index.v1.vue` 不合法。这是小程序的限制，并非本插件的限制。
 
 ## 感谢
 
