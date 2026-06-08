@@ -23,8 +23,25 @@ export type ExcludeIndexSignature<T> = {
 }
 
 export interface SubPageMetaDatum {
+  /**
+   * 子包的根目录
+   */
   root: string
+  /**
+   * 子包由哪些页面组成
+   */
   pages: PageMetaDatum[]
+  /**
+   * 子包插件
+   */
+  plugins?: {
+    [pluginName: string]: {
+      version: string
+      provider: string
+      export?: string
+      [key: string]: any
+    }
+  }
 }
 
 export interface UserTabBarItem extends Partial<TabBarItem> {

@@ -342,9 +342,12 @@ export class PageContext {
   /**
    * Merge sub-package page metadata
    * Parse page metadata for each sub-package and handle sub-package configuration inheritance
+   * Preserves sub-package level properties like plugins from user config
    */
   async mergeSubPageMetaData() {
     const subPageMaps: Record<string, PageMetaDatum[]> = {}
+    // Store plugins config separately to preserve them during merge
+    const subPlugins: Record<string, SubPageMetaDatum['plugins']> = {}
     const subPackages = this.pagesGlobConfig?.subPackages || []
 
     for (const [dir, pages] of this.subPages) {
@@ -354,16 +357,28 @@ export class PageContext {
       const globPackage = subPackages?.find(v => v.root === root)
       subPageMaps[root] = await this.parsePages(pages, 'sub', globPackage?.pages)
       subPageMaps[root] = subPageMaps[root].map(page => ({ ...page, path: slash(path.relative(root, page.path)) }))
+      // Preserve plugins config from user config for this sub-package
+      if (globPackage?.plugins)
+        subPlugins[root] = globPackage.plugins
     }
 
-    // Inherit subPackages that do not exist in the config
-    for (const { root, pages } of subPackages) {
-      if (root && !subPageMaps[root])
+    // Inherit subPackages that do not exist in the scanned pages
+    for (const { root, pages, plugins } of subPackages) {
+      if (root && !subPageMaps[root]) {
         subPageMaps[root] = pages || []
+        // Preserve plugins config for inherited sub-packages
+        if (plugins)
+          subPlugins[root] = plugins
+      }
     }
 
+    // Build final subPageMetaData with plugins preserved
     const subPageMetaData = Object.keys(subPageMaps)
-      .map(root => ({ root, pages: subPageMaps[root] }))
+      .map(root => ({
+        root,
+        pages: subPageMaps[root],
+        ...(subPlugins[root] && { plugins: subPlugins[root] }),
+      }))
       .filter(meta => meta.pages.length > 0)
 
     this.subPageMetaData = subPageMetaData
@@ -568,18 +583,29 @@ export class PageContext {
     for (const item of this.subPageMetaData) {
       newSubPackages.set(item.root, item)
     }
+    // Update existing sub-packages in pages.json with new metadata
     for (const existing of pageJson.subPackages as unknown as SubPageMetaDatum[]) {
       const sub = newSubPackages.get(existing.root)
       if (sub) {
         existing.pages = mergePlatformItems(existing.pages, currentPlatform, sub.pages, 'path').map(stripType) as any
+        // Preserve plugins property from user config
+        if (sub.plugins) {
+          existing.plugins = sub.plugins
+        }
         newSubPackages.delete(existing.root)
       }
     }
+    // Add new sub-packages that don't exist in pages.json yet
     for (const [_, newSub] of newSubPackages) {
-      (pageJson.subPackages as unknown as Array<any>).push({
+      const subPackage: Record<string, any> = {
         root: newSub.root,
         pages: mergePlatformItems(undefined, currentPlatform, newSub.pages, 'path').map(stripType),
-      })
+      }
+      // Include plugins property if configured
+      if (newSub.plugins) {
+        subPackage.plugins = newSub.plugins
+      }
+      (pageJson.subPackages as unknown as Array<any>).push(subPackage)
     }
 
     // tabbar

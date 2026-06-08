@@ -416,6 +416,45 @@ describe('generate routes', () => {
       ]"
     `)
   })
+
+  it('subPackages should preserve plugins property', async () => {
+    const ctx = new PageContext({
+      subPackages: [
+        'playground/src/pages-sub-pages/sub-activity',
+        'playground/src/pages-sub-pages/sub-main',
+      ],
+    })
+    ctx.pagesGlobConfig = {
+      subPackages: [
+        {
+          root: '../playground/src/pages-sub-pages/sub-activity',
+          pages: [],
+          plugins: {
+            healthCardPlugins: {
+              version: '1.0.0',
+              provider: 'wx1234567890',
+            },
+          },
+        },
+      ],
+    }
+    await ctx.scanSubPages()
+    await ctx.mergeSubPageMetaData()
+    const routes = ctx.resolveSubRoutes()
+
+    const parsed = JSON.parse(routes)
+    const subActivity = parsed.find((p: any) => p.root === '../playground/src/pages-sub-pages/sub-activity')
+    expect(subActivity).toBeDefined()
+    expect(subActivity.plugins).toBeDefined()
+    expect(subActivity.plugins.healthCardPlugins).toEqual({
+      version: '1.0.0',
+      provider: 'wx1234567890',
+    })
+
+    const subMain = parsed.find((p: any) => p.root === '../playground/src/pages-sub-pages/sub-main')
+    expect(subMain).toBeDefined()
+    expect(subMain.plugins).toBeUndefined()
+  })
 })
 
 describe('generate tabBar', () => {
