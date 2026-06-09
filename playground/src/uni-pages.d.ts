@@ -6,11 +6,6 @@
 type _LocationUrl =
   "/pages/index" |
   "/pages/A-top" |
-  "/pages/i18n" |
-  "/pages/test-json" |
-  "/pages/test-jsonc-with-comment" |
-  "/pages/test-yaml" |
-  "/pages/test" |
   "/pages/blog/index" |
   "/pages/blog/post" |
   "/pages/define-page/async-function" |
@@ -21,9 +16,18 @@ type _LocationUrl =
   "/pages/define-page/option-api" |
   "/pages/define-page/remove-console" |
   "/pages/define-page/yaml" |
-  "/pages-sub/index" |
+  "/pages/i18n" |
+  "/pages/tabbar-index-zero" |
+  "/pages/tabbar-list" |
+  "/pages/tabbar-no-index" |
+  "/pages/tabbar-profile" |
+  "/pages/test-json" |
+  "/pages/test-jsonc-with-comment" |
+  "/pages/test-yaml" |
+  "/pages/test" |
   "/pages-sub/about/index" |
   "/pages-sub/about/your" |
+  "/pages-sub/index" |
   "/pages/pages-internal-sub/index";
 
 interface NavigateToOptions {

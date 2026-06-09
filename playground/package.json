@@ -3,10 +3,10 @@
   "version": "0.3.24",
   "private": true,
   "scripts": {
-    "dev:h5": "uni",
-    "dev:mp-weixin": "uni -p mp-weixin",
-    "build:h5": "uni build",
-    "build:mp-weixin": "uni build -p mp-weixin"
+    "dev:web": "unh dev web",
+    "build:web": "unh build web",
+    "dev:mp-weixin": "unh dev mp-weixin",
+    "build:mp-weixin": "unh build mp-weixin"
   },
   "dependencies": {
     "@dcloudio/uni-app": "catalog:",
@@ -23,6 +23,7 @@
     "@dcloudio/uni-automator": "catalog:",
     "@dcloudio/uni-cli-shared": "catalog:",
     "@dcloudio/vite-plugin-uni": "catalog:",
+    "@uni-helper/unh": "catalog:",
     "@uni-helper/vite-plugin-uni-layouts": "catalog:",
     "@uni-helper/vite-plugin-uni-pages": "workspace:*",
     "vite": "catalog:"
