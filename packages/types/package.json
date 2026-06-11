@@ -1,7 +1,7 @@
 {
   "name": "@uni-helper/uni-pages-types",
   "type": "module",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Type definitions for uni-app pages.json",
   "author": "KeJun",
   "maintainers": [
