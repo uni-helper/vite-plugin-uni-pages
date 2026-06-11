@@ -1,6 +1,6 @@
 import type { UserPagesConfig } from '@uni-helper/uni-pages-types'
 
-export * from '@uni-helper/uni-pages-types'
+export type * from '@uni-helper/uni-pages-types'
 
 /**
  * Define uni-pages configuration
