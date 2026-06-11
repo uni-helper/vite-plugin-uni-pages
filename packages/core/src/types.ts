@@ -4,7 +4,7 @@ import type { PageContext } from './context'
 import type { debug } from './utils'
 
 export type { DefinePage, ExcludeIndexSignature, MaybeCallable, MaybePromise, MaybePromiseCallable, PageMetaDatum, SubPageMetaDatum, UserPageMeta, UserTabBarItem } from '@uni-helper/uni-pages-types'
-export { definePage } from '@uni-helper/uni-pages-types'
+export type { definePage } from '@uni-helper/uni-pages-types'
 
 /** Debug log type, corresponding to methods in the debug object */
 export type debugType = keyof typeof debug
