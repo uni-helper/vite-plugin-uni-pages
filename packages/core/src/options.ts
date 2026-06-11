@@ -40,7 +40,24 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
 
   const root = viteRoot || slash(process.env.VITE_ROOT_DIR || process.cwd())
   const resolvedDirs = resolvePageDirs(dir, root, exclude)
-  const resolvedSubDirs = subPackages.map(dir => slash(dir))
+
+  // Process subPackages: support both string and SubPackageConfig formats
+  // In monorepo projects, users may need custom root paths in pages.json
+  // instead of auto-generated relative paths with '..'
+  const subPackageRootMap = new Map<string, string>()
+  const resolvedSubDirs: string[] = []
+  for (const sub of subPackages) {
+    if (typeof sub === 'string') {
+      resolvedSubDirs.push(slash(sub))
+    }
+    else {
+      const dirPath = slash(sub.dir)
+      resolvedSubDirs.push(dirPath)
+      // Store mapping from physical directory to custom root for pages.json
+      subPackageRootMap.set(dirPath, sub.root)
+    }
+  }
+
   const resolvedHomePage = typeof homePage === 'string' ? [homePage] : homePage
   const resolvedConfigSource = typeof configSource === 'string' ? [{ files: configSource } as LoadConfigSource<PagesConfig>] : configSource
   const resolvedDts = !dts ? false : typeof dts === 'string' ? dts : resolve(viteRoot, 'uni-pages.d.ts')
@@ -52,6 +69,7 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
     mergePages,
     dirs: resolvedDirs,
     subPackages: resolvedSubDirs,
+    subPackageRootMap,
     outDir,
     exclude,
     root,

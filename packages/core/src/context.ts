@@ -352,7 +352,10 @@ export class PageContext {
 
     for (const [dir, pages] of this.subPages) {
       const basePath = slash(path.join(this.options.root, this.options.outDir))
-      const root = slash(path.relative(basePath, path.join(this.options.root, dir)))
+      // Use custom root from subPackageRootMap if available, otherwise calculate from path
+      // In monorepo scenarios, custom root avoids '..' in pages.json root path
+      const root = this.options.subPackageRootMap.get(dir)
+        ?? slash(path.relative(basePath, path.join(this.options.root, dir)))
 
       const globPackage = subPackages?.find(v => v.root === root)
       subPageMaps[root] = await this.parsePages(pages, 'sub', globPackage?.pages)

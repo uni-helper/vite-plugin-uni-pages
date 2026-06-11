@@ -51,10 +51,18 @@ export interface Options {
   dir: string
 
   /**
-   * all root directories loaded by subPackages
+   * Sub-package page directories for uni-app sub-package loading
+   *
+   * Supports string format (directory path) or object format (custom root in pages.json)
+   *
+   * In monorepo projects, pages may be located outside the project root.
+   * Use object format to specify a custom root that appears in pages.json,
+   * avoiding '..' in the generated root path.
+   *
+   * @see https://github.com/uni-helper/vite-plugin-uni-pages/issues/271
    * @default []
    */
-  subPackages: string[]
+  subPackages: (string | SubPackageConfig)[]
 
   /**
    * pages.json dir
@@ -96,7 +104,7 @@ export type UserOptions = Partial<Options>
  * Resolved configuration options interface
  * Configuration processed by resolveOptions, all paths resolved to absolute paths
  */
-export interface ResolvedOptions extends Omit<Options, 'dir' | 'homePage' | 'configSource' | 'dts'> {
+export interface ResolvedOptions extends Omit<Options, 'dir' | 'homePage' | 'configSource' | 'dts' | 'subPackages'> {
   /**
    * Resolves to the `root` value from Vite config.
    * @default config.root
@@ -115,6 +123,42 @@ export interface ResolvedOptions extends Omit<Options, 'dir' | 'homePage' | 'con
   homePage: string[]
 
   configSource: LoadConfigSource<PagesConfig>[]
+
+  /**
+   * Resolved sub-package directories
+   */
+  subPackages: string[]
+
+  /**
+   * Custom root mapping for sub-packages (dir -> root)
+   * Used for monorepo support to specify custom root paths in pages.json
+   */
+  subPackageRootMap: Map<string, string>
+}
+
+/**
+ * Sub-package configuration interface
+ * Allows customizing the root path in pages.json for monorepo support
+ *
+ * In monorepo projects, pages may be located outside the project root (e.g., ../../packages/login/src/pages).
+ * By default, the plugin generates root paths with '..', which uni-app does not support.
+ * Use this config to specify a custom root that appears in pages.json instead.
+ *
+ * @example
+ * ```ts
+ * subPackages: [
+ *   {
+ *     dir: '../../packages/login/src/pages',  // Physical directory to scan
+ *     root: 'packages/login/src/pages',       // Custom root in pages.json
+ *   }
+ * ]
+ * ```
+ */
+export interface SubPackageConfig {
+  /** Physical directory path to scan for page files */
+  dir: string
+  /** Custom root path that appears in pages.json subPackages.root */
+  root: string
 }
 
 /**

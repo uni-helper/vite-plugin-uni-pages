@@ -103,10 +103,15 @@ interface UserOptions {
 
   /**
    * 分包页面目录的根目录列表
+   * 
    * 用于 uni-app 的分包加载功能
+   * 
+   * 支持字符串格式（目录路径）或对象格式（自定义 pages.json 中的 root）
+   * 
+   * 更多上下文参考 <https://github.com/uni-helper/vite-plugin-uni-pages/issues/271>
    * @default []
    */
-  subPackages?: string[]
+  subPackages?: (string | { dir: string; root: string })[]
 
   /**
    * pages.json 所在目录
@@ -203,6 +208,40 @@ export default defineConfig({
 ### 文件名有限制吗？
 
 文件名内不能带有额外的 `.` 分隔符，如 `index.v1.vue` 不合法。这是小程序的限制，并非本插件的限制。
+
+### 支持 monorepo 吗？
+
+在 monorepo 项目中，如果页面分布在多个 package 中，可以使用 `subPackages` 配置的对象格式来自定义生成的 `root` 路径。
+
+```ts
+// vite.config.ts
+import UniPages from '@uni-helper/vite-plugin-uni-pages'
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+  plugins: [
+    UniPages({
+      subPackages: [
+        // 简写格式（原有功能）
+        'src/pages-sub',
+        // 对象格式（monorepo 支持）
+        {
+          dir: '../../packages/login/src/pages', // 页面目录路径
+          root: 'packages/login/src/pages', // 自定义 pages.json 中的 root
+        },
+        {
+          dir: '../../packages/user/src/pages',
+          root: 'packages/user/src/pages',
+        },
+      ],
+    }),
+  ],
+})
+```
+
+这样生成的 `pages.json` 中 `subPackages.root` 将使用自定义的值，而不是基于文件系统计算的相对路径，避免出现 `..` 造成路径问题。
+
+更多上下文参考 <https://github.com/uni-helper/vite-plugin-uni-pages/issues/271>。
 
 ## 感谢
 

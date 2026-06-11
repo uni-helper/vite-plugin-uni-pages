@@ -455,4 +455,110 @@ describe('generate routes', () => {
     expect(subMain).toBeDefined()
     expect(subMain.plugins).toBeUndefined()
   })
+
+  it('subPackages with custom root (monorepo support)', async () => {
+    const ctx = new PageContext({
+      subPackages: [
+        {
+          dir: 'playground/src/pages-sub-pages/sub-activity',
+          root: 'packages/activity/src/pages',
+        },
+        {
+          dir: 'playground/src/pages-sub-pages/sub-main',
+          root: 'packages/main/src/pages',
+        },
+      ],
+    })
+    await ctx.scanSubPages()
+    await ctx.mergeSubPageMetaData()
+    const routes = ctx.resolveSubRoutes()
+    expect(routes).toMatchInlineSnapshot(`
+      "[
+        {
+          "root": "packages/activity/src/pages",
+          "pages": [
+            {
+              "path": "../../../../../playground/src/pages-sub-pages/sub-activity/pages/about/index"
+            },
+            {
+              "path": "../../../../../playground/src/pages-sub-pages/sub-activity/pages/home/index"
+            }
+          ]
+        },
+        {
+          "root": "packages/main/src/pages",
+          "pages": [
+            {
+              "path": "../../../../../playground/src/pages-sub-pages/sub-main/pages/about/index"
+            },
+            {
+              "path": "../../../../../playground/src/pages-sub-pages/sub-main/pages/home/index"
+            }
+          ]
+        }
+      ]"
+    `)
+  })
+
+  it('subPackages with mixed string and custom root formats', async () => {
+    const ctx = new PageContext({
+      subPackages: [
+        'playground/src/pages-sub-pages/sub-activity',
+        {
+          dir: 'playground/src/pages-sub-pages/sub-main',
+          root: 'packages/main/src/pages',
+        },
+      ],
+    })
+    await ctx.scanSubPages()
+    await ctx.mergeSubPageMetaData()
+    const routes = ctx.resolveSubRoutes()
+    const parsed = JSON.parse(routes)
+
+    expect(parsed).toHaveLength(2)
+
+    // String format uses computed relative path
+    const subActivity = parsed.find((p: any) => p.root === '../playground/src/pages-sub-pages/sub-activity')
+    expect(subActivity).toBeDefined()
+    expect(subActivity.pages).toHaveLength(2)
+    expect(subActivity.pages.map((p: any) => p.path)).toEqual(['pages/about/index', 'pages/home/index'])
+
+    // Object format uses custom root
+    const subMain = parsed.find((p: any) => p.root === 'packages/main/src/pages')
+    expect(subMain).toBeDefined()
+    expect(subMain.pages).toHaveLength(2)
+  })
+
+  it('subPackages with custom root should preserve plugins property', async () => {
+    const ctx = new PageContext({
+      subPackages: [
+        {
+          dir: 'playground/src/pages-sub-pages/sub-activity',
+          root: 'packages/activity/src/pages',
+        },
+      ],
+    })
+    ctx.pagesGlobConfig = {
+      subPackages: [
+        {
+          root: 'packages/activity/src/pages',
+          pages: [],
+          plugins: {
+            testPlugin: {
+              version: '2.0.0',
+            },
+          },
+        },
+      ],
+    }
+    await ctx.scanSubPages()
+    await ctx.mergeSubPageMetaData()
+    const routes = ctx.resolveSubRoutes()
+    const parsed = JSON.parse(routes)
+
+    expect(parsed).toHaveLength(1)
+    expect(parsed[0].root).toBe('packages/activity/src/pages')
+    expect(parsed[0].plugins).toBeDefined()
+    expect(parsed[0].plugins.testPlugin).toEqual({ version: '2.0.0' })
+  })
 })
