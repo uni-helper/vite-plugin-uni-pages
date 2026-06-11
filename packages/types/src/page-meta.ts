@@ -68,6 +68,8 @@ export interface UserPageMeta extends Partial<PageMetaDatum> {
    * 底部 tabBar 的子项 [tabBar](https://uniapp.dcloud.net.cn/collocation/pages#tabBar)
    */
   tabBar?: UserTabBarItem
+
+  [x: string]: any
 }
 
 export type MaybePromise<T> = T | Promise<T>
