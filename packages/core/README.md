@@ -33,7 +33,7 @@ export default defineConfig({
 import { defineUniPages } from '@uni-helper/vite-plugin-uni-pages'
 
 export default defineUniPages({
-  // 你可以手动指定 pages，这种做法具有最高优先级，插件会使用你指定的 pages 生成 pages.json。
+  // 你可以手动指定 pages，与 definePage 合并时，pages.config.ts 中的同名属性会覆盖 definePage。
   // 如果不手动指定 pages，插件会自动扫描页面并生成 pages.json。
   // pages: [],
 
@@ -164,7 +164,10 @@ interface UserOptions {
 
 - **加载用户配置**：通过 `unconfig` 加载 `pages.config.ts` 等配置文件，获取手动指定的页面元数据（`pages`、`subPackages`、`globalStyle` 等）
 - **扫描页面文件**（仅在 `mergePages: true` 时）：根据 `dir` 和 `subPackages` 扫描文件系统，为每个页面文件创建 `Page` 实例
-- **合并页面元数据**：将扫描到的页面与用户配置中的页面元数据合并
+- **合并页面元数据**：将扫描到的页面与用户配置中的页面元数据合并。优先级从低到高：
+  1. `globalStyle`（`pages.config.ts` 中的全局样式）
+  2. `definePage()`（`.vue` 文件中通过宏定义的页面配置）
+  3. `pages.config.ts` 中 `pages` 数组里对应 path 的条目（最高优先级，会覆盖 `definePage` 的同名属性）
 - **生成并写入**：序列化为 `pages.json`，写入到 `outDir` 目录，并生成 TypeScript 类型声明
 
 ### 配置示例
