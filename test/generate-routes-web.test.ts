@@ -560,6 +560,6 @@ describe('generate routes', () => {
     expect(parsed).toHaveLength(1)
     expect(parsed[0].root).toBe('packages/activity/src/pages')
     expect(parsed[0].plugins).toBeDefined()
-    expect(parsed[0].plugins.testPlugin).toEqual({ version: '2.0.0' })
+    expect(parsed[0].plugins.testPlugin).toEqual({ version: '2.0.0', provider: '' })
   })
 })
