@@ -211,3 +211,25 @@ export function stripType<T extends Record<string, unknown>>(item: T): Omit<T, '
   const { type, ...rest } = item
   return rest
 }
+
+/**
+ * Remove the internal `type` marker (`'home'` / `'page'`) from every element of
+ * a `CommentArray` *in place* and return the same array.
+ *
+ * Unlike `items.map(stripType)`, this preserves the `Symbol.for('before:N')` /
+ * `Symbol.for('after:N')` comment slots that `comment-json` attaches to the
+ * array, so multi-platform `#ifdef` / `#endif` conditional-compilation blocks
+ * survive serialization into pages.json. `.map()` rebuilds the array and drops
+ * those symbol-keyed comments.
+ *
+ * @param items - CommentArray (or plain array) of page/tabBar metadata
+ * @returns The same array reference, with `type` removed from each element
+ */
+export function stripTypeInPlace<T extends Record<string, unknown>>(items: T[]): T[] {
+  for (const item of items) {
+    if (item && 'type' in item) {
+      delete (item as Record<string, unknown>).type
+    }
+  }
+  return items
+}

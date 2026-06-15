@@ -103,34 +103,37 @@ export function checkPagesJsonFileSync(path: fs.PathLike): boolean {
 }
 
 /**
- * Safely write file using file lock
- * Avoid data corruption caused by concurrent writes through file lock
- * Use atomic write to ensure file write integrity
+ * Run a task while holding an exclusive file lock.
  *
- * @param path - File path
- * @param content - File content
+ * Unlike {@link writeFileWithLock}, this protects the whole read-modify-write
+ * critical section. The lock is held from the moment `task` starts until it
+ * resolves, so concurrent processes cannot observe or overwrite a half-written
+ * state. This is required by pages.json generation, where the new content
+ * depends on the current content (other platforms' `#ifdef` blocks).
+ *
+ * @param path - File path used as the lock target
+ * @param task - Async work to run inside the lock; return value is forwarded
  * @param retry - Number of retries when lock acquisition fails, defaults to 3
+ * @returns The value resolved by `task`, or `undefined` if the lock could not be acquired
  */
-export async function writeFileWithLock(path: string, content: string, retry = 3) {
+export async function withFileLock<T>(path: string, task: () => Promise<T>, retry = 3): Promise<T | undefined> {
   if (retry <= 0) {
-    debug.error(`${path} Failed to acquire file lock, write failed`)
-    return
+    debug.error(`${path} Failed to acquire file lock, task aborted`)
+    return undefined
   }
 
   let release: () => Promise<void> | undefined
 
   try {
     try {
-      // Acquire file lock
       release = await lockfile.lock(path, { realpath: false })
     }
     catch {
-      // Failed to acquire file lock
+      // Failed to acquire file lock, retry after backoff
       await sleep(500)
-      return writeFileWithLock(path, content, retry - 1)
+      return withFileLock(path, task, retry - 1)
     }
-    // Use atomic write
-    await writeFileAtomic(path, content)
+    return await task()
   }
   finally {
     // eslint-disable-next-line ts/ban-ts-comment
@@ -139,4 +142,23 @@ export async function writeFileWithLock(path: string, content: string, retry = 3
       await release() // Release file lock
     }
   }
+}
+
+/**
+ * Safely write file using file lock
+ * Avoid data corruption caused by concurrent writes through file lock
+ * Use atomic write to ensure file write integrity
+ *
+ * Note: this only makes the *write* atomic. Callers that need to read the
+ * current content before computing the new one must use {@link withFileLock}
+ * so the read and write belong to the same critical section.
+ *
+ * @param path - File path
+ * @param content - File content
+ * @param retry - Number of retries when lock acquisition fails, defaults to 3
+ */
+export async function writeFileWithLock(path: string, content: string, retry = 3) {
+  return withFileLock(path, async () => {
+    await writeFileAtomic(path, content)
+  }, retry)
 }

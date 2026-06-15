@@ -15,9 +15,10 @@ import detectIndent from 'detect-indent'
 
 import detectNewline from 'detect-newline'
 import { loadConfig } from 'unconfig'
+import writeFileAtomic from 'write-file-atomic'
 import { OUTPUT_NAME } from './constant'
 import { writeDeclaration } from './declaration'
-import { checkPagesJsonFileSync, getPageFiles, writeFileWithLock } from './files'
+import { checkPagesJsonFileSync, getPageFiles, withFileLock } from './files'
 import { resolveOptions } from './options'
 import { Page } from './page'
 import {
@@ -26,6 +27,7 @@ import {
   isTargetFile,
   mergePageMetaDataArray,
   stripType,
+  stripTypeInPlace,
 } from './utils'
 
 /**
@@ -450,27 +452,44 @@ export class PageContext {
 
     this.options.onBeforeWriteFile(this)
 
-    const data = await this.genratePagesJSON()
+    // The whole read-modify-write must run inside one lock. genratePagesJSON
+    // reads the existing pages.json (to preserve other platforms' #ifdef
+    // blocks), and the write must land before any other process reads, otherwise
+    // concurrent terminals (e.g. dev:mp-weixin + dev:mp-alipay) corrupt each
+    // other's conditional-compilation output.
+    const updated = await withFileLock(this.resolvedPagesJSONPath, async () => {
+      const data = await this.genratePagesJSON()
 
-    const pagesJson = cjStringify(
-      data,
-      null,
-      this.options.minify ? undefined : await this.getIndent(),
-    ) + (
-      await this.getEndOfLine() ? await this.getNewline() : ''
-    )
+      const pagesJson = cjStringify(
+        data,
+        null,
+        this.options.minify ? undefined : await this.getIndent(),
+      ) + (
+        await this.getEndOfLine() ? await this.getNewline() : ''
+      )
+
+      if (this.lastPagesJson === pagesJson) {
+        debug.pages('PagesJson Not have change')
+        return false
+      }
+
+      // Atomic write (tmp + rename) so a crash mid-write cannot leave a
+      // truncated pages.json. The lock above handles concurrent processes.
+      await writeFileAtomic(this.resolvedPagesJSONPath, pagesJson)
+      this.lastPagesJson = pagesJson
+      return true
+    })
+
+    // Declaration writes a different file (uni-pages.d.ts) and does not need to
+    // be inside the pages.json lock. Mirror the original behaviour: always run
+    // it after the pages.json computation, regardless of whether content changed.
     this.generateDeclaration()
-    if (this.lastPagesJson === pagesJson) {
-      debug.pages('PagesJson Not have change')
-      return false
+
+    if (updated) {
+      this.options.onAfterWriteFile(this)
     }
 
-    await writeFileWithLock(this.resolvedPagesJSONPath, pagesJson)
-
-    this.lastPagesJson = pagesJson
-
-    this.options.onAfterWriteFile(this)
-    return true
+    return updated ?? false
   }
 
   /**
@@ -568,7 +587,7 @@ export class PageContext {
 
     // pages
     const oldPagesArray = oldPages as unknown as CommentArray<CommentObject> | undefined
-    pageJson.pages = mergePlatformItems(oldPagesArray, currentPlatform, this.pageMetaData, 'path').map(stripType) as unknown as PageMetaDatum[]
+    pageJson.pages = stripTypeInPlace(mergePlatformItems(oldPagesArray, currentPlatform, this.pageMetaData, 'path')) as unknown as PageMetaDatum[]
 
     // mergePlatformItems uses a Map internally which may lose the ordering from setHomePage,
     // so we need to ensure the home page is placed first after the merge
@@ -591,7 +610,7 @@ export class PageContext {
     for (const existing of pageJson.subPackages as unknown as SubPageMetaDatum[]) {
       const sub = newSubPackages.get(existing.root)
       if (sub) {
-        existing.pages = mergePlatformItems(existing.pages as unknown as CommentArray<CommentObject>, currentPlatform, sub.pages, 'path').map(stripType) as unknown as PageMetaDatum[]
+        existing.pages = stripTypeInPlace(mergePlatformItems(existing.pages as unknown as CommentArray<CommentObject>, currentPlatform, sub.pages, 'path')) as unknown as PageMetaDatum[]
         // Preserve plugins property from user config
         if (sub.plugins) {
           existing.plugins = sub.plugins
@@ -603,7 +622,7 @@ export class PageContext {
     for (const [_, newSub] of newSubPackages) {
       const subPackage: SubPageMetaDatum = {
         root: newSub.root,
-        pages: mergePlatformItems(undefined, currentPlatform, newSub.pages, 'path').map(stripType) as unknown as PageMetaDatum[],
+        pages: stripTypeInPlace(mergePlatformItems(undefined, currentPlatform, newSub.pages, 'path')) as unknown as PageMetaDatum[],
       }
       // Include plugins property if configured
       if (newSub.plugins) {

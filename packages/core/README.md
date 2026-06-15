@@ -246,6 +246,19 @@ export default defineConfig({
 
 更多上下文参考 <https://github.com/uni-helper/vite-plugin-uni-pages/issues/271>。
 
+## 多终端并发开发
+
+同一项目里同时运行到多个平台时（例如，两个终端分别运行 `pnpm run dev:mp-weixin` 和 `pnpm run dev:mp-alipay`），多个进程会读写同一个 `pages.json`。
+
+本插件默认会：
+
+- 通过文件锁串行化对 `pages.json` 的「读取已有内容 → 合并当前平台配置 → 写回」整个流程，避免并发写入互相覆盖；
+- 保留其他平台已经写入的条件编译块（`#ifdef H5` / `#ifndef MP-WEIXIN` 等），只更新当前平台对应的条目。
+
+这样每个终端都能保留各自的平台配置。条件编译注释基于 `comment-json` 写入，最终 `pages.json` 同时包含所有平台的分支。
+
+> 注意：每个终端只生成「当前平台」的条目并合并到 `pages.json`，并不会主动列出所有平台。`pages.json` 里出现哪些平台的条件编译块，取决于哪些终端正在运行、以及历史写入过的内容。若需要在单次构建中就输出全部平台的条件编译语句，请关注后续基于 [`pages-json`](https://github.com/uni-ku/pages-json) 条件编译的方案。
+
 ## 感谢
 
 - [hannoeru/vite-plugin-pages](https://github.com/hannoeru/vite-plugin-pages)

@@ -35,4 +35,5 @@ export default defineConfig({
 
 ## 感谢
 
-- [vite-plugin-pages](https://github.com/hannoeru/vite-plugin-pages.git)
+- [hannoeru/vite-plugin-pages](https://github.com/hannoeru/vite-plugin-pages)
+- [uni-ku/pages-json](https://github.com/uni-ku/pages-json)
