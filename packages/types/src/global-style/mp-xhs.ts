@@ -61,5 +61,25 @@ export interface MpXhs {
    */
   onReachBottomDistance?: number
 
+  /**
+   * 下拉 loading 的样式，仅支持 "dark" / "light"
+   *
+   * @default "dark"
+   */
+  backgroundTextStyle?: 'dark' | 'light' | ThemeVar
+
+  /**
+   * 屏幕旋转设置，支持 auto / portrait / landscape
+   *
+   * "auto" 自动
+   *
+   * "portrait" 竖屏
+   *
+   * "landscape" 横屏
+   *
+   * @default "portrait"
+   */
+  pageOrientation?: 'auto' | 'portrait' | 'landscape'
+
   [x: string]: any
 }

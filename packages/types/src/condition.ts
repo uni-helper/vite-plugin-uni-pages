@@ -24,5 +24,5 @@ export interface Condition {
   /**
    * 启动模式列表
    */
-  list: Partial<ConditionItem>[]
+  list: ConditionItem[]
 }

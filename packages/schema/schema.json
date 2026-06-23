@@ -1147,22 +1147,7 @@
         "list": {
           "description": "启动模式列表",
           "items": {
-            "additionalProperties": false,
-            "properties": {
-              "name": {
-                "description": "启动模式名称",
-                "type": "string"
-              },
-              "path": {
-                "description": "启动页面路径",
-                "type": "string"
-              },
-              "query": {
-                "description": "启动参数，可在页面的 onLoad 函数里获得",
-                "type": "string"
-              }
-            },
-            "type": "object"
+            "$ref": "#/definitions/ConditionItem"
           },
           "type": "array"
         }
@@ -1170,6 +1155,28 @@
       "required": [
         "current",
         "list"
+      ],
+      "type": "object"
+    },
+    "ConditionItem": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "启动模式名称",
+          "type": "string"
+        },
+        "path": {
+          "description": "启动页面路径",
+          "type": "string"
+        },
+        "query": {
+          "description": "启动参数，可在页面的 onLoad 函数里获得",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "path"
       ],
       "type": "object"
     },
@@ -1418,6 +1425,11 @@
         "pageOrientation": {
           "default": "portrait",
           "description": "横屏配置，屏幕旋转设置，仅支持 \"auto\" / \"portrait\" / \"landscape\"，详见 [响应显示区域变化](https://developers.weixin.qq.com/miniprogram/dev/framework/view/resizable.html)\n\n\"auto\" 自动\n\n\"portrait\" 竖屏\n\n\"landscape\" 横屏",
+          "enum": [
+            "auto",
+            "portrait",
+            "landscape"
+          ],
           "type": "string"
         },
         "renderingMode": {
@@ -2046,6 +2058,11 @@
             "custom"
           ],
           "type": "string"
+        },
+        "onReachBottomDistance": {
+          "default": 50,
+          "description": "页面上拉触底事件触发时距页面底部距离，单位为 px",
+          "type": "number"
         }
       },
       "type": "object"
@@ -2402,6 +2419,11 @@
             "custom"
           ],
           "type": "string"
+        },
+        "onReachBottomDistance": {
+          "default": 50,
+          "description": "页面上拉触底事件触发时距页面底部距离，单位为 px",
+          "type": "number"
         },
         "pageOrientation": {
           "default": "portrait",
@@ -2820,6 +2842,23 @@
           "default": "#FFFFFF",
           "description": "窗口的背景色，支持 HEX 颜色"
         },
+        "backgroundTextStyle": {
+          "anyOf": [
+            {
+              "const": "dark",
+              "type": "string"
+            },
+            {
+              "const": "light",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "default": "dark",
+          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\""
+        },
         "enablePullDownRefresh": {
           "default": false,
           "description": "是否开启全局的下拉刷新",
@@ -2872,6 +2911,16 @@
           "default": 50,
           "description": "页面上拉触底事件触发时距页面底部距离，单位为 px",
           "type": "number"
+        },
+        "pageOrientation": {
+          "default": "portrait",
+          "description": "屏幕旋转设置，支持 auto / portrait / landscape\n\n\"auto\" 自动\n\n\"portrait\" 竖屏\n\n\"landscape\" 横屏",
+          "enum": [
+            "auto",
+            "portrait",
+            "landscape"
+          ],
+          "type": "string"
         }
       },
       "type": "object"

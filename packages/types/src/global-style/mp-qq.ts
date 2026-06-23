@@ -88,5 +88,12 @@ export interface MpQq {
    */
   pageOrientation?: 'auto' | 'portrait' | 'landscape'
 
+  /**
+   * 页面上拉触底事件触发时距页面底部距离，单位为 px
+   *
+   * @default 50
+   */
+  onReachBottomDistance?: number
+
   [x: string]: any
 }

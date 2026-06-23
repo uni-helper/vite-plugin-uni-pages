@@ -15,8 +15,6 @@ export interface EasyCom {
    * "custom": {
    *   "^uni-(.*)": "@/components/uni-$1.vue", // 匹配 components 目录内的 vue 文件
    *   "^vue-file-(.*)": "packageName/path/to/vue-file-$1.vue" // 匹配 node_modules 内的 vue 文件
-   * }
-}
    */
   custom?: Record<string, string>
 }

@@ -68,7 +68,7 @@ export interface GlobalStyle {
    *
    * @default "default"
    *
-   * @desc 微信小程序 7.0+、百度小程序、H5、App（2.0.3+）
+   * @desc 微信小程序 7.0+、百度小程序、H5、App（2.0.3+）、小红书小程序
    */
   'navigationStyle'?: 'default' | 'custom'
 
@@ -77,7 +77,7 @@ export interface GlobalStyle {
    *
    * @default "#ffffff"
    *
-   * @desc 微信小程序
+   * @desc 微信小程序、小红书小程序
    *
    * @format color
    */
@@ -183,7 +183,7 @@ export interface GlobalStyle {
    *
    * @desc App 2.4.7+、微信小程序、QQ小程序
    */
-  'pageOrientation'?: string
+  'pageOrientation'?: 'auto' | 'portrait' | 'landscape'
 
   /**
    * 窗口显示的动画效果，详见 [窗口动画](https://uniapp.dcloud.net.cn/api/router#animation)
