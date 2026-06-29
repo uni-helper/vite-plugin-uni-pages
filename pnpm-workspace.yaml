@@ -415,6 +415,7 @@ catalog:
   tsdown: ^0.22.3
   typescript: ^6.0.3
   unconfig: ^7.5.0
+  unrun: ^0.3.1
   vite: ^5.4.21
   vitest: ^3.2.6
   vue: ~3.4.38

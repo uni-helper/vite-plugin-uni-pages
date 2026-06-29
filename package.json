@@ -38,6 +38,7 @@
     "rimraf": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
+    "unrun": "catalog:",
     "vitest": "catalog:"
   }
 }
