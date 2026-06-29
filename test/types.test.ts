@@ -96,6 +96,8 @@ describe('definePage global type (issue #281)', () => {
         cwd: root,
         encoding: 'utf-8',
         stdio: ['ignore', 'pipe', 'pipe'],
+        // `npx` is `npx.cmd` on Windows; spawning a `.cmd` requires a shell.
+        shell: process.platform === 'win32',
       })
     }
     catch (error: any) {
