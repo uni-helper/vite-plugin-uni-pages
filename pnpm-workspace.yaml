@@ -1,3 +1,6 @@
+shellEmulator: true
+
+trustPolicy: off
 packages:
   - 'packages/*'
   - playground
@@ -391,7 +394,7 @@ catalog:
   '@types/proper-lockfile': ^4.1.4
   '@types/write-file-atomic': ^4.0.3
   '@uni-helper/unh': ^0.3.1
-  '@uni-helper/uni-env': ^0.2.2
+  '@uni-helper/uni-env': ^0.3.1
   '@uni-helper/vite-plugin-uni-layouts': ^0.1.11
   '@vue/compiler-sfc': ~3.4.38
   ast-kit: ^1.4.3
@@ -401,7 +404,7 @@ catalog:
   debug: ^4.4.3
   detect-indent: ^6.1.0
   detect-newline: ^3.1.0
-  eslint: ^10.5.0
+  eslint: ^10.6.0
   json5: ^2.2.3
   lodash.groupby: ^4.6.0
   magic-string: ^0.30.21
@@ -421,6 +424,3 @@ catalog:
 
 configDependencies:
   '@pnpm/plugin-trusted-deps': 0.2.2+sha512-+ZupiXKJhW2fbSilfyRp+wrAY54MKg+c0JWSFGdeb/y9bUoYN5u4XLOZ0Txk7O2bBa6NMhWrX5mwmsHP3/nm9Q==
-shellEmulator: true
-
-trustPolicy: off
