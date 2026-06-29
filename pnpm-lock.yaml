@@ -153,10 +153,6 @@ pnpmfileChecksum: sha256-15yQafiOk/n/FnyMLJdjllwGXgNxN7Ro+mGuxVKxhic=
 importers:
 
   .:
-    dependencies:
-      unrun:
-        specifier: 'catalog:'
-        version: 0.3.1(synckit@0.11.13)
     devDependencies:
       '@antfu/eslint-config':
         specifier: 'catalog:'
@@ -182,6 +178,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      unrun:
+        specifier: 'catalog:'
+        version: 0.3.1(synckit@0.11.13)
       vitest:
         specifier: 'catalog:'
         version: 3.2.6(@types/debug@4.1.13)(@types/node@24.13.2)(jiti@2.7.0)(jsdom@16.7.0(bufferutil@4.1.0))(terser@5.48.0)(yaml@2.9.0)
