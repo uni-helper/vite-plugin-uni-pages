@@ -772,6 +772,20 @@ function mergePlatformItems<T extends Record<string, unknown> = Record<string, u
   }
 
   // 3. Merge items into tmpMap
+  // Items from pageMetaData carry an internal `type` marker ('home' | 'page') that
+  // must not affect equality: file items read back from pages.json have already had
+  // `type` stripped by stripTypeInPlace, so a raw JSON.stringify comparison would
+  // treat the same page as two different entries and produce duplicate routes
+  // across platform runs (see https://github.com/uni-helper/vite-plugin-uni-pages/issues/283).
+  // stringifyForCompare normalizes both sides by dropping `type` before serializing.
+  const stringifyForCompare = (val: T): string => {
+    if (val && typeof val === 'object' && 'type' in val) {
+      const { type: _type, ...rest } = val
+      return JSON.stringify(rest)
+    }
+    return JSON.stringify(val)
+  }
+
   for (const item of items) {
     const newItem = item
     const uniqueKey = item[uniqueKeyName] as string
@@ -784,7 +798,7 @@ function mergePlatformItems<T extends Record<string, unknown> = Record<string, u
       // If not exists, add to newMap
       tmpMap.set(uniqueKey, [{
         item: newItem,
-        itemStr: JSON.stringify(newItem),
+        itemStr: stringifyForCompare(newItem),
         platforms: [currentPlatform],
         platformStr: currentPlatform,
       }])
@@ -794,7 +808,7 @@ function mergePlatformItems<T extends Record<string, unknown> = Record<string, u
     // If exists, check if elements are equal
     const existing = tmpMap.get(uniqueKey)!
 
-    const newItemStr = JSON.stringify(newItem)
+    const newItemStr = stringifyForCompare(newItem)
     const equalObj = existing.find(val => val.itemStr === newItemStr)
     if (equalObj) {
       equalObj.platforms.push(currentPlatform)
@@ -804,7 +818,7 @@ function mergePlatformItems<T extends Record<string, unknown> = Record<string, u
     else {
       existing.push({
         item: newItem,
-        itemStr: newItemStr,
+        itemStr: stringifyForCompare(newItem),
         platforms: [currentPlatform],
         platformStr: currentPlatform,
       })
