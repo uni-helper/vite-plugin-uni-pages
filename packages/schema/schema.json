@@ -20,9 +20,9 @@
     "AppHarmony": {
       "description": "设置编译到 App（Harmony）平台的特定样式\n\n相应的类型是 AppHarmony",
       "properties": {
-        "softInputMode": {
+        "softinputMode": {
           "default": "adjustPan",
-          "description": "软键盘弹出模式，仅支持 \"adjustResize\" / \"adjustPan\"",
+          "description": "软键盘弹出模式\n\n\"adjustResize\" 重新测量并压缩布局尺寸\n\n\"adjustPan\" 整体平移窗口而不改变布局大小",
           "enum": [
             "adjustResize",
             "adjustPan"
@@ -156,16 +156,16 @@
           "description": "滚动条显示策略，设置为 \"none\" 时不显示滚动条",
           "type": "string"
         },
-        "softInputMode": {
+        "softinputMode": {
           "default": "adjustPan",
-          "description": "软键盘弹出模式，仅支持 \"adjustResize\" / \"adjustPan\"",
+          "description": "软键盘弹出模式，仅支持 \"adjustResize\" / \"adjustPan\"\n\n\"adjustResize\" 重新测量并压缩布局尺寸\n\n\"adjustPan\" 整体平移窗口而不改变布局大小",
           "enum": [
             "adjustResize",
             "adjustPan"
           ],
           "type": "string"
         },
-        "softInputNavBar": {
+        "softinputNavBar": {
           "default": "auto",
           "description": "iOS 软键盘上完成工具栏的显示模式，设置为 \"none\" 时关闭工具栏",
           "enum": [
@@ -1138,18 +1138,15 @@
       "type": "object"
     },
     "Condition": {
-      "additionalProperties": false,
+      "description": "启动模式配置",
       "properties": {
         "current": {
           "description": "当前激活的模式，list 节点的索引值",
           "type": "number"
         },
         "list": {
-          "description": "启动模式列表",
-          "items": {
-            "$ref": "#/definitions/ConditionItem"
-          },
-          "type": "array"
+          "$ref": "#/definitions/ConditionList",
+          "description": "启动模式列表"
         }
       },
       "required": [
@@ -1158,8 +1155,13 @@
       ],
       "type": "object"
     },
-    "ConditionItem": {
-      "additionalProperties": false,
+    "ConditionList": {
+      "items": {
+        "$ref": "#/definitions/ConditionListItem"
+      },
+      "type": "array"
+    },
+    "ConditionListItem": {
       "properties": {
         "name": {
           "description": "启动模式名称",
@@ -1182,6 +1184,7 @@
     },
     "EasyCom": {
       "additionalProperties": false,
+      "description": "组件自动引入规则",
       "properties": {
         "autoscan": {
           "default": true,
@@ -1199,6 +1202,7 @@
       "type": "object"
     },
     "GlobalStyle": {
+      "description": "globalStyle 节点的类型，用于设置应用的状态栏、导航条、标题、窗口背景色等",
       "properties": {
         "allowsBounceVertical": {
           "default": "YES",
@@ -1250,7 +1254,19 @@
             }
           ],
           "default": "#ffffff",
-          "description": "底部窗口的背景色（bounce回弹区域）",
+          "description": "底部窗口的背景色（bounce 回弹区域），支持 HEX 颜色",
+          "format": "color"
+        },
+        "backgroundColorContent": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "description": "页面容器背景色，支持 HEX 颜色",
           "format": "color"
         },
         "backgroundColorTop": {
@@ -1263,7 +1279,7 @@
             }
           ],
           "default": "#ffffff",
-          "description": "顶部窗口的背景色（bounce回弹区域）",
+          "description": "顶部窗口的背景色（bounce 回弹区域），支持 HEX 颜色",
           "format": "color"
         },
         "backgroundTextStyle": {
@@ -1282,16 +1298,6 @@
           ],
           "default": "dark",
           "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\""
-        },
-        "disableScroll": {
-          "default": false,
-          "description": "设置为 true 则页面整体不能上下滚动（bounce 效果），只在页面配置中有效，在 globalStyle 中设置无效",
-          "type": "boolean"
-        },
-        "disableSwipeBack": {
-          "default": false,
-          "description": "是否禁用滑动返回",
-          "type": "boolean"
         },
         "dynamicRpx": {
           "default": false,
@@ -1318,11 +1324,11 @@
         },
         "mp-alipay": {
           "$ref": "#/definitions/MpAlipay",
-          "description": "设置编译到 mp-alipay 平台的特定样式，配置项参考 [MP-ALIPAY](https://uniapp.dcloud.net.cn/collocation/pages#mp-alipay) 和 <https://opendocs.alipay.com/mini/framework/app-json#window>\n\n相应的类型是 MpAlipay"
+          "description": "设置编译到 mp-alipay 平台的特定样式，配置项参考 [MP-ALIPAY](https://uniapp.dcloud.net.cn/collocation/pages#mp-alipay)\n\n相应的类型是 MpAlipay"
         },
         "mp-baidu": {
           "$ref": "#/definitions/MpBaidu",
-          "description": "设置编译到 mp-baidu 平台的特定样式，配置项参考 [MP-BAIDU](https://uniapp.dcloud.net.cn/collocation/pages.html#mp-baidu) 和 <https://smartprogram.baidu.com/docs/develop/framework/process/#window>\n\n相应的类型是 MpBaidu"
+          "description": "设置编译到 mp-baidu 平台的特定样式，配置项参考 [MP-BAIDU](https://uniapp.dcloud.net.cn/collocation/pages.html#mp-baidu)\n\n相应的类型是 MpBaidu"
         },
         "mp-harmony": {
           "$ref": "#/definitions/MpHarmony",
@@ -1346,11 +1352,11 @@
         },
         "mp-toutiao": {
           "$ref": "#/definitions/MpToutiao",
-          "description": "设置编译到 mp-toutiao 平台的特定样式，配置项参考 <https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/develop/framework/general-configuration#window>\n\n相应的类型是 MpToutiao"
+          "description": "设置编译到 mp-toutiao 平台的特定样式\n\n相应的类型是 MpToutiao"
         },
         "mp-weixin": {
           "$ref": "#/definitions/MpWeixin",
-          "description": "设置编译到 mp-weixin 平台的特定样式，配置项参考 [MP-WEIXIN](https://uniapp.dcloud.net.cn/collocation/pages#mp-weixin) 和 <https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html#window>\n\n相应的类型是 MpWeixin"
+          "description": "设置编译到 mp-weixin 平台的特定样式，配置项参考 [MP-WEIXIN](https://uniapp.dcloud.net.cn/collocation/pages#mp-weixin)\n\n相应的类型是 MpWeixin"
         },
         "mp-xhs": {
           "$ref": "#/definitions/MpXhs",
@@ -1367,25 +1373,6 @@
           ],
           "description": "导航栏背景颜色（同状态栏背景色），支持 HEX 颜色",
           "format": "color"
-        },
-        "navigationBarShadow": {
-          "additionalProperties": false,
-          "description": "导航栏阴影",
-          "properties": {
-            "colorType": {
-              "description": "阴影颜色",
-              "enum": [
-                "grey",
-                "blue",
-                "green",
-                "orange",
-                "red",
-                "yellow"
-              ],
-              "type": "string"
-            }
-          },
-          "type": "object"
         },
         "navigationBarTextStyle": {
           "anyOf": [
@@ -1476,7 +1463,7 @@
         },
         "transparentTitle": {
           "default": "none",
-          "description": "导航栏整体（前景、背景）透明设置，仅支持 \"always\" / \"auto\" / \"none\n\n\"always\" 一直透明\n\n\"auto\" 滑动自适应\n\n\"none\" 不透明",
+          "description": "导航栏整体（前景、背景）透明设置，仅支持 \"always\" / \"auto\" / \"none\"\n\n\"always\" 一直透明\n\n\"auto\" 滑动自适应\n\n\"none\" 不透明",
           "enum": [
             "always",
             "auto",
@@ -1497,12 +1484,13 @@
     "H5": {
       "properties": {
         "pullToRefresh": {
-          "description": "下拉刷新，详见 [下拉刷新](https://uniapp.dcloud.net.cn/collocation/pages#h5-pulltorefresh)",
+          "description": "下拉刷新，详见 [下拉刷新](https://uniapp.dcloud.net.cn/collocation/pages#h5-pulltorefresh)\n\nh5 平台下拉刷新动画，只有 circle 类型",
           "properties": {
             "color": {
               "$ref": "#/definitions/HEXColor",
               "default": "#2BD009",
-              "description": "下拉刷新控件颜色，支持 HEX 颜色"
+              "description": "下拉刷新控件颜色，支持 HEX 颜色",
+              "format": "color"
             },
             "offset": {
               "anyOf": [
@@ -1514,7 +1502,7 @@
                 }
               ],
               "default": "0px",
-              "description": "下拉刷新控件起始位置，支持支持单位为 px 的逻辑像素值或百分比"
+              "description": "下拉刷新控件的起始位置，支持单位为 px 的逻辑像素值或百分比"
             }
           },
           "type": "object"
@@ -1534,7 +1522,7 @@
                   "format": "color"
                 },
                 "buttons": {
-                  "description": "自定义按钮，详见 [自定义按钮](https://uniapp.dcloud.net.cn/collocation/pages#app-titlenview-buttons)",
+                  "description": "自定义按钮，详见 [自定义按钮](https://uniapp.dcloud.net.cn/collocation/pages#h5-titlenview-buttons)",
                   "items": {
                     "$ref": "#/definitions/TitleNViewButton"
                   },
@@ -1629,8 +1617,20 @@
     "HEXColor": {
       "type": "string"
     },
+    "MatchMedia": {
+      "additionalProperties": false,
+      "description": "配置显示该窗口的规则",
+      "properties": {
+        "minWidth": {
+          "default": 768,
+          "description": "当设备可见区域宽度 >= minWidth 时，显示该 window",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
     "MpAlipay": {
-      "description": "设置编译到 mp-alipay 平台的特定样式，配置项参考 [MP-ALIPAY](https://uniapp.dcloud.net.cn/collocation/pages#mp-alipay) 和 <https://opendocs.alipay.com/mini/framework/app-json#window>\n\n相应的类型是 MpAlipay",
+      "description": "设置编译到 mp-alipay 平台的特定样式，配置项参考 <https://opendocs.alipay.com/mini/framework/app-json#window>\n\n相应的类型是 MpAlipay",
       "properties": {
         "allowsBounceVertical": {
           "default": "YES",
@@ -1659,7 +1659,7 @@
           "format": "color"
         },
         "backgroundImageUrl": {
-          "description": "下拉露出显示背景图的链接，支持网络地址和本地地址，尽量使用绝对地址",
+          "description": "下拉露出显示背景图的链接",
           "type": "string"
         },
         "defaultTitle": {
@@ -1716,11 +1716,19 @@
           "type": "string"
         },
         "titleBarColor": {
-          "$ref": "#/definitions/HEXColor",
-          "description": "导航栏背景色，支持 HEX 颜色"
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "description": "导航栏背景色，支持 HEX 颜色",
+          "format": "color"
         },
         "titleImage": {
-          "description": "导航栏图片地址，会替换当前文字标题，只支持 https 图片链接",
+          "description": "导航栏图片地址",
           "type": "string"
         },
         "titlePenetrate": {
@@ -1746,7 +1754,7 @@
       "type": "object"
     },
     "MpBaidu": {
-      "description": "设置编译到 mp-baidu 平台的特定样式，配置项参考 [MP-BAIDU](https://uniapp.dcloud.net.cn/collocation/pages.html#mp-baidu) 和 <https://smartprogram.baidu.com/docs/develop/framework/process/#window>\n\n相应的类型是 MpBaidu",
+      "description": "设置编译到 mp-baidu 平台的特定样式，配置项参考 <https://smartprogram.baidu.com/docs/develop/framework/process/#window>\n\n相应的类型是 MpBaidu",
       "properties": {
         "backgroundColor": {
           "anyOf": [
@@ -1770,7 +1778,8 @@
             }
           ],
           "default": "#FFFFFF",
-          "description": "底部窗口的背景色，仅 iOS 支持"
+          "description": "底部窗口的背景色，仅 iOS 支持",
+          "format": "color"
         },
         "backgroundColorTop": {
           "anyOf": [
@@ -1782,7 +1791,8 @@
             }
           ],
           "default": "#FFFFFF",
-          "description": "顶部窗口的背景色，仅 iOS 支持"
+          "description": "顶部窗口的背景色，仅 iOS 支持",
+          "format": "color"
         },
         "backgroundTextStyle": {
           "anyOf": [
@@ -1889,7 +1899,8 @@
             }
           ],
           "default": "#FFFFFF",
-          "description": "窗口的背景色，支持 HEX 颜色"
+          "description": "窗口的背景色，支持 HEX 颜色",
+          "format": "color"
         },
         "backgroundTextStyle": {
           "anyOf": [
@@ -1968,7 +1979,8 @@
             }
           ],
           "default": "#FFFFFF",
-          "description": "下拉窗口的背景色，不是页面的背景颜色"
+          "description": "下拉窗口的背景色，不是页面的背景颜色",
+          "format": "color"
         },
         "backgroundColorBottom": {
           "anyOf": [
@@ -1980,7 +1992,8 @@
             }
           ],
           "default": "#FFFFFF",
-          "description": "底部窗口的背景色，仅 iOS 支持"
+          "description": "底部窗口的背景色，仅 iOS 支持",
+          "format": "color"
         },
         "backgroundColorTop": {
           "anyOf": [
@@ -1992,7 +2005,8 @@
             }
           ],
           "default": "#FFFFFF",
-          "description": "顶部窗口的背景色，仅 iOS 支持"
+          "description": "顶部窗口的背景色，仅 iOS 支持",
+          "format": "color"
         },
         "backgroundTextStyle": {
           "anyOf": [
@@ -2080,7 +2094,8 @@
             }
           ],
           "default": "#FFFFFF",
-          "description": "窗口的背景色，支持 HEX 颜色"
+          "description": "窗口的背景色，支持 HEX 颜色",
+          "format": "color"
         },
         "backgroundColorBottom": {
           "anyOf": [
@@ -2092,7 +2107,8 @@
             }
           ],
           "default": "#FFFFFF",
-          "description": "底部窗口的背景色，仅 iOS 支持"
+          "description": "底部窗口的背景色，仅 iOS 支持",
+          "format": "color"
         },
         "backgroundColorTop": {
           "anyOf": [
@@ -2104,7 +2120,8 @@
             }
           ],
           "default": "#FFFFFF",
-          "description": "顶部窗口的背景色，仅 iOS 支持"
+          "description": "顶部窗口的背景色，仅 iOS 支持",
+          "format": "color"
         },
         "backgroundTextStyle": {
           "anyOf": [
@@ -2137,7 +2154,7 @@
               "$ref": "#/definitions/ThemeVar"
             }
           ],
-          "default": "#000000",
+          "default": "#ffffff",
           "description": "导航栏背景颜色，支持 HEX 颜色",
           "format": "color"
         },
@@ -2207,7 +2224,8 @@
             }
           ],
           "default": "#FFFFFF",
-          "description": "窗口的背景色，支持 HEX 颜色"
+          "description": "窗口的背景色，支持 HEX 颜色",
+          "format": "color"
         },
         "backgroundColorBottom": {
           "anyOf": [
@@ -2219,7 +2237,8 @@
             }
           ],
           "default": "#FFFFFF",
-          "description": "底部窗口的背景色"
+          "description": "底部窗口的背景色",
+          "format": "color"
         },
         "backgroundColorTop": {
           "anyOf": [
@@ -2231,7 +2250,8 @@
             }
           ],
           "default": "#FFFFFF",
-          "description": "顶部窗口的背景色"
+          "description": "顶部窗口的背景色",
+          "format": "color"
         },
         "backgroundTextStyle": {
           "anyOf": [
@@ -2329,7 +2349,8 @@
             }
           ],
           "default": "#FFFFFF",
-          "description": "窗口的背景色，支持 HEX 颜色"
+          "description": "窗口的背景色，支持 HEX 颜色",
+          "format": "color"
         },
         "backgroundColorBottom": {
           "anyOf": [
@@ -2341,7 +2362,8 @@
             }
           ],
           "default": "#FFFFFF",
-          "description": "底部窗口的背景色，仅 iOS 支持"
+          "description": "底部窗口的背景色，仅 iOS 支持",
+          "format": "color"
         },
         "backgroundColorTop": {
           "anyOf": [
@@ -2353,7 +2375,8 @@
             }
           ],
           "default": "#FFFFFF",
-          "description": "顶部窗口的背景色，仅 iOS 支持"
+          "description": "顶部窗口的背景色，仅 iOS 支持",
+          "format": "color"
         },
         "backgroundTextStyle": {
           "anyOf": [
@@ -2451,7 +2474,8 @@
             }
           ],
           "default": "#FFFFFF",
-          "description": "窗口的背景色，支持 HEX 颜色"
+          "description": "窗口的背景色，支持 HEX 颜色",
+          "format": "color"
         },
         "backgroundColorBottom": {
           "anyOf": [
@@ -2463,7 +2487,8 @@
             }
           ],
           "default": "同 backgroundColor",
-          "description": "底部窗口的背景色，仅 iOS 支持"
+          "description": "底部窗口的背景色，仅 iOS 支持",
+          "format": "color"
         },
         "backgroundColorTop": {
           "anyOf": [
@@ -2475,7 +2500,8 @@
             }
           ],
           "default": "同 backgroundColor",
-          "description": "顶部窗口的背景色，仅 iOS 支持"
+          "description": "顶部窗口的背景色，仅 iOS 支持",
+          "format": "color"
         },
         "backgroundTextStyle": {
           "anyOf": [
@@ -2535,7 +2561,7 @@
         },
         "navigationStyle": {
           "default": "default",
-          "description": "导航栏样式\n\n\"default\" 默认样式\n\n\"custom\" 自定义导航栏，只保留右上角胶囊按钮",
+          "description": "导航栏样式，导航栏样式，仅支持 \"default\" / \"custom\"\n\ncustom 模式可自定义导航栏，具体效果样式效果参照 [页面自定义结构文档](https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/open-capacity/basic-capacities/custom-page-structure/)\n\n具体申请入口在[「控制台」-「我的应用」](https://developer.open-douyin.com/console?type=1)-「具体小程序」-「能力」-「互动能力」中完成自定义导航栏权限申请\n\n注意：custom 需要申请权限，否则会阻碍代码包上传，2022 年 5 月 23 日会强制变动，详细参考[获取小程序页面结构自定义能力规范](https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/operation/platform-capabilities/custom-page-structure/custom/)\n\n\"default\" 默认样式\n\n\"custom\" 自定义导航栏，只保留右上角胶囊按钮",
           "enum": [
             "default",
             "custom"
@@ -2666,7 +2692,7 @@
       "type": "object"
     },
     "MpWeixin": {
-      "description": "设置编译到 mp-weixin 平台的特定样式，配置项参考 [MP-WEIXIN](https://uniapp.dcloud.net.cn/collocation/pages#mp-weixin) 和 <https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html#window>\n\n相应的类型是 MpWeixin",
+      "description": "设置编译到 mp-weixin 平台的特定样式，配置项参考 <https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html#window>\n\n相应的类型是 MpWeixin",
       "properties": {
         "backgroundColor": {
           "anyOf": [
@@ -2678,7 +2704,8 @@
             }
           ],
           "default": "#FFFFFF",
-          "description": "窗口的背景色，支持 HEX 颜色"
+          "description": "窗口的背景色，支持 HEX 颜色",
+          "format": "color"
         },
         "backgroundColorBottom": {
           "anyOf": [
@@ -2690,7 +2717,8 @@
             }
           ],
           "default": "#FFFFFF",
-          "description": "底部窗口的背景色，仅 iOS 支持"
+          "description": "底部窗口的背景色，仅 iOS 支持",
+          "format": "color"
         },
         "backgroundColorTop": {
           "anyOf": [
@@ -2702,7 +2730,8 @@
             }
           ],
           "default": "#FFFFFF",
-          "description": "顶部窗口的背景色，仅 iOS 支持"
+          "description": "顶部窗口的背景色，仅 iOS 支持",
+          "format": "color"
         },
         "backgroundTextStyle": {
           "anyOf": [
@@ -2828,7 +2857,7 @@
       "type": "object"
     },
     "MpXhs": {
-      "description": "设置编译到 mp-xhs 平台的特定样式，配置项参考 <https://miniapp.xiaohongshu.com/doc/DC813994>\n\n相应的类型是 MpXhs",
+      "description": "设置编译到 mp-xhs 平台的特定样式，配置项参考 <https://miniapp.xiaohongshu.com/doc/DC813994#anchorId-window>>\n\n相应的类型是 MpXhs",
       "properties": {
         "backgroundColor": {
           "anyOf": [
@@ -2840,7 +2869,8 @@
             }
           ],
           "default": "#FFFFFF",
-          "description": "窗口的背景色，支持 HEX 颜色"
+          "description": "窗口的背景色，支持 HEX 颜色",
+          "format": "color"
         },
         "backgroundTextStyle": {
           "anyOf": [
@@ -2925,9 +2955,11 @@
       },
       "type": "object"
     },
-    "PageMetaDatum": {
+    "PageItem": {
+      "description": "pages 数组的元素类型",
       "properties": {
         "needLogin": {
+          "default": false,
           "description": "当前页面是否需要登录才可以访问，此配置优先级高于 uniIdRouter 下的 needLogin",
           "type": "boolean"
         },
@@ -2936,17 +2968,274 @@
           "type": "string"
         },
         "style": {
-          "$ref": "#/definitions/GlobalStyle",
-          "description": "配置页面窗口表现，配置项参考下方 pageStyle"
-        },
-        "type": {
-          "type": "string"
+          "$ref": "#/definitions/PageStyle",
+          "description": "配置页面窗口表现，配置项参考 [pageStyle](https://uniapp.dcloud.net.cn/collocation/pages#style)"
         }
       },
       "required": [
         "path"
       ],
       "type": "object"
+    },
+    "PageStyle": {
+      "description": "pages 每个页面 style 节点的类型，用于设置每个页面的状态栏、导航条、标题、窗口背景色等\n\n页面中配置项会覆盖 globalStyle 中相同的配置项",
+      "properties": {
+        "allowsBounceVertical": {
+          "default": "YES",
+          "description": "是否允许向下拉拽",
+          "enum": [
+            "YES",
+            "NO"
+          ],
+          "type": "string"
+        },
+        "app-harmony": {
+          "$ref": "#/definitions/AppHarmony",
+          "description": "设置编译到 App（Harmony）平台的特定样式，配置项参考 [app-harmony](https://uniapp.dcloud.net.cn/collocation/pages#app-harmony)\n\n相应的类型是 AppHarmony"
+        },
+        "app-plus": {
+          "$ref": "#/definitions/AppPlus",
+          "description": "设置编译到 App 平台的特定样式，配置项参考 [app-plus](https://uniapp.dcloud.net.cn/collocation/pages#app-plus)\n\n相应的类型是 AppPlus"
+        },
+        "backgroundColor": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "default": "#ffffff",
+          "description": "下拉显示出来的窗口的背景色，支持 HEX 颜色",
+          "format": "color"
+        },
+        "backgroundColorBottom": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "default": "#ffffff",
+          "description": "底部窗口的背景色（bounce 回弹区域），支持 HEX 颜色",
+          "format": "color"
+        },
+        "backgroundColorTop": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "default": "#ffffff",
+          "description": "顶部窗口的背景色（bounce 回弹区域），支持 HEX 颜色",
+          "format": "color"
+        },
+        "backgroundTextStyle": {
+          "anyOf": [
+            {
+              "const": "dark",
+              "type": "string"
+            },
+            {
+              "const": "light",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "default": "dark",
+          "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\""
+        },
+        "disableScroll": {
+          "default": false,
+          "description": "设置为 true 则页面整体不能上下滚动（bounce 效果），只在页面配置中有效，在 globalStyle 中设置无效",
+          "type": "boolean"
+        },
+        "disableSwipeBack": {
+          "default": false,
+          "description": "是否禁用滑动返回",
+          "type": "boolean"
+        },
+        "enablePullDownRefresh": {
+          "default": false,
+          "description": "是否开启下拉刷新，详见 [页面生命周期](https://uniapp.dcloud.net.cn/tutorial/page.html#lifecycle)",
+          "type": "boolean"
+        },
+        "h5": {
+          "$ref": "#/definitions/H5",
+          "description": "设置编译到 H5 平台的特定样式，配置项参考 [H5](https://uniapp.dcloud.net.cn/collocation/pages#h5)\n\n相应的类型是 H5"
+        },
+        "leftWindow": {
+          "default": true,
+          "description": "当存在 leftWindow 时，默认是否显示 leftWindow，详见 [topWindow](https://uniapp.dcloud.net.cn/collocation/pages.html#topwindow)",
+          "type": "boolean"
+        },
+        "maxWidth": {
+          "description": "当浏览器可见区域宽度大于 maxWidth 时两侧留白，当小于等于 maxWidth 时页面铺满，单位为 px\n\n不同页面支持配置不同的 maxWidth\n\nmaxWidth = leftWindow（可选）+ page（页面主体）+ rightWindow（可选）\n\n使用时，页面内 fixed 元素需要使用 --window-left 和 --window-right 来保证布局位置正确",
+          "type": "number"
+        },
+        "mp-alipay": {
+          "$ref": "#/definitions/MpAlipay",
+          "description": "设置编译到 mp-alipay 平台的特定样式，配置项参考 [MP-ALIPAY](https://uniapp.dcloud.net.cn/collocation/pages#mp-alipay)\n\n相应的类型是 MpAlipay"
+        },
+        "mp-baidu": {
+          "$ref": "#/definitions/MpBaidu",
+          "description": "设置编译到 mp-baidu 平台的特定样式，配置项参考 [MP-BAIDU](https://uniapp.dcloud.net.cn/collocation/pages.html#mp-baidu)\n\n相应的类型是 MpBaidu"
+        },
+        "mp-harmony": {
+          "$ref": "#/definitions/MpHarmony",
+          "description": "设置编译到 mp-harmony 平台的特定样式\n\n相应的类型是 MpHarmony"
+        },
+        "mp-jd": {
+          "$ref": "#/definitions/MpJd",
+          "description": "设置编译到 mp-jd 平台的特定样式\n\n相应的类型是 MpJd"
+        },
+        "mp-kuaishou": {
+          "$ref": "#/definitions/MpKuaishou",
+          "description": "设置编译到 mp-kuaishou 平台的特定样式\n\n相应的类型是 MpKuaishou"
+        },
+        "mp-lark": {
+          "$ref": "#/definitions/MpLark",
+          "description": "设置编译到 mp-lark 平台的特定样式\n\n相应的类型是 MpLark"
+        },
+        "mp-qq": {
+          "$ref": "#/definitions/MpQq",
+          "description": "设置编译到 mp-qq 平台的特定样式\n\n相应的类型是 MpQq"
+        },
+        "mp-toutiao": {
+          "$ref": "#/definitions/MpToutiao",
+          "description": "设置编译到 mp-toutiao 平台的特定样式\n\n相应的类型是 MpToutiao"
+        },
+        "mp-weixin": {
+          "$ref": "#/definitions/MpWeixin",
+          "description": "设置编译到 mp-weixin 平台的特定样式，配置项参考 [MP-WEIXIN](https://uniapp.dcloud.net.cn/collocation/pages#mp-weixin)\n\n相应的类型是 MpWeixin"
+        },
+        "mp-xhs": {
+          "$ref": "#/definitions/MpXhs",
+          "description": "设置编译到 mp-xhs 平台的特定样式\n\n相应的类型是 MpXhs"
+        },
+        "navigationBarBackgroundColor": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "description": "导航栏背景颜色（同状态栏背景色），支持 HEX 颜色",
+          "format": "color"
+        },
+        "navigationBarShadow": {
+          "additionalProperties": false,
+          "description": "导航栏阴影，配置参考 [导航栏阴影](https://uniapp.dcloud.net.cn/collocation/pages#navigationbarshadow)\n\n微信/百度/头条小程序需要配置: \"disableScroll\": true\n\n支付宝小程序需要配置 \"allowsBounceVertical\": \"NO\"",
+          "properties": {
+            "colorType": {
+              "description": "阴影颜色\n\n支持 grey、blue、green、orange、red、yellow",
+              "enum": [
+                "grey",
+                "blue",
+                "green",
+                "orange",
+                "red",
+                "yellow"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "navigationBarTextStyle": {
+          "anyOf": [
+            {
+              "const": "black",
+              "type": "string"
+            },
+            {
+              "const": "white",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "default": "black",
+          "description": "导航栏标题颜色及状态栏前景颜色，仅支持 \"black\" / \"white\""
+        },
+        "navigationBarTitleText": {
+          "description": "导航栏标题文字内容",
+          "type": "string"
+        },
+        "navigationStyle": {
+          "default": "default",
+          "description": "导航栏样式，仅支持 \"default\" / \"custom\"\n\n\"custom\" 即取消默认的原生导航栏，详看 [使用注意](https://uniapp.dcloud.net.cn/collocation/pages#customnav)",
+          "enum": [
+            "default",
+            "custom"
+          ],
+          "type": "string"
+        },
+        "onReachBottomDistance": {
+          "default": 50,
+          "description": "页面上拉触底事件触发时距页面底部距离，单位为 px，详见 [页面生命周期](https://uniapp.dcloud.net.cn/tutorial/page.html#lifecycle)",
+          "type": "number"
+        },
+        "rightWindow": {
+          "default": true,
+          "description": "当存在 rightWindow 时，默认是否显示 rightWindow，详见 [topWindow](https://uniapp.dcloud.net.cn/collocation/pages.html#topwindow)",
+          "type": "boolean"
+        },
+        "titleImage": {
+          "description": "导航栏图片地址（替换当前文字标题）\n\n支付宝小程序内必须使用 https 图片链接地址",
+          "type": "string"
+        },
+        "titlePenetrate": {
+          "default": "NO",
+          "description": "导航栏点击穿透",
+          "enum": [
+            "YES",
+            "NO"
+          ],
+          "type": "string"
+        },
+        "topWindow": {
+          "default": true,
+          "description": "当存在 topWindow 时，默认是否显示 topWindow，详见 [topWindow](https://uniapp.dcloud.net.cn/collocation/pages.html#topwindow)",
+          "type": "boolean"
+        },
+        "transparentTitle": {
+          "default": "none",
+          "description": "导航栏整体（前景、背景）透明设置，仅支持 \"always\" / \"auto\" / \"none\"\n\n\"always\" 一直透明\n\n\"auto\" 滑动自适应\n\n\"none\" 不透明",
+          "enum": [
+            "always",
+            "auto",
+            "none"
+          ],
+          "type": "string"
+        },
+        "usingComponents": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "引用小程序组件，详见 [小程序组件](https://uniapp.dcloud.net.cn/tutorial/miniprogram-subject.html#%E5%B0%8F%E7%A8%8B%E5%BA%8F%E8%87%AA%E5%AE%9A%E4%B9%89%E7%BB%84%E4%BB%B6%E6%94%AF%E6%8C%81)",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "Pages": {
+      "description": "设置页面路径及窗口表现\n\n文档中为必填，类型上保持可选，插件可由文件扫描自动生成",
+      "items": {
+        "$ref": "#/definitions/PageItem"
+      },
+      "type": "array"
     },
     "PagesConfig": {
       "description": "对 uni-app 进行全局配置，决定页面文件的路径、窗口样式、原生的导航栏、底部的原生 tabBar 等，类似微信小程序中 app.json 的页面管理部分\n\n注意定位权限申请等原属于 app.json 的内容，需要在 manifest 中配置",
@@ -2972,41 +3261,12 @@
           "description": "大屏左侧窗口"
         },
         "pages": {
-          "description": "设置页面路径及窗口表现",
-          "items": {
-            "$ref": "#/definitions/PageMetaDatum"
-          },
-          "type": "array"
+          "$ref": "#/definitions/Pages",
+          "description": "设置页面路径及窗口表现\n\n文档中为必填，类型上保持可选，插件可由文件扫描自动生成"
         },
         "preloadRule": {
-          "additionalProperties": {
-            "additionalProperties": false,
-            "description": "页面路径",
-            "properties": {
-              "network": {
-                "default": "wifi",
-                "description": "在指定网络下预下载\n\n\"all\" 不限网络\n\n\"wifi\" 仅 wifi 下预下载",
-                "enum": [
-                  "all",
-                  "wifi"
-                ],
-                "type": "string"
-              },
-              "packages": {
-                "description": "进入页面后预下载分包的 root 或 name\n\n__APP__ 表示主包",
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              }
-            },
-            "required": [
-              "packages"
-            ],
-            "type": "object"
-          },
-          "description": "分包预下载规则",
-          "type": "object"
+          "$ref": "#/definitions/PreloadRule",
+          "description": "分包预下载规则"
         },
         "rightWindow": {
           "$ref": "#/definitions/TheWindow",
@@ -3038,11 +3298,10 @@
               "properties": {
                 "isSubpackage": {
                   "default": false,
-                  "description": "是否打包为分包",
+                  "description": "是否把 worker 打包为分包",
                   "type": "boolean"
                 },
                 "path": {
-                  "description": "`Worker` 代码放置的目录",
                   "type": "string"
                 }
               },
@@ -3052,13 +3311,45 @@
               "type": "object"
             }
           ],
-          "description": "`Worker` 代码放置的目录"
+          "description": "worker 代码目录"
         }
       },
       "type": "object"
     },
     "PercentageSize": {
       "type": "string"
+    },
+    "PreloadRule": {
+      "additionalProperties": {
+        "$ref": "#/definitions/PreloadRuleItem"
+      },
+      "description": "分包预下载规则",
+      "type": "object"
+    },
+    "PreloadRuleItem": {
+      "description": "进入页面后预下载分包的规则",
+      "properties": {
+        "network": {
+          "default": "wifi",
+          "description": "在指定网络下预下载\n\n\"all\" 不限网络\n\n\"wifi\" 仅 wifi 下预下载",
+          "enum": [
+            "all",
+            "wifi"
+          ],
+          "type": "string"
+        },
+        "packages": {
+          "description": "进入页面后预下载分包的 root 或 name\n\n__APP__ 表示主包",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "packages"
+      ],
+      "type": "object"
     },
     "PxSize": {
       "type": "string"
@@ -3067,35 +3358,14 @@
       "type": "string"
     },
     "SubPackage": {
-      "additionalProperties": false,
+      "description": "subPackages 数组的元素类型，即应用的子包",
       "properties": {
         "pages": {
-          "description": "子包由哪些页面组成，参数同 pages",
-          "items": {
-            "$ref": "#/definitions/PageMetaDatum"
-          },
-          "type": "array"
+          "$ref": "#/definitions/Pages",
+          "description": "子包由哪些页面组成，参数同 pages"
         },
         "plugins": {
-          "additionalProperties": {
-            "properties": {
-              "export": {
-                "type": "string"
-              },
-              "provider": {
-                "type": "string"
-              },
-              "version": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "version",
-              "provider"
-            ],
-            "type": "object"
-          },
-          "description": "分包插件",
+          "description": "子包的插件",
           "type": "object"
         },
         "root": {
@@ -3110,12 +3380,14 @@
       "type": "object"
     },
     "SubPackages": {
+      "description": "分包加载配置，H5 不支持",
       "items": {
         "$ref": "#/definitions/SubPackage"
       },
       "type": "array"
     },
     "TabBar": {
+      "description": "设置底部 tab 的表现",
       "properties": {
         "backgroundColor": {
           "anyOf": [
@@ -3146,7 +3418,7 @@
         },
         "blurEffect": {
           "default": "none",
-          "description": "iOS 高斯模糊效果，参考 [使用说明](https://ask.dcloud.net.cn/article/36617)",
+          "description": "iOS 高斯模糊效果，参考 [使用说明](https://uniapp.dcloud.net.cn/tutorial/app-blureffect.html)",
           "enum": [
             "dark",
             "extralight",
@@ -3268,7 +3540,8 @@
       "properties": {
         "color": {
           "$ref": "#/definitions/HEXColor",
-          "description": "字体图标颜色"
+          "description": "字体图标颜色",
+          "format": "color"
         },
         "fontSize": {
           "description": "字体图标字号，单位为 px",
@@ -3276,7 +3549,8 @@
         },
         "selectedColor": {
           "$ref": "#/definitions/HEXColor",
-          "description": "字体图标选中颜色"
+          "description": "字体图标选中颜色",
+          "format": "color"
         },
         "selectedText": {
           "description": "选中后字库 Unicode 码",
@@ -3292,15 +3566,8 @@
     "TabBarItem": {
       "properties": {
         "iconPath": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "$ref": "#/definitions/ThemeVar"
-            }
-          ],
-          "description": "图片路径，icon 大小限制为 40 kb，建议尺寸为 81px * 81px\n\n当 position 为 \"top\" 时，此参数无效\n\n不支持网络图片，不支持字体图标"
+          "description": "图片路径，icon 大小限制为 40 kb，建议尺寸为 81px * 81px\n\n当 position 为 \"top\" 时，此参数无效\n\n不支持网络图片，不支持字体图标",
+          "type": "string"
         },
         "iconfont": {
           "$ref": "#/definitions/TabBarIconFont",
@@ -3311,22 +3578,16 @@
           "type": "string"
         },
         "selectedIconPath": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "$ref": "#/definitions/ThemeVar"
-            }
-          ],
-          "description": "选中时的图片路径，icon 大小限制为 40 kb，建议尺寸为 81px * 81px\n\n当 position 为 \"top\" 时，此参数无效\n\n不支持网络图片，不支持字体图标"
+          "description": "选中时的图片路径，icon 大小限制为 40 kb，建议尺寸为 81px * 81px\n\n当 position 为 \"top\" 时，此参数无效\n\n不支持网络图片，不支持字体图标",
+          "type": "string"
         },
         "text": {
           "description": "tab 上按钮文字，在 App 和 H5 平台为非必填，例如中间可放一个没有文字的 + 号图标",
           "type": "string"
         },
         "visible": {
-          "description": "该项是否显示，默认显示",
+          "default": true,
+          "description": "该项是否显示",
           "type": "boolean"
         }
       },
@@ -3365,33 +3626,25 @@
         },
         "width": {
           "default": "80px",
-          "description": "中间按钮的宽度，tabBar 其它项为减去此宽度后平分，默认值为与其它项平分宽度",
+          "description": "中间按钮的宽度，tabBar 其它项为减去此宽度后平分",
           "type": "string"
         }
       },
       "type": "object"
     },
     "TheWindow": {
-      "additionalProperties": false,
+      "description": "leftWindow / topWindow / rightWindow 的类型",
       "properties": {
         "matchMedia": {
-          "additionalProperties": false,
-          "description": "配置显示该窗口的规则，配置项参考 [matchMedia](https://uniapp.dcloud.net.cn/collocation/pages#matchmedia)",
-          "properties": {
-            "minWidth": {
-              "default": 768,
-              "description": "当设备可见区域宽度 >= minWidth 时，显示该 window",
-              "type": "number"
-            }
-          },
-          "type": "object"
+          "$ref": "#/definitions/MatchMedia",
+          "description": "配置显示该窗口的规则，配置项参考 [matchMedia](https://uniapp.dcloud.net.cn/collocation/pages#matchmedia)"
         },
         "path": {
           "description": "配置页面路径",
           "type": "string"
         },
         "style": {
-          "$ref": "#/definitions/GlobalStyle",
+          "$ref": "#/definitions/PageStyle",
           "description": "配置页面窗口表现，配置项参考 [pageStyle](https://uniapp.dcloud.net.cn/collocation/pages#style)"
         }
       },
@@ -3505,7 +3758,7 @@
       "type": "object"
     },
     "UniIdRouter": {
-      "additionalProperties": false,
+      "description": "自动跳转相关配置，新增于 HBuilderX 3.5.0",
       "properties": {
         "loginPage": {
           "description": "登录页面路径",
@@ -3515,7 +3768,7 @@
           "type": "string"
         },
         "needLogin": {
-          "description": "需要登录才可以访问的页面列表，可以使用正则语法",
+          "description": "需要登录才可访问的页面列表，可以使用正则语法",
           "examples": [
             [
               "pages/detail/.*"
@@ -3528,14 +3781,10 @@
         },
         "resToLogin": {
           "default": true,
-          "description": "是否是否自动解析云对象及 clientDB 的错误码，如果是客户端 token 不正确或 token 过期则自动跳转配置的登录页面",
+          "description": "是否自动解析云对象及 clientDB 的错误码，如果是客户端 token 不正确或 token 过期则自动跳转配置的登录页面，",
           "type": "boolean"
         }
       },
-      "required": [
-        "loginPage",
-        "needLogin"
-      ],
       "type": "object"
     }
   }
