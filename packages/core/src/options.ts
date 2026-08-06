@@ -89,7 +89,11 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
 }
 
 /**
- * Resolves the page dirs for its for its given globs
+ * Resolve page directories from the given glob pattern
+ * @param dir - Page directory glob pattern
+ * @param root - Project root directory
+ * @param exclude - Glob patterns to exclude
+ * @returns Matched directory paths
  */
 export function resolvePageDirs(dir: string, root: string, exclude: string[]): string[] {
   const dirs = globSync(slash(dir), {

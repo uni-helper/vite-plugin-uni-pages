@@ -197,13 +197,13 @@ export async function tryPageMetaFromMacro(sfc: SFCDescriptor): Promise<UserPage
       filename: sfc.filename,
     })
 
-    const res = typeof parsed === 'function'
+    const parsedMeta = typeof parsed === 'function'
       ? await Promise.resolve(parsed())
       : await Promise.resolve(parsed)
 
     return {
       type: 'page',
-      ...res,
+      ...parsedMeta,
     }
   }
   return undefined
@@ -234,12 +234,12 @@ export function findMacro(stmts: t.Statement[], filename: string): t.CallExpress
   if (!macro)
     return
 
-  // 提取 macro function 内的第一个参数
+  // Extract the first argument of the macro call
   const [opt] = macro.arguments
 
-  // 检查 macro 的参数是否正确
+  // Validate the macro argument: only function or object literals are supported
   if (opt && !t.isFunctionExpression(opt) && !t.isArrowFunctionExpression(opt) && !t.isObjectExpression(opt)) {
-    debug.definePage(`definePage() 参数仅支持函数或对象：${filename}`)
+    debug.definePage(`definePage() only supports a function or object literal as argument: ${filename}`)
     return
   }
 
