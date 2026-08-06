@@ -26,8 +26,6 @@ import {
   invalidatePagesModule,
   isTargetFile,
   mergePageMetaDataArray,
-  stripType,
-  stripTypeInPlace,
 } from './utils'
 
 /**
@@ -508,8 +506,7 @@ export class PageContext {
    * @returns JSON string of main package page metadata
    */
   resolveRoutes() {
-    const routes = this.pageMetaData.map(stripType)
-    return cjStringify(routes, null, 2)
+    return cjStringify(this.pageMetaData, null, 2)
   }
 
   /**
@@ -517,11 +514,7 @@ export class PageContext {
    * @returns JSON string of sub-package page metadata
    */
   resolveSubRoutes() {
-    const routes = this.subPageMetaData.map(({ pages, ...rest }) => ({
-      ...rest,
-      pages: pages.map(stripType),
-    }))
-    return cjStringify(routes, null, 2)
+    return cjStringify(this.subPageMetaData, null, 2)
   }
 
   /**
@@ -587,7 +580,7 @@ export class PageContext {
 
     // pages
     const oldPagesArray = oldPages as unknown as CommentArray<CommentObject> | undefined
-    pageJson.pages = stripTypeInPlace(mergePlatformItems(oldPagesArray, currentPlatform, this.pageMetaData, 'path')) as unknown as PageMetaDatum[]
+    pageJson.pages = mergePlatformItems(oldPagesArray, currentPlatform, this.pageMetaData, 'path') as unknown as PageMetaDatum[]
 
     // mergePlatformItems uses a Map internally which may lose the ordering from setHomePage,
     // so we need to ensure the home page is placed first after the merge
@@ -610,7 +603,7 @@ export class PageContext {
     for (const existing of pageJson.subPackages as unknown as SubPageMetaDatum[]) {
       const sub = newSubPackages.get(existing.root)
       if (sub) {
-        existing.pages = stripTypeInPlace(mergePlatformItems(existing.pages as unknown as CommentArray<CommentObject>, currentPlatform, sub.pages, 'path')) as unknown as PageMetaDatum[]
+        existing.pages = mergePlatformItems(existing.pages as unknown as CommentArray<CommentObject>, currentPlatform, sub.pages, 'path') as unknown as PageMetaDatum[]
         // Preserve plugins property from user config
         if (sub.plugins) {
           existing.plugins = sub.plugins
@@ -622,7 +615,7 @@ export class PageContext {
     for (const [_, newSub] of newSubPackages) {
       const subPackage: SubPageMetaDatum = {
         root: newSub.root,
-        pages: stripTypeInPlace(mergePlatformItems(undefined, currentPlatform, newSub.pages, 'path')) as unknown as PageMetaDatum[],
+        pages: mergePlatformItems(undefined, currentPlatform, newSub.pages, 'path') as unknown as PageMetaDatum[],
       }
       // Include plugins property if configured
       if (newSub.plugins) {
@@ -727,6 +720,20 @@ function mergePlatformItems<T extends Record<string, unknown> = Record<string, u
     }
   }
 
+  // Items may carry an internal `type` marker ('home' | 'page'), but it must not
+  // affect equality: pages.json files written by older versions may have `type`
+  // stripped, so a raw JSON.stringify comparison would treat the same page as two
+  // different entries and produce duplicate routes across platform runs
+  // (see https://github.com/uni-helper/vite-plugin-uni-pages/issues/283).
+  // stringifyForCompare normalizes both sides by dropping `type` before serializing.
+  const stringifyForCompare = (val: T): string => {
+    if (val && typeof val === 'object' && 'type' in val) {
+      const { type: _type, ...rest } = val
+      return JSON.stringify(rest)
+    }
+    return JSON.stringify(val)
+  }
+
   // 2. Iterate source, judge each element, then add to new tmpMap using uniqueKey element value as key
   interface MultiPlatformItem {
     item: T
@@ -767,25 +774,11 @@ function mergePlatformItems<T extends Record<string, unknown> = Record<string, u
     }
 
     const existing = tmpMap.get(uniqueKey) || []
-    existing.push({ item, itemStr: JSON.stringify(item), platforms, platformStr: platforms.join(' || ') })
+    existing.push({ item, itemStr: stringifyForCompare(item), platforms, platformStr: platforms.join(' || ') })
     tmpMap.set(uniqueKey, existing)
   }
 
   // 3. Merge items into tmpMap
-  // Items from pageMetaData carry an internal `type` marker ('home' | 'page') that
-  // must not affect equality: file items read back from pages.json have already had
-  // `type` stripped by stripTypeInPlace, so a raw JSON.stringify comparison would
-  // treat the same page as two different entries and produce duplicate routes
-  // across platform runs (see https://github.com/uni-helper/vite-plugin-uni-pages/issues/283).
-  // stringifyForCompare normalizes both sides by dropping `type` before serializing.
-  const stringifyForCompare = (val: T): string => {
-    if (val && typeof val === 'object' && 'type' in val) {
-      const { type: _type, ...rest } = val
-      return JSON.stringify(rest)
-    }
-    return JSON.stringify(val)
-  }
-
   for (const item of items) {
     const newItem = item
     const uniqueKey = item[uniqueKeyName] as string

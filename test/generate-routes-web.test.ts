@@ -38,22 +38,27 @@ describe('generate routes', () => {
       "[
         {
           "path": "../playground/src/pages/index",
+          "type": "home",
           "middlewares": [
             "auth",
             "test"
           ]
         },
         {
-          "path": "../playground/src/pages/A-top"
+          "path": "../playground/src/pages/A-top",
+          "type": "page"
         },
         {
-          "path": "../playground/src/pages/blog/index"
+          "path": "../playground/src/pages/blog/index",
+          "type": "page"
         },
         {
-          "path": "../playground/src/pages/blog/post"
+          "path": "../playground/src/pages/blog/post",
+          "type": "page"
         },
         {
           "path": "../playground/src/pages/define-page/async-function",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -63,6 +68,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/define-page/conditional-compilation",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world: H5"
           },
@@ -72,6 +78,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/define-page/function",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -81,6 +88,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/define-page/nested-function",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -90,6 +98,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/define-page/object",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -99,54 +108,63 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/define-page/option-api",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "Option API 内使用 definePage"
           }
         },
         {
           "path": "../playground/src/pages/define-page/remove-console",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "this is a title"
           }
         },
         {
           "path": "../playground/src/pages/define-page/yaml",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "yaml test"
           }
         },
         {
           "path": "../playground/src/pages/i18n",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "%app.name%"
           }
         },
         {
           "path": "../playground/src/pages/tabbar-index-zero",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "零索引"
           }
         },
         {
           "path": "../playground/src/pages/tabbar-list",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "列表"
           }
         },
         {
           "path": "../playground/src/pages/tabbar-no-index",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "无索引"
           }
         },
         {
           "path": "../playground/src/pages/tabbar-profile",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "我的"
           }
         },
         {
           "path": "../playground/src/pages/test-json",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "test json page"
           },
@@ -156,6 +174,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/test-jsonc-with-comment",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "test jsonc page H5"
           },
@@ -163,6 +182,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/test-yaml",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "test yaml page"
           },
@@ -172,6 +192,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/test",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "test page"
           },
@@ -198,22 +219,27 @@ describe('generate routes', () => {
           "style": {
             "navigationBarTextStyle": "black",
             "navigationBarTitleText": "uni-helper"
-          }
+          },
+          "type": "home"
         },
         {
           "path": "../playground/src/pages/A-top",
+          "type": "page",
           "style": {}
         },
         {
           "path": "../playground/src/pages/blog/index",
+          "type": "page",
           "style": {}
         },
         {
           "path": "../playground/src/pages/blog/post",
+          "type": "page",
           "style": {}
         },
         {
           "path": "../playground/src/pages/define-page/async-function",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -223,6 +249,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/define-page/conditional-compilation",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world: H5"
           },
@@ -232,6 +259,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/define-page/function",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -241,6 +269,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/define-page/nested-function",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -250,6 +279,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/define-page/object",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -259,30 +289,35 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/define-page/option-api",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "Option API 内使用 definePage"
           }
         },
         {
           "path": "../playground/src/pages/define-page/remove-console",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "this is a title"
           }
         },
         {
           "path": "../playground/src/pages/define-page/yaml",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "yaml test"
           }
         },
         {
           "path": "../playground/src/pages/i18n",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "%app.name%"
           }
         },
         {
           "path": "../playground/src/pages/index",
+          "type": "page",
           "style": {},
           "middlewares": [
             "auth",
@@ -291,30 +326,35 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/tabbar-index-zero",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "零索引"
           }
         },
         {
           "path": "../playground/src/pages/tabbar-list",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "列表"
           }
         },
         {
           "path": "../playground/src/pages/tabbar-no-index",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "无索引"
           }
         },
         {
           "path": "../playground/src/pages/tabbar-profile",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "我的"
           }
         },
         {
           "path": "../playground/src/pages/test-json",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "test json page"
           },
@@ -324,6 +364,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/test-jsonc-with-comment",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "test jsonc page H5"
           },
@@ -331,6 +372,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/test-yaml",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "test yaml page"
           },
@@ -340,6 +382,7 @@ describe('generate routes', () => {
         },
         {
           "path": "../playground/src/pages/test",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "test page"
           },
@@ -367,10 +410,12 @@ describe('generate routes', () => {
           "root": "../playground/src/pages-sub-pages/sub-activity",
           "pages": [
             {
-              "path": "pages/about/index"
+              "path": "pages/about/index",
+              "type": "page"
             },
             {
-              "path": "pages/home/index"
+              "path": "pages/home/index",
+              "type": "page"
             }
           ]
         },
@@ -378,10 +423,12 @@ describe('generate routes', () => {
           "root": "../playground/src/pages-sub-pages/sub-main",
           "pages": [
             {
-              "path": "pages/about/index"
+              "path": "pages/about/index",
+              "type": "page"
             },
             {
-              "path": "pages/home/index"
+              "path": "pages/home/index",
+              "type": "page"
             }
           ]
         }
@@ -406,10 +453,12 @@ describe('generate routes', () => {
           "root": "../playground/src/pages-sub-pages/sub-main",
           "pages": [
             {
-              "path": "pages/about/index"
+              "path": "pages/about/index",
+              "type": "page"
             },
             {
-              "path": "pages/home/index"
+              "path": "pages/home/index",
+              "type": "page"
             }
           ]
         }
@@ -478,10 +527,12 @@ describe('generate routes', () => {
           "root": "packages/activity/src/pages",
           "pages": [
             {
-              "path": "../../../../../playground/src/pages-sub-pages/sub-activity/pages/about/index"
+              "path": "../../../../../playground/src/pages-sub-pages/sub-activity/pages/about/index",
+              "type": "page"
             },
             {
-              "path": "../../../../../playground/src/pages-sub-pages/sub-activity/pages/home/index"
+              "path": "../../../../../playground/src/pages-sub-pages/sub-activity/pages/home/index",
+              "type": "page"
             }
           ]
         },
@@ -489,10 +540,12 @@ describe('generate routes', () => {
           "root": "packages/main/src/pages",
           "pages": [
             {
-              "path": "../../../../../playground/src/pages-sub-pages/sub-main/pages/about/index"
+              "path": "../../../../../playground/src/pages-sub-pages/sub-main/pages/about/index",
+              "type": "page"
             },
             {
-              "path": "../../../../../playground/src/pages-sub-pages/sub-main/pages/home/index"
+              "path": "../../../../../playground/src/pages-sub-pages/sub-main/pages/home/index",
+              "type": "page"
             }
           ]
         }

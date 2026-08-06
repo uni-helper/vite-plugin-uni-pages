@@ -18,22 +18,27 @@ describe('generate routes - mp-weixin platform', () => {
       "[
         {
           "path": "../playground/src/pages/index",
+          "type": "home",
           "middlewares": [
             "auth",
             "test"
           ]
         },
         {
-          "path": "../playground/src/pages/A-top"
+          "path": "../playground/src/pages/A-top",
+          "type": "page"
         },
         {
-          "path": "../playground/src/pages/blog/index"
+          "path": "../playground/src/pages/blog/index",
+          "type": "page"
         },
         {
-          "path": "../playground/src/pages/blog/post"
+          "path": "../playground/src/pages/blog/post",
+          "type": "page"
         },
         {
           "path": "../playground/src/pages/define-page/async-function",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -43,6 +48,7 @@ describe('generate routes - mp-weixin platform', () => {
         },
         {
           "path": "../playground/src/pages/define-page/conditional-compilation",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -52,6 +58,7 @@ describe('generate routes - mp-weixin platform', () => {
         },
         {
           "path": "../playground/src/pages/define-page/function",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -61,6 +68,7 @@ describe('generate routes - mp-weixin platform', () => {
         },
         {
           "path": "../playground/src/pages/define-page/nested-function",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -70,6 +78,7 @@ describe('generate routes - mp-weixin platform', () => {
         },
         {
           "path": "../playground/src/pages/define-page/object",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "hello world"
           },
@@ -79,54 +88,63 @@ describe('generate routes - mp-weixin platform', () => {
         },
         {
           "path": "../playground/src/pages/define-page/option-api",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "Option API 内使用 definePage"
           }
         },
         {
           "path": "../playground/src/pages/define-page/remove-console",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "this is a title"
           }
         },
         {
           "path": "../playground/src/pages/define-page/yaml",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "yaml test"
           }
         },
         {
           "path": "../playground/src/pages/i18n",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "%app.name%"
           }
         },
         {
           "path": "../playground/src/pages/tabbar-index-zero",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "零索引"
           }
         },
         {
           "path": "../playground/src/pages/tabbar-list",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "列表"
           }
         },
         {
           "path": "../playground/src/pages/tabbar-no-index",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "无索引"
           }
         },
         {
           "path": "../playground/src/pages/tabbar-profile",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "我的"
           }
         },
         {
           "path": "../playground/src/pages/test-json",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "test json page"
           },
@@ -136,6 +154,7 @@ describe('generate routes - mp-weixin platform', () => {
         },
         {
           "path": "../playground/src/pages/test-jsonc-with-comment",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "test jsonc page"
           },
@@ -143,6 +162,7 @@ describe('generate routes - mp-weixin platform', () => {
         },
         {
           "path": "../playground/src/pages/test-yaml",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "test yaml page"
           },
@@ -152,6 +172,7 @@ describe('generate routes - mp-weixin platform', () => {
         },
         {
           "path": "../playground/src/pages/test",
+          "type": "page",
           "style": {
             "navigationBarTitleText": "test page"
           },
