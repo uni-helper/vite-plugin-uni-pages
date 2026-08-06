@@ -80,13 +80,13 @@ export function mergePageMetaDataArray(pageMetaData: InternalPages): InternalPag
   const pageMetaDataObj = groupBy(pageMetaData, 'path')
   const result: InternalPages = []
   for (const path in pageMetaDataObj) {
-    const _pageMetaData = pageMetaDataObj[path]
-    const options = _pageMetaData[0]
-    for (const page of _pageMetaData) {
-      options.style = Object.assign(options.style ?? {}, page.style ?? {})
-      Object.assign(options, page)
+    const group = pageMetaDataObj[path]
+    const mergedPage = group[0]
+    for (const page of group) {
+      mergedPage.style = Object.assign(mergedPage.style ?? {}, page.style ?? {})
+      Object.assign(mergedPage, page)
     }
-    result.push(options)
+    result.push(mergedPage)
   }
   return result
 }
@@ -187,10 +187,10 @@ export async function parseCode(options: { imports: string[], code: string, file
 /**
  * Async sleep function
  * @param ms - Sleep duration in milliseconds
- * @returns Promise object
+ * @returns Promise resolved after the given delay
  */
-export function sleep(ms: number): Promise<unknown> {
-  return new Promise(resolve => setTimeout(resolve, ms))
+export function sleep(ms: number): Promise<void> {
+  return new Promise<void>(resolve => setTimeout(resolve, ms))
 }
 
 /**

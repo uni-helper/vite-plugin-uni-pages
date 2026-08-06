@@ -122,7 +122,7 @@ export async function withFileLock<T>(path: string, task: () => Promise<T>, retr
     return undefined
   }
 
-  let release: () => Promise<void> | undefined
+  let release: (() => Promise<void>) | undefined
 
   try {
     try {
@@ -136,8 +136,6 @@ export async function withFileLock<T>(path: string, task: () => Promise<T>, retr
     return await task()
   }
   finally {
-    // eslint-disable-next-line ts/ban-ts-comment
-    // @ts-expect-error'
     if (release) {
       await release() // Release file lock
     }
