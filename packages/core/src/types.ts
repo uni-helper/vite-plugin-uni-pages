@@ -1,10 +1,83 @@
 import type { LoadConfigSource } from 'unconfig'
-import type { PagesConfig } from './config'
+import type { PageItem, PagesConfig, TabBarItem } from './config'
 import type { PageContext } from './context'
 import type { debug } from './utils'
 
-export type { DefinePage, ExcludeIndexSignature, MaybeCallable, MaybePromise, MaybePromiseCallable, PageMetaDatum, SubPageMetaDatum, UserPageMeta, UserTabBarItem } from '@uni-helper/uni-pages-types'
-export type { definePage } from '@uni-helper/uni-pages-types'
+/**
+ * Exclude index signature keys from an object type, keeping only explicit keys
+ */
+export type ExcludeIndexSignature<T> = {
+  [K in keyof T as string extends K ? never : number extends K ? never : symbol extends K ? never : K]: T[K]
+}
+
+/**
+ * Internal page metadata
+ * Extends the document-level PageItem with the plugin-internal `type` marker,
+ * which is stripped before writing pages.json
+ */
+export interface InternalPageItem extends PageItem {
+  /** Internal marker used by the plugin to identify the home page */
+  type?: 'home' | 'page'
+}
+
+export type InternalPages = InternalPageItem[]
+
+/**
+ * tabBar item that users can define in the definePage macro
+ * Extends the document-level TabBarItem with plugin-only fields
+ */
+export interface UserTabBarItem extends Partial<TabBarItem> {
+  /**
+   * Page path, filled automatically by the plugin when omitted
+   *
+   * @deprecated Use pagePath from pages.json instead
+   */
+  pagePath?: string
+  /**
+   * Index used by the plugin to sort tabBar items
+   *
+   * @default 0
+   */
+  index?: number
+}
+
+/**
+ * Page metadata that users can define in the definePage macro
+ * Extends the document-level PageItem with plugin-only fields
+ */
+export interface UserPageItem extends Partial<PageItem> {
+  /**
+   * @deprecated Use path from pages.json instead
+   */
+  path?: string
+  /**
+   * Page type, set to "home" to mark the home page
+   */
+  type?: 'home' | 'page'
+  /**
+   * tabBar item configuration, the plugin collects it to generate pages.json tabBar.list
+   */
+  tabBar?: UserTabBarItem
+  [x: string]: any
+}
+
+/** Value or Promise of the value */
+export type MaybePromise<T> = T | Promise<T>
+
+/** Value or function returning the value */
+export type MaybeCallable<T> = T | (() => T)
+
+/** Value, function returning the value, or function returning a Promise of the value */
+export type MaybePromiseCallable<T> = T | (() => T) | (() => Promise<T>)
+
+/**
+ * Define page metadata in a Vue page file
+ * The macro call is removed by the plugin during build
+ */
+export declare function definePage(options: MaybePromiseCallable<UserPageItem>): void
+
+/** Type of the definePage macro */
+export type DefinePage = typeof definePage
 
 /** Debug log type, corresponding to methods in the debug object */
 export type debugType = keyof typeof debug

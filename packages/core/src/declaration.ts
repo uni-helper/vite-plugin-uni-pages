@@ -13,7 +13,7 @@ import { normalizePath } from 'vite'
  * @param ctx - Page context instance
  * @returns Declaration file code string
  */
-export function getDeclaration(ctx: PageContext) {
+export function getDeclaration(ctx: PageContext): string {
   const subPagesPath = ctx.subPageMetaData.map((sub) => {
     return sub.pages.map(v => (`"/${normalizePath(join(sub.root, v.path))}"`))
   }).flat()
@@ -61,7 +61,7 @@ declare module "virtual:uni-pages" {
  * @param filePath - File path
  * @param content - File content
  */
-async function writeFile(filePath: string, content: string) {
+async function writeFile(filePath: string, content: string): Promise<void> {
   await mkdir(dirname(filePath), { recursive: true })
   return await writeFile_(filePath, content, 'utf-8')
 }
@@ -73,7 +73,7 @@ async function writeFile(filePath: string, content: string) {
  * @param ctx - Page context instance
  * @param filepath - Declaration file output path
  */
-export async function writeDeclaration(ctx: PageContext, filepath: string) {
+export async function writeDeclaration(ctx: PageContext, filepath: string): Promise<void> {
   const originalContent = existsSync(filepath) ? await readFile(filepath, 'utf-8') : ''
 
   const code = getDeclaration(ctx)

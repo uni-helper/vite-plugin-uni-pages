@@ -1,7 +1,7 @@
 import type { SFCDescriptor, SFCParseOptions } from '@vue/compiler-sfc'
 import type { TabBarItem } from './config'
 import type { PageContext } from './context'
-import type { PageMetaDatum, PagePath, UserPageMeta } from './types'
+import type { InternalPageItem, PagePath, UserPageItem } from './types'
 import fs from 'node:fs'
 import { extname } from 'node:path'
 import * as t from '@babel/types'
@@ -34,7 +34,7 @@ export class Page {
   /** Raw JSON string of page metadata for change detection */
   private raw: string = ''
   /** Parsed page metadata */
-  private meta: UserPageMeta | undefined
+  private meta: UserPageItem | undefined
 
   /**
    * Create a page instance
@@ -54,7 +54,7 @@ export class Page {
    * @param forceUpdate - Whether to force update, ignoring cache
    * @returns Page metadata object
    */
-  public async getPageMeta(forceUpdate = false): Promise<PageMetaDatum> {
+  public async getPageMeta(forceUpdate = false): Promise<InternalPageItem> {
     if (forceUpdate || !this.meta) {
       await this.read()
     }
@@ -96,7 +96,7 @@ export class Page {
    * Check if the page has changed
    * @returns Whether the page has changed
    */
-  public hasChanged() {
+  public hasChanged(): boolean {
     return this.changed
   }
 
@@ -104,8 +104,8 @@ export class Page {
    * Read page file and parse metadata
    * Extract configuration defined by definePage macro from Vue SFC
    */
-  public async read() {
-    let meta: UserPageMeta
+  public async read(): Promise<void> {
+    let meta: UserPageItem
     try {
       meta = await this.readPageMetaFromFile()
     }
@@ -127,7 +127,7 @@ export class Page {
     this.raw = raw
   }
 
-  private async readPageMetaFromFile(): Promise<UserPageMeta> {
+  private async readPageMetaFromFile(): Promise<UserPageItem> {
     try {
       const content = await fs.promises.readFile(this.path.absolutePath, { encoding: 'utf-8' })
       const sfc = parseSFC(content, { filename: this.path.absolutePath })
@@ -174,7 +174,7 @@ export function parseSFC(code: string, options?: SFCParseOptions): SFCDescriptor
  * @param sfc - Vue SFC descriptor
  * @returns Page metadata object, or undefined if definePage is not found
  */
-export async function tryPageMetaFromMacro(sfc: SFCDescriptor): Promise<UserPageMeta | undefined> {
+export async function tryPageMetaFromMacro(sfc: SFCDescriptor): Promise<UserPageItem | undefined> {
   const sfcScript = sfc.scriptSetup || sfc.script
 
   if (!sfcScript) {

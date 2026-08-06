@@ -157,7 +157,7 @@ export async function withFileLock<T>(path: string, task: () => Promise<T>, retr
  * @param content - File content
  * @param retry - Number of retries when lock acquisition fails, defaults to 3
  */
-export async function writeFileWithLock(path: string, content: string, retry = 3) {
+export async function writeFileWithLock(path: string, content: string, retry = 3): Promise<void | undefined> {
   return withFileLock(path, async () => {
     await writeFileAtomic(path, content)
   }, retry)

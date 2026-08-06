@@ -1,8 +1,8 @@
 import type { FSWatcher } from 'chokidar'
 import type { CommentObject, CommentSymbol } from 'comment-json'
 import type { Logger, ViteDevServer } from 'vite'
-import type { PagesConfig, TabBar, TabBarItem } from './config'
-import type { ExcludeIndexSignature, PageMetaDatum, PagePath, ResolvedOptions, SubPageMetaDatum, UserOptions } from './types'
+import type { Pages, PagesConfig, SubPackage, SubPackages, TabBar, TabBarItem } from './config'
+import type { ExcludeIndexSignature, InternalPageItem, InternalPages, PagePath, ResolvedOptions, UserOptions } from './types'
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -51,9 +51,9 @@ export class PageContext {
   /** Sub-package page map, key is the sub-package root directory, value is the page map under that sub-package */
   subPages = new Map<string, Map<string, Page>>()
   /** Main package page metadata array for generating pages.json pages field */
-  pageMetaData: PageMetaDatum[] = []
+  pageMetaData: InternalPages = []
   /** Sub-package page metadata array for generating pages.json subPackages field */
-  subPageMetaData: SubPageMetaDatum[] = []
+  subPageMetaData: SubPackages = []
 
   /** Generated pages.json file path */
   resolvedPagesJSONPath = ''
@@ -100,7 +100,7 @@ export class PageContext {
    * Set the Vite logger
    * @param logger - Vite logger instance
    */
-  setLogger(logger: Logger) {
+  setLogger(logger: Logger): void {
     this.logger = logger
   }
 
@@ -108,7 +108,7 @@ export class PageContext {
    * Load user page configuration file (e.g. pages.config.ts)
    * Uses unconfig to load configuration, supporting multiple config file formats
    */
-  async loadUserPagesConfig() {
+  async loadUserPagesConfig(): Promise<void> {
     const configSource = this.options.configSource
     const { config, sources } = await loadConfig<PagesConfig>({ cwd: this.root, sources: configSource, defaults: {} })
     this.pagesGlobConfig = config.default || config
@@ -120,7 +120,7 @@ export class PageContext {
    * Scan main package page directories and collect all page file paths
    * Scan corresponding directories based on the configured dirs option
    */
-  async scanPages() {
+  async scanPages(): Promise<void> {
     const pageDirFiles = this.options.dirs.map((dir) => {
       return { dir, files: getPagePaths(dir, this.options) }
     })
@@ -141,7 +141,7 @@ export class PageContext {
    * Scan sub-package page directories and collect all sub-package page file paths
    * Scan corresponding directories based on the configured subPackages option
    */
-  async scanSubPages() {
+  async scanSubPages(): Promise<void> {
     const paths: Record<string, PagePath[]> = {}
     const subPages = new Map<string, Map<string, Page>>()
     for (const dir of this.options.subPackages) {
@@ -164,7 +164,7 @@ export class PageContext {
    * Set up Vite dev server for HMR and file watching
    * @param server - Vite dev server instance
    */
-  setupViteServer(server: ViteDevServer) {
+  setupViteServer(server: ViteDevServer): void {
     if (this._server === server)
       return
 
@@ -177,10 +177,10 @@ export class PageContext {
    * Automatically update pages.json when page files or config files change
    * @param watcher - chokidar file watcher instance
    */
-  async setupWatcher(watcher: FSWatcher) {
+  async setupWatcher(watcher: FSWatcher): Promise<void> {
     watcher.add(this.pagesConfigSourcePaths)
     const targetDirs = [...this.options.dirs, ...this.options.subPackages].map(v => slash(path.resolve(this.root, v)))
-    const isInTargetDirs = (filePath: string) => targetDirs.some(v => slash(path.resolve(this.root, filePath)).startsWith(v))
+    const isInTargetDirs = (filePath: string): boolean => targetDirs.some(v => slash(path.resolve(this.root, filePath)).startsWith(v))
 
     watcher.on('add', async (path) => {
       path = slash(path)
@@ -236,7 +236,7 @@ export class PageContext {
    * Page update callback, triggered when page files or configuration changes
    * Responsible for invalidating virtual modules and notifying the browser to do a full reload
    */
-  onUpdate() {
+  onUpdate(): void {
     if (!this._server)
       return
 
@@ -254,13 +254,13 @@ export class PageContext {
    * @param overrides custom page config
    * @returns pages rules
    */
-  async parsePages(pages: Map<string, Page>, type: 'main' | 'sub', overrides?: PageMetaDatum[]) {
-    const jobs: Promise<PageMetaDatum>[] = []
+  async parsePages(pages: Map<string, Page>, type: 'main' | 'sub', overrides?: Pages): Promise<InternalPages> {
+    const jobs: Promise<InternalPageItem>[] = []
     for (const [_, page] of pages) {
       jobs.push(page.getPageMeta())
     }
     const generatedPageMetaData = await Promise.all(jobs)
-    const customPageMetaData = overrides || []
+    const customPageMetaData = (overrides || []) as InternalPages
 
     const result = customPageMetaData.length
       ? mergePageMetaDataArray(generatedPageMetaData.concat(customPageMetaData))
@@ -271,7 +271,7 @@ export class PageContext {
       result.reduce((map, page) => {
         map.set(page.path, page)
         return map
-      }, new Map<string, PageMetaDatum>()).values(),
+      }, new Map<string, InternalPageItem>()).values(),
     )
 
     return type === 'main' ? this.setHomePage(parseMeta) : parseMeta
@@ -282,7 +282,7 @@ export class PageContext {
    * @param result pages rules array
    * @returns pages rules
    */
-  setHomePage(result: PageMetaDatum[]): PageMetaDatum[] {
+  setHomePage(result: InternalPages): InternalPages {
     const hasHome = result.some(({ type }) => type === 'home')
     if (!hasHome) {
       // Resolve homePage config to the same relative-path format as page paths (relative to basePath)
@@ -325,7 +325,7 @@ export class PageContext {
    * Merge main package page metadata
    * Filter out pages belonging to sub-packages, then parse page metadata and merge user configuration
    */
-  async mergePageMetaData() {
+  async mergePageMetaData(): Promise<void> {
     // Collect all absolute paths of pages in sub-packages
     const subPageAbsolutePaths = Array.from(this.subPages.values()).flatMap(v => Array.from(v.keys()))
 
@@ -344,10 +344,10 @@ export class PageContext {
    * Parse page metadata for each sub-package and handle sub-package configuration inheritance
    * Preserves sub-package level properties like plugins from user config
    */
-  async mergeSubPageMetaData() {
-    const subPageMaps: Record<string, PageMetaDatum[]> = {}
+  async mergeSubPageMetaData(): Promise<void> {
+    const subPageMaps: Record<string, InternalPages> = {}
     // Store plugins config separately to preserve them during merge
-    const subPlugins: Record<string, SubPageMetaDatum['plugins']> = {}
+    const subPlugins: Record<string, SubPackage['plugins']> = {}
     const subPackages = this.pagesGlobConfig?.subPackages || []
 
     for (const [dir, pages] of this.subPages) {
@@ -399,7 +399,7 @@ export class PageContext {
    * @param filepath - Changed file path for incremental update judgment
    * @returns Whether pages.json was successfully updated
    */
-  async updatePagesJSON(filepath?: string) {
+  async updatePagesJSON(filepath?: string): Promise<boolean> {
     if (filepath) {
       let page = this.pages.get(filepath)
       if (!page) {
@@ -495,7 +495,7 @@ export class PageContext {
    * Returns JavaScript code containing pages and subPackages exports
    * @returns Virtual module code string
    */
-  virtualModule() {
+  virtualModule(): string {
     const pages = `export const pages = ${this.resolveRoutes()};`
     const subPackages = `export const subPackages = ${this.resolveSubRoutes()};`
     return [pages, subPackages].join('\n')
@@ -505,7 +505,7 @@ export class PageContext {
    * Resolve main package route data to JSON string
    * @returns JSON string of main package page metadata
    */
-  resolveRoutes() {
+  resolveRoutes(): string {
     return cjStringify(this.pageMetaData, null, 2)
   }
 
@@ -513,7 +513,7 @@ export class PageContext {
    * Resolve sub-package route data to JSON string
    * @returns JSON string of sub-package page metadata
    */
-  resolveSubRoutes() {
+  resolveSubRoutes(): string {
     return cjStringify(this.subPageMetaData, null, 2)
   }
 
@@ -561,7 +561,7 @@ export class PageContext {
    * Generate TypeScript declaration file
    * Generate type definitions for page paths to provide type hints during navigation
    */
-  generateDeclaration() {
+  generateDeclaration(): Promise<void> | undefined {
     if (!this.options.dts)
       return
 
@@ -569,7 +569,7 @@ export class PageContext {
     return writeDeclaration(this, this.options.dts)
   }
 
-  private async genratePagesJSON() {
+  private async genratePagesJSON(): Promise<PagesConfig> {
     const content = await fs.promises.readFile(this.resolvedPagesJSONPath, { encoding: 'utf-8' }).catch(() => '')
 
     const { pages: oldPages, subPackages: oldSubPackages, tabBar: oldTabBar } = cjParse(content || '{}') as CommentObject
@@ -580,13 +580,13 @@ export class PageContext {
 
     // pages
     const oldPagesArray = oldPages as unknown as CommentArray<CommentObject> | undefined
-    pageJson.pages = mergePlatformItems(oldPagesArray, currentPlatform, this.pageMetaData, 'path') as unknown as PageMetaDatum[]
+    pageJson.pages = mergePlatformItems(oldPagesArray, currentPlatform, this.pageMetaData, 'path') as unknown as Pages
 
     // mergePlatformItems uses a Map internally which may lose the ordering from setHomePage,
     // so we need to ensure the home page is placed first after the merge
     if (pageJson.pages && pageJson.pages.length > 0) {
-      const pagesArray = pageJson.pages as unknown as PageMetaDatum[]
-      const homeIndex = pagesArray.findIndex((page: PageMetaDatum) => page.type === 'home')
+      const pagesArray = pageJson.pages as unknown as InternalPages
+      const homeIndex = pagesArray.findIndex((page: InternalPageItem) => page.type === 'home')
       if (homeIndex > 0) {
         const [homePage] = pagesArray.splice(homeIndex, 1)
         pagesArray.unshift(homePage)
@@ -595,15 +595,15 @@ export class PageContext {
 
     // subPackages
     pageJson.subPackages = oldSubPackages || new CommentArray<CommentObject>()
-    const newSubPackages = new Map<string, SubPageMetaDatum>()
+    const newSubPackages = new Map<string, SubPackage>()
     for (const item of this.subPageMetaData) {
       newSubPackages.set(item.root, item)
     }
     // Update existing sub-packages in pages.json with new metadata
-    for (const existing of pageJson.subPackages as unknown as SubPageMetaDatum[]) {
+    for (const existing of pageJson.subPackages as unknown as SubPackage[]) {
       const sub = newSubPackages.get(existing.root)
       if (sub) {
-        existing.pages = mergePlatformItems(existing.pages as unknown as CommentArray<CommentObject>, currentPlatform, sub.pages, 'path') as unknown as PageMetaDatum[]
+        existing.pages = mergePlatformItems(existing.pages as unknown as CommentArray<CommentObject>, currentPlatform, sub.pages, 'path') as unknown as Pages
         // Preserve plugins property from user config
         if (sub.plugins) {
           existing.plugins = sub.plugins
@@ -613,15 +613,15 @@ export class PageContext {
     }
     // Add new sub-packages that don't exist in pages.json yet
     for (const [_, newSub] of newSubPackages) {
-      const subPackage: SubPageMetaDatum = {
+      const subPackage: SubPackage = {
         root: newSub.root,
-        pages: mergePlatformItems(undefined, currentPlatform, newSub.pages, 'path') as unknown as PageMetaDatum[],
+        pages: mergePlatformItems(undefined, currentPlatform, newSub.pages, 'path') as unknown as Pages,
       }
       // Include plugins property if configured
       if (newSub.plugins) {
         subPackage.plugins = newSub.plugins
       }
-      (pageJson.subPackages as unknown as SubPageMetaDatum[]).push(subPackage)
+      (pageJson.subPackages as unknown as SubPackage[]).push(subPackage)
     }
 
     // tabbar
@@ -649,7 +649,7 @@ export class PageContext {
     this.resolvedPagesJSONEofNewline = (resolvedPagesJSONContent.at(-1) ?? '\n') === this.resolvedPagesJSONNewline
   }
 
-  private async getIndent() {
+  private async getIndent(): Promise<string> {
     if (!this.resolvedPagesJSONIndent) {
       await this.readInfoFromPagesJSON()
     }
@@ -657,7 +657,7 @@ export class PageContext {
     return this.resolvedPagesJSONIndent!
   }
 
-  private async getNewline() {
+  private async getNewline(): Promise<string> {
     if (!this.resolvedPagesJSONNewline) {
       await this.readInfoFromPagesJSON()
     }
@@ -665,7 +665,7 @@ export class PageContext {
     return this.resolvedPagesJSONNewline!
   }
 
-  private async getEndOfLine() {
+  private async getEndOfLine(): Promise<boolean> {
     if (!this.resolvedPagesJSONEofNewline) {
       await this.readInfoFromPagesJSON()
     }
@@ -680,7 +680,10 @@ export class PageContext {
  * @param options - Resolved configuration options
  * @returns Page path array containing relative and absolute paths
  */
-function getPagePaths(dir: string, options: ResolvedOptions) {
+function getPagePaths(dir: string, options: ResolvedOptions): {
+  relativePath: string
+  absolutePath: string
+}[] {
   const pagesDirPath = slash(path.resolve(options.root, dir))
   const basePath = slash(path.join(options.root, options.outDir))
   const files = getPageFiles(pagesDirPath, options)
@@ -706,7 +709,7 @@ function getPagePaths(dir: string, options: ResolvedOptions) {
  * @param uniqueKeyName - Field name used to identify configuration item uniqueness (e.g. 'path' or 'pagePath')
  * @returns Merged configuration item array with conditional compilation comments
  */
-function mergePlatformItems<T extends Record<string, unknown> = Record<string, unknown>>(source: CommentArray<CommentObject> | undefined, currentPlatform: string, items: T[], uniqueKeyName: keyof ExcludeIndexSignature<T>): CommentArray<CommentObject> {
+function mergePlatformItems<T extends object = Record<string, unknown>>(source: CommentArray<CommentObject> | undefined, currentPlatform: string, items: T[], uniqueKeyName: keyof ExcludeIndexSignature<T>): CommentArray<CommentObject> {
   const src = source || new CommentArray<CommentObject>()
   currentPlatform = currentPlatform.toUpperCase()
 

@@ -1,5 +1,5 @@
 import type { ModuleNode, ViteDevServer } from 'vite'
-import type { PageMetaDatum } from './types'
+import type { InternalPages } from './types'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import vm from 'node:vm'
@@ -15,7 +15,7 @@ import { FILE_EXTENSIONS, RESOLVED_MODULE_ID_VIRTUAL } from './constant'
  *
  * @param server - Vite dev server instance
  */
-export function invalidatePagesModule(server: ViteDevServer) {
+export function invalidatePagesModule(server: ViteDevServer): void {
   const { moduleGraph } = server
   const mods = moduleGraph.getModulesByFile(RESOLVED_MODULE_ID_VIRTUAL)
   if (mods) {
@@ -55,7 +55,7 @@ export const debug = {
  * @param extensions - File extensions array
  * @returns Glob pattern string
  */
-export function extsToGlob(extensions: string[]) {
+export function extsToGlob(extensions: string[]): string {
   return extensions.length > 1 ? `{${extensions.join(',')}}` : (extensions[0] || '')
 }
 
@@ -66,7 +66,7 @@ export function extsToGlob(extensions: string[]) {
  * @param path - File path
  * @returns Whether it's a target file
  */
-export function isTargetFile(path: string) {
+export function isTargetFile(path: string): boolean {
   const ext = path.split('.').pop()
   return FILE_EXTENSIONS.includes(ext!)
 }
@@ -76,9 +76,9 @@ export function isTargetFile(path: string) {
  * @param pageMetaData  page meta data array
  * TODO: support merge middleware
  */
-export function mergePageMetaDataArray(pageMetaData: PageMetaDatum[]) {
+export function mergePageMetaDataArray(pageMetaData: InternalPages): InternalPages {
   const pageMetaDataObj = groupBy(pageMetaData, 'path')
-  const result: PageMetaDatum[] = []
+  const result: InternalPages = []
   for (const path in pageMetaDataObj) {
     const _pageMetaData = pageMetaDataObj[path]
     const options = _pageMetaData[0]
@@ -189,7 +189,7 @@ export async function parseCode(options: { imports: string[], code: string, file
  * @param ms - Sleep duration in milliseconds
  * @returns Promise object
  */
-export function sleep(ms: number) {
+export function sleep(ms: number): Promise<unknown> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 

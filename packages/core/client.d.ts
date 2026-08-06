@@ -1,8 +1,8 @@
 /// <reference path="./global.d.ts" />
 
 declare module 'virtual:uni-pages' {
-  import type { PageMetaDatum, SubPackage } from '@uni-helper/uni-pages-types'
+  import type { InternalPages, SubPackages } from '@uni-helper/uni-pages-types'
 
-  export const pages: PageMetaDatum[]
-  export const subPackages: SubPackage[]
+  export const pages: InternalPages
+  export const subPackages: SubPackages
 }

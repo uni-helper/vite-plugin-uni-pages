@@ -9,6 +9,6 @@ export type * from '@uni-helper/uni-pages-types'
  * @param config - Page configuration object
  * @returns Configuration object
  */
-export function defineUniPages(config: UserPagesConfig) {
+export function defineUniPages(config: UserPagesConfig): UserPagesConfig {
   return config
 }
