@@ -134,6 +134,26 @@ interface UserOptions {
   minify?: boolean
 
   /**
+   * 是否在 pages.json 末尾插入换行
+   * @default false
+   */
+  insertFinalNewline?: boolean
+
+  /**
+   * 生成的 pages.json 的缩进
+   * 接受空格数量或字符串（如 `'\t'`）
+   * 当 `minify` 为 `true` 时被忽略
+   * @default 2
+   */
+  indent?: number | string
+
+  /**
+   * 生成的 pages.json 的换行符
+   * @default '\n'
+   */
+  eol?: '\n' | '\r\n'
+
+  /**
    * 启用调试日志
    * 为 true 时启用所有分类；为字符串时仅启用特定分类
    * 可选分类：hmr | options | pages | subPages | error | cache | declaration | definePage
