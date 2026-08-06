@@ -10,7 +10,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
  *
  * Scenario: two dev servers (e.g. dev:mp-weixin + dev:h5) write the same
  * pages.json. The H5 terminal previously wrote an `#ifdef H5` block. The
- * mp-weixin terminal must NOT clobber it — its `genratePagesJSON` reads the
+ * mp-weixin terminal must NOT clobber it — its `generatePagesJSON` reads the
  * existing file inside the lock and preserves other platforms' blocks.
  *
  * Note on the platform model: `process.env.UNI_PLATFORM` is captured at module

@@ -121,11 +121,7 @@ export class PageContext {
    * Scan corresponding directories based on the configured dirs option
    */
   async scanPages(): Promise<void> {
-    const pageDirFiles = this.options.dirs.map((dir) => {
-      return { dir, files: getPagePaths(dir, this.options) }
-    })
-
-    const paths = pageDirFiles.map(page => page.files).flat()
+    const paths = this.options.dirs.flatMap(dir => getPagePaths(dir, this.options))
     debug.pages(paths)
 
     const pages = new Map<string, Page>()
@@ -250,11 +246,11 @@ export class PageContext {
   /**
    * parse pages rules && set page type
    * @param pages page path array
-   * @param type  page type
+   * @param packageType  page package type (main package or sub-package)
    * @param overrides custom page config
    * @returns pages rules
    */
-  async parsePages(pages: Map<string, Page>, type: 'main' | 'sub', overrides?: Pages): Promise<InternalPages> {
+  async parsePages(pages: Map<string, Page>, packageType: 'main' | 'sub', overrides?: Pages): Promise<InternalPages> {
     const jobs: Promise<InternalPageItem>[] = []
     for (const [_, page] of pages) {
       jobs.push(page.getPageMeta())
@@ -274,7 +270,7 @@ export class PageContext {
       }, new Map<string, InternalPageItem>()).values(),
     )
 
-    return type === 'main' ? this.setHomePage(parseMeta) : parseMeta
+    return packageType === 'main' ? this.setHomePage(parseMeta) : parseMeta
   }
 
   /**
@@ -438,32 +434,34 @@ export class PageContext {
     await this.mergeSubPageMetaData()
     this.options.onAfterMergePageMetaData(this)
 
-    const pagesMap = new Map()
     const pages = this.withUniPlatform
       ? this.pageMetaData.filter(v => !/\..*$/.test(v.path) || v.path.includes(platform)).map((v) => {
           v.path = v.path.replace(/\..*$/, '')
           return v
         })
       : this.pageMetaData
+
+    // Deduplicate by page path
+    const pagesMap = new Map<string, InternalPageItem>()
     pages.forEach(v => pagesMap.set(v.path, v))
     this.pageMetaData = [...pagesMap.values()]
 
     this.options.onBeforeWriteFile(this)
 
-    // The whole read-modify-write must run inside one lock. genratePagesJSON
+    // The whole read-modify-write must run inside one lock. generatePagesJSON
     // reads the existing pages.json (to preserve other platforms' #ifdef
     // blocks), and the write must land before any other process reads, otherwise
     // concurrent terminals (e.g. dev:mp-weixin + dev:mp-alipay) corrupt each
     // other's conditional-compilation output.
     const updated = await withFileLock(this.resolvedPagesJSONPath, async () => {
-      const data = await this.genratePagesJSON()
+      const data = await this.generatePagesJSON()
 
       const pagesJson = cjStringify(
         data,
         null,
         this.options.minify ? undefined : await this.getIndent(),
       ) + (
-        await this.getEndOfLine() ? await this.getNewline() : ''
+        await this.hasEofNewline() ? await this.getNewline() : ''
       )
 
       if (this.lastPagesJson === pagesJson) {
@@ -569,7 +567,7 @@ export class PageContext {
     return writeDeclaration(this, this.options.dts)
   }
 
-  private async genratePagesJSON(): Promise<PagesConfig> {
+  private async generatePagesJSON(): Promise<PagesConfig> {
     const content = await fs.promises.readFile(this.resolvedPagesJSONPath, { encoding: 'utf-8' }).catch(() => '')
 
     const { pages: oldPages, subPackages: oldSubPackages, tabBar: oldTabBar } = cjParse(content || '{}') as CommentObject
@@ -665,8 +663,10 @@ export class PageContext {
     return this.resolvedPagesJSONNewline!
   }
 
-  private async getEndOfLine(): Promise<boolean> {
-    if (!this.resolvedPagesJSONEofNewline) {
+  private async hasEofNewline(): Promise<boolean> {
+    // Use an explicit undefined check: a cached value of `false` (file without
+    // trailing newline) is valid and must not trigger a re-read on every call
+    if (this.resolvedPagesJSONEofNewline === undefined) {
       await this.readInfoFromPagesJSON()
     }
 
@@ -680,10 +680,7 @@ export class PageContext {
  * @param options - Resolved configuration options
  * @returns Page path array containing relative and absolute paths
  */
-function getPagePaths(dir: string, options: ResolvedOptions): {
-  relativePath: string
-  absolutePath: string
-}[] {
+function getPagePaths(dir: string, options: ResolvedOptions): PagePath[] {
   const pagesDirPath = slash(path.resolve(options.root, dir))
   const basePath = slash(path.join(options.root, options.outDir))
   const files = getPageFiles(pagesDirPath, options)
@@ -716,10 +713,10 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
   // 1. Extract the first comment from CommentArray and get platforms as lastPlatforms
   let lastPlatforms: string[] = []
   for (const comment of (src[Symbol.for('before:0') as CommentSymbol] || [])) {
-    const trimed = comment.value.trim()
-    if (trimed.startsWith('GENERATED BY UNI-PAGES, PLATFORM:')) {
+    const trimmed = comment.value.trim()
+    if (trimmed.startsWith('GENERATED BY UNI-PAGES, PLATFORM:')) {
       // Remove current platform
-      lastPlatforms = trimed.split(':')[1].split('||').map(s => s.trim()).filter(s => s !== currentPlatform).sort()
+      lastPlatforms = trimmed.split(':')[1].split('||').map(s => s.trim()).filter(s => s !== currentPlatform).sort()
     }
   }
 
@@ -737,14 +734,14 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
     return JSON.stringify(val)
   }
 
-  // 2. Iterate source, judge each element, then add to new tmpMap using uniqueKey element value as key
+  // 2. Iterate source, judge each element, then add to new mergedMap using uniqueKey element value as key
   interface MultiPlatformItem {
     item: T
     itemStr: string
     platforms: string[]
     platformStr: string
   }
-  const tmpMap = new Map<string, MultiPlatformItem[]>()
+  const mergedMap = new Map<string, MultiPlatformItem[]>()
 
   for (let i = 0; i < src.length; i++) {
     const item = src[i] as unknown as T
@@ -776,25 +773,24 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
       continue
     }
 
-    const existing = tmpMap.get(uniqueKey) || []
+    const existing = mergedMap.get(uniqueKey) || []
     existing.push({ item, itemStr: stringifyForCompare(item), platforms, platformStr: platforms.join(' || ') })
-    tmpMap.set(uniqueKey, existing)
+    mergedMap.set(uniqueKey, existing)
   }
 
-  // 3. Merge items into tmpMap
+  // 3. Merge items into mergedMap
   for (const item of items) {
-    const newItem = item
     const uniqueKey = item[uniqueKeyName] as string
 
     if (!uniqueKey) {
       continue
     }
 
-    if (!tmpMap.has(uniqueKey)) {
-      // If not exists, add to newMap
-      tmpMap.set(uniqueKey, [{
-        item: newItem,
-        itemStr: stringifyForCompare(newItem),
+    if (!mergedMap.has(uniqueKey)) {
+      // If not exists, add to mergedMap
+      mergedMap.set(uniqueKey, [{
+        item,
+        itemStr: stringifyForCompare(item),
         platforms: [currentPlatform],
         platformStr: currentPlatform,
       }])
@@ -802,10 +798,10 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
     }
 
     // If exists, check if elements are equal
-    const existing = tmpMap.get(uniqueKey)!
+    const existing = mergedMap.get(uniqueKey)!
 
-    const newItemStr = stringifyForCompare(newItem)
-    const equalObj = existing.find(val => val.itemStr === newItemStr)
+    const itemStr = stringifyForCompare(item)
+    const equalObj = existing.find(val => val.itemStr === itemStr)
     if (equalObj) {
       equalObj.platforms.push(currentPlatform)
       equalObj.platforms.sort()
@@ -813,20 +809,20 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
     }
     else {
       existing.push({
-        item: newItem,
-        itemStr: stringifyForCompare(newItem),
+        item,
+        itemStr,
         platforms: [currentPlatform],
         platformStr: currentPlatform,
       })
     }
   }
 
-  // 4. Iterate tmpMap to generate result:CommentArray<CommentObject>
+  // 4. Iterate mergedMap to generate result:CommentArray<CommentObject>
   const result = new CommentArray<CommentObject>()
 
   // Check platform usage frequency, use the most frequently used platform as default
   const platformUsage: Record<string, number> = {}
-  tmpMap.forEach((val) => {
+  mergedMap.forEach((val) => {
     Object.values(val).forEach((v) => {
       platformUsage[v.platformStr] = (platformUsage[v.platformStr] || 0) + 1
     })
@@ -848,7 +844,7 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
   }]
 
   // Process elements in insertion order
-  for (const [_, list] of tmpMap) {
+  for (const [_, list] of mergedMap) {
     for (const { item, platformStr } of list) {
       result.push(item as unknown as CommentObject)
 
