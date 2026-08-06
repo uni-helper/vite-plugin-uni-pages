@@ -1036,16 +1036,18 @@ export interface AppPlus {
    *
    * @desc App-iOS
    */
-  softInputNavBar?: 'auto' | 'none'
+  softinputNavBar?: 'auto' | 'none'
 
   /**
    * 软键盘弹出模式，仅支持 "adjustResize" / "adjustPan"
    *
-   * @default "adjustPan"
+   * "adjustResize" 重新测量并压缩布局尺寸
    *
-   * @desc App
+   * "adjustPan" 整体平移窗口而不改变布局大小
+   *
+   * @default "adjustPan"
    */
-  softInputMode?: 'adjustResize' | 'adjustPan'
+  softinputMode?: 'adjustResize' | 'adjustPan'
 
   /**
    * 下拉刷新

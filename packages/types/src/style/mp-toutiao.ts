@@ -30,7 +30,13 @@ export interface MpToutiao {
   navigationBarTitleText?: string
 
   /**
-   * 导航栏样式
+   * 导航栏样式，导航栏样式，仅支持 "default" / "custom"
+   *
+   * custom 模式可自定义导航栏，具体效果样式效果参照 [页面自定义结构文档](https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/open-capacity/basic-capacities/custom-page-structure/)
+   *
+   * 具体申请入口在[「控制台」-「我的应用」](https://developer.open-douyin.com/console?type=1)-「具体小程序」-「能力」-「互动能力」中完成自定义导航栏权限申请
+   *
+   * 注意：custom 需要申请权限，否则会阻碍代码包上传，2022 年 5 月 23 日会强制变动，详细参考[获取小程序页面结构自定义能力规范](https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/operation/platform-capabilities/custom-page-structure/custom/)
    *
    * "default" 默认样式
    *
@@ -44,6 +50,8 @@ export interface MpToutiao {
    * 窗口的背景色，支持 HEX 颜色
    *
    * @default "#FFFFFF"
+   *
+   * @format color
    */
   backgroundColor?: HEXColor | ThemeVar
 
@@ -58,6 +66,8 @@ export interface MpToutiao {
    * 顶部窗口的背景色，仅 iOS 支持
    *
    * @default 同 backgroundColor
+   *
+   * @format color
    */
   backgroundColorTop?: HEXColor | ThemeVar
 
@@ -65,6 +75,8 @@ export interface MpToutiao {
    * 底部窗口的背景色，仅 iOS 支持
    *
    * @default 同 backgroundColor
+   *
+   * @format color
    */
   backgroundColorBottom?: HEXColor | ThemeVar
 

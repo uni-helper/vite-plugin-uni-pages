@@ -1,7 +1,8 @@
 import type { Condition } from './condition'
 import type { EasyCom } from './easycom'
-import type { GlobalStyle } from './global-style'
-import type { PageMetaDatum } from './page-meta'
+import type { Pages } from './pages'
+import type { PreloadRule } from './preload-rule'
+import type { GlobalStyle } from './style'
 import type { SubPackages } from './sub-packages'
 import type { TabBar } from './tab-bar'
 import type { TheWindow } from './the-window'
@@ -20,8 +21,10 @@ export interface PagesConfig {
 
   /**
    * 设置页面路径及窗口表现
+   *
+   * 文档中为必填，类型上保持可选，插件可由文件扫描自动生成
    */
-  pages?: PageMetaDatum[]
+  pages?: Pages
 
   /**
    * 组件自动引入规则
@@ -50,48 +53,19 @@ export interface PagesConfig {
   /**
    * 分包预下载规则
    *
-   * @desc 微信小程序
+   * @desc 微信小程序、QQ 小程序、抖音小程序、支付宝小程序、京东小程序
    */
-  preloadRule?: {
-    /**
-     * 页面路径
-     */
-    [path: string]: {
-      /**
-       * 进入页面后预下载分包的 root 或 name
-       *
-       * __APP__ 表示主包
-       */
-      packages: string[]
-
-      /**
-       * 在指定网络下预下载
-       *
-       * "all" 不限网络
-       *
-       * "wifi" 仅 wifi 下预下载
-       *
-       * @default "wifi"
-       */
-      network?: 'all' | 'wifi'
-    }
-  }
+  preloadRule?: PreloadRule
 
   /**
-   * `Worker` 代码放置的目录
+   * worker 代码目录
    *
-   * @desc 微信小程序
+   * @desc 微信小程序、支付宝小程序
    */
   workers?: string | {
-    /**
-     * `Worker` 代码放置的目录
-     */
     path: string
-
     /**
-     * 是否打包为分包
-     *
-     * @desc 微信小程序基础库 v2.27.3
+     * 是否把 worker 打包为分包
      *
      * @default false
      */

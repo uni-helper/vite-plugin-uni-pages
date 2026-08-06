@@ -33,6 +33,8 @@ export interface MpHarmony {
    * 窗口的背景色，支持 HEX 颜色
    *
    * @default "#FFFFFF"
+   *
+   * @format color
    */
   backgroundColor?: HEXColor | ThemeVar
 

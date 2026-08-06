@@ -1,7 +1,7 @@
 import type { HEXColor, ThemeVar } from '../common'
 
 /**
- * 设置编译到 mp-alipay 平台的特定样式，配置项参考 [MP-ALIPAY](https://uniapp.dcloud.net.cn/collocation/pages#mp-alipay) 和 <https://opendocs.alipay.com/mini/framework/app-json#window>
+ * 设置编译到 mp-alipay 平台的特定样式，配置项参考 <https://opendocs.alipay.com/mini/framework/app-json#window>
  *
  * 相应的类型是 MpAlipay
  *
@@ -30,7 +30,7 @@ export interface MpAlipay {
   backgroundImageColor?: HEXColor
 
   /**
-   * 下拉露出显示背景图的链接，支持网络地址和本地地址，尽量使用绝对地址
+   * 下拉露出显示背景图的链接
    */
   backgroundImageUrl?: string
 
@@ -106,14 +106,16 @@ export interface MpAlipay {
   titlePenetrate?: 'YES' | 'NO'
 
   /**
-   * 导航栏图片地址，会替换当前文字标题，只支持 https 图片链接
+   * 导航栏图片地址
    */
   titleImage?: string
 
   /**
    * 导航栏背景色，支持 HEX 颜色
+   *
+   * @format color
    */
-  titleBarColor?: HEXColor
+  titleBarColor?: HEXColor | ThemeVar
 
   /**
    * 导航栏前景色

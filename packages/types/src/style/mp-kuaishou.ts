@@ -1,17 +1,17 @@
 import type { HEXColor, ThemeVar } from '../common'
 
 /**
- * 设置编译到 mp-jd 平台的特定样式，配置项参考 <https://mp-docs.jd.com/doc/miniapp/dev/reference/2595#heading-3>
+ * 设置编译到 mp-kuaishou 平台的特定样式，配置项参考 <https://mp.kuaishou.com/docs/develop/frame/config/conf_appjson.html#window>
  *
- * 相应的类型是 MpJd
+ * 相应的类型是 MpKuaishou
  *
- * @desc 京东小程序
+ * @desc 快手小程序
  */
-export interface MpJd {
+export interface MpKuaishou {
   /**
    * 导航栏背景颜色，支持 HEX 颜色
    *
-   * @default "#000000"
+   * @default "#ffffff"
    *
    * @format color
    */
@@ -41,9 +41,11 @@ export interface MpJd {
   navigationStyle?: 'default' | 'custom'
 
   /**
-   * 下拉窗口的背景色，不是页面的背景颜色
+   * 窗口的背景色，支持 HEX 颜色
    *
    * @default "#FFFFFF"
+   *
+   * @format color
    */
   backgroundColor?: HEXColor | ThemeVar
 
@@ -58,6 +60,8 @@ export interface MpJd {
    * 顶部窗口的背景色，仅 iOS 支持
    *
    * @default "#FFFFFF"
+   *
+   * @format color
    */
   backgroundColorTop?: HEXColor | ThemeVar
 
@@ -65,22 +69,37 @@ export interface MpJd {
    * 底部窗口的背景色，仅 iOS 支持
    *
    * @default "#FFFFFF"
+   *
+   * @format color
    */
   backgroundColorBottom?: HEXColor | ThemeVar
 
   /**
-   * 是否开启全局的下拉刷新，详见 [Page.onPullDownRefresh](https://mp-docs.jd.com/doc/dev/framework/520#heading-10)
+   * 是否开启全局的下拉刷新，详见 [Page.onPullDownRefresh](https://mp.kuaishou.com/docs/develop/frame/page/page_page.html#onpulldownrefresh)
    *
    * @default false
    */
   enablePullDownRefresh?: boolean
 
   /**
-   * 页面上拉触底事件触发时距页面底部距离，单位为 px
+   * 页面上拉触底事件触发时距页面底部距离，单位为 px，详见 [Page.onReachBottom](https://mp.kuaishou.com/docs/develop/frame/page/page_page.html#onreachbottom)
    *
    * @default 50
    */
   onReachBottomDistance?: number
+
+  /**
+   * 屏幕旋转设置，支持 auto / portrait / landscape，详见 [响应显示区域变化](https://developers.weixin.qq.com/miniprogram/dev/framework/view/resizable.html)
+   *
+   * "auto" 自动
+   *
+   * "portrait" 竖屏
+   *
+   * "landscape" 横屏
+   *
+   * @default "portrait"
+   */
+  pageOrientation?: 'auto' | 'portrait' | 'landscape'
 
   [x: string]: any
 }

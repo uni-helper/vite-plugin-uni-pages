@@ -1,3 +1,8 @@
+/**
+ * 组件自动引入规则
+ *
+ * @desc 2.5.5+
+ */
 export interface EasyCom {
   /**
    * 是否开启自动扫描，开启后将会自动扫描符合 `components/组件名称/组件名称.vue` 目录结构的组件

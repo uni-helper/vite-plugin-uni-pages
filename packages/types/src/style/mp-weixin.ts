@@ -1,7 +1,7 @@
 import type { HEXColor, ThemeVar } from '../common'
 
 /**
- * 设置编译到 mp-weixin 平台的特定样式，配置项参考 [MP-WEIXIN](https://uniapp.dcloud.net.cn/collocation/pages#mp-weixin) 和 <https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html#window>
+ * 设置编译到 mp-weixin 平台的特定样式，配置项参考 <https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html#window>
  *
  * 相应的类型是 MpWeixin
  *
@@ -36,7 +36,13 @@ export interface MpWeixin {
    *
    * "custom" 自定义导航栏，只保留右上角胶囊按钮
    *
-   * @desc iOS / Android 微信客户端 6.6.0，Windows 微信客户端不支持
+   * @desc iOS / Android 微信客户端 6.6.0，Windows / Mac 微信基础库 3.6.1
+   *
+   * @desc iOS/Android 客户端 7.0.0 以下版本，navigationStyle 只在 app.json 中生效
+   *
+   * @desc iOS/Android 客户端 6.7.2 版本开始，navigationStyle: custom 对 web-view 组件无效
+   *
+   * @desc 开启 custom 后，低版本客户端需要做好兼容。开发者工具基础库版本切到 1.7.0（不代表最低版本，只供调试用）可方便切到旧视觉
    *
    * @default "default"
    */
@@ -55,6 +61,8 @@ export interface MpWeixin {
    * 窗口的背景色，支持 HEX 颜色
    *
    * @default "#FFFFFF"
+   *
+   * @format color
    */
   backgroundColor?: HEXColor | ThemeVar
 
@@ -71,6 +79,8 @@ export interface MpWeixin {
    * @desc 微信客户端 6.5.16
    *
    * @default "#FFFFFF"
+   *
+   * @format color
    */
   backgroundColorTop?: HEXColor | ThemeVar
 
@@ -80,6 +90,8 @@ export interface MpWeixin {
    * @desc 微信客户端 6.5.16
    *
    * @default "#FFFFFF"
+   *
+   * @format color
    */
   backgroundColorBottom?: HEXColor | ThemeVar
 

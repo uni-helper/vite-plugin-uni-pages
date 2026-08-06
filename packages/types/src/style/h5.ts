@@ -15,7 +15,7 @@ export interface H5 {
     backgroundColor?: HEXColor
 
     /**
-     * 自定义按钮，详见 [自定义按钮](https://uniapp.dcloud.net.cn/collocation/pages#app-titlenview-buttons)
+     * 自定义按钮，详见 [自定义按钮](https://uniapp.dcloud.net.cn/collocation/pages#h5-titlenview-buttons)
      */
     buttons?: TitleNViewButton[]
 
@@ -120,17 +120,21 @@ export interface H5 {
 
   /**
    * 下拉刷新，详见 [下拉刷新](https://uniapp.dcloud.net.cn/collocation/pages#h5-pulltorefresh)
+   *
+   * h5 平台下拉刷新动画，只有 circle 类型
    */
   pullToRefresh?: {
     /**
      * 下拉刷新控件颜色，支持 HEX 颜色
      *
      * @default "#2BD009"
+     *
+     * @format color
      */
     color?: HEXColor
 
     /**
-     * 下拉刷新控件起始位置，支持支持单位为 px 的逻辑像素值或百分比
+     * 下拉刷新控件的起始位置，支持单位为 px 的逻辑像素值或百分比
      *
      * @default "0px"
      */

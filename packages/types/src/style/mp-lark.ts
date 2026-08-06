@@ -1,15 +1,17 @@
 import type { HEXColor, ThemeVar } from '../common'
 
 /**
- * 设置编译到 mp-baidu 平台的特定样式，配置项参考 [MP-BAIDU](https://uniapp.dcloud.net.cn/collocation/pages.html#mp-baidu) 和 <https://smartprogram.baidu.com/docs/develop/framework/process/#window>
+ * 设置编译到 mp-lark 平台的特定样式，配置项参考 <https://open.feishu.cn/document/client-docs/gadget/introduction/global-settings#a172b7dd>
  *
- * 相应的类型是 MpBaidu
+ * 相应的类型是 MpLark
  *
- * @desc 百度小程序
+ * @desc 飞书小程序
  */
-export interface MpBaidu {
+export interface MpLark {
   /**
    * 导航栏背景颜色，支持 HEX 颜色
+   *
+   * @desc iOS, Android
    *
    * @default "#000000"
    *
@@ -20,14 +22,33 @@ export interface MpBaidu {
   /**
    * 导航栏标题、状态栏颜色
    *
+   * @desc iOS, Android
+   *
    * @default "white"
    */
   navigationBarTextStyle?: 'black' | 'white' | ThemeVar
 
   /**
    * 导航栏标题文字内容
+   *
+   * @desc iOS, Android, PC
    */
   navigationBarTitleText?: string
+
+  /**
+   * 导航栏透明设置
+   *
+   * "always" 一直透明
+   *
+   * "auto" 滑动自适应
+   *
+   * "none" 不透明
+   *
+   * @desc iOS, Android
+   *
+   * @default "none"
+   */
+  transparentTitle?: 'always' | 'auto' | 'none'
 
   /**
    * 导航栏样式
@@ -36,7 +57,7 @@ export interface MpBaidu {
    *
    * "custom" 自定义导航栏，只保留右上角胶囊按钮
    *
-   * @desc 2.10.34
+   * @desc iOS, Android, PC
    *
    * @default "default"
    */
@@ -45,33 +66,49 @@ export interface MpBaidu {
   /**
    * 窗口的背景色，支持 HEX 颜色
    *
+   * @desc iOS, Android, PC(3.14.0+)
+   *
    * @default "#FFFFFF"
+   *
+   * @format color
    */
   backgroundColor?: HEXColor | ThemeVar
 
   /**
    * 下拉 loading 的样式，仅支持 "dark" / "light"
    *
+   * @desc iOS, Android
+   *
    * @default "dark"
    */
   backgroundTextStyle?: 'dark' | 'light' | ThemeVar
 
   /**
-   * 顶部窗口的背景色，仅 iOS 支持
+   * 顶部窗口的背景色
+   *
+   * @desc iOS
    *
    * @default "#FFFFFF"
+   *
+   * @format color
    */
   backgroundColorTop?: HEXColor | ThemeVar
 
   /**
-   * 底部窗口的背景色，仅 iOS 支持
+   * 底部窗口的背景色
+   *
+   * @desc iOS
    *
    * @default "#FFFFFF"
+   *
+   * @format color
    */
   backgroundColorBottom?: HEXColor | ThemeVar
 
   /**
    * 是否开启全局的下拉刷新
+   *
+   * @desc iOS, Android
    *
    * @default false
    */
@@ -80,37 +117,18 @@ export interface MpBaidu {
   /**
    * 页面上拉触底事件触发时距页面底部距离，单位为 px
    *
+   * @desc iOS, Android
+   *
    * @default 50
    */
   onReachBottomDistance?: number
 
   /**
-   * 小程序页面是否禁止响应字体大小的设置
+   * PCMode 模式下特定的窗口配置，支持的属性与通用 window 配置属性一致，仅当在 ext 内配置了 defaultPages.PCMode 时生效
    *
-   * "auto" 默认响应
-   *
-   * "none" 不响应
-   *
-   * @desc 基础库版本 3.200.1
-   *
-   * @default "auto"
+   * @desc PC(3.14.0+)
    */
-  textSizeAdjust?: 'auto' | 'none'
-
-  /**
-   * 屏幕旋转设置，支持 auto / portrait / landscape
-   *
-   * "auto" 自动
-   *
-   * "portrait" 竖屏
-   *
-   * "landscape" 横屏
-   *
-   * @desc 基础库版本 3.450.8，web 化暂不支持
-   *
-   * @default "portrait"
-   */
-  pageOrientation?: 'auto' | 'portrait' | 'landscape'
+  PCMode?: Omit<MpLark, 'PCMode'>
 
   [x: string]: any
 }

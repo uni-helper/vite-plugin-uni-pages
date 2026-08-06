@@ -1,13 +1,13 @@
 import type { HEXColor, ThemeVar } from '../common'
 
 /**
- * 设置编译到 mp-xhs 平台的特定样式，配置项参考 <https://miniapp.xiaohongshu.com/doc/DC813994>
+ * 设置编译到 mp-baidu 平台的特定样式，配置项参考 <https://smartprogram.baidu.com/docs/develop/framework/process/#window>
  *
- * 相应的类型是 MpXhs
+ * 相应的类型是 MpBaidu
  *
- * @desc 小红书小程序
+ * @desc 百度小程序
  */
-export interface MpXhs {
+export interface MpBaidu {
   /**
    * 导航栏背景颜色，支持 HEX 颜色
    *
@@ -36,6 +36,8 @@ export interface MpXhs {
    *
    * "custom" 自定义导航栏，只保留右上角胶囊按钮
    *
+   * @desc 2.10.34
+   *
    * @default "default"
    */
   navigationStyle?: 'default' | 'custom'
@@ -46,6 +48,31 @@ export interface MpXhs {
    * @default "#FFFFFF"
    */
   backgroundColor?: HEXColor | ThemeVar
+
+  /**
+   * 下拉 loading 的样式，仅支持 "dark" / "light"
+   *
+   * @default "dark"
+   */
+  backgroundTextStyle?: 'dark' | 'light' | ThemeVar
+
+  /**
+   * 顶部窗口的背景色，仅 iOS 支持
+   *
+   * @default "#FFFFFF"
+   *
+   * @format color
+   */
+  backgroundColorTop?: HEXColor | ThemeVar
+
+  /**
+   * 底部窗口的背景色，仅 iOS 支持
+   *
+   * @default "#FFFFFF"
+   *
+   * @format color
+   */
+  backgroundColorBottom?: HEXColor | ThemeVar
 
   /**
    * 是否开启全局的下拉刷新
@@ -62,11 +89,17 @@ export interface MpXhs {
   onReachBottomDistance?: number
 
   /**
-   * 下拉 loading 的样式，仅支持 "dark" / "light"
+   * 小程序页面是否禁止响应字体大小的设置
    *
-   * @default "dark"
+   * "auto" 默认响应
+   *
+   * "none" 不响应
+   *
+   * @desc 基础库版本 3.200.1
+   *
+   * @default "auto"
    */
-  backgroundTextStyle?: 'dark' | 'light' | ThemeVar
+  textSizeAdjust?: 'auto' | 'none'
 
   /**
    * 屏幕旋转设置，支持 auto / portrait / landscape
@@ -76,6 +109,8 @@ export interface MpXhs {
    * "portrait" 竖屏
    *
    * "landscape" 横屏
+   *
+   * @desc 基础库版本 3.450.8，web 化暂不支持
    *
    * @default "portrait"
    */

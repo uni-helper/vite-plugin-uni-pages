@@ -1,13 +1,13 @@
 import type { HEXColor, ThemeVar } from '../common'
 
 /**
- * 设置编译到 mp-qq 平台的特定样式，配置项参考 <https://q.qq.com/wiki/develop/miniprogram/frame/dispose.html#window>
+ * 设置编译到 mp-jd 平台的特定样式，配置项参考 <https://mp-docs.jd.com/doc/miniapp/dev/reference/2595#heading-3>
  *
- * 相应的类型是 MpQq
+ * 相应的类型是 MpJd
  *
- * @desc QQ 小程序
+ * @desc 京东小程序
  */
-export interface MpQq {
+export interface MpJd {
   /**
    * 导航栏背景颜色，支持 HEX 颜色
    *
@@ -41,9 +41,11 @@ export interface MpQq {
   navigationStyle?: 'default' | 'custom'
 
   /**
-   * 窗口的背景色，支持 HEX 颜色
+   * 下拉窗口的背景色，不是页面的背景颜色
    *
    * @default "#FFFFFF"
+   *
+   * @format color
    */
   backgroundColor?: HEXColor | ThemeVar
 
@@ -58,6 +60,8 @@ export interface MpQq {
    * 顶部窗口的背景色，仅 iOS 支持
    *
    * @default "#FFFFFF"
+   *
+   * @format color
    */
   backgroundColorTop?: HEXColor | ThemeVar
 
@@ -65,28 +69,17 @@ export interface MpQq {
    * 底部窗口的背景色，仅 iOS 支持
    *
    * @default "#FFFFFF"
+   *
+   * @format color
    */
   backgroundColorBottom?: HEXColor | ThemeVar
 
   /**
-   * 是否开启全局的下拉刷新，详见 [Page.onPullDownRefresh](https://q.qq.com/wiki/develop/miniprogram/frame/logic/logic_register_page.html#onPullDownRefresh)
+   * 是否开启全局的下拉刷新，详见 [Page.onPullDownRefresh](https://mp-docs.jd.com/doc/dev/framework/520#heading-10)
    *
    * @default false
    */
   enablePullDownRefresh?: boolean
-
-  /**
-   * 屏幕旋转设置，支持 auto / portrait / landscape，详见 [响应显示区域变化](https://q.qq.com/wiki/develop/miniprogram/frame/view/view_section_change.html)
-   *
-   * "auto" 自动
-   *
-   * "portrait" 竖屏
-   *
-   * "landscape" 横屏
-   *
-   * @default "portrait"
-   */
-  pageOrientation?: 'auto' | 'portrait' | 'landscape'
 
   /**
    * 页面上拉触底事件触发时距页面底部距离，单位为 px
