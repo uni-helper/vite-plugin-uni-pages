@@ -82,9 +82,9 @@ interface UserOptions {
    * 默认应用入口页面（首页）
    * 当没有页面通过 definePage({ type: 'home' }) 标记为首页时使用
    * 支持多个路径样式以兼容不同的目录结构
-   * @default 'pages/index' 或 'pages/index/index'
+   * @default ['pages/index', 'pages/index/index']
    */
-  homePage?: string
+  homePage?: string | string[]
 
   /**
    * 是否自动扫描目录并合并页面配置到 pages.json
@@ -103,15 +103,15 @@ interface UserOptions {
 
   /**
    * 分包页面目录的根目录列表
-   * 
+   *
    * 用于 uni-app 的分包加载功能
-   * 
+   *
    * 支持字符串格式（目录路径）或对象格式（自定义 pages.json 中的 root）
-   * 
+   *
    * 更多上下文参考 <https://github.com/uni-helper/vite-plugin-uni-pages/issues/271>
    * @default []
    */
-  subPackages?: (string | { dir: string; root: string })[]
+  subPackages?: (string | { dir: string, root: string })[]
 
   /**
    * pages.json 所在目录
@@ -123,7 +123,7 @@ interface UserOptions {
   /**
    * 排除的文件/目录模式
    * 基于 tinyglobby 的 ignore 选项
-   * @default ['node_modules', '.git', '**/__*__/**']
+   * @default ['node_modules', '.git', '**\/__*__/**']
    */
   exclude?: string[]
 
@@ -140,7 +140,7 @@ interface UserOptions {
    * 也可通过环境变量 DEBUG=vite-plugin-uni-pages:* 控制
    * @default false
    */
-  debug?: boolean | debugType
+  debug?: boolean | DebugType
 
   // 生命周期钩子，在每个阶段完成后触发，接收 PageContext 实例
   onBeforeLoadUserConfig?: (ctx: PageContext) => void

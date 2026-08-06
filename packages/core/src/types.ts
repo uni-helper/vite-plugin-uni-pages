@@ -80,7 +80,12 @@ export declare function definePage(options: MaybePromiseCallable<UserPageItem>):
 export type DefinePage = typeof definePage
 
 /** Debug log type, corresponding to methods in the debug object */
-export type debugType = keyof typeof debug
+export type DebugType = keyof typeof debug
+
+/**
+ * @deprecated Use {@link DebugType} instead
+ */
+export type debugType = DebugType
 
 /** Configuration source type, supports string path or unconfig LoadConfigSource object */
 export type ConfigSource = string | LoadConfigSource<PagesConfig> | LoadConfigSource<PagesConfig>[]
@@ -107,9 +112,9 @@ export interface Options {
   configSource: ConfigSource
   /**
    * The default application entry page is the home page
-   * @default 'pages/index' or 'pages/index/index'
+   * @default ['pages/index', 'pages/index/index']
    */
-  homePage: string
+  homePage: string | string[]
 
   /**
    * Whether to merge pages in pages.json
@@ -158,7 +163,7 @@ export interface Options {
   /**
    * enable debug log
    */
-  debug: boolean | debugType
+  debug: boolean | DebugType
 
   onBeforeLoadUserConfig: (ctx: PageContext) => void
   onAfterLoadUserConfig: (ctx: PageContext) => void
