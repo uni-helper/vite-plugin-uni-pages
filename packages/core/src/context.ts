@@ -3,7 +3,6 @@ import type { CommentObject, CommentSymbol } from 'comment-json'
 import type { Logger, ViteDevServer } from 'vite'
 import type { Pages, PagesConfig, SubPackage, SubPackages, TabBar, TabBarItem } from './config'
 import type { ExcludeIndexSignature, InternalPageItem, InternalPages, PagePath, ResolvedOptions, UserOptions } from './types'
-
 import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
@@ -11,9 +10,6 @@ import { slash } from '@antfu/utils'
 import { platform } from '@uni-helper/uni-env'
 import { parse as cjParse, stringify as cjStringify, CommentArray } from 'comment-json'
 import dbg from 'debug'
-import detectIndent from 'detect-indent'
-
-import detectNewline from 'detect-newline'
 import { loadConfig } from 'unconfig'
 import writeFileAtomic from 'write-file-atomic'
 import { OUTPUT_NAME } from './constant'
@@ -57,9 +53,6 @@ export class PageContext {
 
   /** Generated pages.json file path */
   resolvedPagesJSONPath = ''
-  private resolvedPagesJSONIndent?: string // '  '
-  private resolvedPagesJSONNewline?: string // '\n'
-  private resolvedPagesJSONEofNewline?: boolean // true
 
   /** Original options passed by the user */
   rawOptions: UserOptions
@@ -456,13 +449,16 @@ export class PageContext {
     const updated = await withFileLock(this.resolvedPagesJSONPath, async () => {
       const data = await this.generatePagesJSON()
 
-      const pagesJson = cjStringify(
+      let pagesJson = cjStringify(
         data,
         null,
-        this.options.minify ? undefined : await this.getIndent(),
-      ) + (
-        await this.hasEofNewline() ? await this.getNewline() : ''
+        this.options.minify ? undefined : this.options.indent,
       )
+      if (this.options.eol !== '\n')
+        pagesJson = pagesJson.replaceAll('\n', this.options.eol)
+
+      if (this.options.insertFinalNewline)
+        pagesJson += this.options.eol
 
       if (this.lastPagesJson === pagesJson) {
         debug.pages('PagesJson Not have change')
@@ -638,39 +634,6 @@ export class PageContext {
     }
 
     return pageJson
-  }
-
-  private async readInfoFromPagesJSON(): Promise<void> {
-    const resolvedPagesJSONContent = await fs.promises.readFile(this.resolvedPagesJSONPath, { encoding: 'utf-8' }).catch(() => '')
-    this.resolvedPagesJSONIndent = detectIndent(resolvedPagesJSONContent).indent || '  '
-    this.resolvedPagesJSONNewline = detectNewline(resolvedPagesJSONContent) || '\n'
-    this.resolvedPagesJSONEofNewline = (resolvedPagesJSONContent.at(-1) ?? '\n') === this.resolvedPagesJSONNewline
-  }
-
-  private async getIndent(): Promise<string> {
-    if (!this.resolvedPagesJSONIndent) {
-      await this.readInfoFromPagesJSON()
-    }
-
-    return this.resolvedPagesJSONIndent!
-  }
-
-  private async getNewline(): Promise<string> {
-    if (!this.resolvedPagesJSONNewline) {
-      await this.readInfoFromPagesJSON()
-    }
-
-    return this.resolvedPagesJSONNewline!
-  }
-
-  private async hasEofNewline(): Promise<boolean> {
-    // Use an explicit undefined check: a cached value of `false` (file without
-    // trailing newline) is valid and must not trigger a re-read on every call
-    if (this.resolvedPagesJSONEofNewline === undefined) {
-      await this.readInfoFromPagesJSON()
-    }
-
-    return this.resolvedPagesJSONEofNewline!
   }
 }
 

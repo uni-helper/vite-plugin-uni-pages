@@ -161,6 +161,28 @@ export interface Options {
   minify: boolean
 
   /**
+   * Whether to insert a final newline at the end of the generated pages.json
+   * @default false
+   */
+  insertFinalNewline: boolean
+
+  /**
+   * Indentation of the generated pages.json
+   *
+   * Accepts a number of spaces or a string (e.g. `'\t'`)
+   *
+   * Ignored when `minify` is `true`
+   * @default 2
+   */
+  indent: number | string
+
+  /**
+   * Line ending of the generated pages.json
+   * @default '\n'
+   */
+  eol: '\n' | '\r\n'
+
+  /**
    * enable debug log
    */
   debug: boolean | DebugType
