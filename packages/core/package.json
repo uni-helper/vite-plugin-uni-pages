@@ -75,8 +75,7 @@
     "tinyglobby": "catalog:",
     "typescript": "catalog:",
     "unconfig": "catalog:",
-    "write-file-atomic": "catalog:",
-    "yaml": "catalog:"
+    "write-file-atomic": "catalog:"
   },
   "devDependencies": {
     "@antfu/utils": "catalog:",

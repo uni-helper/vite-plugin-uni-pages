@@ -135,9 +135,6 @@ catalogs:
     write-file-atomic:
       specifier: ^7.0.1
       version: 7.0.1
-    yaml:
-      specifier: ^2.9.0
-      version: 2.9.0
 
 pnpmfileChecksum: sha256-15yQafiOk/n/FnyMLJdjllwGXgNxN7Ro+mGuxVKxhic=
 
@@ -229,9 +226,6 @@ importers:
       write-file-atomic:
         specifier: 'catalog:'
         version: 7.0.1
-      yaml:
-        specifier: 'catalog:'
-        version: 2.9.0
     devDependencies:
       '@antfu/utils':
         specifier: 'catalog:'
@@ -293,9 +287,6 @@ importers:
       vue-i18n:
         specifier: 'catalog:'
         version: 9.14.5(vue@3.4.38(typescript@6.0.3))
-      yaml:
-        specifier: 'catalog:'
-        version: 2.9.0
     devDependencies:
       '@dcloudio/types':
         specifier: 'catalog:'

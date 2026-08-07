@@ -15,8 +15,7 @@
     "@dcloudio/uni-mp-weixin": "catalog:",
     "@uni-helper/uni-env": "catalog:",
     "vue": "catalog:",
-    "vue-i18n": "catalog:",
-    "yaml": "catalog:"
+    "vue-i18n": "catalog:"
   },
   "devDependencies": {
     "@dcloudio/types": "catalog:",

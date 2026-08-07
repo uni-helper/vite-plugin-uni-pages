@@ -418,7 +418,6 @@ catalog:
   vue: ~3.4.38
   vue-i18n: ^9.14.0
   write-file-atomic: ^7.0.1
-  yaml: ^2.9.0
 
 configDependencies:
   '@pnpm/plugin-trusted-deps': 0.2.2+sha512-+ZupiXKJhW2fbSilfyRp+wrAY54MKg+c0JWSFGdeb/y9bUoYN5u4XLOZ0Txk7O2bBa6NMhWrX5mwmsHP3/nm9Q==
