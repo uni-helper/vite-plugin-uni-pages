@@ -15,8 +15,10 @@ pnpm i -D @uni-helper/vite-plugin-uni-pages
 ## 使用
 
 ```ts
-// vite.config.ts
-import Uni from '@dcloudio/vite-plugin-uni'
+// vite.config.mts
+import Uni from '@uni-helper/plugin-uni'
+// 或
+// import Uni from '@dcloudio/vite-plugin-uni'
 import UniPages from '@uni-helper/vite-plugin-uni-pages'
 import { defineConfig } from 'vite'
 
@@ -193,7 +195,7 @@ interface UserOptions {
 ### 配置示例
 
 ```ts
-// vite.config.ts
+// vite.config.mts
 import UniPages from '@uni-helper/vite-plugin-uni-pages'
 import { defineConfig } from 'vite'
 
@@ -237,7 +239,7 @@ export default defineConfig({
 在 monorepo 项目中，如果页面分布在多个 package 中，可以使用 `subPackages` 配置的对象格式来自定义生成的 `root` 路径。
 
 ```ts
-// vite.config.ts
+// vite.config.mts
 import UniPages from '@uni-helper/vite-plugin-uni-pages'
 import { defineConfig } from 'vite'
 

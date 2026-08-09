@@ -20,8 +20,10 @@ pnpm i -D @uni-helper/vite-plugin-uni-pages
 📖 **请阅读[完整文档](https://uni-helper.js.org/vite-plugin-uni-pages)了解完整使用方法！**
 
 ```ts
-// vite.config.ts
-import Uni from '@dcloudio/vite-plugin-uni'
+// vite.config.mts
+import Uni from '@uni-helper/plugin-uni'
+// 或
+// import Uni from '@dcloudio/vite-plugin-uni'
 import UniPages from '@uni-helper/vite-plugin-uni-pages'
 import { defineConfig } from 'vite'
 

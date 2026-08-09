@@ -181,9 +181,11 @@ export async function tryPageMetaFromMacro(sfc: SFCDescriptor): Promise<UserPage
     return undefined
   }
 
-  const ast = babelParse(sfcScript.content, sfcScript.lang || 'js', {
-    plugins: [['importAttributes', { deprecatedAssertSyntax: true }]],
-  })
+  // Import attributes (`with { ... }`) are natively supported by @babel/parser 8.
+  // The deprecated `assert { ... }` syntax has been removed upstream; such files
+  // fail to parse here, the error propagates to Page.read() and the page
+  // degrades to path-only metadata (the definePage macro cannot be evaluated).
+  const ast = babelParse(sfcScript.content, sfcScript.lang || 'js')
   const macro = findMacro(ast.body, sfc.filename)
   if (macro) {
     const imports = findImports(ast.body).filter(imp => !!imp.specifiers.length).map(imp => babelGenerate(imp).code)

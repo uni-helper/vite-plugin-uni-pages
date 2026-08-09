@@ -29,17 +29,13 @@
       "import": {
         "types": "./index.d.ts",
         "default": "./dist/index.mjs"
-      },
-      "require": {
-        "types": "./index.d.ts",
-        "default": "./dist/index.cjs"
       }
     },
     "./client": {
       "types": "./client.d.ts"
     }
   },
-  "main": "./dist/index.cjs",
+  "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "types": "./index.d.ts",
   "files": [
@@ -48,6 +44,9 @@
     "global.d.ts",
     "index.d.ts"
   ],
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
+  },
   "scripts": {
     "build": "tsdown",
     "build-post": "exit 0",
@@ -60,8 +59,6 @@
   },
   "dependencies": {
     "@babel/generator": "catalog:",
-    "@babel/types": "catalog:",
-    "@types/proper-lockfile": "catalog:",
     "@uni-helper/uni-env": "catalog:",
     "@uni-helper/uni-pages-types": "workspace:*",
     "@vue/compiler-sfc": "catalog:",
@@ -79,10 +76,11 @@
   },
   "devDependencies": {
     "@antfu/utils": "catalog:",
-    "@types/babel__generator": "catalog:",
+    "@babel/types": "catalog:",
     "@types/debug": "catalog:",
     "@types/lodash.groupby": "catalog:",
     "@types/node": "catalog:",
+    "@types/proper-lockfile": "catalog:",
     "@types/write-file-atomic": "catalog:",
     "vite": "catalog:"
   }

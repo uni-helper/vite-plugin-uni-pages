@@ -29,14 +29,10 @@
       "import": {
         "types": "./dist/index.d.mts",
         "default": "./dist/index.mjs"
-      },
-      "require": {
-        "types": "./dist/index.d.cts",
-        "default": "./dist/index.cjs"
       }
     }
   },
-  "main": "./dist/index.cjs",
+  "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "files": [
@@ -47,6 +43,14 @@
     "build-post": "exit 0",
     "dev": "tsdown --watch",
     "prepublishOnly": "pnpm build"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "tsdown": "catalog:",

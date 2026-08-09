@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PageContext } from '../packages/core/src'
 
+// The uni-env `platform` constant is frozen at module load time and cannot be
+// stubbed, but definePage macros are evaluated at scan time and read
+// `process.env.UNI_PLATFORM` then — keep the stub for parity with the other
+// platform-specific suites.
 describe('generate tabBar', () => {
   beforeEach(() => {
     vi.stubEnv('UNI_PLATFORM', 'web')

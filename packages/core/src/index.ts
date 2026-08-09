@@ -85,14 +85,25 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
       const sfc = parseSFC(code, { filename: id })
 
       let macro: CallExpression | undefined
+      // Parse each script block independently: a syntax error in one block
+      // (e.g. the deprecated `assert { ... }` import attributes removed in
+      // @babel/parser 8) must not skip macro removal in the other block
+      const tryFindMacro = (content: string, lang: string | undefined, block: string): CallExpression | undefined => {
+        try {
+          return findMacro(babelParse(content, lang || 'js').body, sfc.filename)
+        }
+        catch (error: unknown) {
+          this.warn(`[vite-plugin-uni-pages] Failed to parse ${block} in ${id}, its definePage macro may stay in the output: ${error instanceof Error ? error?.message : error}`)
+          return undefined
+        }
+      }
+
       if (sfc.scriptSetup) {
-        const ast = babelParse(sfc.scriptSetup.content, sfc.scriptSetup.lang || 'js')
-        macro = findMacro(ast.body, sfc.filename)
+        macro = tryFindMacro(sfc.scriptSetup.content, sfc.scriptSetup.lang, '<script setup>')
       }
 
       if (!macro && sfc.script) {
-        const ast = babelParse(sfc.script.content, sfc.script.lang || 'js')
-        macro = findMacro(ast.body, sfc.filename)
+        macro = tryFindMacro(sfc.script.content, sfc.script.lang, '<script>')
       }
 
       if (!macro)
@@ -104,11 +115,14 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
       if (s.hasChanged()) {
         return {
           code: s.toString(),
+          // magic-string v1 types `sourcesContent` as `(string | null)[]`,
+          // which rollup's `ExistingRawSourceMap` rejects; the serialized JSON
+          // string is accepted by `SourceMapInput` and avoids the mismatch
           map: s.generateMap({
             source: id,
             includeContent: true,
             file: `${id}.map`,
-          }),
+          }).toString(),
         }
       }
     },

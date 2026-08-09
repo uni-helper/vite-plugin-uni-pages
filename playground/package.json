@@ -22,9 +22,11 @@
     "@dcloudio/uni-automator": "catalog:",
     "@dcloudio/uni-cli-shared": "catalog:",
     "@dcloudio/vite-plugin-uni": "catalog:",
+    "@uni-helper/plugin-uni": "catalog:",
     "@uni-helper/unh": "catalog:",
     "@uni-helper/vite-plugin-uni-layouts": "catalog:",
     "@uni-helper/vite-plugin-uni-pages": "workspace:*",
+    "typescript": "catalog:",
     "vite": "catalog:"
   }
 }

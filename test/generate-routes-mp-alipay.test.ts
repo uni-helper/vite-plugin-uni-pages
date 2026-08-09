@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PageContext } from '../packages/core/src'
 
+// The uni-env `platform` constant is frozen at module load time and cannot be
+// stubbed, but definePage macros are evaluated at scan time and read
+// `process.env.UNI_PLATFORM` then — the conditional-compilation fixtures
+// below depend on it, so the stub must stay.
 describe('generate routes - mp-alipay platform', () => {
   beforeEach(() => {
     vi.stubEnv('UNI_PLATFORM', 'mp-alipay')
@@ -98,13 +102,6 @@ describe('generate routes - mp-alipay platform', () => {
           "type": "page",
           "style": {
             "navigationBarTitleText": "this is a title"
-          }
-        },
-        {
-          "path": "../playground/src/pages/define-page/yaml",
-          "type": "page",
-          "style": {
-            "navigationBarTitleText": "yaml test"
           }
         },
         {

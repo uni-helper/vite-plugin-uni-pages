@@ -1,5 +1,5 @@
 import type { PagesConfig } from '@uni-helper/vite-plugin-uni-pages'
-import uni from '@dcloudio/vite-plugin-uni'
+import Uni from '@uni-helper/plugin-uni'
 import UniLayouts from '@uni-helper/vite-plugin-uni-layouts'
 import UniPages from '@uni-helper/vite-plugin-uni-pages'
 import { defineConfig } from 'vite'
@@ -29,12 +29,12 @@ export default defineConfig({
       // ],
     }),
     UniLayouts(),
-    uni(),
+    Uni(),
   ],
   UniPages: {
     globalStyle: {
       navigationBarTextStyle: 'black',
-      navigationBarTitleText: 'uni-helper - vite.config.ts',
+      navigationBarTitleText: 'uni-helper - vite.config.mts',
       navigationBarBackgroundColor: '#F8F8F8',
       backgroundColor: '#F8F8F8',
     },

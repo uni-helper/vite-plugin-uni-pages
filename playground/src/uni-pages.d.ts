@@ -17,7 +17,6 @@ type _LocationUrl =
   "/pages/define-page/object" |
   "/pages/define-page/option-api" |
   "/pages/define-page/remove-console" |
-  "/pages/define-page/yaml" |
   "/pages/i18n" |
   "/pages/tabbar-index-zero" |
   "/pages/tabbar-list" |

@@ -21,6 +21,10 @@ const pagesGlobConfig: UserPagesConfig = {
   ],
 }
 
+// The uni-env `platform` constant is frozen at module load time and cannot be
+// stubbed, but definePage macros are evaluated at scan time and read
+// `process.env.UNI_PLATFORM` then — the conditional-compilation fixtures
+// below depend on it, so the stub must stay.
 describe('generate routes', () => {
   beforeEach(() => {
     vi.stubEnv('UNI_PLATFORM', 'web')
@@ -118,13 +122,6 @@ describe('generate routes', () => {
           "type": "page",
           "style": {
             "navigationBarTitleText": "this is a title"
-          }
-        },
-        {
-          "path": "../playground/src/pages/define-page/yaml",
-          "type": "page",
-          "style": {
-            "navigationBarTitleText": "yaml test"
           }
         },
         {
@@ -299,13 +296,6 @@ describe('generate routes', () => {
           "type": "page",
           "style": {
             "navigationBarTitleText": "this is a title"
-          }
-        },
-        {
-          "path": "../playground/src/pages/define-page/yaml",
-          "type": "page",
-          "style": {
-            "navigationBarTitleText": "yaml test"
           }
         },
         {

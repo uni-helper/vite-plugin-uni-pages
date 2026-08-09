@@ -20,7 +20,6 @@ describe('get files', () => {
         "define-page/object.vue",
         "define-page/option-api.vue",
         "define-page/remove-console.vue",
-        "define-page/yaml.vue",
         "i18n.vue",
         "index.nvue",
         "index.vue",
