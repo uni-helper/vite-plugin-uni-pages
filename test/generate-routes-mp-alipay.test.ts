@@ -1,17 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPages } from '../packages/core/src'
 
-// Platform is injectable through the pipeline seam now, but definePage macros
-// are evaluated in a sandbox that requires @uni-helper/uni-env, which reads
-// `process.env.UNI_PLATFORM` at require time — keep the stub so the
-// conditional-compilation fixtures resolve to the mp-alipay titles.
+// The uni-env platform constant is frozen at module load time and cannot be
+// stubbed, so the platform is injected through the pipeline seam instead.
+// This makes the suite deterministic regardless of the shell's UNI_PLATFORM
+// and lets it verify the platform-dependent fixtures: `platform-injected`
+// renders the injected platform while `skip-on-mp-weixin` stays on alipay.
+// The env stub stays for parity with the other platform-specific suites.
 describe('generate routes - mp-alipay platform', () => {
   beforeEach(() => {
     vi.stubEnv('UNI_PLATFORM', 'mp-alipay')
   })
 
   it('vue - pages snapshot', async () => {
-    const ctx = await createPages({ dir: 'playground/src/pages', homePage: 'pages/index', subPackages: ['playground/src/pages/pages-internal-sub'] })
+    const ctx = await createPages({ dir: 'playground/src/pages', homePage: 'pages/index', subPackages: ['playground/src/pages/pages-internal-sub'] }, { platform: 'mp-alipay' })
 
     const routes = ctx.resolveRoutes()
 
@@ -95,10 +97,24 @@ describe('generate routes - mp-alipay platform', () => {
           }
         },
         {
+          "path": "../playground/src/pages/define-page/platform-injected",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "platform: mp-alipay"
+          }
+        },
+        {
           "path": "../playground/src/pages/define-page/remove-console",
           "type": "page",
           "style": {
             "navigationBarTitleText": "this is a title"
+          }
+        },
+        {
+          "path": "../playground/src/pages/define-page/skip-on-mp-weixin",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "skip on mp-weixin"
           }
         },
         {

@@ -21,17 +21,18 @@ const pagesGlobConfig: UserPagesConfig = {
   ],
 }
 
-// The uni-env `platform` constant is frozen at module load time and cannot be
-// stubbed, but definePage macros are evaluated at scan time and read
-// `process.env.UNI_PLATFORM` then — the conditional-compilation fixtures
-// below depend on it, so the stub must stay.
+// The uni-env platform constant is frozen at module load time and cannot be
+// stubbed, so the platform is injected through the pipeline seam instead.
+// This makes the suite deterministic regardless of the shell's UNI_PLATFORM:
+// `platform-injected` renders the injected platform and `skip-on-mp-weixin`
+// stays on web. The env stub stays for parity with the other suites.
 describe('generate routes', () => {
   beforeEach(() => {
     vi.stubEnv('UNI_PLATFORM', 'web')
   })
 
   it('vue - pages snapshot', async () => {
-    const ctx = await createPages({ dir: 'playground/src/pages', homePage: 'pages/index', subPackages: ['playground/src/pages/pages-internal-sub'] })
+    const ctx = await createPages({ dir: 'playground/src/pages', homePage: 'pages/index', subPackages: ['playground/src/pages/pages-internal-sub'] }, { platform: 'web' })
 
     const routes = ctx.resolveRoutes()
 
@@ -115,10 +116,24 @@ describe('generate routes', () => {
           }
         },
         {
+          "path": "../playground/src/pages/define-page/platform-injected",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "platform: web"
+          }
+        },
+        {
           "path": "../playground/src/pages/define-page/remove-console",
           "type": "page",
           "style": {
             "navigationBarTitleText": "this is a title"
+          }
+        },
+        {
+          "path": "../playground/src/pages/define-page/skip-on-mp-weixin",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "skip on mp-weixin"
           }
         },
         {
@@ -199,7 +214,7 @@ describe('generate routes', () => {
   })
 
   it('vue - not merge pages snapshot', async () => {
-    const ctx = new PageContext({ dir: 'playground/src/pages', mergePages: false, subPackages: ['playground/src/pages/pages-internal-sub'] })
+    const ctx = new PageContext({ dir: 'playground/src/pages', mergePages: false, subPackages: ['playground/src/pages/pages-internal-sub'] }, process.cwd(), 'web')
     ctx.pagesGlobConfig = pagesGlobConfig
     await ctx.scanAndMerge()
     const routes = ctx.resolveRoutes()
@@ -287,10 +302,24 @@ describe('generate routes', () => {
           }
         },
         {
+          "path": "../playground/src/pages/define-page/platform-injected",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "platform: web"
+          }
+        },
+        {
           "path": "../playground/src/pages/define-page/remove-console",
           "type": "page",
           "style": {
             "navigationBarTitleText": "this is a title"
+          }
+        },
+        {
+          "path": "../playground/src/pages/define-page/skip-on-mp-weixin",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "skip on mp-weixin"
           }
         },
         {

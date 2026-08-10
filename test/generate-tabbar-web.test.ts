@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPages, PageContext } from '../packages/core/src'
 
-// The uni-env `platform` constant is frozen at module load time and cannot be
-// stubbed, but definePage macros are evaluated at scan time and read
-// `process.env.UNI_PLATFORM` then — keep the stub for parity with the other
-// platform-specific suites.
+// The uni-env platform constant is frozen at module load time and cannot be
+// stubbed, so the platform is injected through the pipeline seam instead.
+// This keeps the suite deterministic regardless of the shell's UNI_PLATFORM:
+// `skip-on-mp-weixin` stays on web and contributes its tabBar item here.
 describe('generate tabBar', () => {
   beforeEach(() => {
     vi.stubEnv('UNI_PLATFORM', 'web')
   })
 
   it('tabBar items should not contain index field', async () => {
-    const ctx = await createPages({ dir: 'playground/src/pages' })
+    const ctx = await createPages({ dir: 'playground/src/pages' }, { platform: 'web' })
 
     const tabBar = await ctx.resolveTabBar()
 
@@ -24,7 +24,7 @@ describe('generate tabBar', () => {
   })
 
   it('tabBar items should be sorted by index', async () => {
-    const ctx = await createPages({ dir: 'playground/src/pages' })
+    const ctx = await createPages({ dir: 'playground/src/pages' }, { platform: 'web' })
 
     const tabBar = await ctx.resolveTabBar()
 
@@ -48,7 +48,7 @@ describe('generate tabBar', () => {
   })
 
   it('tabBar should merge with config-defined tabBar', async () => {
-    const ctx = new PageContext({ dir: 'playground/src/pages' })
+    const ctx = new PageContext({ dir: 'playground/src/pages' }, process.cwd(), 'web')
     ctx.pagesGlobConfig = {
       tabBar: {
         color: '#999999',
@@ -85,7 +85,7 @@ describe('generate tabBar', () => {
   })
 
   it('tabBar should return undefined when no tabBar items exist', async () => {
-    const ctx = await createPages({ dir: 'playground/src/pages/blog' })
+    const ctx = await createPages({ dir: 'playground/src/pages/blog' }, { platform: 'web' })
 
     const tabBar = await ctx.resolveTabBar()
 
@@ -93,7 +93,7 @@ describe('generate tabBar', () => {
   })
 
   it('tabBar items without index should default to index 0', async () => {
-    const ctx = await createPages({ dir: 'playground/src/pages' })
+    const ctx = await createPages({ dir: 'playground/src/pages' }, { platform: 'web' })
 
     const noIndexPage = Array.from(ctx.pages.values()).find(p => p.path.relativePath.includes('tabbar-no-index'))
     expect(noIndexPage).toBeDefined()
@@ -103,7 +103,7 @@ describe('generate tabBar', () => {
   })
 
   it('tabBar items with index: 0 should remain 0', async () => {
-    const ctx = await createPages({ dir: 'playground/src/pages' })
+    const ctx = await createPages({ dir: 'playground/src/pages' }, { platform: 'web' })
 
     const zeroIndexPage = Array.from(ctx.pages.values()).find(p => p.path.relativePath.includes('tabbar-index-zero'))
     expect(zeroIndexPage).toBeDefined()

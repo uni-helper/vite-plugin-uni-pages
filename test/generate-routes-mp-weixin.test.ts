@@ -1,17 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPages } from '../packages/core/src'
 
-// Platform is injectable through the pipeline seam now, but definePage macros
-// are evaluated in a sandbox that requires @uni-helper/uni-env, which reads
-// `process.env.UNI_PLATFORM` at require time — keep the stub so the
-// conditional-compilation fixtures resolve to the mp-weixin titles.
+// The uni-env platform constant is frozen at module load time and cannot be
+// stubbed, so the platform is injected through the pipeline seam instead.
+// This makes the suite deterministic regardless of the shell's UNI_PLATFORM
+// and lets it verify the platform-dependent fixtures: `platform-injected`
+// renders the injected platform and `skip-on-mp-weixin` is dropped here.
+// The env stub stays for parity with the other platform-specific suites.
 describe('generate routes - mp-weixin platform', () => {
   beforeEach(() => {
     vi.stubEnv('UNI_PLATFORM', 'mp-weixin')
   })
 
   it('vue - pages snapshot', async () => {
-    const ctx = await createPages({ dir: 'playground/src/pages', homePage: 'pages/index', subPackages: ['playground/src/pages/pages-internal-sub'] })
+    const ctx = await createPages({ dir: 'playground/src/pages', homePage: 'pages/index', subPackages: ['playground/src/pages/pages-internal-sub'] }, { platform: 'mp-weixin' })
 
     const routes = ctx.resolveRoutes()
 
@@ -92,6 +94,13 @@ describe('generate routes - mp-weixin platform', () => {
           "type": "page",
           "style": {
             "navigationBarTitleText": "Option API 内使用 definePage"
+          }
+        },
+        {
+          "path": "../playground/src/pages/define-page/platform-injected",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "platform: mp-weixin"
           }
         },
         {
@@ -179,7 +188,7 @@ describe('generate routes - mp-weixin platform', () => {
   })
 
   it('conditional-compilation page should show mp-weixin specific title', async () => {
-    const ctx = await createPages({ dir: 'playground/src/pages/define-page' })
+    const ctx = await createPages({ dir: 'playground/src/pages/define-page' }, { platform: 'mp-weixin' })
 
     const routes = JSON.parse(ctx.resolveRoutes())
     const conditionalPage = routes.find((r: any) => r.path.includes('conditional-compilation'))
@@ -189,7 +198,7 @@ describe('generate routes - mp-weixin platform', () => {
   })
 
   it('test-jsonc-with-comment page should not have H5-specific content', async () => {
-    const ctx = await createPages({ dir: 'playground/src/pages' })
+    const ctx = await createPages({ dir: 'playground/src/pages' }, { platform: 'mp-weixin' })
 
     const routes = JSON.parse(ctx.resolveRoutes())
     const jsoncPage = routes.find((r: any) => r.path.includes('test-jsonc-with-comment'))
