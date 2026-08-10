@@ -71,10 +71,21 @@ export type MaybeCallable<T> = T | (() => T)
 export type MaybePromiseCallable<T> = T | (() => T) | (() => Promise<T>)
 
 /**
+ * Context injected into function-form definePage macros
+ */
+export interface DefinePageContext {
+  /** Current platform identifier, e.g. 'mp-weixin' */
+  platform: string
+}
+
+/**
  * Define page metadata in a Vue page file
  * The macro call is removed by the plugin during build
+ *
+ * Return `null` (or pass `null` directly) to exclude the page from
+ * pages.json on the current platform
  */
-export declare function definePage(options: MaybePromiseCallable<UserPageItem>): void
+export declare function definePage(options: UserPageItem | null | ((context: DefinePageContext) => MaybePromise<UserPageItem | null>)): void
 
 /** Type of the definePage macro */
 export type DefinePage = typeof definePage

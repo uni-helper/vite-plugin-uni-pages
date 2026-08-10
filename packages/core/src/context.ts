@@ -438,7 +438,12 @@ export class PageContext {
    * @returns pages rules
    */
   private async parsePages(pages: Map<string, Page>, packageType: 'main' | 'sub', overrides?: Pages): Promise<InternalPages> {
-    const jobs = Array.from(pages.values(), page => page.getPageMeta())
+    // Load every page first: the `skipped` flag (definePage(null) opt-out) is
+    // only accurate after the file has been read
+    const allPages = Array.from(pages.values())
+    await Promise.all(allPages.map(page => page.ensureLoaded()))
+
+    const jobs = allPages.filter(page => !page.skipped).map(page => page.getPageMeta())
     const generatedPageMetaData = await Promise.all(jobs)
     const customPageMetaData = (overrides || []) as InternalPages
 

@@ -6,6 +6,7 @@ import path from 'node:path'
 import vm from 'node:vm'
 import babelGenerate from '@babel/generator'
 import * as t from '@babel/types'
+import { platform as uniEnvPlatform } from '@uni-helper/uni-env'
 import { parse as VueParser } from '@vue/compiler-sfc'
 import { babelParse, isCallOf } from 'ast-kit'
 import * as ts from 'typescript'
@@ -51,9 +52,12 @@ export function parseSFC(code: string, options?: SFCParseOptions): SFCDescriptor
  *
  * @param code - Vue SFC source code
  * @param filename - SFC filename, used for error location and module resolution
- * @returns Page metadata object, or undefined if definePage is not found
+ * @param platform - Current platform identifier, injected into function-form macros; defaults to the uni-env platform
+ * @returns Page metadata object, `null` when the macro explicitly opts out
+ * (definePage(null) or a function returning null), or undefined if definePage
+ * is not found
  */
-export async function evaluateDefinePage(code: string, filename: string): Promise<UserPageItem | undefined> {
+export async function evaluateDefinePage(code: string, filename: string, platform: string = uniEnvPlatform): Promise<UserPageItem | null | undefined> {
   const sfc = parseSFC(code, { filename })
   const sfcScript = sfc.scriptSetup || sfc.script
 
@@ -82,7 +86,13 @@ export async function evaluateDefinePage(code: string, filename: string): Promis
     filename,
   })
 
-  const parsedMeta = typeof parsed === 'function' ? await parsed() : parsed
+  // Function-form macros receive the current platform so users can branch on
+  // it without reading process.env.UNI_PLATFORM themselves
+  const parsedMeta = typeof parsed === 'function' ? await parsed({ platform }) : parsed
+
+  // An explicit null opts the page out of pages.json on this platform
+  if (parsedMeta === null)
+    return null
 
   return {
     type: 'page',
@@ -165,9 +175,9 @@ function findMacro(stmts: t.Statement[], filename: string): t.CallExpression | u
   // Extract the first argument of the macro call
   const [opt] = macro.arguments
 
-  // Validate the macro argument: only function or object literals are supported
-  if (opt && !t.isFunctionExpression(opt) && !t.isArrowFunctionExpression(opt) && !t.isObjectExpression(opt)) {
-    debug.definePage(`definePage() only supports a function or object literal as argument: ${filename}`)
+  // Validate the macro argument: only function, object literal or null are supported
+  if (opt && !t.isFunctionExpression(opt) && !t.isArrowFunctionExpression(opt) && !t.isObjectExpression(opt) && !t.isNullLiteral(opt)) {
+    debug.definePage(`definePage() only supports a function, object literal or null as argument: ${filename}`)
     return
   }
 
@@ -267,8 +277,11 @@ async function parseCode(options: { imports: string[], code: string, filename: s
       timeout: 1000, // Set timeout to avoid long-running scripts
     })
 
-    // Get exported value
-    return (vmContext.exports as any).default || vmContext.exports
+    // Get exported value. `export default null` transpiles to
+    // `exports.default = null`, which the `||` fallback would swallow, so key
+    // on property presence instead of truthiness
+    const exportsObj = vmContext.exports as any
+    return 'default' in exportsObj ? exportsObj.default : exportsObj
   }
   catch (error: any) {
     throw new Error(`EXEC SCRIPT FAIL IN ${filename}: ${error.message} \n\n${jsCode}\n\n`)
