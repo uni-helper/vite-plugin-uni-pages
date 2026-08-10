@@ -1,7 +1,7 @@
 import type { FSWatcher } from 'chokidar'
 import type { Logger, ModuleNode, ViteDevServer } from 'vite'
 import type { Pages, PagesConfig, SubPackage, SubPackages, TabBar, TabBarItem } from './config'
-import type { InternalPageItem, InternalPages, PagePath, ResolvedOptions, UserOptions } from './types'
+import type { InternalPages, PagePath, ResolvedOptions, UserOptions } from './types'
 import path from 'node:path'
 import process from 'node:process'
 import { slash } from '@antfu/utils'
@@ -65,6 +65,11 @@ export class PageContext {
 
   /** Cached previous pages.json content to avoid redundant writes */
   private lastPagesJson = ''
+
+  /** Base path that page paths in pages.json are resolved relative to */
+  private get basePath(): string {
+    return resolveBasePath(this.options)
+  }
 
   /**
    * Create a PageContext instance
@@ -141,15 +146,12 @@ export class PageContext {
   async setupWatcher(watcher: FSWatcher): Promise<void> {
     watcher.add(this.pagesConfigSourcePaths)
     const targetDirs = [...this.options.dirs, ...this.options.subPackages].map(v => slash(path.resolve(this.root, v)))
-    const isInTargetDirs = (filePath: string): boolean => targetDirs.some(v => slash(path.resolve(this.root, filePath)).startsWith(v))
+    const isWatchedPageFile = (filePath: string): boolean =>
+      isTargetFile(filePath) && targetDirs.some(v => slash(path.resolve(this.root, filePath)).startsWith(v))
 
     watcher.on('add', async (path) => {
       path = slash(path)
-
-      if (!isTargetFile(path))
-        return
-
-      if (!isInTargetDirs(path))
+      if (!isWatchedPageFile(path))
         return
 
       debug.pages(`File added: ${path}`)
@@ -168,24 +170,17 @@ export class PageContext {
       }
 
       path = slash(path)
-      if (!isTargetFile(path))
-        return
-      if (!isInTargetDirs(path))
+      if (!isWatchedPageFile(path))
         return
 
       debug.pages(`File changed: ${path}`)
-      debug.pages(targetDirs)
-      debug.pages(isInTargetDirs(path))
       if (await this.updatePagesJSON(path))
         this.onUpdate()
     })
 
     watcher.on('unlink', async (path) => {
       path = slash(path)
-      if (!isTargetFile(path))
-        return
-
-      if (!isInTargetDirs(path))
+      if (!isWatchedPageFile(path))
         return
 
       debug.pages(`File removed: ${path}`)
@@ -222,17 +217,7 @@ export class PageContext {
    */
   async updatePagesJSON(filepath?: string): Promise<boolean> {
     if (filepath) {
-      let page = this.pages.get(filepath)
-      if (!page) {
-        let subPage: Page | undefined
-        for (const [_, pages] of this.subPages) {
-          subPage = pages.get(filepath)
-          if (subPage) {
-            break
-          }
-        }
-        page = subPage
-      }
+      const page = this.findPage(filepath)
       if (page) {
         await page.read()
         if (!page.hasChanged()) {
@@ -266,10 +251,7 @@ export class PageContext {
         })
       : this.pageMetaData
 
-    // Deduplicate by page path
-    const pagesMap = new Map<string, InternalPageItem>()
-    pages.forEach(v => pagesMap.set(v.path, v))
-    this.pageMetaData = [...pagesMap.values()]
+    this.pageMetaData = dedupeByPath(pages)
 
     this.options.onBeforeWriteFile(this.resolvedPagesJSONPath)
 
@@ -363,10 +345,7 @@ export class PageContext {
       list: this.pagesGlobConfig?.tabBar?.list || [],
     }
 
-    const pagePaths = new Map<string, boolean>()
-    for (const item of tabBar.list) {
-      pagePaths.set(item.pagePath, true)
-    }
+    const pagePaths = new Set(tabBar.list.map(item => item.pagePath))
 
     tabBarItems.sort((a, b) => a.index - b.index)
 
@@ -410,6 +389,25 @@ export class PageContext {
   }
 
   /**
+   * Find a tracked page (main package or any sub-package) by its absolute file path
+   * @param filepath - Absolute path of the page file
+   * @returns The tracked page, or undefined when the file is not tracked
+   */
+  private findPage(filepath: string): Page | undefined {
+    const mainPage = this.pages.get(filepath)
+    if (mainPage)
+      return mainPage
+
+    for (const pages of this.subPages.values()) {
+      const subPage = pages.get(filepath)
+      if (subPage)
+        return subPage
+    }
+
+    return undefined
+  }
+
+  /**
    * Scan sub-package page directories and collect all sub-package page file paths
    * Scan corresponding directories based on the configured subPackages option
    */
@@ -440,10 +438,7 @@ export class PageContext {
    * @returns pages rules
    */
   private async parsePages(pages: Map<string, Page>, packageType: 'main' | 'sub', overrides?: Pages): Promise<InternalPages> {
-    const jobs: Promise<InternalPageItem>[] = []
-    for (const [_, page] of pages) {
-      jobs.push(page.getPageMeta())
-    }
+    const jobs = Array.from(pages.values(), page => page.getPageMeta())
     const generatedPageMetaData = await Promise.all(jobs)
     const customPageMetaData = (overrides || []) as InternalPages
 
@@ -451,13 +446,7 @@ export class PageContext {
       ? mergePageMetaDataArray(generatedPageMetaData.concat(customPageMetaData))
       : generatedPageMetaData
 
-    // Use Map for deduplication, keeping the last element for each path while maintaining good performance
-    const parseMeta = Array.from(
-      result.reduce((map, page) => {
-        map.set(page.path, page)
-        return map
-      }, new Map<string, InternalPageItem>()).values(),
-    )
+    const parseMeta = dedupeByPath(result)
 
     return packageType === 'main' ? this.setHomePage(parseMeta) : parseMeta
   }
@@ -471,7 +460,7 @@ export class PageContext {
     const hasHome = result.some(({ type }) => type === 'home')
     if (!hasHome) {
       // Resolve homePage config to the same relative-path format as page paths (relative to basePath)
-      const basePath = slash(path.join(this.options.root, this.options.outDir))
+      const basePath = this.basePath
       const resolvedHomePages = this.options.homePage.map((v) => {
         return slash(path.relative(basePath, slash(path.resolve(basePath, v))))
       })
@@ -511,12 +500,11 @@ export class PageContext {
    * Filter out pages belonging to sub-packages, then parse page metadata and merge user configuration
    */
   private async mergePageMetaData(): Promise<void> {
-    // Collect all absolute paths of pages in sub-packages
-    const subPageAbsolutePaths = Array.from(this.subPages.values()).flatMap(v => Array.from(v.keys()))
-
-    // Filter out pages belonging to sub-packages
-    for (const subPageAbsolutePath of subPageAbsolutePaths)
-      this.pages.delete(subPageAbsolutePath)
+    // Drop main-package entries that belong to sub-packages
+    for (const pages of this.subPages.values()) {
+      for (const subPageAbsolutePath of pages.keys())
+        this.pages.delete(subPageAbsolutePath)
+    }
 
     const pageMetaData = await this.parsePages(this.pages, 'main', this.pagesGlobConfig?.pages)
 
@@ -530,48 +518,49 @@ export class PageContext {
    * Preserves sub-package level properties like plugins from user config
    */
   private async mergeSubPageMetaData(): Promise<void> {
-    const subPageMaps: Record<string, InternalPages> = {}
-    // Store plugins config separately to preserve them during merge
-    const subPlugins: Record<string, SubPackage['plugins']> = {}
+    const packagesByRoot = new Map<string, SubPackage>()
     const subPackages = this.pagesGlobConfig?.subPackages || []
 
     for (const [dir, pages] of this.subPages) {
-      const basePath = slash(path.join(this.options.root, this.options.outDir))
       // Use custom root from subPackageRootMap if available, otherwise calculate from path
       // In monorepo scenarios, custom root avoids '..' in pages.json root path
       const root = this.options.subPackageRootMap.get(dir)
-        ?? slash(path.relative(basePath, path.join(this.options.root, dir)))
+        ?? slash(path.relative(this.basePath, path.join(this.options.root, dir)))
 
       const globPackage = subPackages?.find(v => v.root === root)
-      subPageMaps[root] = await this.parsePages(pages, 'sub', globPackage?.pages)
-      subPageMaps[root] = subPageMaps[root].map(page => ({ ...page, path: slash(path.relative(root, page.path)) }))
-      // Preserve plugins config from user config for this sub-package
-      if (globPackage?.plugins)
-        subPlugins[root] = globPackage.plugins
+      const parsedPages = (await this.parsePages(pages, 'sub', globPackage?.pages))
+        .map(page => ({ ...page, path: slash(path.relative(root, page.path)) }))
+      packagesByRoot.set(root, {
+        root,
+        pages: parsedPages,
+        // Preserve plugins config from user config for this sub-package
+        ...(globPackage?.plugins && { plugins: globPackage.plugins }),
+      })
     }
 
     // Inherit subPackages that do not exist in the scanned pages
     for (const { root, pages, plugins } of subPackages) {
-      if (root && !subPageMaps[root]) {
-        subPageMaps[root] = pages || []
-        // Preserve plugins config for inherited sub-packages
-        if (plugins)
-          subPlugins[root] = plugins
+      if (root && !packagesByRoot.has(root)) {
+        packagesByRoot.set(root, {
+          root,
+          pages: pages || [],
+          ...(plugins && { plugins }),
+        })
       }
     }
 
-    // Build final subPageMetaData with plugins preserved
-    const subPageMetaData = Object.keys(subPageMaps)
-      .map(root => ({
-        root,
-        pages: subPageMaps[root],
-        ...(subPlugins[root] && { plugins: subPlugins[root] }),
-      }))
-      .filter(meta => meta.pages.length > 0)
-
-    this.subPageMetaData = subPageMetaData
+    this.subPageMetaData = [...packagesByRoot.values()].filter(meta => meta.pages.length > 0)
     debug.subPages(this.subPageMetaData)
   }
+}
+
+/**
+ * Resolve the base path that page paths in pages.json are relative to
+ * @param options - Resolved configuration options
+ * @returns Slashed base path joined from root and outDir
+ */
+function resolveBasePath(options: ResolvedOptions): string {
+  return slash(path.join(options.root, options.outDir))
 }
 
 /**
@@ -582,7 +571,7 @@ export class PageContext {
  */
 function getPagePaths(dir: string, options: ResolvedOptions): PagePath[] {
   const pagesDirPath = slash(path.resolve(options.root, dir))
-  const basePath = slash(path.join(options.root, options.outDir))
+  const basePath = resolveBasePath(options)
   const files = getPageFiles(pagesDirPath, options)
   debug.pages(dir, files)
   const pagePaths = files
@@ -593,6 +582,19 @@ function getPagePaths(dir: string, options: ResolvedOptions): PagePath[] {
     }))
 
   return pagePaths
+}
+
+/**
+ * Deduplicate page metadata by path, keeping the last entry for each path
+ * @param pageMetaData - Page metadata array
+ * @returns Deduplicated page metadata array in first-seen order
+ */
+function dedupeByPath<T extends { path: string }>(pageMetaData: T[]): T[] {
+  const byPath = new Map<string, T>()
+  for (const page of pageMetaData)
+    byPath.set(page.path, page)
+
+  return [...byPath.values()]
 }
 
 /**
