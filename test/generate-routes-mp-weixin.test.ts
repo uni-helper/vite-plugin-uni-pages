@@ -60,6 +60,15 @@ describe('generate routes - mp-weixin platform', () => {
           ]
         },
         {
+          "path": "../playground/src/pages/define-page/conditional-define",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "conditional base",
+            "navigationBarBackgroundColor": "#07c160",
+            "enablePullDownRefresh": true
+          }
+        },
+        {
           "path": "../playground/src/pages/define-page/function",
           "type": "page",
           "style": {

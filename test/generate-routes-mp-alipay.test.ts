@@ -60,6 +60,14 @@ describe('generate routes - mp-alipay platform', () => {
           ]
         },
         {
+          "path": "../playground/src/pages/define-page/conditional-define",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "conditional base",
+            "enablePullDownRefresh": true
+          }
+        },
+        {
           "path": "../playground/src/pages/define-page/function",
           "type": "page",
           "style": {

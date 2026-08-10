@@ -79,6 +79,13 @@ describe('generate routes', () => {
           ]
         },
         {
+          "path": "../playground/src/pages/define-page/conditional-define",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "conditional base"
+          }
+        },
+        {
           "path": "../playground/src/pages/define-page/function",
           "type": "page",
           "style": {
@@ -263,6 +270,13 @@ describe('generate routes', () => {
           "middlewares": [
             "auth"
           ]
+        },
+        {
+          "path": "../playground/src/pages/define-page/conditional-define",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "conditional base"
+          }
         },
         {
           "path": "../playground/src/pages/define-page/function",

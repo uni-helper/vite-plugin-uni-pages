@@ -15,6 +15,7 @@ describe('get files', () => {
         "blog/post.vue",
         "define-page/async-function.vue",
         "define-page/conditional-compilation.vue",
+        "define-page/conditional-define.vue",
         "define-page/function.vue",
         "define-page/nested-function.vue",
         "define-page/object.vue",
