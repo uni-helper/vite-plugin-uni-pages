@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { parse as cjParse } from 'comment-json'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { PageContext } from '../packages/core/src'
 
 /**
  * Regression test for https://github.com/uni-helper/vite-plugin-uni-pages/issues/283
@@ -20,13 +21,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
  *
  * This test models the exact on-disk sequence (H5 run writes the file first,
  * mp-weixin run reads and merges it) in-process to keep it fast and
- * deterministic. `process.env.UNI_PLATFORM` is set before importing
- * PageContext because `@uni-helper/uni-env` captures the platform at module
- * load time.
+ * deterministic. The platform is injected through the PageContext constructor
+ * so it does not depend on `process.env.UNI_PLATFORM`.
  */
-process.env.UNI_PLATFORM = 'mp-weixin'
-
-const { PageContext } = await import('../packages/core/src')
 
 describe('issue #283: cross-platform run does not duplicate routes', () => {
   let tmpDir: string
@@ -85,6 +82,7 @@ describe('issue #283: cross-platform run does not duplicate routes', () => {
     const ctx = new PageContext(
       { dir: 'src/pages', outDir: 'src', homePage: 'pages/index/index', dts: false, mergePages: true },
       tmpDir,
+      'mp-weixin',
     )
     await ctx.updatePagesJSON()
 

@@ -1,6 +1,6 @@
 import type { UserPagesConfig } from '../packages/core/src'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { PageContext } from '../packages/core/src'
+import { createPages, PageContext } from '../packages/core/src'
 
 const pagesGlobConfig: UserPagesConfig = {
   globalStyle: {
@@ -31,10 +31,7 @@ describe('generate routes', () => {
   })
 
   it('vue - pages snapshot', async () => {
-    const ctx = new PageContext({ dir: 'playground/src/pages', homePage: 'pages/index', subPackages: ['playground/src/pages/pages-internal-sub'] })
-    await ctx.scanPages()
-    await ctx.scanSubPages()
-    await ctx.mergePageMetaData()
+    const ctx = await createPages({ dir: 'playground/src/pages', homePage: 'pages/index', subPackages: ['playground/src/pages/pages-internal-sub'] })
 
     const routes = ctx.resolveRoutes()
 
@@ -203,10 +200,8 @@ describe('generate routes', () => {
 
   it('vue - not merge pages snapshot', async () => {
     const ctx = new PageContext({ dir: 'playground/src/pages', mergePages: false, subPackages: ['playground/src/pages/pages-internal-sub'] })
-    await ctx.scanPages()
     ctx.pagesGlobConfig = pagesGlobConfig
-    await ctx.scanSubPages()
-    await ctx.mergePageMetaData()
+    await ctx.scanAndMerge()
     const routes = ctx.resolveRoutes()
 
     expect(routes).toMatchInlineSnapshot(`
@@ -385,14 +380,12 @@ describe('generate routes', () => {
   })
 
   it('fix subPackage cannot match the second-level dir', async () => {
-    const ctx = new PageContext({
+    const ctx = await createPages({
       subPackages: [
         'playground/src/pages-sub-pages/sub-activity',
         'playground/src/pages-sub-pages/sub-main',
       ],
     })
-    await ctx.scanSubPages()
-    await ctx.mergeSubPageMetaData()
     const routes = ctx.resolveSubRoutes()
     expect(routes).toMatchInlineSnapshot(`
       "[
@@ -427,14 +420,12 @@ describe('generate routes', () => {
   })
 
   it('check pages is exist', async () => {
-    const ctx = new PageContext({
+    const ctx = await createPages({
       subPackages: [
         'playground/src/pages-sub-empty',
         'playground/src/pages-sub-pages/sub-main',
       ],
     })
-    await ctx.scanSubPages()
-    await ctx.mergeSubPageMetaData()
     const routes = ctx.resolveSubRoutes()
 
     expect(routes).toMatchInlineSnapshot(`
@@ -477,8 +468,7 @@ describe('generate routes', () => {
         },
       ],
     }
-    await ctx.scanSubPages()
-    await ctx.mergeSubPageMetaData()
+    await ctx.scanAndMerge()
     const routes = ctx.resolveSubRoutes()
 
     const parsed = JSON.parse(routes)
@@ -496,7 +486,7 @@ describe('generate routes', () => {
   })
 
   it('subPackages with custom root (monorepo support)', async () => {
-    const ctx = new PageContext({
+    const ctx = await createPages({
       subPackages: [
         {
           dir: 'playground/src/pages-sub-pages/sub-activity',
@@ -508,8 +498,6 @@ describe('generate routes', () => {
         },
       ],
     })
-    await ctx.scanSubPages()
-    await ctx.mergeSubPageMetaData()
     const routes = ctx.resolveSubRoutes()
     expect(routes).toMatchInlineSnapshot(`
       "[
@@ -544,7 +532,7 @@ describe('generate routes', () => {
   })
 
   it('subPackages with mixed string and custom root formats', async () => {
-    const ctx = new PageContext({
+    const ctx = await createPages({
       subPackages: [
         'playground/src/pages-sub-pages/sub-activity',
         {
@@ -553,8 +541,6 @@ describe('generate routes', () => {
         },
       ],
     })
-    await ctx.scanSubPages()
-    await ctx.mergeSubPageMetaData()
     const routes = ctx.resolveSubRoutes()
     const parsed = JSON.parse(routes)
 
@@ -595,8 +581,7 @@ describe('generate routes', () => {
         },
       ],
     }
-    await ctx.scanSubPages()
-    await ctx.mergeSubPageMetaData()
+    await ctx.scanAndMerge()
     const routes = ctx.resolveSubRoutes()
     const parsed = JSON.parse(routes)
 

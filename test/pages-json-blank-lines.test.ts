@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { parse as cjParse } from 'comment-json'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { PageContext } from '../packages/core/src'
 
 /**
  * Regression coverage for comment-json v5 blank line handling.
@@ -14,16 +15,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
  * `before:N` comment array carries `value` and crashed with
  * `Cannot read properties of undefined (reading 'trim')`.
  *
- * Platform model follows concurrent-pages-json.test.ts: `UNI_PLATFORM` is set
- * before importing PageContext so the current process models mp-weixin, while
- * the pre-seeded file represents another terminal's (H5) output.
+ * Platform model follows concurrent-pages-json.test.ts: the current platform
+ * (mp-weixin) is injected through the PageContext constructor, while the
+ * pre-seeded file represents another terminal's (H5) output.
  */
-
-// Set BEFORE importing context.ts, which captures `platform` from uni-env.
-process.env.UNI_PLATFORM = 'mp-weixin'
-
-// Dynamic import so the env above is in place when the module loads.
-const { PageContext } = await import('../packages/core/src')
 
 describe('pages.json with blank lines (comment-json v5 BlankLine tokens)', () => {
   let tmpDir: string
@@ -60,7 +55,7 @@ describe('pages.json with blank lines (comment-json v5 BlankLine tokens)', () =>
     // The seeded `pages/index` entry is identical to what the scanned page
     // resolves to, so it merges into a single item that stays first in the
     // result. This keeps the test focused on blank line handling; the home
-    // reordering in generatePagesJSON is covered separately by
+    // reordering in writePagesJson is covered separately by
     // pages-json-home-reorder.test.ts.
     fs.writeFileSync(
       pagesJsonPath,
@@ -99,6 +94,7 @@ describe('pages.json with blank lines (comment-json v5 BlankLine tokens)', () =>
     const ctx = new PageContext(
       { dir: 'src/pages', outDir: 'src', homePage: 'pages/index', dts: false },
       tmpDir,
+      'mp-weixin',
     )
     // Before the BlankLine guard this threw inside mergePlatformItems.
     await ctx.updatePagesJSON()

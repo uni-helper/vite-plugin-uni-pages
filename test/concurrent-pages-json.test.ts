@@ -4,28 +4,21 @@ import os from 'node:os'
 import path from 'node:path'
 import { parse as cjParse } from 'comment-json'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { PageContext } from '../packages/core/src'
 
 /**
  * Regression coverage for the multi-terminal pages.json race.
  *
  * Scenario: two dev servers (e.g. dev:mp-weixin + dev:h5) write the same
  * pages.json. The H5 terminal previously wrote an `#ifdef H5` block. The
- * mp-weixin terminal must NOT clobber it — its `generatePagesJSON` reads the
+ * mp-weixin terminal must NOT clobber it — `writePagesJson` reads the
  * existing file inside the lock and preserves other platforms' blocks.
  *
- * Note on the platform model: `process.env.UNI_PLATFORM` is captured at module
- * load time by `@uni-helper/uni-env` (imported by context.ts), so we set it on
- * `process.env` before dynamically importing PageContext. A single test file
- * can therefore only model one "current" platform; we model the mp-weixin
- * terminal as the current process and the H5 terminal's output as a pre-seeded
- * file (exactly what the real race looks like on disk).
+ * The current platform is injected through the PageContext constructor
+ * instead of relying on `process.env.UNI_PLATFORM`; the H5 terminal's output
+ * is modeled as a pre-seeded file (exactly what the real race looks like on
+ * disk).
  */
-
-// Set BEFORE importing context.ts, which captures `platform` from uni-env.
-process.env.UNI_PLATFORM = 'mp-weixin'
-
-// Dynamic import so the env above is in place when the module loads.
-const { PageContext } = await import('../packages/core/src')
 
 describe('concurrent pages.json update preserves other platforms', () => {
   let tmpDir: string
@@ -88,6 +81,7 @@ describe('concurrent pages.json update preserves other platforms', () => {
     const ctx = new PageContext(
       { dir: 'src/pages', outDir: 'src', homePage: 'pages/index', dts: false },
       tmpDir,
+      'mp-weixin',
     )
     await ctx.updatePagesJSON()
 
@@ -117,6 +111,7 @@ describe('concurrent pages.json update preserves other platforms', () => {
     const ctx = new PageContext(
       { dir: 'src/pages', outDir: 'src', homePage: 'pages/index', dts: false },
       tmpDir,
+      'mp-weixin',
     )
 
     // Fire two updates near-simultaneously, mimicking two terminals reacting

@@ -1,7 +1,7 @@
 import type { LoadConfigSource } from 'unconfig'
-import type { PageItem, PagesConfig, TabBarItem } from './config'
-import type { PageContext } from './context'
-import type { debug } from './utils'
+import type { PageItem, PagesConfig, SubPackages, TabBarItem } from './config'
+import type { debug } from './logger'
+import type { Page } from './page'
 
 /**
  * Exclude index signature keys from an object type, keeping only explicit keys
@@ -187,14 +187,18 @@ export interface Options {
    */
   debug: boolean | DebugType
 
-  onBeforeLoadUserConfig: (ctx: PageContext) => void
-  onAfterLoadUserConfig: (ctx: PageContext) => void
-  onBeforeScanPages: (ctx: PageContext) => void
-  onAfterScanPages: (ctx: PageContext) => void
-  onBeforeMergePageMetaData: (ctx: PageContext) => void
-  onAfterMergePageMetaData: (ctx: PageContext) => void
-  onBeforeWriteFile: (ctx: PageContext) => void
-  onAfterWriteFile: (ctx: PageContext) => void
+  /**
+   * Lifecycle hooks, fired at each pipeline stage. Hooks receive only the
+   * stage's input or output data, never the whole context.
+   */
+  onBeforeLoadUserConfig: () => void
+  onAfterLoadUserConfig: (pagesGlobConfig: PagesConfig | undefined) => void
+  onBeforeScanPages: () => void
+  onAfterScanPages: (pages: Map<string, Page>, subPages: Map<string, Map<string, Page>>) => void
+  onBeforeMergePageMetaData: (pages: Map<string, Page>, pagesGlobConfig: PagesConfig | undefined) => void
+  onAfterMergePageMetaData: (pageMetaData: InternalPages, subPageMetaData: SubPackages) => void
+  onBeforeWriteFile: (filePath: string) => void
+  onAfterWriteFile: (filePath: string, content: string) => void
 }
 
 /** User configuration options type, all options are optional */

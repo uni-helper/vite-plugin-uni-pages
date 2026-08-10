@@ -1,17 +1,18 @@
 import type { ResolvedOptions } from './types'
 import fs from 'node:fs'
+import path from 'node:path'
 import lockfile from 'proper-lockfile'
 import { globSync } from 'tinyglobby'
-import writeFileAtomic from 'write-file-atomic'
-import { FILE_EXTENSIONS } from './constant'
-import { debug, extsToGlob, sleep } from './utils'
+import { FILE_EXTENSIONS, OUTPUT_NAME } from './constant'
+import { debug } from './logger'
+
 /**
  * Resolves the files that are valid pages for the given context.
  */
 export function getPageFiles(path: string, options: ResolvedOptions): string[] {
   const { exclude } = options
 
-  const ext = extsToGlob(FILE_EXTENSIONS)
+  const ext = FILE_EXTENSIONS.length > 1 ? `{${FILE_EXTENSIONS.join(',')}}` : (FILE_EXTENSIONS[0] || '')
 
   const files = globSync(`**/*.${ext}`, {
     ignore: exclude,
@@ -23,11 +24,36 @@ export function getPageFiles(path: string, options: ResolvedOptions): string[] {
 }
 
 /**
- * Check the pages.json file at the specified path, create an empty pages.json file if it doesn't exist or is not a valid file
- * @param path - File path to check
- * @returns boolean - Whether the operation was successful
+ * Check if file is a target page file
+ * Determine if the file extension is in the supported page file types list
+ *
+ * @param path - File path
+ * @returns Whether it's a target file
  */
-export function checkPagesJsonFileSync(path: fs.PathLike): boolean {
+export function isTargetFile(path: string): boolean {
+  const ext = path.split('.').pop()
+  return FILE_EXTENSIONS.includes(ext!)
+}
+
+/**
+ * Resolve the pages.json file path for the given project root and output dir
+ *
+ * @param root - Project root directory
+ * @param outDir - pages.json output directory relative to root
+ * @returns Absolute pages.json file path
+ */
+export function resolvePagesJsonPath(root: string, outDir: string): string {
+  return path.join(root, outDir, OUTPUT_NAME)
+}
+
+/**
+ * Ensure a pages.json file exists at the given path and is readable/writable.
+ * Creates a placeholder file when missing or replaces it when unusable; the
+ * placeholder is overwritten by the next pages.json generation.
+ *
+ * @param path - File path to check
+ */
+export function checkPagesJsonFileSync(path: fs.PathLike): void {
   /**
    * Create an empty pages.json file
    * @param path - File path
@@ -69,7 +95,8 @@ export function checkPagesJsonFileSync(path: fs.PathLike): boolean {
     }
     catch {
       // File does not exist, create new file
-      return createEmptyFile(path)
+      createEmptyFile(path)
+      return
     }
 
     // Check if it's a file
@@ -77,39 +104,38 @@ export function checkPagesJsonFileSync(path: fs.PathLike): boolean {
     if (!stat.isFile()) {
       // Not a file, try to delete and recreate
       if (!unlinkFile(path)) {
-        return false
+        return
       }
-      return createEmptyFile(path)
+      createEmptyFile(path)
+      return
     }
 
     // Check read/write permissions
     try {
       fs.accessSync(path, fs.constants.R_OK | fs.constants.W_OK)
-
-      return true
     }
     catch {
       // Insufficient permissions, try to delete and recreate
       if (!unlinkFile(path)) {
-        return false
+        return
       }
-      return createEmptyFile(path)
+      createEmptyFile(path)
     }
   }
   catch {
     // Other errors occurred, try to create file
-    return createEmptyFile(path)
+    createEmptyFile(path)
   }
 }
 
 /**
  * Run a task while holding an exclusive file lock.
  *
- * Unlike {@link writeFileWithLock}, this protects the whole read-modify-write
- * critical section. The lock is held from the moment `task` starts until it
- * resolves, so concurrent processes cannot observe or overwrite a half-written
- * state. This is required by pages.json generation, where the new content
- * depends on the current content (other platforms' `#ifdef` blocks).
+ * Protects the whole read-modify-write critical section. The lock is held
+ * from the moment `task` starts until it resolves, so concurrent processes
+ * cannot observe or overwrite a half-written state. This is required by
+ * pages.json generation, where the new content depends on the current content
+ * (other platforms' `#ifdef` blocks).
  *
  * @param path - File path used as the lock target
  * @param task - Async work to run inside the lock; return value is forwarded
@@ -143,20 +169,10 @@ export async function withFileLock<T>(path: string, task: () => Promise<T>, retr
 }
 
 /**
- * Safely write file using file lock
- * Avoid data corruption caused by concurrent writes through file lock
- * Use atomic write to ensure file write integrity
- *
- * Note: this only makes the *write* atomic. Callers that need to read the
- * current content before computing the new one must use {@link withFileLock}
- * so the read and write belong to the same critical section.
- *
- * @param path - File path
- * @param content - File content
- * @param retry - Number of retries when lock acquisition fails, defaults to 3
+ * Async sleep function
+ * @param ms - Sleep duration in milliseconds
+ * @returns Promise resolved after the given delay
  */
-export async function writeFileWithLock(path: string, content: string, retry = 3): Promise<void | undefined> {
-  return withFileLock(path, async () => {
-    await writeFileAtomic(path, content)
-  }, retry)
+function sleep(ms: number): Promise<void> {
+  return new Promise<void>(resolve => setTimeout(resolve, ms))
 }

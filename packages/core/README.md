@@ -164,15 +164,15 @@ interface UserOptions {
    */
   debug?: boolean | DebugType
 
-  // 生命周期钩子，在每个阶段完成后触发，接收 PageContext 实例
-  onBeforeLoadUserConfig?: (ctx: PageContext) => void
-  onAfterLoadUserConfig?: (ctx: PageContext) => void
-  onBeforeScanPages?: (ctx: PageContext) => void
-  onAfterScanPages?: (ctx: PageContext) => void
-  onBeforeMergePageMetaData?: (ctx: PageContext) => void
-  onAfterMergePageMetaData?: (ctx: PageContext) => void
-  onBeforeWriteFile?: (ctx: PageContext) => void
-  onAfterWriteFile?: (ctx: PageContext) => void
+  // 生命周期钩子，在每个阶段前后触发，仅接收该阶段的输入或输出数据
+  onBeforeLoadUserConfig?: () => void
+  onAfterLoadUserConfig?: (pagesGlobConfig: PagesConfig | undefined) => void
+  onBeforeScanPages?: () => void
+  onAfterScanPages?: (pages: Map<string, Page>, subPages: Map<string, Map<string, Page>>) => void
+  onBeforeMergePageMetaData?: (pages: Map<string, Page>, pagesGlobConfig: PagesConfig | undefined) => void
+  onAfterMergePageMetaData?: (pageMetaData: InternalPages, subPageMetaData: SubPackages) => void
+  onBeforeWriteFile?: (filePath: string) => void
+  onAfterWriteFile?: (filePath: string, content: string) => void
 }
 ```
 
@@ -208,8 +208,8 @@ export default defineConfig({
       exclude: ['node_modules', '.git', '**/__*__/**', '**/components/**'],
       minify: true,
       debug: true, // 或 debug: 'pages'
-      onAfterScanPages(ctx) {
-        console.log(`扫描到 ${ctx.pages.size} 个主包页面`)
+      onAfterScanPages(pages) {
+        console.log(`扫描到 ${pages.size} 个主包页面`)
       },
     }),
   ],

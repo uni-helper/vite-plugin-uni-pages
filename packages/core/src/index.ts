@@ -1,30 +1,29 @@
-import type { CallExpression } from '@babel/types'
 import type { Plugin } from 'vite'
 import type { UserOptions } from './types'
-import path from 'node:path'
 import process from 'node:process'
-import { babelParse } from 'ast-kit'
 import chokidar from 'chokidar'
 import MagicString from 'magic-string'
 import { createLogger } from 'vite'
 import {
   FILE_EXTENSIONS,
   MODULE_ID_VIRTUAL,
-  OUTPUT_NAME,
   RESOLVED_MODULE_ID_VIRTUAL,
 } from './constant'
 import { PageContext } from './context'
-import { checkPagesJsonFileSync } from './files'
-import { findMacro, parseSFC } from './page'
+import { checkPagesJsonFileSync, resolvePagesJsonPath } from './files'
+import { findDefinePageMacro } from './macro'
 
 export * from './config'
 export * from './constant'
 export * from './context'
 export * from './files'
+export * from './logger'
+export * from './macro'
 export * from './options'
 export * from './page'
+export * from './pagesJson'
+export * from './pipeline'
 export * from './types'
-export * from './utils'
 
 /**
  * vite-plugin-uni-pages plugin main entry
@@ -42,10 +41,11 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
   let ctx: PageContext
 
   // TODO: check if the pages.json file is valid
-  const resolvedPagesJSONPath = path.join(
+  // config.root is unknown until configResolved, so fall back to the same
+  // root resolution Vite will use; the path rule itself lives in one place
+  const resolvedPagesJSONPath = resolvePagesJsonPath(
     process.env.VITE_ROOT_DIR || process.cwd(),
     userOptions.outDir ?? 'src',
-    OUTPUT_NAME,
   )
   checkPagesJsonFileSync(resolvedPagesJSONPath)
 
@@ -82,29 +82,15 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
         return null
       }
 
-      const sfc = parseSFC(code, { filename: id })
-
-      let macro: CallExpression | undefined
-      // Parse each script block independently: a syntax error in one block
-      // (e.g. the deprecated `assert { ... }` import attributes removed in
-      // @babel/parser 8) must not skip macro removal in the other block
-      const tryFindMacro = (content: string, lang: string | undefined, block: string): CallExpression | undefined => {
-        try {
-          return findMacro(babelParse(content, lang || 'js').body, sfc.filename)
-        }
-        catch (error: unknown) {
+      // Each script block is parsed independently inside the macro module: a
+      // syntax error in one block (e.g. the deprecated `assert { ... }` import
+      // attributes removed in @babel/parser 8) must not skip macro removal in
+      // the other block
+      const macro = findDefinePageMacro(code, id, {
+        onParseError: (block, error) => {
           this.warn(`[vite-plugin-uni-pages] Failed to parse ${block} in ${id}, its definePage macro may stay in the output: ${error instanceof Error ? error?.message : error}`)
-          return undefined
-        }
-      }
-
-      if (sfc.scriptSetup) {
-        macro = tryFindMacro(sfc.scriptSetup.content, sfc.scriptSetup.lang, '<script setup>')
-      }
-
-      if (!macro && sfc.script) {
-        macro = tryFindMacro(sfc.script.content, sfc.script.lang, '<script>')
-      }
+        },
+      })
 
       if (!macro)
         return null

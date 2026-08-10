@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { PageContext } from '../packages/core/src'
+import { createPages, PageContext } from '../packages/core/src'
 
 // The uni-env `platform` constant is frozen at module load time and cannot be
 // stubbed, but definePage macros are evaluated at scan time and read
@@ -11,9 +11,7 @@ describe('generate tabBar', () => {
   })
 
   it('tabBar items should not contain index field', async () => {
-    const ctx = new PageContext({ dir: 'playground/src/pages' })
-    await ctx.scanPages()
-    await ctx.mergePageMetaData()
+    const ctx = await createPages({ dir: 'playground/src/pages' })
 
     const tabBar = await ctx.resolveTabBar()
 
@@ -26,9 +24,7 @@ describe('generate tabBar', () => {
   })
 
   it('tabBar items should be sorted by index', async () => {
-    const ctx = new PageContext({ dir: 'playground/src/pages' })
-    await ctx.scanPages()
-    await ctx.mergePageMetaData()
+    const ctx = await createPages({ dir: 'playground/src/pages' })
 
     const tabBar = await ctx.resolveTabBar()
 
@@ -53,7 +49,6 @@ describe('generate tabBar', () => {
 
   it('tabBar should merge with config-defined tabBar', async () => {
     const ctx = new PageContext({ dir: 'playground/src/pages' })
-    await ctx.scanPages()
     ctx.pagesGlobConfig = {
       tabBar: {
         color: '#999999',
@@ -69,7 +64,7 @@ describe('generate tabBar', () => {
         ],
       },
     }
-    await ctx.mergePageMetaData()
+    await ctx.scanAndMerge()
 
     const tabBar = await ctx.resolveTabBar()
 
@@ -90,9 +85,7 @@ describe('generate tabBar', () => {
   })
 
   it('tabBar should return undefined when no tabBar items exist', async () => {
-    const ctx = new PageContext({ dir: 'playground/src/pages/blog' })
-    await ctx.scanPages()
-    await ctx.mergePageMetaData()
+    const ctx = await createPages({ dir: 'playground/src/pages/blog' })
 
     const tabBar = await ctx.resolveTabBar()
 
@@ -100,9 +93,7 @@ describe('generate tabBar', () => {
   })
 
   it('tabBar items without index should default to index 0', async () => {
-    const ctx = new PageContext({ dir: 'playground/src/pages' })
-    await ctx.scanPages()
-    await ctx.mergePageMetaData()
+    const ctx = await createPages({ dir: 'playground/src/pages' })
 
     const noIndexPage = Array.from(ctx.pages.values()).find(p => p.path.relativePath.includes('tabbar-no-index'))
     expect(noIndexPage).toBeDefined()
@@ -112,9 +103,7 @@ describe('generate tabBar', () => {
   })
 
   it('tabBar items with index: 0 should remain 0', async () => {
-    const ctx = new PageContext({ dir: 'playground/src/pages' })
-    await ctx.scanPages()
-    await ctx.mergePageMetaData()
+    const ctx = await createPages({ dir: 'playground/src/pages' })
 
     const zeroIndexPage = Array.from(ctx.pages.values()).find(p => p.path.relativePath.includes('tabbar-index-zero'))
     expect(zeroIndexPage).toBeDefined()

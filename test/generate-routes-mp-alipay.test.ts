@@ -1,20 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { PageContext } from '../packages/core/src'
+import { createPages } from '../packages/core/src'
 
-// The uni-env `platform` constant is frozen at module load time and cannot be
-// stubbed, but definePage macros are evaluated at scan time and read
-// `process.env.UNI_PLATFORM` then — the conditional-compilation fixtures
-// below depend on it, so the stub must stay.
+// Platform is injectable through the pipeline seam now, but definePage macros
+// are evaluated in a sandbox that requires @uni-helper/uni-env, which reads
+// `process.env.UNI_PLATFORM` at require time — keep the stub so the
+// conditional-compilation fixtures resolve to the mp-alipay titles.
 describe('generate routes - mp-alipay platform', () => {
   beforeEach(() => {
     vi.stubEnv('UNI_PLATFORM', 'mp-alipay')
   })
 
   it('vue - pages snapshot', async () => {
-    const ctx = new PageContext({ dir: 'playground/src/pages', homePage: 'pages/index', subPackages: ['playground/src/pages/pages-internal-sub'] })
-    await ctx.scanPages()
-    await ctx.scanSubPages()
-    await ctx.mergePageMetaData()
+    const ctx = await createPages({ dir: 'playground/src/pages', homePage: 'pages/index', subPackages: ['playground/src/pages/pages-internal-sub'] })
 
     const routes = ctx.resolveRoutes()
 
@@ -182,9 +179,7 @@ describe('generate routes - mp-alipay platform', () => {
   })
 
   it('conditional-compilation page should show mp-alipay specific title', async () => {
-    const ctx = new PageContext({ dir: 'playground/src/pages/define-page' })
-    await ctx.scanPages()
-    await ctx.mergePageMetaData()
+    const ctx = await createPages({ dir: 'playground/src/pages/define-page' })
 
     const routes = JSON.parse(ctx.resolveRoutes())
     const conditionalPage = routes.find((r: any) => r.path.includes('conditional-compilation'))
@@ -194,9 +189,7 @@ describe('generate routes - mp-alipay platform', () => {
   })
 
   it('test-jsonc-with-comment page should not have H5-specific content', async () => {
-    const ctx = new PageContext({ dir: 'playground/src/pages' })
-    await ctx.scanPages()
-    await ctx.mergePageMetaData()
+    const ctx = await createPages({ dir: 'playground/src/pages' })
 
     const routes = JSON.parse(ctx.resolveRoutes())
     const jsoncPage = routes.find((r: any) => r.path.includes('test-jsonc-with-comment'))

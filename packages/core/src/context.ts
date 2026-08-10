@@ -1,28 +1,22 @@
 import type { FSWatcher } from 'chokidar'
-import type { CommentLineToken, CommentObject, CommentSymbol } from 'comment-json'
-import type { Logger, ViteDevServer } from 'vite'
+import type { Logger, ModuleNode, ViteDevServer } from 'vite'
 import type { Pages, PagesConfig, SubPackage, SubPackages, TabBar, TabBarItem } from './config'
-import type { ExcludeIndexSignature, InternalPageItem, InternalPages, PagePath, ResolvedOptions, UserOptions } from './types'
-import fs from 'node:fs'
+import type { InternalPageItem, InternalPages, PagePath, ResolvedOptions, UserOptions } from './types'
 import path from 'node:path'
 import process from 'node:process'
 import { slash } from '@antfu/utils'
-import { platform } from '@uni-helper/uni-env'
-import { parse as cjParse, stringify as cjStringify, CommentArray } from 'comment-json'
+import { platform as uniEnvPlatform } from '@uni-helper/uni-env'
+import { stringify as cjStringify } from 'comment-json'
 import dbg from 'debug'
+import groupBy from 'lodash.groupby'
 import { loadConfig } from 'unconfig'
-import writeFileAtomic from 'write-file-atomic'
-import { OUTPUT_NAME } from './constant'
+import { RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import { writeDeclaration } from './declaration'
-import { checkPagesJsonFileSync, getPageFiles, withFileLock } from './files'
+import { checkPagesJsonFileSync, getPageFiles, isTargetFile, resolvePagesJsonPath } from './files'
+import { debug } from './logger'
 import { resolveOptions } from './options'
 import { Page } from './page'
-import {
-  debug,
-  invalidatePagesModule,
-  isTargetFile,
-  mergePageMetaDataArray,
-} from './utils'
+import { writePagesJson } from './pagesJson'
 
 /**
  * Page context class responsible for page scanning, config loading, page metadata merging and pages.json generation
@@ -33,6 +27,10 @@ import {
  * 3. Parse page metadata (definePage macro)
  * 4. Merge page configurations and generate pages.json
  * 5. Provide virtual module and HMR support
+ *
+ * The pipeline runs in a fixed order — load user config, scan, merge, write —
+ * orchestrated by {@link updatePagesJSON} (full run) or {@link scanAndMerge}
+ * (in-memory only). Callers never need to know the stage order.
  */
 export class PageContext {
   private _server: ViteDevServer | undefined
@@ -54,12 +52,12 @@ export class PageContext {
   /** Generated pages.json file path */
   resolvedPagesJSONPath = ''
 
-  /** Original options passed by the user */
-  rawOptions: UserOptions
   /** Project root directory */
   root: string
   /** Resolved configuration options */
   options: ResolvedOptions
+  /** Current platform identifier, e.g. 'mp-weixin'; injected so callers are not bound to the env frozen at import time */
+  readonly platform: string
   logger?: Logger
 
   /** Whether to work with vite-plugin-uni-platform plugin */
@@ -72,10 +70,11 @@ export class PageContext {
    * Create a PageContext instance
    * @param userOptions - User configuration options
    * @param viteRoot - Vite project root directory, defaults to current working directory
+   * @param platform - Current platform identifier, defaults to the uni-env platform
    */
-  constructor(userOptions: UserOptions, viteRoot: string = process.cwd()) {
-    this.rawOptions = userOptions
+  constructor(userOptions: UserOptions, viteRoot: string = process.cwd(), platform: string = uniEnvPlatform) {
     this.root = slash(viteRoot)
+    this.platform = platform
     debug.options('root', this.root)
     this.options = resolveOptions(userOptions, this.root)
     // debug logic
@@ -85,7 +84,7 @@ export class PageContext {
       const suffix = typeof debugOption === 'boolean' ? '*' : debugOption
       dbg.enable(`${prefix}${suffix}`)
     }
-    this.resolvedPagesJSONPath = path.join(this.root, this.options.outDir, OUTPUT_NAME)
+    this.resolvedPagesJSONPath = resolvePagesJsonPath(this.root, this.options.outDir)
     debug.options(this.options)
   }
 
@@ -110,43 +109,15 @@ export class PageContext {
   }
 
   /**
-   * Scan main package page directories and collect all page file paths
-   * Scan corresponding directories based on the configured dirs option
+   * Run the scan and merge pipeline in order: scan main and sub-package pages,
+   * then merge their metadata. The stage order lives here so callers and tests
+   * do not have to know it.
    */
-  async scanPages(): Promise<void> {
-    const paths = this.options.dirs.flatMap(dir => getPagePaths(dir, this.options))
-    debug.pages(paths)
-
-    const pages = new Map<string, Page>()
-    for (const path of paths) {
-      const page = this.pages.get(path.absolutePath) || new Page(this, path)
-      pages.set(path.absolutePath, page)
-    }
-
-    this.pages = pages
-  }
-
-  /**
-   * Scan sub-package page directories and collect all sub-package page file paths
-   * Scan corresponding directories based on the configured subPackages option
-   */
-  async scanSubPages(): Promise<void> {
-    const paths: Record<string, PagePath[]> = {}
-    const subPages = new Map<string, Map<string, Page>>()
-    for (const dir of this.options.subPackages) {
-      const pagePaths = getPagePaths(dir, this.options)
-      paths[dir] = pagePaths
-
-      const pages = new Map<string, Page>()
-      for (const path of pagePaths) {
-        const page = this.subPages.get(dir)?.get(path.absolutePath) || new Page(this, path)
-        pages.set(path.absolutePath, page)
-      }
-      subPages.set(dir, pages)
-    }
-    debug.subPages(JSON.stringify(paths, null, 2))
-
-    this.subPages = subPages
+  async scanAndMerge(): Promise<void> {
+    await this.scanPages()
+    await this.scanSubPages()
+    await this.mergePageMetaData()
+    await this.mergeSubPageMetaData()
   }
 
   /**
@@ -187,6 +158,15 @@ export class PageContext {
     })
 
     watcher.on('change', async (path) => {
+      // Config sources are watched by absolute path; handle them before the
+      // page-file checks so a config change is never dropped by them
+      if (this.pagesConfigSourcePaths.includes(path)) {
+        debug.pages(`Config source changed: ${path}`)
+        if (await this.updatePagesJSON())
+          this.onUpdate()
+        return
+      }
+
       path = slash(path)
       if (!isTargetFile(path))
         return
@@ -198,14 +178,6 @@ export class PageContext {
       debug.pages(isInTargetDirs(path))
       if (await this.updatePagesJSON(path))
         this.onUpdate()
-    })
-
-    watcher.on('change', async (path) => {
-      if (this.pagesConfigSourcePaths.includes(path)) {
-        debug.pages(`Config source changed: ${path}`)
-        if (await this.updatePagesJSON())
-          this.onUpdate()
-      }
     })
 
     watcher.on('unlink', async (path) => {
@@ -235,147 +207,6 @@ export class PageContext {
     this._server.ws.send({
       type: 'full-reload',
     })
-  }
-
-  /**
-   * parse pages rules && set page type
-   * @param pages page path array
-   * @param packageType  page package type (main package or sub-package)
-   * @param overrides custom page config
-   * @returns pages rules
-   */
-  async parsePages(pages: Map<string, Page>, packageType: 'main' | 'sub', overrides?: Pages): Promise<InternalPages> {
-    const jobs: Promise<InternalPageItem>[] = []
-    for (const [_, page] of pages) {
-      jobs.push(page.getPageMeta())
-    }
-    const generatedPageMetaData = await Promise.all(jobs)
-    const customPageMetaData = (overrides || []) as InternalPages
-
-    const result = customPageMetaData.length
-      ? mergePageMetaDataArray(generatedPageMetaData.concat(customPageMetaData))
-      : generatedPageMetaData
-
-    // Use Map for deduplication, keeping the last element for each path while maintaining good performance
-    const parseMeta = Array.from(
-      result.reduce((map, page) => {
-        map.set(page.path, page)
-        return map
-      }, new Map<string, InternalPageItem>()).values(),
-    )
-
-    return packageType === 'main' ? this.setHomePage(parseMeta) : parseMeta
-  }
-
-  /**
-   * set home page
-   * @param result pages rules array
-   * @returns pages rules
-   */
-  setHomePage(result: InternalPages): InternalPages {
-    const hasHome = result.some(({ type }) => type === 'home')
-    if (!hasHome) {
-      // Resolve homePage config to the same relative-path format as page paths (relative to basePath)
-      const basePath = slash(path.join(this.options.root, this.options.outDir))
-      const resolvedHomePages = this.options.homePage.map((v) => {
-        return slash(path.relative(basePath, slash(path.resolve(basePath, v))))
-      })
-
-      // Match by exact path first, then fall back to segment-boundary suffix match
-      // to handle cases where dir is outside outDir (e.g. test environments)
-      const matchHomePage = (itemPath: string, configPath: string): boolean => {
-        if (itemPath === configPath)
-          return true
-        const normalizedItem = itemPath.replace(/\\/g, '/')
-        const normalizedConfig = configPath.replace(/\\/g, '/')
-        return normalizedItem.endsWith(`/${normalizedConfig}`)
-      }
-
-      const isFoundHome = result.some((item) => {
-        const isFound = resolvedHomePages.some(expectedPath => matchHomePage(item.path, expectedPath))
-        if (isFound)
-          item.type = 'home'
-
-        return isFound
-      })
-
-      if (!isFoundHome) {
-        this.logger?.warn('No home page found, check the configuration of pages.config.ts, or add the `homePage` option to UniPages in the Vite config file, or add `definePage({ type: "home" })` in your vue page.', {
-          timestamp: true,
-        })
-      }
-    }
-
-    result.sort(page => (page.type === 'home' ? -1 : 0))
-
-    return result
-  }
-
-  /**
-   * Merge main package page metadata
-   * Filter out pages belonging to sub-packages, then parse page metadata and merge user configuration
-   */
-  async mergePageMetaData(): Promise<void> {
-    // Collect all absolute paths of pages in sub-packages
-    const subPageAbsolutePaths = Array.from(this.subPages.values()).flatMap(v => Array.from(v.keys()))
-
-    // Filter out pages belonging to sub-packages
-    for (const subPageAbsolutePath of subPageAbsolutePaths)
-      this.pages.delete(subPageAbsolutePath)
-
-    const pageMetaData = await this.parsePages(this.pages, 'main', this.pagesGlobConfig?.pages)
-
-    this.pageMetaData = pageMetaData
-    debug.pages(this.pageMetaData)
-  }
-
-  /**
-   * Merge sub-package page metadata
-   * Parse page metadata for each sub-package and handle sub-package configuration inheritance
-   * Preserves sub-package level properties like plugins from user config
-   */
-  async mergeSubPageMetaData(): Promise<void> {
-    const subPageMaps: Record<string, InternalPages> = {}
-    // Store plugins config separately to preserve them during merge
-    const subPlugins: Record<string, SubPackage['plugins']> = {}
-    const subPackages = this.pagesGlobConfig?.subPackages || []
-
-    for (const [dir, pages] of this.subPages) {
-      const basePath = slash(path.join(this.options.root, this.options.outDir))
-      // Use custom root from subPackageRootMap if available, otherwise calculate from path
-      // In monorepo scenarios, custom root avoids '..' in pages.json root path
-      const root = this.options.subPackageRootMap.get(dir)
-        ?? slash(path.relative(basePath, path.join(this.options.root, dir)))
-
-      const globPackage = subPackages?.find(v => v.root === root)
-      subPageMaps[root] = await this.parsePages(pages, 'sub', globPackage?.pages)
-      subPageMaps[root] = subPageMaps[root].map(page => ({ ...page, path: slash(path.relative(root, page.path)) }))
-      // Preserve plugins config from user config for this sub-package
-      if (globPackage?.plugins)
-        subPlugins[root] = globPackage.plugins
-    }
-
-    // Inherit subPackages that do not exist in the scanned pages
-    for (const { root, pages, plugins } of subPackages) {
-      if (root && !subPageMaps[root]) {
-        subPageMaps[root] = pages || []
-        // Preserve plugins config for inherited sub-packages
-        if (plugins)
-          subPlugins[root] = plugins
-      }
-    }
-
-    // Build final subPageMetaData with plugins preserved
-    const subPageMetaData = Object.keys(subPageMaps)
-      .map(root => ({
-        root,
-        pages: subPageMaps[root],
-        ...(subPlugins[root] && { plugins: subPlugins[root] }),
-      }))
-      .filter(meta => meta.pages.length > 0)
-
-    this.subPageMetaData = subPageMetaData
-    debug.subPages(this.subPageMetaData)
   }
 
   /**
@@ -412,24 +243,24 @@ export class PageContext {
     }
 
     checkPagesJsonFileSync(this.resolvedPagesJSONPath)
-    this.options.onBeforeLoadUserConfig(this)
+    this.options.onBeforeLoadUserConfig()
     await this.loadUserPagesConfig()
-    this.options.onAfterLoadUserConfig(this)
+    this.options.onAfterLoadUserConfig(this.pagesGlobConfig)
 
     if (this.options.mergePages) {
-      this.options.onBeforeScanPages(this)
+      this.options.onBeforeScanPages()
       await this.scanPages()
       await this.scanSubPages()
-      this.options.onAfterScanPages(this)
+      this.options.onAfterScanPages(this.pages, this.subPages)
     }
 
-    this.options.onBeforeMergePageMetaData(this)
+    this.options.onBeforeMergePageMetaData(this.pages, this.pagesGlobConfig)
     await this.mergePageMetaData()
     await this.mergeSubPageMetaData()
-    this.options.onAfterMergePageMetaData(this)
+    this.options.onAfterMergePageMetaData(this.pageMetaData, this.subPageMetaData)
 
     const pages = this.withUniPlatform
-      ? this.pageMetaData.filter(v => !/\..*$/.test(v.path) || v.path.includes(platform)).map((v) => {
+      ? this.pageMetaData.filter(v => !/\..*$/.test(v.path) || v.path.includes(this.platform)).map((v) => {
           v.path = v.path.replace(/\..*$/, '')
           return v
         })
@@ -440,37 +271,33 @@ export class PageContext {
     pages.forEach(v => pagesMap.set(v.path, v))
     this.pageMetaData = [...pagesMap.values()]
 
-    this.options.onBeforeWriteFile(this)
+    this.options.onBeforeWriteFile(this.resolvedPagesJSONPath)
 
-    // The whole read-modify-write must run inside one lock. generatePagesJSON
-    // reads the existing pages.json (to preserve other platforms' #ifdef
-    // blocks), and the write must land before any other process reads, otherwise
-    // concurrent terminals (e.g. dev:mp-weixin + dev:mp-alipay) corrupt each
-    // other's conditional-compilation output.
-    const updated = await withFileLock(this.resolvedPagesJSONPath, async () => {
-      const data = await this.generatePagesJSON()
+    // Merged entries keep the object read from pages.json, which has no
+    // internal `type` marker, so resolve the home page path from the scanned
+    // metadata and hand it to the pages.json module for repositioning
+    const homePath = this.pageMetaData.find(meta => meta.type === 'home')?.path
 
-      let pagesJson = cjStringify(
-        data,
-        null,
-        this.options.minify ? undefined : this.options.indent,
-      )
-      if (this.options.eol !== '\n')
-        pagesJson = pagesJson.replaceAll('\n', this.options.eol)
-
-      if (this.options.insertFinalNewline)
-        pagesJson += this.options.eol
-
-      if (this.lastPagesJson === pagesJson) {
-        debug.pages('PagesJson Not have change')
-        return false
-      }
-
-      // Atomic write (tmp + rename) so a crash mid-write cannot leave a
-      // truncated pages.json. The lock above handles concurrent processes.
-      await writeFileAtomic(this.resolvedPagesJSONPath, pagesJson)
-      this.lastPagesJson = pagesJson
-      return true
+    // The whole read-modify-write runs inside one file lock owned by the
+    // pages.json module, so concurrent terminals (e.g. dev:mp-weixin +
+    // dev:mp-alipay) cannot corrupt each other's conditional-compilation output
+    const result = await writePagesJson(this.resolvedPagesJSONPath, {
+      pages: this.pageMetaData,
+      subPackages: this.subPageMetaData,
+      tabBar: await this.resolveTabBar(),
+      homePath,
+    }, {
+      platform: this.platform,
+      globConfig: this.pagesGlobConfig,
+      format: {
+        minify: this.options.minify,
+        indent: this.options.indent,
+        eol: this.options.eol,
+        insertFinalNewline: this.options.insertFinalNewline,
+      },
+      // Getter: evaluated inside the lock so an overlapping update sees the
+      // content this instance just wrote, matching the pre-refactor semantics
+      previousContent: () => this.lastPagesJson,
     })
 
     // Declaration writes a different file (uni-pages.d.ts) and does not need to
@@ -478,11 +305,12 @@ export class PageContext {
     // it after the pages.json computation, regardless of whether content changed.
     this.generateDeclaration()
 
-    if (updated) {
-      this.options.onAfterWriteFile(this)
+    if (result?.updated) {
+      this.lastPagesJson = result.content
+      this.options.onAfterWriteFile(this.resolvedPagesJSONPath, result.content)
     }
 
-    return updated ?? false
+    return result?.updated ?? false
   }
 
   /**
@@ -564,116 +392,185 @@ export class PageContext {
     return writeDeclaration(this, this.options.dts)
   }
 
-  private async generatePagesJSON(): Promise<PagesConfig> {
-    const content = await fs.promises.readFile(this.resolvedPagesJSONPath, { encoding: 'utf-8' }).catch(() => '')
+  /**
+   * Scan main package page directories and collect all page file paths
+   * Scan corresponding directories based on the configured dirs option
+   */
+  private async scanPages(): Promise<void> {
+    const paths = this.options.dirs.flatMap(dir => getPagePaths(dir, this.options))
+    debug.pages(paths)
 
-    const { pages: oldPages, subPackages: oldSubPackages, tabBar: oldTabBar } = cjParse(content || '{}') as CommentObject
+    const pages = new Map<string, Page>()
+    for (const path of paths) {
+      const page = this.pages.get(path.absolutePath) || new Page(this, path)
+      pages.set(path.absolutePath, page)
+    }
 
-    const { pages: _pages, subPackages: _subPackages, tabBar: _tabBar, ...pageJson } = this.pagesGlobConfig || {}
+    this.pages = pages
+  }
 
-    const currentPlatform = platform.toUpperCase()
+  /**
+   * Scan sub-package page directories and collect all sub-package page file paths
+   * Scan corresponding directories based on the configured subPackages option
+   */
+  private async scanSubPages(): Promise<void> {
+    const paths: Record<string, PagePath[]> = {}
+    const subPages = new Map<string, Map<string, Page>>()
+    for (const dir of this.options.subPackages) {
+      const pagePaths = getPagePaths(dir, this.options)
+      paths[dir] = pagePaths
 
-    // pages
-    const oldPagesArray = oldPages as unknown as CommentArray<CommentObject> | undefined
-    pageJson.pages = mergePlatformItems(oldPagesArray, currentPlatform, this.pageMetaData, 'path') as unknown as Pages
+      const pages = new Map<string, Page>()
+      for (const path of pagePaths) {
+        const page = this.subPages.get(dir)?.get(path.absolutePath) || new Page(this, path)
+        pages.set(path.absolutePath, page)
+      }
+      subPages.set(dir, pages)
+    }
+    debug.subPages(JSON.stringify(paths, null, 2))
 
-    // mergePlatformItems uses a Map internally which may lose the ordering from setHomePage,
-    // so we need to ensure the home page is placed first after the merge
-    if (pageJson.pages && pageJson.pages.length > 0) {
-      const pagesArray = pageJson.pages as unknown as InternalPages
-      // Merged entries keep the object from pages.json, which has no internal
-      // `type` marker, so resolve the home page path from the scanned metadata
-      // and match by path; fall back to the `type` marker for type-bearing items
-      const homeMeta = this.pageMetaData.find(meta => meta.type === 'home')
-      const homeIndex = homeMeta
-        ? pagesArray.findIndex((page: InternalPageItem) => page.path === homeMeta.path)
-        : pagesArray.findIndex((page: InternalPageItem) => page.type === 'home')
-      if (homeIndex > 0) {
-        // `CommentArray#splice`/`unshift` only re-index the surviving elements'
-        // comments: the removed entry's comments stay stranded at its old index
-        // and get attached to whatever element moves into that slot, misplacing
-        // `#ifdef`/`#endif` blocks and the generation marker. Snapshot the home
-        // entry's comments, drop the stranded ones, then re-attach them at 0.
-        const commentArray = pagesArray as unknown as CommentArray<CommentObject>
-        const homeBefore = commentArray[Symbol.for(`before:${homeIndex}`) as CommentSymbol]
-        const homeAfter = commentArray[Symbol.for(`after:${homeIndex}`) as CommentSymbol]
-        // before:0 mixes the generation marker with the previous first entry's
-        // own comments (e.g. its #ifdef block): keep the marker on top and
-        // leave the entry's comments attached to it at its new index 1
-        const firstBefore = commentArray[Symbol.for('before:0') as CommentSymbol] || []
-        const isMarker = (token: CommentLineToken | { type: string, value?: string }): boolean =>
-          token.type !== 'BlankLine' && typeof token.value === 'string' && token.value.trim().startsWith('GENERATED BY UNI-PAGES, PLATFORM:')
-        const markerTokens = firstBefore.filter(isMarker)
-        const firstEntryTokens = firstBefore.filter(token => !isMarker(token))
+    this.subPages = subPages
+  }
 
-        // Drop home's own comment symbols BEFORE splicing: comment-json then
-        // shifts every following element's comments down into the freed slot,
-        // so deleting `before/after:${homeIndex}` afterwards would destroy the
-        // comments of the element that moved into that position. `before:0`
-        // must also be gone before the unshift re-indexes everything by +1.
-        Reflect.deleteProperty(commentArray, Symbol.for(`before:${homeIndex}`))
-        Reflect.deleteProperty(commentArray, Symbol.for(`after:${homeIndex}`))
-        Reflect.deleteProperty(commentArray, Symbol.for('before:0'))
-        const [homePage] = pagesArray.splice(homeIndex, 1)
-        pagesArray.unshift(homePage)
+  /**
+   * parse pages rules && set page type
+   * @param pages page path array
+   * @param packageType  page package type (main package or sub-package)
+   * @param overrides custom page config
+   * @returns pages rules
+   */
+  private async parsePages(pages: Map<string, Page>, packageType: 'main' | 'sub', overrides?: Pages): Promise<InternalPages> {
+    const jobs: Promise<InternalPageItem>[] = []
+    for (const [_, page] of pages) {
+      jobs.push(page.getPageMeta())
+    }
+    const generatedPageMetaData = await Promise.all(jobs)
+    const customPageMetaData = (overrides || []) as InternalPages
 
-        commentArray[Symbol.for('before:0') as CommentSymbol] = [...markerTokens, ...(homeBefore || [])]
-        if (firstEntryTokens.length > 0) {
-          commentArray[Symbol.for('before:1') as CommentSymbol] = firstEntryTokens
-        }
-        if (homeAfter) {
-          commentArray[Symbol.for('after:0') as CommentSymbol] = homeAfter
-        }
+    const result = customPageMetaData.length
+      ? mergePageMetaDataArray(generatedPageMetaData.concat(customPageMetaData))
+      : generatedPageMetaData
+
+    // Use Map for deduplication, keeping the last element for each path while maintaining good performance
+    const parseMeta = Array.from(
+      result.reduce((map, page) => {
+        map.set(page.path, page)
+        return map
+      }, new Map<string, InternalPageItem>()).values(),
+    )
+
+    return packageType === 'main' ? this.setHomePage(parseMeta) : parseMeta
+  }
+
+  /**
+   * set home page
+   * @param result pages rules array
+   * @returns pages rules
+   */
+  private setHomePage(result: InternalPages): InternalPages {
+    const hasHome = result.some(({ type }) => type === 'home')
+    if (!hasHome) {
+      // Resolve homePage config to the same relative-path format as page paths (relative to basePath)
+      const basePath = slash(path.join(this.options.root, this.options.outDir))
+      const resolvedHomePages = this.options.homePage.map((v) => {
+        return slash(path.relative(basePath, slash(path.resolve(basePath, v))))
+      })
+
+      // Match by exact path first, then fall back to segment-boundary suffix match
+      // to handle cases where dir is outside outDir (e.g. test environments)
+      const matchHomePage = (itemPath: string, configPath: string): boolean => {
+        if (itemPath === configPath)
+          return true
+        const normalizedItem = itemPath.replace(/\\/g, '/')
+        const normalizedConfig = configPath.replace(/\\/g, '/')
+        return normalizedItem.endsWith(`/${normalizedConfig}`)
+      }
+
+      const isFoundHome = result.some((item) => {
+        const isFound = resolvedHomePages.some(expectedPath => matchHomePage(item.path, expectedPath))
+        if (isFound)
+          item.type = 'home'
+
+        return isFound
+      })
+
+      if (!isFoundHome) {
+        this.logger?.warn('No home page found, check the configuration of pages.config.ts, or add the `homePage` option to UniPages in the Vite config file, or add `definePage({ type: "home" })` in your vue page.', {
+          timestamp: true,
+        })
       }
     }
 
-    // subPackages
-    pageJson.subPackages = oldSubPackages || new CommentArray<CommentObject>()
-    const newSubPackages = new Map<string, SubPackage>()
-    for (const item of this.subPageMetaData) {
-      newSubPackages.set(item.root, item)
-    }
-    // Update existing sub-packages in pages.json with new metadata
-    for (const existing of pageJson.subPackages as unknown as SubPackage[]) {
-      const sub = newSubPackages.get(existing.root)
-      if (sub) {
-        existing.pages = mergePlatformItems(existing.pages as unknown as CommentArray<CommentObject>, currentPlatform, sub.pages, 'path') as unknown as Pages
-        // Preserve plugins property from user config
-        if (sub.plugins) {
-          existing.plugins = sub.plugins
-        }
-        newSubPackages.delete(existing.root)
-      }
-    }
-    // Add new sub-packages that don't exist in pages.json yet
-    for (const [_, newSub] of newSubPackages) {
-      const subPackage: SubPackage = {
-        root: newSub.root,
-        pages: mergePlatformItems(undefined, currentPlatform, newSub.pages, 'path') as unknown as Pages,
-      }
-      // Include plugins property if configured
-      if (newSub.plugins) {
-        subPackage.plugins = newSub.plugins
-      }
-      (pageJson.subPackages as unknown as SubPackage[]).push(subPackage)
+    result.sort(page => (page.type === 'home' ? -1 : 0))
+
+    return result
+  }
+
+  /**
+   * Merge main package page metadata
+   * Filter out pages belonging to sub-packages, then parse page metadata and merge user configuration
+   */
+  private async mergePageMetaData(): Promise<void> {
+    // Collect all absolute paths of pages in sub-packages
+    const subPageAbsolutePaths = Array.from(this.subPages.values()).flatMap(v => Array.from(v.keys()))
+
+    // Filter out pages belonging to sub-packages
+    for (const subPageAbsolutePath of subPageAbsolutePaths)
+      this.pages.delete(subPageAbsolutePath)
+
+    const pageMetaData = await this.parsePages(this.pages, 'main', this.pagesGlobConfig?.pages)
+
+    this.pageMetaData = pageMetaData
+    debug.pages(this.pageMetaData)
+  }
+
+  /**
+   * Merge sub-package page metadata
+   * Parse page metadata for each sub-package and handle sub-package configuration inheritance
+   * Preserves sub-package level properties like plugins from user config
+   */
+  private async mergeSubPageMetaData(): Promise<void> {
+    const subPageMaps: Record<string, InternalPages> = {}
+    // Store plugins config separately to preserve them during merge
+    const subPlugins: Record<string, SubPackage['plugins']> = {}
+    const subPackages = this.pagesGlobConfig?.subPackages || []
+
+    for (const [dir, pages] of this.subPages) {
+      const basePath = slash(path.join(this.options.root, this.options.outDir))
+      // Use custom root from subPackageRootMap if available, otherwise calculate from path
+      // In monorepo scenarios, custom root avoids '..' in pages.json root path
+      const root = this.options.subPackageRootMap.get(dir)
+        ?? slash(path.relative(basePath, path.join(this.options.root, dir)))
+
+      const globPackage = subPackages?.find(v => v.root === root)
+      subPageMaps[root] = await this.parsePages(pages, 'sub', globPackage?.pages)
+      subPageMaps[root] = subPageMaps[root].map(page => ({ ...page, path: slash(path.relative(root, page.path)) }))
+      // Preserve plugins config from user config for this sub-package
+      if (globPackage?.plugins)
+        subPlugins[root] = globPackage.plugins
     }
 
-    // tabbar
-    const { list, ...tabBarOthers } = (await this.resolveTabBar()) || {}
-    if (list) {
-      const oldTabBarObj = oldTabBar as unknown as { list?: CommentArray<CommentObject> } | undefined
-      const { list: oldList } = oldTabBarObj || {}
-      const newList = mergePlatformItems(oldList, currentPlatform, list, 'pagePath')
-      pageJson.tabBar = {
-        ...tabBarOthers, // Always update properties other than list directly
-        list: newList,
+    // Inherit subPackages that do not exist in the scanned pages
+    for (const { root, pages, plugins } of subPackages) {
+      if (root && !subPageMaps[root]) {
+        subPageMaps[root] = pages || []
+        // Preserve plugins config for inherited sub-packages
+        if (plugins)
+          subPlugins[root] = plugins
       }
     }
-    else {
-      pageJson.tabBar = undefined // Clear directly, currently not supporting platform A having tabBar while platform B does not
-    }
 
-    return pageJson
+    // Build final subPageMetaData with plugins preserved
+    const subPageMetaData = Object.keys(subPageMaps)
+      .map(root => ({
+        root,
+        pages: subPageMaps[root],
+        ...(subPlugins[root] && { plugins: subPlugins[root] }),
+      }))
+      .filter(meta => meta.pages.length > 0)
+
+    this.subPageMetaData = subPageMetaData
+    debug.subPages(this.subPageMetaData)
   }
 }
 
@@ -699,199 +596,38 @@ function getPagePaths(dir: string, options: ResolvedOptions): PagePath[] {
 }
 
 /**
- * Merge multi-platform page configuration items
- * Handle conditional compilation comments (#ifdef / #endif), merge configuration items from different platforms into one array
- * Same configuration items will automatically merge platform identifiers, different configuration items will keep conditional compilation comments
- *
- * @param source - Existing configuration item array (from pages.json)
- * @param currentPlatform - Current platform identifier (e.g. H5, MP-WEIXIN)
- * @param items - New configuration item array
- * @param uniqueKeyName - Field name used to identify configuration item uniqueness (e.g. 'path' or 'pagePath')
- * @returns Merged configuration item array with conditional compilation comments
+ * merge page meta data array by path and assign style
+ * @param pageMetaData  page meta data array
+ * TODO: support merge middleware
  */
-function mergePlatformItems<T extends object = Record<string, unknown>>(source: CommentArray<CommentObject> | undefined, currentPlatform: string, items: T[], uniqueKeyName: keyof ExcludeIndexSignature<T>): CommentArray<CommentObject> {
-  const src = source || new CommentArray<CommentObject>()
-  currentPlatform = currentPlatform.toUpperCase()
-
-  // 1. Extract the first comment from CommentArray and get platforms as lastPlatforms
-  let lastPlatforms: string[] = []
-  for (const comment of (src[Symbol.for('before:0') as CommentSymbol] || [])) {
-    // comment-json v5 emits BlankLine tokens (without `value`) when the source
-    // contains blank lines, e.g. manually formatted pages.json files
-    if (comment.type === 'BlankLine')
-      continue
-
-    const trimmed = comment.value.trim()
-    if (trimmed.startsWith('GENERATED BY UNI-PAGES, PLATFORM:')) {
-      // Remove current platform
-      lastPlatforms = trimmed.split(':')[1].split('||').map(s => s.trim()).filter(s => s !== currentPlatform).sort()
+function mergePageMetaDataArray(pageMetaData: InternalPages): InternalPages {
+  const pageMetaDataObj = groupBy(pageMetaData, 'path')
+  const result: InternalPages = []
+  for (const path in pageMetaDataObj) {
+    const group = pageMetaDataObj[path]
+    const mergedPage = group[0]
+    for (const page of group) {
+      mergedPage.style = Object.assign(mergedPage.style ?? {}, page.style ?? {})
+      Object.assign(mergedPage, page)
     }
+    result.push(mergedPage)
   }
-
-  // Items may carry an internal `type` marker ('home' | 'page'), but it must not
-  // affect equality: pages.json files written by older versions may have `type`
-  // stripped, so a raw JSON.stringify comparison would treat the same page as two
-  // different entries and produce duplicate routes across platform runs
-  // (see https://github.com/uni-helper/vite-plugin-uni-pages/issues/283).
-  // stringifyForCompare normalizes both sides by dropping `type` before serializing.
-  const stringifyForCompare = (val: T): string => {
-    if (val && typeof val === 'object' && 'type' in val) {
-      const { type: _type, ...rest } = val
-      return JSON.stringify(rest)
-    }
-    return JSON.stringify(val)
-  }
-
-  // 2. Iterate source, judge each element, then add to new mergedMap using uniqueKey element value as key
-  interface MultiPlatformItem {
-    item: T
-    itemStr: string
-    platforms: string[]
-    platformStr: string
-  }
-  const mergedMap = new Map<string, MultiPlatformItem[]>()
-
-  for (let i = 0; i < src.length; i++) {
-    const item = src[i] as unknown as T
-    const uniqueKey = (item as Record<string, unknown>)[uniqueKeyName as string] as string
-
-    if (!uniqueKey) {
-      continue
-    }
-
-    // Check if there are conditional compilation comments
-    const beforeComments = src[Symbol.for(`before:${i}`) as CommentSymbol]
-    // const afterComments = src[Symbol.for(`after:${i}`) as CommentSymbol]
-
-    // BlankLine tokens carry no `value` and must be skipped before matching
-    const ifdefComment = beforeComments?.find((c): c is CommentLineToken => c.type !== 'BlankLine' && c.value.trim().startsWith('#ifdef'))
-    // const endifComment = afterComments?.find(c => c.value.trim().startsWith('#endif'))
-
-    let platforms: string[] = [...lastPlatforms]
-
-    if (ifdefComment) {
-      const match = ifdefComment.value.match(/#ifdef\s+(.+)/)
-      if (match) {
-        // Remove current platform
-        platforms = match[1].split('||').map(p => p.trim()).filter(s => s !== currentPlatform).sort()
-      }
-    }
-
-    // Skip if platforms is empty except for current platform
-    if (platforms.length === 0) {
-      continue
-    }
-
-    const existing = mergedMap.get(uniqueKey) || []
-    existing.push({ item, itemStr: stringifyForCompare(item), platforms, platformStr: platforms.join(' || ') })
-    mergedMap.set(uniqueKey, existing)
-  }
-
-  // 3. Merge items into mergedMap
-  for (const item of items) {
-    const uniqueKey = item[uniqueKeyName] as string
-
-    if (!uniqueKey) {
-      continue
-    }
-
-    if (!mergedMap.has(uniqueKey)) {
-      // If not exists, add to mergedMap
-      mergedMap.set(uniqueKey, [{
-        item,
-        itemStr: stringifyForCompare(item),
-        platforms: [currentPlatform],
-        platformStr: currentPlatform,
-      }])
-      continue
-    }
-
-    // If exists, check if elements are equal
-    const existing = mergedMap.get(uniqueKey)!
-
-    const itemStr = stringifyForCompare(item)
-    const equalObj = existing.find(val => val.itemStr === itemStr)
-    if (equalObj) {
-      equalObj.platforms.push(currentPlatform)
-      equalObj.platforms.sort()
-      equalObj.platformStr = equalObj.platforms.join(' || ')
-    }
-    else {
-      existing.push({
-        item,
-        itemStr,
-        platforms: [currentPlatform],
-        platformStr: currentPlatform,
-      })
-    }
-  }
-
-  // 4. Iterate mergedMap to generate result:CommentArray<CommentObject>
-  const result = new CommentArray<CommentObject>()
-
-  // Check platform usage frequency, use the most frequently used platform as default
-  const platformUsage: Record<string, number> = {}
-  mergedMap.forEach((val) => {
-    Object.values(val).forEach((v) => {
-      platformUsage[v.platformStr] = (platformUsage[v.platformStr] || 0) + 1
-    })
-  })
-  const usageKeys = Object.keys(platformUsage).sort()
-  const defaultPlatformStr = usageKeys.length
-    // Sort the keys so the tie-break is deterministic instead of depending on
-    // map insertion order: the home reordering above changes that order
-    // between runs, which used to flip the default platform back and forth
-    // until the output converged
-    ? usageKeys.reduce((a, b) => (platformUsage[a] > platformUsage[b] ? a : b))
-    : currentPlatform
-
-  // Add generation identifier comment to result's Symbol.for(`before:0`)
-  result[Symbol.for('before:0') as CommentSymbol] = [{
-    type: 'LineComment',
-    value: ` GENERATED BY UNI-PAGES, PLATFORM: ${defaultPlatformStr}`,
-    inline: false,
-    loc: {
-      start: { line: 0, column: 0 },
-      end: { line: 0, column: 0 },
-    },
-  }]
-
-  // Process elements in insertion order
-  for (const [_, list] of mergedMap) {
-    for (const { item, platformStr } of list) {
-      result.push(item as unknown as CommentObject)
-
-      // Check if platforms matches defaultPlatformStr (platforms and defaultPlatforms are pre-sorted)
-      if (platformStr !== defaultPlatformStr) {
-      // Platform info exists and differs from default platform, add conditional compilation comments
-        // Append instead of replacing: before:0 may already carry the
-        // generation marker, which must stay at the top of the array
-        result[Symbol.for(`before:${result.length - 1}`) as CommentSymbol] = [
-          ...(result[Symbol.for(`before:${result.length - 1}`) as CommentSymbol] || []),
-          {
-            type: 'LineComment',
-            value: ` #ifdef ${platformStr}`,
-            inline: false,
-            loc: {
-              start: { line: 0, column: 0 },
-              end: { line: 0, column: 0 },
-            },
-          },
-        ]
-
-        result[Symbol.for(`after:${result.length - 1}`) as CommentSymbol] = [{
-          type: 'LineComment',
-          value: ' #endif',
-          inline: false,
-          loc: {
-            start: { line: 0, column: 0 },
-            end: { line: 0, column: 0 },
-          },
-        }]
-      }
-    }
-  }
-
-  // 5. Return result:CommentArray<CommentObject>
   return result
+}
+
+/**
+ * Invalidate virtual module to trigger HMR update
+ * When page configuration changes, the virtual module needs to be invalidated to regenerate content
+ *
+ * @param server - Vite dev server instance
+ */
+function invalidatePagesModule(server: ViteDevServer): void {
+  const { moduleGraph } = server
+  const mods = moduleGraph.getModulesByFile(RESOLVED_MODULE_ID_VIRTUAL)
+  if (mods) {
+    const seen = new Set<ModuleNode>()
+    mods.forEach((mod) => {
+      moduleGraph.invalidateModule(mod, seen)
+    })
+  }
 }

@@ -4,9 +4,10 @@ import os from 'node:os'
 import path from 'node:path'
 import { parse as cjParse } from 'comment-json'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { PageContext } from '../packages/core/src'
 
 /**
- * Regression coverage for the home page reordering in generatePagesJSON.
+ * Regression coverage for the home page reordering in writePagesJson.
  *
  * Three pre-existing issues combined to corrupt pages.json when the home
  * entry was not already first in the merged array:
@@ -20,16 +21,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
  * 3. When the first merged entry needed an `#ifdef` block, assigning
  *    `before:0` replaced the GENERATED marker instead of appending to it.
  *
- * Platform model follows concurrent-pages-json.test.ts: `UNI_PLATFORM` is set
- * before importing PageContext so the current process models mp-weixin, while
- * the pre-seeded file represents another terminal's output.
+ * Platform model follows concurrent-pages-json.test.ts: the current platform
+ * (mp-weixin) is injected through the PageContext constructor, while the
+ * pre-seeded file represents another terminal's output.
  */
-
-// Set BEFORE importing context.ts, which captures `platform` from uni-env.
-process.env.UNI_PLATFORM = 'mp-weixin'
-
-// Dynamic import so the env above is in place when the module loads.
-const { PageContext } = await import('../packages/core/src')
 
 function writePage(pagesDir: string, name: string, title: string): void {
   fs.writeFileSync(
@@ -125,6 +120,7 @@ describe('pages.json home page reordering keeps comment attachment', () => {
     const ctx = new PageContext(
       { dir: 'src/pages', outDir: 'src', homePage: 'pages/index', dts: false },
       tmpDir,
+      'mp-weixin',
     )
     await ctx.updatePagesJSON()
 
@@ -175,6 +171,7 @@ describe('pages.json home page reordering keeps comment attachment', () => {
     const ctx = new PageContext(
       { dir: 'src/pages', outDir: 'src', homePage: 'pages/index', dts: false },
       tmpDir,
+      'mp-weixin',
     )
     await ctx.updatePagesJSON()
     const first = fs.readFileSync(pagesJsonPath, 'utf-8')
@@ -233,6 +230,7 @@ describe('pages.json home page reordering keeps comment attachment', () => {
     const ctx = new PageContext(
       { dir: 'src/pages', outDir: 'src', homePage: 'pages/index', dts: false },
       tmpDir,
+      'mp-weixin',
     )
     await ctx.updatePagesJSON()
 
@@ -320,6 +318,7 @@ describe('pages.json home page reordering keeps comment attachment', () => {
     const ctx = new PageContext(
       { dir: 'src/pages', outDir: 'src', homePage: 'pages/index', dts: false },
       tmpDir,
+      'mp-weixin',
     )
     await ctx.updatePagesJSON()
     const first = fs.readFileSync(pagesJsonPath, 'utf-8')

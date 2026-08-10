@@ -1,14 +1,11 @@
-import type { SFCDescriptor, SFCParseOptions } from '@vue/compiler-sfc'
 import type { TabBarItem } from './config'
 import type { PageContext } from './context'
 import type { InternalPageItem, PagePath, UserPageItem } from './types'
 import fs from 'node:fs'
 import { extname } from 'node:path'
-import * as t from '@babel/types'
-import { parse as VueParser } from '@vue/compiler-sfc'
-import { babelParse, isCallOf } from 'ast-kit'
 import { normalizePath } from 'vite'
-import { babelGenerate, debug, parseCode } from './utils'
+import { debug } from './logger'
+import { evaluateDefinePage } from './macro'
 
 /**
  * Page class representing a Vue page file
@@ -130,9 +127,7 @@ export class Page {
   private async readPageMetaFromFile(): Promise<UserPageItem> {
     try {
       const content = await fs.promises.readFile(this.path.absolutePath, { encoding: 'utf-8' })
-      const sfc = parseSFC(content, { filename: this.path.absolutePath })
-
-      const meta = await tryPageMetaFromMacro(sfc)
+      const meta = await evaluateDefinePage(content, this.path.absolutePath)
       if (meta) {
         return meta
       }
@@ -143,124 +138,4 @@ export class Page {
       throw new Error(`Read page meta fail in ${this.path.relativePath}\n${err.message}`)
     }
   }
-}
-
-/**
- * Parse Vue Single File Component (SFC)
- * Compatible with different versions of @vue/compiler-sfc
- *
- * @param code - Vue SFC source code
- * @param options - Parse options
- * @returns SFC descriptor object
- */
-export function parseSFC(code: string, options?: SFCParseOptions): SFCDescriptor {
-  return (
-    VueParser(code, {
-      pad: 'space',
-      ...options,
-    }).descriptor
-    // for @vue/compiler-sfc ^2.7
-    || (VueParser as any)({
-      source: code,
-      ...options,
-    })
-  )
-}
-
-/**
- * Try to extract page metadata defined by definePage macro from SFC
- * Support using definePage in script setup or regular script
- *
- * @param sfc - Vue SFC descriptor
- * @returns Page metadata object, or undefined if definePage is not found
- */
-export async function tryPageMetaFromMacro(sfc: SFCDescriptor): Promise<UserPageItem | undefined> {
-  const sfcScript = sfc.scriptSetup || sfc.script
-
-  if (!sfcScript) {
-    return undefined
-  }
-
-  // Import attributes (`with { ... }`) are natively supported by @babel/parser 8.
-  // The deprecated `assert { ... }` syntax has been removed upstream; such files
-  // fail to parse here, the error propagates to Page.read() and the page
-  // degrades to path-only metadata (the definePage macro cannot be evaluated).
-  const ast = babelParse(sfcScript.content, sfcScript.lang || 'js')
-  const macro = findMacro(ast.body, sfc.filename)
-  if (macro) {
-    const imports = findImports(ast.body).filter(imp => !!imp.specifiers.length).map(imp => babelGenerate(imp).code)
-
-    const [macroOption] = macro.arguments
-    const code = babelGenerate(macroOption).code
-
-    const parsed = await parseCode({
-      imports,
-      code,
-      filename: sfc.filename,
-    })
-
-    const parsedMeta = typeof parsed === 'function'
-      ? await Promise.resolve(parsed())
-      : await Promise.resolve(parsed)
-
-    return {
-      type: 'page',
-      ...parsedMeta,
-    }
-  }
-  return undefined
-}
-
-/**
- * Find definePage macro call in AST
- * Support function expressions, arrow functions and object expressions as arguments
- *
- * @param stmts - AST statement array
- * @param filename - Filename for error reporting
- * @returns definePage call expression, or undefined if not found
- */
-export function findMacro(stmts: t.Statement[], filename: string): t.CallExpression | undefined {
-  let macro: t.CallExpression | undefined
-
-  for (const stmt of stmts) {
-    let node: t.Node = stmt
-    if (stmt.type === 'ExpressionStatement')
-      node = stmt.expression
-
-    if (isCallOf(node, 'definePage')) {
-      macro = node
-      break
-    }
-  }
-
-  if (!macro)
-    return
-
-  // Extract the first argument of the macro call
-  const [opt] = macro.arguments
-
-  // Validate the macro argument: only function or object literals are supported
-  if (opt && !t.isFunctionExpression(opt) && !t.isArrowFunctionExpression(opt) && !t.isObjectExpression(opt)) {
-    debug.definePage(`definePage() only supports a function or object literal as argument: ${filename}`)
-    return
-  }
-
-  return macro
-}
-
-/**
- * Extract all import declarations from AST
- * Used to provide necessary imports when executing definePage arguments
- *
- * @param stmts - AST statement array
- * @returns Import declaration array
- */
-export function findImports(stmts: t.Statement[]): t.ImportDeclaration[] {
-  const imports: t.ImportDeclaration[] = []
-  for (const stmt of stmts) {
-    if (t.isImportDeclaration(stmt)) {
-      imports.push(stmt)
-    }
-  }
-  return imports
 }
