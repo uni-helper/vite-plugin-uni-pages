@@ -4,7 +4,7 @@ import type { UserPageItem } from './types'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import vm from 'node:vm'
-import babelGenerator from '@babel/generator'
+import babelGenerate from '@babel/generator'
 import * as t from '@babel/types'
 import { parse as VueParser } from '@vue/compiler-sfc'
 import { babelParse, isCallOf } from 'ast-kit'
@@ -20,20 +20,6 @@ import { debug } from './logger'
  * functions: evaluateDefinePage (scan path) and findDefinePageMacro (transform
  * path).
  */
-
-/**
- * Get default export of a module
- * Compatible with CommonJS and ES Module export styles
- *
- * @param expr - Module object
- * @returns Default export value
- */
-function getDefaultExport<T = any>(expr: T): T {
-  return (expr as any).default === undefined ? expr : (expr as any).default
-}
-
-/** Babel code generator for converting AST back to code */
-const babelGenerate = getDefaultExport(babelGenerator)
 
 /**
  * Parse Vue Single File Component (SFC)
@@ -96,9 +82,7 @@ export async function evaluateDefinePage(code: string, filename: string): Promis
     filename,
   })
 
-  const parsedMeta = typeof parsed === 'function'
-    ? await Promise.resolve(parsed())
-    : await Promise.resolve(parsed)
+  const parsedMeta = typeof parsed === 'function' ? await parsed() : parsed
 
   return {
     type: 'page',
@@ -198,13 +182,7 @@ function findMacro(stmts: t.Statement[], filename: string): t.CallExpression | u
  * @returns Import declaration array
  */
 function findImports(stmts: t.Statement[]): t.ImportDeclaration[] {
-  const imports: t.ImportDeclaration[] = []
-  for (const stmt of stmts) {
-    if (t.isImportDeclaration(stmt)) {
-      imports.push(stmt)
-    }
-  }
-  return imports
+  return stmts.filter(t.isImportDeclaration)
 }
 
 /**
@@ -290,10 +268,7 @@ async function parseCode(options: { imports: string[], code: string, filename: s
     })
 
     // Get exported value
-    const result = (vmContext.exports as any).default || vmContext.exports
-
-    // Return result
-    return result
+    return (vmContext.exports as any).default || vmContext.exports
   }
   catch (error: any) {
     throw new Error(`EXEC SCRIPT FAIL IN ${filename}: ${error.message} \n\n${jsCode}\n\n`)
