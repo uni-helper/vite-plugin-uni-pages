@@ -128,11 +128,7 @@ export class Page {
     try {
       const content = await fs.promises.readFile(this.path.absolutePath, { encoding: 'utf-8' })
       const meta = await evaluateDefinePage(content, this.path.absolutePath)
-      if (meta) {
-        return meta
-      }
-
-      return { type: 'page' }
+      return meta ?? { type: 'page' }
     }
     catch (err: any) {
       throw new Error(`Read page meta fail in ${this.path.relativePath}\n${err.message}`)

@@ -54,33 +54,31 @@ export function resolvePagesJsonPath(root: string, outDir: string): string {
  * @param path - File path to check
  */
 export function checkPagesJsonFileSync(path: fs.PathLike): void {
-  /**
-   * Create an empty pages.json file
-   * @param path - File path
-   * @returns boolean - Whether the creation was successful
-   */
-  const createEmptyFile = (path: fs.PathLike): boolean => {
+  /** Create a placeholder pages.json file, swallowing write errors */
+  const createEmptyFile = (filePath: fs.PathLike): void => {
     try {
       fs.writeFileSync(
-        path,
+        filePath,
         JSON.stringify({ pages: [{ path: '' }] }, null, 2),
         { encoding: 'utf-8' },
       )
-      return true
     }
-    catch {
-      return false
-    }
+    catch {}
   }
 
-  /**
-   * Delete the file at the specified path
-   * @param path - File path
-   * @returns boolean - Whether the deletion was successful
-   */
-  const unlinkFile = (path: fs.PathLike): boolean => {
+  /** Delete then recreate the file; gives up silently when deletion fails */
+  const replaceFile = (filePath: fs.PathLike): void => {
     try {
-      fs.unlinkSync(path)
+      fs.unlinkSync(filePath)
+      createEmptyFile(filePath)
+    }
+    catch {}
+  }
+
+  /** Whether the file is readable and writable */
+  const hasReadWriteAccess = (filePath: fs.PathLike): boolean => {
+    try {
+      fs.accessSync(filePath, fs.constants.R_OK | fs.constants.W_OK)
       return true
     }
     catch {
@@ -89,7 +87,6 @@ export function checkPagesJsonFileSync(path: fs.PathLike): void {
   }
 
   try {
-    // Check if file exists
     try {
       fs.accessSync(path, fs.constants.F_OK)
     }
@@ -99,28 +96,9 @@ export function checkPagesJsonFileSync(path: fs.PathLike): void {
       return
     }
 
-    // Check if it's a file
-    const stat = fs.statSync(path)
-    if (!stat.isFile()) {
-      // Not a file, try to delete and recreate
-      if (!unlinkFile(path)) {
-        return
-      }
-      createEmptyFile(path)
-      return
-    }
-
-    // Check read/write permissions
-    try {
-      fs.accessSync(path, fs.constants.R_OK | fs.constants.W_OK)
-    }
-    catch {
-      // Insufficient permissions, try to delete and recreate
-      if (!unlinkFile(path)) {
-        return
-      }
-      createEmptyFile(path)
-    }
+    // Replace the file when it is not a regular file or lacks read/write permissions
+    if (!fs.statSync(path).isFile() || !hasReadWriteAccess(path))
+      replaceFile(path)
   }
   catch {
     // Other errors occurred, try to create file
