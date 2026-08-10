@@ -13,6 +13,7 @@ import { PageContext } from './context'
 import { checkPagesJsonFileSync, resolvePagesJsonPath } from './files'
 import { findDefinePageMacro } from './macro'
 
+export * from './condition'
 export * from './config'
 export * from './constant'
 export * from './context'

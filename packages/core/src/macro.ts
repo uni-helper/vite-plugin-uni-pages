@@ -10,6 +10,7 @@ import { platform as uniEnvPlatform } from '@uni-helper/uni-env'
 import { parse as VueParser } from '@vue/compiler-sfc'
 import { babelParse, isCallOf } from 'ast-kit'
 import * as ts from 'typescript'
+import { DefineConditional, isConditional } from './condition'
 import { debug } from './logger'
 
 /**
@@ -86,17 +87,24 @@ export async function evaluateDefinePage(code: string, filename: string, platfor
     filename,
   })
 
-  // Function-form macros receive the current platform so users can branch on
-  // it without reading process.env.UNI_PLATFORM themselves
-  const parsedMeta = typeof parsed === 'function' ? await parsed({ platform }) : parsed
+  // Function-form macros receive the current platform and the conditional
+  // `define` factory so users can branch per platform without reading
+  // process.env.UNI_PLATFORM themselves
+  const parsedMeta = typeof parsed === 'function'
+    ? await parsed({ platform, define: (base: Record<string, any>) => new DefineConditional(base) })
+    : parsed
+
+  // Conditional definitions are resolved for the current platform right here
+  // so downstream stages keep handling plain objects
+  const resolvedMeta = isConditional(parsedMeta) ? parsedMeta.resolve(platform) : parsedMeta
 
   // An explicit null opts the page out of pages.json on this platform
-  if (parsedMeta === null)
+  if (resolvedMeta === null)
     return null
 
   return {
     type: 'page',
-    ...parsedMeta,
+    ...resolvedMeta,
   }
 }
 

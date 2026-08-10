@@ -1,4 +1,5 @@
 import type { LoadConfigSource } from 'unconfig'
+import type { DefineConditional } from './condition'
 import type { PageItem, PagesConfig, SubPackages, TabBarItem } from './config'
 import type { debug } from './logger'
 import type { Page } from './page'
@@ -76,6 +77,16 @@ export type MaybePromiseCallable<T> = T | (() => T) | (() => Promise<T>)
 export interface DefinePageContext {
   /** Current platform identifier, e.g. 'mp-weixin' */
   platform: string
+  /**
+   * Create a platform-conditional page metadata definition
+   *
+   * Usage: `define(base).ifdef(platforms, partial).ifndef(platforms, partial)`.
+   * Matching branches are deep-merged into `base` in declaration order:
+   * objects merge recursively, arrays and primitives are replaced.
+   * `h5` and `web` are aliases of the same platform, so listing either
+   * one in a branch covers both.
+   */
+  define: (base: UserPageItem) => DefineConditional
 }
 
 /**
@@ -83,9 +94,10 @@ export interface DefinePageContext {
  * The macro call is removed by the plugin during build
  *
  * Return `null` (or pass `null` directly) to exclude the page from
- * pages.json on the current platform
+ * pages.json on the current platform. Use the injected `define` factory
+ * for platform-conditional metadata without manual platform branching.
  */
-export declare function definePage(options: UserPageItem | null | ((context: DefinePageContext) => MaybePromise<UserPageItem | null>)): void
+export declare function definePage(options: UserPageItem | null | ((context: DefinePageContext) => MaybePromise<UserPageItem | DefineConditional | null>)): void
 
 /** Type of the definePage macro */
 export type DefinePage = typeof definePage
