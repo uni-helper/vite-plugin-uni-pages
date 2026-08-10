@@ -59,6 +59,7 @@
   },
   "dependencies": {
     "@babel/generator": "catalog:",
+    "@babel/types": "catalog:",
     "@uni-helper/uni-env": "catalog:",
     "@uni-helper/uni-pages-types": "workspace:*",
     "@vue/compiler-sfc": "catalog:",
@@ -76,7 +77,6 @@
   },
   "devDependencies": {
     "@antfu/utils": "catalog:",
-    "@babel/types": "catalog:",
     "@types/debug": "catalog:",
     "@types/lodash.groupby": "catalog:",
     "@types/node": "catalog:",
