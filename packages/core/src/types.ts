@@ -116,38 +116,60 @@ export type ConfigSource = string | LoadConfigSource<PagesConfig> | LoadConfigSo
 /**
  * Plugin configuration options interface
  * Defines all configuration options that users can pass in
+ *
+ * Internal pipeline: load user config -> scan page files -> merge page
+ * metadata -> generate and write pages.json
  */
 export interface Options {
 
   /**
    * Generate TypeScript declaration for pages path
    *
-   * Accept boolean or a path related to project root
+   * When `true`, generates `uni-pages.d.ts` in the project root.
+   * When a string, used as a custom output path relative to the project root.
    *
    * @default true
+   * @since 0.2.9
    */
   dts?: boolean | string
   /**
-   * Load from configs files
+   * Loading source of the page config file
    *
-   * @default 'pages.config.(ts|mts|cts|js|cjs|mjs|json)',
+   * Based on unconfig, supports merging multiple config sources
+   *
+   * @default 'pages.config'
+   * @since 0.2.7
    */
   configSource: ConfigSource
   /**
-   * The default application entry page is the home page
+   * Default application entry page (home page)
+   *
+   * Used when no page is marked as home via `definePage({ type: 'home' })`.
+   * Supports multiple path styles for compatibility with different directory layouts.
+   *
    * @default ['pages/index', 'pages/index/index']
+   * @since 0.1.9
    */
   homePage: string | string[]
 
   /**
-   * Whether to merge pages in pages.json
+   * Whether to auto-scan directories and merge page configs into pages.json
+   *
+   * When disabled, only the user config file is loaded and the filesystem is not scanned
+   *
    * @default true
+   * @since 0.1.0
    */
   mergePages: boolean
 
   /**
-   * Paths to the directory to search for page components.
+   * Search directory for main package pages
+   *
+   * Supports glob patterns, e.g. 'src/{pages,views}'.
+   * The final result is resolved by tinyglobby into a list of matched directories.
+   *
    * @default 'src/pages'
+   * @since 0.1.0
    */
   dir: string
 
@@ -162,30 +184,41 @@ export interface Options {
    *
    * @see https://github.com/uni-helper/vite-plugin-uni-pages/issues/271
    * @default []
+   * @since 0.1.8
    */
   subPackages: (string | SubPackageConfig)[]
 
   /**
-   * pages.json dir
-   * @default "src"
+   * Directory of pages.json
+   *
+   * Relative to the project root, also the base for computing page relative paths
+   *
+   * @default 'src'
+   * @since 0.0.1
    */
   outDir: string
 
   /**
-   * pages to be excluded, based on [tinyglobby ignore option](https://superchupu.dev/tinyglobby/documentation#ignore)
-   * @default []
+   * File/directory patterns to exclude
+   *
+   * Based on the [tinyglobby ignore option](https://superchupu.dev/tinyglobby/documentation#ignore)
+   *
+   * @default ['node_modules', '.git', '**\/__*__/**']
+   * @since 0.0.4
    */
   exclude: string[]
 
   /**
-   * minify the `pages.json`
+   * Minify the generated pages.json
    * @default false
+   * @since 0.1.6
    */
   minify: boolean
 
   /**
    * Whether to insert a final newline at the end of the generated pages.json
    * @default false
+   * @since 0.5.0
    */
   insertFinalNewline: boolean
 
@@ -196,23 +229,35 @@ export interface Options {
    *
    * Ignored when `minify` is `true`
    * @default 2
+   * @since 0.5.0
    */
   indent: number | string
 
   /**
    * Line ending of the generated pages.json
    * @default '\n'
+   * @since 0.5.0
    */
   eol: '\n' | '\r\n'
 
   /**
-   * enable debug log
+   * Enable debug logs
+   *
+   * When `true`, enables all categories; when a string, enables only the
+   * specific category. Available categories:
+   * hmr | options | pages | subPages | error | cache | declaration | definePage.
+   * Can also be controlled via the DEBUG=vite-plugin-uni-pages:* environment variable.
+   *
+   * @default false
+   * @since 0.1.8
    */
   debug: boolean | DebugType
 
   /**
    * Lifecycle hooks, fired at each pipeline stage. Hooks receive only the
    * stage's input or output data, never the whole context.
+   *
+   * @since 0.0.3
    */
   onBeforeLoadUserConfig: () => void
   onAfterLoadUserConfig: (pagesGlobConfig: PagesConfig | undefined) => void
