@@ -17,13 +17,14 @@ pnpm i -D @uni-helper/vite-plugin-uni-pages
 
 ## 使用
 
-📖 **请阅读[完整文档](https://uni-helper.js.org/vite-plugin-uni-pages)了解完整使用方法！**
+📖 请阅读[在线文档](https://uni-helper.js.org/vite-plugin-uni-pages)或各包 README 文档了解使用方法。
 
 ```ts
 // vite.config.mts
 import Uni from '@uni-helper/plugin-uni'
 // 或
-// import Uni from '@dcloudio/vite-plugin-uni'
+// import dcloudioUni from '@dcloudio/vite-plugin-uni'
+// const Uni = dcloudioUni.default || dcloudioUni
 import UniPages from '@uni-helper/vite-plugin-uni-pages'
 import { defineConfig } from 'vite'
 
