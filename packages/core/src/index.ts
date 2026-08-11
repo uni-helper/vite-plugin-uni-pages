@@ -22,7 +22,7 @@ export * from './logger'
 export * from './macro'
 export * from './options'
 export * from './page'
-export * from './pagesJson'
+export * from './pages-json'
 export * from './pipeline'
 export * from './types'
 

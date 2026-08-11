@@ -242,6 +242,11 @@ function ensureHomePageFirst(pagesArray: InternalPages | undefined, homePath: st
   // so deleting `before/after:${homeIndex}` afterwards would destroy the
   // comments of the element that moved into that position. `before:0`
   // must also be gone before the unshift re-indexes everything by +1.
+  // `after-value:${homeIndex}` needs no handling here: `pagesArray` is the
+  // freshly built output of mergePlatformItems, whose only comment tokens
+  // are `before` entries (#ifdef blocks and the generation marker); user
+  // after-value comments are dropped at that earlier stage and cannot
+  // reach this function (verified empirically).
   Reflect.deleteProperty(commentArray, Symbol.for(`before:${homeIndex}`))
   Reflect.deleteProperty(commentArray, Symbol.for(`after:${homeIndex}`))
   Reflect.deleteProperty(commentArray, Symbol.for('before:0'))

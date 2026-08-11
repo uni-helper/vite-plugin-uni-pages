@@ -16,7 +16,7 @@ import { checkPagesJsonFileSync, getPageFiles, isTargetFile, resolvePagesJsonPat
 import { debug } from './logger'
 import { resolveOptions } from './options'
 import { Page } from './page'
-import { writePagesJson } from './pagesJson'
+import { writePagesJson } from './pages-json'
 
 /**
  * Page context class responsible for page scanning, config loading, page metadata merging and pages.json generation
