@@ -3,10 +3,10 @@
   "version": "0.3.24",
   "private": true,
   "scripts": {
-    "dev:web": "unh dev web",
+    "build:mp-weixin": "unh build mp-weixin",
     "build:web": "unh build web",
     "dev:mp-weixin": "unh dev mp-weixin",
-    "build:mp-weixin": "unh build mp-weixin"
+    "dev:web": "unh dev web"
   },
   "dependencies": {
     "@dcloudio/uni-app": "catalog:",
