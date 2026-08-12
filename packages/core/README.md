@@ -121,6 +121,8 @@ definePage(({ define }) =>
 
 你也可以导入 [虚拟模块](https://v5.vite.dev/guide/api-plugin.html#virtual-modules-convention) 来访问所有页面的元数据。
 
+> 注意：虚拟模块的导出不保证稳定，可能会在小版本中出现变化。
+
 ```ts
 /// <reference types="@uni-helper/vite-plugin-uni-pages/client" />
 import { pages } from 'virtual:uni-pages'
@@ -435,70 +437,7 @@ export default defineConfig({
 
 ## 开发
 
-### 前置条件
-
-- [Node.js](https://nodejs.org/) 24
-- [pnpm](https://pnpm.io/) 10.34.4
-
-### 常用命令
-
-```bash
-# 安装依赖（在 monorepo 根目录执行）
-pnpm install
-
-# 构建所有包
-pnpm build
-
-# 仅构建 core 包
-pnpm -C packages/core build
-
-# 运行测试（在 monorepo 根目录执行）
-pnpm test
-
-# 测试覆盖率
-pnpm coverage
-
-# 代码检查
-pnpm lint
-
-# 类型检查
-pnpm type-check
-
-# 启动 playground 调试
-pnpm play:mp-weixin
-pnpm play:web
-```
-
-### 测试
-
-测试文件位于 monorepo 根目录的 `test/` 目录下，使用 [Vitest](https://vitest.dev/) 运行：
-
-```shell
-test/
-├── generate-routes-*.test.ts            各平台（web / mp-weixin / mp-alipay）路由生成
-├── generate-tabbar-web.test.ts          tabBar 生成
-├── define-page-*.test.ts                definePage 宏：条件 DSL、null、平台行为
-├── concurrent-pages-json.test.ts        多终端并发读写 pages.json
-├── files*.test.ts                       文件工具与文件锁
-├── pages-json-*.test.ts                 pages.json 生成细节（空行、首页排序、子包收敛）
-├── repro-dup.test.ts                    重复路由回归
-└── types.test.ts                        类型断言
-```
-
-平台相关的快照测试通过 seam 注入 `platform`，并用 `vi.mock` / `vi.stubEnv` 隔离环境变量与文件系统，保证不同环境下结果确定。
-
-### 项目结构
-
-```shell
-vite-plugin-uni-pages/
-├── packages/
-│   ├── core/           插件核心逻辑
-│   ├── types/          pages.json TypeScript 类型定义
-│   └── schema/         JSON Schema（从 types 自动生成）
-├── test/               测试文件
-├── playground/         示例 uni-app 项目
-└── pnpm-workspace.yaml
-```
+环境搭建、常用命令、测试与项目结构见仓库根目录的 [CONTRIBUTING.md](../../CONTRIBUTING.md)。
 
 ## 架构
 
