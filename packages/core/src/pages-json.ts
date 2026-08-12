@@ -215,10 +215,20 @@ function ensureHomePageFirst(pagesArray: InternalPages | undefined, homePath: st
   // Entries merged from pages.json may lack the internal `type` marker
   // (user-written entries never carry it), so match the home page by the
   // path resolved from scanned metadata; fall back to the `type` marker
-  // for type-bearing entries
-  const homeIndex = homePath
-    ? pagesArray.findIndex((page: InternalPageItem) => page.path === homePath)
-    : pagesArray.findIndex((page: InternalPageItem) => page.type === 'home')
+  // for type-bearing entries. A path may appear once per platform with
+  // different home status (per-platform home behind #ifdef blocks), so
+  // prefer the variant that actually carries the home marker — moving a
+  // non-home variant first would leave the platform's real home stranded
+  // behind it after conditional compilation
+  let homeIndex = -1
+  if (homePath) {
+    homeIndex = pagesArray.findIndex((page: InternalPageItem) => page.path === homePath && page.type === 'home')
+    if (homeIndex === -1)
+      homeIndex = pagesArray.findIndex((page: InternalPageItem) => page.path === homePath)
+  }
+  else {
+    homeIndex = pagesArray.findIndex((page: InternalPageItem) => page.type === 'home')
+  }
   if (homeIndex <= 0)
     return
 
@@ -340,6 +350,24 @@ function stringifyForCompare<T extends object>(val: T): string {
     return JSON.stringify(rest)
   }
   return JSON.stringify(val)
+}
+
+/**
+ * Whether two content-equal items agree on home status
+ *
+ * The `type` marker is excluded from content comparison (see
+ * stringifyForCompare), so a marker-less entry still merges with its scanned
+ * counterpart. But when both sides explicitly carry a marker and disagree
+ * ('home' vs 'page'), they describe different home pages per platform and
+ * must stay separate entries behind #ifdef blocks instead of collapsing into
+ * whichever run wrote first — collapsing is what kept stale home markers
+ * alive after a home switch and silently dropped platform-scoped home
+ * declarations.
+ */
+function homeStatusCompatible(a: object, b: object): boolean {
+  const typeA = (a as InternalPageItem).type
+  const typeB = (b as InternalPageItem).type
+  return typeA === undefined || typeB === undefined || typeA === typeB
 }
 
 /** One merged item with the platforms it appears on */
@@ -472,7 +500,7 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
     const existing = mergedMap.get(uniqueKey)!
 
     const itemStr = stringifyForCompare(item)
-    const equalObj = existing.find(val => val.itemStr === itemStr)
+    const equalObj = existing.find(val => val.itemStr === itemStr && homeStatusCompatible(val.item, item))
     if (equalObj) {
       equalObj.platforms.push(currentPlatform)
       equalObj.platforms.sort()
