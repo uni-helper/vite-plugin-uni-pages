@@ -107,6 +107,17 @@ export function checkPagesJsonFileSync(path: fs.PathLike): void {
 }
 
 /**
+ * In-process FIFO queue of lock sections per file path.
+ *
+ * Same-process callers wait here instead of racing on the OS-level lock, so
+ * they never starve each other (a retry-based race loses callers that wake up
+ * in lockstep but always miss the brief free window, e.g. the burst of watcher
+ * `add` events at dev-server startup). The OS-level lock below still protects
+ * against other processes.
+ */
+const lockQueues = new Map<string, Promise<unknown>>()
+
+/**
  * Run a task while holding an exclusive file lock.
  *
  * Protects the whole read-modify-write critical section. The lock is held
@@ -115,35 +126,51 @@ export function checkPagesJsonFileSync(path: fs.PathLike): void {
  * pages.json generation, where the new content depends on the current content
  * (other platforms' `#ifdef` blocks).
  *
+ * Same-process callers are serialized by a per-path FIFO queue before ever
+ * touching the OS-level lock; the retry/backoff below only guards against
+ * other processes.
+ *
  * @param path - File path used as the lock target
  * @param task - Async work to run inside the lock; return value is forwarded
  * @param retry - Number of retries when lock acquisition fails, defaults to 3
  * @returns The value resolved by `task`, or `undefined` if the lock could not be acquired
  */
-export async function withFileLock<T>(path: string, task: () => Promise<T>, retry = 3): Promise<T | undefined> {
-  if (retry <= 0) {
-    debug.error(`${path} Failed to acquire file lock, task aborted`)
-    return undefined
-  }
+export function withFileLock<T>(path: string, task: () => Promise<T>, retry = 3): Promise<T | undefined> {
+  // Chain onto the previous section's completion (swallowing its outcome so a
+  // failed predecessor never rejects the followers), then run in FIFO order.
+  // Entries are keyed by lock target, of which there are only a handful, so
+  // the map needs no draining.
+  const previous = lockQueues.get(path) ?? Promise.resolve()
+  const current = previous
+    .catch(() => {})
+    .then(() => acquireAndRun(path, task, retry))
+  lockQueues.set(path, current)
+  return current
+}
 
-  let release: (() => Promise<void>) | undefined
-
-  try {
+/** Acquire the OS-level lock (retrying against other processes) and run the task */
+async function acquireAndRun<T>(path: string, task: () => Promise<T>, retry: number): Promise<T | undefined> {
+  for (let attempt = retry; attempt > 0; attempt--) {
+    let release: (() => Promise<void>) | undefined
     try {
       release = await lockfile.lock(path, { realpath: false })
     }
     catch {
-      // Failed to acquire file lock, retry after backoff
+      // Another process holds the lock, retry after backoff
       await sleep(500)
-      return withFileLock(path, task, retry - 1)
+      continue
     }
-    return await task()
-  }
-  finally {
-    if (release) {
+
+    try {
+      return await task()
+    }
+    finally {
       await release() // Release file lock
     }
   }
+
+  debug.error(`${path} Failed to acquire file lock, task aborted`)
+  return undefined
 }
 
 /**

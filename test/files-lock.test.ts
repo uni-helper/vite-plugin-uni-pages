@@ -66,4 +66,33 @@ describe('withFileLock serialization', () => {
     expect(first).toBe('first-value')
     expect(second).toBe('second-value')
   })
+
+  it('serializes a burst of concurrent callers without starving any of them', async () => {
+    // Regression: dev-server startup fires one watcher `add` event per page
+    // file, so dozens of in-process callers race on the lock simultaneously.
+    // With retry-only contention the losers woke up in lockstep, always missed
+    // the brief free window and exhausted their retries ("Failed to acquire
+    // file lock, task aborted"). The per-path queue must run every caller.
+    const results = await Promise.all(
+      Array.from({ length: 29 }, (_, i) => withFileLock(lockFile, async () => i)),
+    )
+
+    expect(results).toEqual(Array.from({ length: 29 }, (_, i) => i))
+  })
+
+  it('keeps waiting callers running after a task throws', async () => {
+    const log: string[] = []
+
+    await Promise.all([
+      withFileLock(lockFile, async () => {
+        log.push('before-throw')
+        throw new Error('boom')
+      }).catch(() => log.push('caught')),
+      withFileLock(lockFile, async () => {
+        log.push('after-throw')
+      }),
+    ])
+
+    expect(log).toEqual(['before-throw', 'caught', 'after-throw'])
+  })
 })
