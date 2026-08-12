@@ -14,10 +14,10 @@ import { PageContext } from '../packages/core/src'
  * same page path, breaking the build.
  *
  * Root cause: items coming from `pageMetaData` carry an internal `type`
- * marker (`'home'` / `'page'`), while entries already written to pages.json
- * have had `type` stripped. `mergePlatformItems` compared the two sides via
- * `JSON.stringify`, so the marker made every cross-platform item look
- * different and a duplicate was appended instead of merged.
+ * marker (`'home'` / `'page'`), while entries already in pages.json may
+ * lack it (legacy output or user edits). `mergePlatformItems` compared the
+ * two sides via `JSON.stringify`, so the marker made every cross-platform
+ * item look different and a duplicate was appended instead of merged.
  *
  * This test models the exact on-disk sequence (H5 run writes the file first,
  * mp-weixin run reads and merges it) in-process to keep it fast and
@@ -51,8 +51,8 @@ describe('issue #283: cross-platform run does not duplicate routes', () => {
 
     pagesJsonPath = path.join(tmpDir, 'src', 'pages.json')
 
-    // Seed the file as if the H5 terminal just finished writing it: a single
-    // entry tagged H5 via the GENERATED comment, no `type` marker.
+    // Seed the file with the legacy shape of an H5 run: a single entry
+    // tagged H5 via the GENERATED comment, no `type` marker.
     fs.writeFileSync(
       pagesJsonPath,
       [

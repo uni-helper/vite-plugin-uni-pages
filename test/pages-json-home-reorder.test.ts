@@ -15,9 +15,9 @@ import { PageContext } from '../packages/core/src'
  * 1. `CommentArray#splice`/`unshift` only re-index the surviving elements'
  *    comment symbols: the removed entry's comments stay stranded at its old
  *    index and end up attached to whatever element moves into that slot.
- * 2. Merged entries keep the object read from pages.json, which has no
- *    internal `type` marker, so the `type === 'home'` lookup never matched
- *    and the reordering silently did not run.
+ * 2. A merged entry may keep the object read from pages.json without the
+ *    internal `type` marker (this seed does), so the `type === 'home'`
+ *    lookup never matched and the reordering silently did not run.
  * 3. When the first merged entry needed an `#ifdef` block, assigning
  *    `before:0` replaced the GENERATED marker instead of appending to it.
  *

@@ -1,5 +1,8 @@
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { mergePagesJson } from '../packages/core/src'
+import { mergePagesJson, PageContext } from '../packages/core/src'
 
 /**
  * Direct tests of the pure pages.json merge seam.
@@ -191,5 +194,49 @@ describe('mergePagesJson pure merge seam', () => {
     expect(crlf).toContain('\r\n')
     // Every line break is CRLF: no bare LF survives
     expect(crlf.replaceAll('\r\n', '').includes('\n')).toBe(false)
+  })
+})
+
+describe('page metadata merge does not leak style across runs', () => {
+  it('keeps cached page style clean when a config override disappears', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-merge-leak-'))
+    try {
+      const pagesDir = path.join(tmpDir, 'src', 'pages', 'index')
+      fs.mkdirSync(pagesDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(pagesDir, 'index.vue'),
+        [
+          '<script lang="ts" setup>',
+          'definePage(() => ({ style: { navigationBarTitleText: \'home\' } }));',
+          '</script>',
+          '',
+          '<template><div>home</div></template>',
+          '',
+        ].join('\n'),
+        'utf-8',
+      )
+
+      // Same context across both runs: Page instances (and their cached
+      // meta style objects) are reused, so any in-place mutation of those
+      // objects survives into the second run
+      const ctx = new PageContext({ dir: 'src/pages', dts: false }, tmpDir, 'h5')
+
+      ctx.pagesGlobConfig = {
+        pages: [{ path: 'pages/index/index', style: { enablePullDownRefresh: true } }],
+      }
+      await ctx.scanAndMerge()
+      expect(ctx.resolveRoutes()).toContain('enablePullDownRefresh')
+
+      // The override disappears: the generated entry must fall back to its
+      // own style without residue from the previous run
+      ctx.pagesGlobConfig = {}
+      await ctx.scanAndMerge()
+      const routes = ctx.resolveRoutes()
+      expect(routes).toContain('navigationBarTitleText')
+      expect(routes).not.toContain('enablePullDownRefresh')
+    }
+    finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
   })
 })

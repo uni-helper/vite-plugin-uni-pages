@@ -255,9 +255,10 @@ export class PageContext {
 
     this.options.onBeforeWriteFile(this.resolvedPagesJSONPath)
 
-    // Merged entries keep the object read from pages.json, which has no
-    // internal `type` marker, so resolve the home page path from the scanned
-    // metadata and hand it to the pages.json module for repositioning
+    // Entries merged from pages.json may lack the internal `type` marker
+    // (user-written entries never carry it), so resolve the home page path
+    // from the scanned metadata and hand it to the pages.json module for
+    // repositioning
     const homePath = this.pageMetaData.find(meta => meta.type === 'home')?.path
 
     // The whole read-modify-write runs inside one file lock owned by the
@@ -612,9 +613,19 @@ function mergePageMetaDataArray(pageMetaData: InternalPages): InternalPages {
   const result: InternalPages = []
   for (const path in pageMetaDataObj) {
     const group = pageMetaDataObj[path]
-    const mergedPage = group[0]
+    const mergedPage = { ...group[0] }
     for (const page of group) {
-      mergedPage.style = Object.assign(mergedPage.style ?? {}, page.style ?? {})
+      // Accumulate style for entries without their own style key; an entry
+      // carrying its own style replaces the accumulation outright via the
+      // Object.assign below, mirroring the previous in-place implementation.
+      // Two guards differ from that implementation on purpose: the target is
+      // always a fresh object (the old code mutated style objects shared
+      // with the Page cache, leaking stale keys across runs), and the check
+      // is Object.hasOwn so inherited style keys don't count as the entry's
+      // own — Object.assign never copies inherited keys either. Style
+      // values are plain objects in practice (JSON parse / object literals)
+      if (!Object.hasOwn(page, 'style'))
+        mergedPage.style = Object.assign({ ...(mergedPage.style ?? {}) }, page.style ?? {})
       Object.assign(mergedPage, page)
     }
     result.push(mergedPage)

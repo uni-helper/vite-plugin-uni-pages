@@ -13,8 +13,10 @@ export type ExcludeIndexSignature<T> = {
 
 /**
  * Internal page metadata
- * Extends the document-level PageItem with the plugin-internal `type` marker,
- * which is stripped before writing pages.json
+ * Extends the document-level PageItem with the plugin-internal `type` marker.
+ * Plugin-generated entries keep it in pages.json by design (it powers the
+ * home fallback in later runs); only the cross-platform equality comparison
+ * normalizes it away
  */
 export interface InternalPageItem extends PageItem {
   /** Internal marker used by the plugin to identify the home page */
