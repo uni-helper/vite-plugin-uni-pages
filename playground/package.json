@@ -22,6 +22,7 @@
     "@dcloudio/uni-automator": "catalog:",
     "@dcloudio/uni-cli-shared": "catalog:",
     "@dcloudio/vite-plugin-uni": "catalog:",
+    "@types/node": "catalog:",
     "@uni-helper/plugin-uni": "catalog:",
     "@uni-helper/unh": "catalog:",
     "@uni-helper/vite-plugin-uni-layouts": "catalog:",
