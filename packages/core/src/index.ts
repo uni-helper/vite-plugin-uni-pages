@@ -1,6 +1,8 @@
 import type { Plugin } from 'vite'
 import type { UserOptions } from './types'
+import path from 'node:path'
 import process from 'node:process'
+import { slash } from '@antfu/utils'
 import chokidar from 'chokidar'
 import MagicString from 'magic-string'
 import { createLogger } from 'vite'
@@ -70,8 +72,12 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
       await ctx.updatePagesJSON()
 
       if (config.command === 'build') {
-        if (config.build.watch)
-          ctx.setupWatcher(chokidar.watch([...ctx.options.dirs, ...ctx.options.subPackages]))
+        if (config.build.watch) {
+          // Resolve against the real Vite root: chokidar would otherwise
+          // interpret relative dirs against process.cwd() and watch the wrong
+          // directories whenever root differs from cwd
+          ctx.setupWatcher(chokidar.watch([...ctx.options.dirs, ...ctx.options.subPackages].map(v => slash(path.resolve(config.root, v)))))
+        }
       }
     },
     /**
