@@ -12,10 +12,12 @@ type _LocationUrl =
   "/pages/blog/post" |
   "/pages/define-page/async-function" |
   "/pages/define-page/conditional-compilation" |
+  "/pages/define-page/conditional-define" |
   "/pages/define-page/function" |
   "/pages/define-page/nested-function" |
   "/pages/define-page/object" |
   "/pages/define-page/option-api" |
+  "/pages/define-page/platform-injected" |
   "/pages/define-page/remove-console" |
   "/pages/i18n" |
   "/pages/tabbar-index-zero" |
