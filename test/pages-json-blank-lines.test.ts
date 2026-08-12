@@ -106,16 +106,15 @@ describe('pages.json with blank lines (comment-json v5 BlankLine tokens)', () =>
     expect(content).toContain('h5 only')
     expect(content).toContain('pages/index')
 
-    // The platform counts tie ('H5' vs 'H5 || MP-WEIXIN'), and the
-    // deterministic tie-break keeps the alphabetically last maximum, so the
-    // merged pages/index entry is the default platform and stays plain while
-    // the H5-only entry is wrapped in an #ifdef block. Check positional
-    // attachment, not just presence: pages/index must come before the ifdef
-    // block, which must wrap pages/h5-only.
+    // The merged pages/index entry covers the full platform union
+    // ('H5 || MP-WEIXIN') and stays plain, while the H5-only entry keeps
+    // its #ifdef block. Check positional attachment, not just presence:
+    // pages/index must come before the ifdef block, which must wrap
+    // pages/h5-only.
     const indexPos = content.indexOf('"pages/index"')
-    const ifdefPos = content.indexOf('#ifdef H5')
+    const ifdefPos = content.indexOf('#ifdef H5\n')
     const h5Pos = content.indexOf('"pages/h5-only"')
-    const endifPos = content.indexOf('#endif')
+    const endifPos = content.indexOf('#endif', h5Pos)
     expect(indexPos).toBeGreaterThan(-1)
     expect(indexPos).toBeLessThan(ifdefPos)
     expect(ifdefPos).toBeLessThan(h5Pos)

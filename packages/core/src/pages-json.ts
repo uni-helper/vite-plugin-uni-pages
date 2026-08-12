@@ -399,25 +399,26 @@ function extractLastPlatforms(src: CommentArray<CommentObject>, currentPlatform:
 }
 
 /**
- * Pick the platform combination used by most merged items as the default
- * (written without `#ifdef`). Keys are pre-sorted so the tie-break is
- * deterministic instead of depending on map insertion order: the home
- * reordering changes that order between runs, which used to flip the
- * default platform back and forth until the output converged
+ * Compute the sorted union of every platform recorded across merged variants
+ *
+ * The union is the file-wide platform set: it feeds the generation marker
+ * and decides which variants may be emitted without an `#ifdef` block.
+ * Unwrapped entries are visible to every platform under uni-app conditional
+ * compilation, so only variants covering the whole union may go unwrapped.
+ * The previous most-used-combination default could resolve to a
+ * single-platform combination (dominant platform-exclusive pages or usage
+ * ties), emitting that platform's variants bare and leaking them into other
+ * platforms' views as duplicate routes
  */
-function resolveDefaultPlatform<T extends object>(mergedMap: Map<string, MultiPlatformItem<T>[]>, currentPlatform: string): string {
-  const platformUsage = new Map<string, number>()
+function resolvePlatformUnion<T extends object>(mergedMap: Map<string, MultiPlatformItem<T>[]>): string[] {
+  const union = new Set<string>()
   for (const list of mergedMap.values()) {
-    for (const { platformStr } of list) {
-      platformUsage.set(platformStr, (platformUsage.get(platformStr) || 0) + 1)
+    for (const { platforms } of list) {
+      for (const platform of platforms)
+        union.add(platform)
     }
   }
-
-  const usageKeys = [...platformUsage.keys()].sort()
-  if (usageKeys.length === 0)
-    return currentPlatform
-
-  return usageKeys.reduce((a, b) => (platformUsage.get(a)! > platformUsage.get(b)! ? a : b))
+  return [...union].sort()
 }
 
 /**
@@ -519,20 +520,23 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
   // 4. Iterate mergedMap to generate result:CommentArray<CommentObject>
   const result = new CommentArray<CommentObject>()
 
-  // Use the most frequently used platform combination as default
-  const defaultPlatformStr = resolveDefaultPlatform(mergedMap, currentPlatform)
+  // Only variants covering the full platform union may be emitted without
+  // an #ifdef block: unwrapped entries are visible to every platform, so a
+  // narrower variant must stay wrapped to keep other platforms' views clean
+  const platformUnionStr = resolvePlatformUnion(mergedMap).join(' || ') || currentPlatform
 
   // Add generation identifier comment to result's Symbol.for(`before:0`)
-  result[Symbol.for('before:0') as CommentSymbol] = [lineComment(` ${GENERATION_MARKER_PREFIX} ${defaultPlatformStr}`)]
+  result[Symbol.for('before:0') as CommentSymbol] = [lineComment(` ${GENERATION_MARKER_PREFIX} ${platformUnionStr}`)]
 
   // Process elements in insertion order
   for (const [_, list] of mergedMap) {
     for (const { item, platformStr } of list) {
       result.push(item as unknown as CommentObject)
 
-      // Check if platforms matches defaultPlatformStr (platforms and defaultPlatforms are pre-sorted)
-      if (platformStr !== defaultPlatformStr) {
-        // Platform info exists and differs from default platform, add conditional compilation comments
+      // Check if the variant covers the full platform union (both strings are pre-sorted)
+      if (platformStr !== platformUnionStr) {
+        // Variant covers only a subset of the platforms: wrap it so the
+        // other platforms' conditional-compilation views skip it.
         // Append instead of replacing: before:0 may already carry the
         // generation marker, which must stay at the top of the array
         result[Symbol.for(`before:${result.length - 1}`) as CommentSymbol] = [

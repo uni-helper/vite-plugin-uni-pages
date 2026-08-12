@@ -91,12 +91,17 @@ describe('mergePagesJson pure merge seam', () => {
     }, { platform: 'mp-weixin' })
 
     expect(content).toContain('#ifdef H5')
+    expect(content).toContain('#ifdef MP-WEIXIN')
     expect(content).toContain('h5 title')
     expect(content).toContain('weixin title')
-    // The current platform becomes the default (no #ifdef wrapper) on a
-    // tie, so only the other platform's entry sits inside an #ifdef block
-    expect(content.match(/#ifdef/g)).toHaveLength(1)
-    expect(content.match(/#endif/g)).toHaveLength(1)
+    // Neither variant covers the full platform union ('H5 || MP-WEIXIN'),
+    // so both stay wrapped: unwrapping one would leak it into the other
+    // platform's conditional-compilation view
+    expect(content.match(/#ifdef/g)).toHaveLength(2)
+    expect(content.match(/#endif/g)).toHaveLength(2)
+    // Each block wraps its own platform's variant, not the other one's
+    expect(content.indexOf('#ifdef H5')).toBeLessThan(content.indexOf('h5 title'))
+    expect(content.indexOf('#ifdef MP-WEIXIN')).toBeLessThan(content.indexOf('weixin title'))
     // The home entry was reordered to the first position by its type marker
     expect(content.indexOf('weixin title')).toBeLessThan(content.indexOf('h5 title'))
   })
