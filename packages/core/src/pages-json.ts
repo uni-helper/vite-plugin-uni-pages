@@ -13,8 +13,8 @@ import { debug } from './logger'
  * Deep module owning everything pages.json-specific: multi-platform #ifdef
  * merging, home page reordering with comment attachment surgery, generation
  * marker handling, serialization formatting, file locking and atomic writes.
- * Callers only see {@link writePagesJson}; comment-json internals never leak
- * past its interface.
+ * Callers see {@link writePagesJson} and the pure {@link mergePagesJson};
+ * comment-json internals never leak past their interface.
  */
 
 /** Route data assembled by the scan/merge pipeline */
@@ -26,16 +26,22 @@ export interface PagesJsonData {
   /** Resolved tabBar configuration */
   tabBar?: TabBar
   /**
-   * Path of the home page resolved from scanned metadata. Merged entries keep
-   * the object read from pages.json (no internal `type` marker), so the home
-   * entry is repositioned by path; falls back to the `type` marker when unset.
+   * Path of the home page resolved from scanned metadata. Entries merged
+   * from pages.json may lack the internal `type` marker (user-written
+   * entries never carry it), so the home entry is primarily repositioned
+   * by path; falls back to the `type` marker when unset.
    */
   homePath?: string
 }
 
 /** Serialization options for the generated pages.json */
 export interface PagesJsonFormatOptions {
-  /** Minify the output, takes precedence over `indent` */
+  /**
+   * Minify the output, takes precedence over `indent`. Single-line JSON
+   * cannot carry comments, so the generation marker and any user comments
+   * are dropped — multi-platform tracking then restarts from scratch on the
+   * next run
+   */
   minify?: boolean
   /** Indentation, number of spaces or string (e.g. '\t') */
   indent?: number | string
@@ -60,6 +66,9 @@ export interface WritePagesJsonOptions {
   previousContent?: string | (() => string | undefined)
 }
 
+/** Options for the pure merge step: everything of {@link WritePagesJsonOptions} except file-level concerns */
+export type MergePagesJsonOptions = Pick<WritePagesJsonOptions, 'platform' | 'globConfig' | 'format'>
+
 /**
  * Merge the given route data into pages.json and write it back
  *
@@ -78,17 +87,7 @@ export async function writePagesJson(jsonPath: string, data: PagesJsonData, opti
   return withFileLock(jsonPath, async () => {
     const existingContent = await fs.promises.readFile(jsonPath, { encoding: 'utf-8' }).catch(() => '')
 
-    const pageJson = mergeIntoPagesJson(existingContent, data, options)
-
-    const minify = options.format?.minify ?? false
-    const indent = options.format?.indent ?? 2
-    const eol = options.format?.eol ?? '\n'
-    let content = cjStringify(pageJson, null, minify ? undefined : indent)
-    if (eol !== '\n')
-      content = content.replaceAll('\n', eol)
-
-    if (options.format?.insertFinalNewline)
-      content += eol
+    const content = mergePagesJson(existingContent, data, options)
 
     const previousContent = typeof options.previousContent === 'function'
       ? options.previousContent()
@@ -213,9 +212,10 @@ function ensureHomePageFirst(pagesArray: InternalPages | undefined, homePath: st
   if (!pagesArray || pagesArray.length === 0)
     return
 
-  // Merged entries keep the object from pages.json, which has no internal
-  // `type` marker, so resolve the home page path from the scanned metadata
-  // and match by path; fall back to the `type` marker for type-bearing items
+  // Entries merged from pages.json may lack the internal `type` marker
+  // (user-written entries never carry it), so match the home page by the
+  // path resolved from scanned metadata; fall back to the `type` marker
+  // for type-bearing entries
   const homeIndex = homePath
     ? pagesArray.findIndex((page: InternalPageItem) => page.path === homePath)
     : pagesArray.findIndex((page: InternalPageItem) => page.type === 'home')
@@ -276,6 +276,37 @@ function hasGenerationMarker(src: CommentArray<CommentObject> | undefined): bool
   return (src[Symbol.for('before:0') as CommentSymbol] || []).some(isGenerationMarker)
 }
 
+/**
+ * Compute the merged pages.json content string without touching the file
+ * system
+ *
+ * Pure read-modify-write core: merges the route data into the existing
+ * pages.json text (multi-platform `#ifdef` blocks, home reordering,
+ * generation marker, sub-package convergence) and serializes it. File
+ * locking, change detection and atomic writes stay in {@link writePagesJson};
+ * tests exercise this interface directly with plain strings.
+ *
+ * @param existingContent - Current pages.json text, empty string when missing
+ * @param data - Route data assembled by the scan/merge pipeline
+ * @param options - Platform, user config and serialization format
+ * @returns Serialized pages.json content
+ */
+export function mergePagesJson(existingContent: string, data: PagesJsonData, options: MergePagesJsonOptions): string {
+  const pageJson = mergeIntoPagesJson(existingContent, data, options)
+
+  const minify = options.format?.minify ?? false
+  const indent = options.format?.indent ?? 2
+  const eol = options.format?.eol ?? '\n'
+  let content = cjStringify(pageJson, null, minify ? undefined : indent)
+  if (eol !== '\n')
+    content = content.replaceAll('\n', eol)
+
+  if (options.format?.insertFinalNewline)
+    content += eol
+
+  return content
+}
+
 /** Build a line comment token for serialized pages.json output */
 function lineComment(value: string): CommentLineToken {
   return {
@@ -296,9 +327,10 @@ function platformsExcluding(platformList: string, currentPlatform: string): stri
 
 /**
  * Items may carry an internal `type` marker ('home' | 'page'), but it must not
- * affect equality: pages.json files written by older versions may have `type`
- * stripped, so a raw JSON.stringify comparison would treat the same page as two
- * different entries and produce duplicate routes across platform runs
+ * affect equality: entries merged from pages.json may lack the marker
+ * (user-written entries never carry it), so a raw JSON.stringify comparison
+ * would treat the same page as two different entries and produce duplicate
+ * routes across platform runs
  * (see https://github.com/uni-helper/vite-plugin-uni-pages/issues/283).
  * Normalize both sides by dropping `type` before serializing.
  */
@@ -415,6 +447,9 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
   }
 
   // 3. Merge items into mergedMap
+  // The internal `type` marker stays on scanned entries by design (it powers
+  // the home fallback in ensureHomePageFirst on later runs); only the
+  // equality comparison normalizes it away (stringifyForCompare)
   for (const item of items) {
     const uniqueKey = item[uniqueKeyName] as string
 
