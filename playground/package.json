@@ -3,8 +3,10 @@
   "version": "0.3.24",
   "private": true,
   "scripts": {
+    "build:mp-alipay": "unh build mp-alipay",
     "build:mp-weixin": "unh build mp-weixin",
     "build:web": "unh build web",
+    "dev:mp-alipay": "unh dev mp-alipay",
     "dev:mp-weixin": "unh dev mp-weixin",
     "dev:web": "unh dev web"
   },
