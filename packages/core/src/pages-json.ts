@@ -1,4 +1,4 @@
-import type { CommentLineToken, CommentObject, CommentSymbol } from 'comment-json'
+import type { CommentLineToken, CommentObject, CommentSymbol, CommentToken } from 'comment-json'
 import type { Pages, PagesConfig, SubPackage, SubPackages, TabBar } from './config'
 import type { ExcludeIndexSignature, InternalPageItem, InternalPages } from './types'
 import fs from 'node:fs'
@@ -205,70 +205,100 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
 }
 
 /**
- * Move the home page entry to the first position while keeping its comment
- * attachment intact
+ * Move every home page entry to the front while keeping comment attachment
+ * intact
+ *
+ * Each platform may declare its own home behind #ifdef blocks, and an
+ * unwrapped entry is visible to every platform. The home of a platform must
+ * therefore precede every entry visible to that platform; placing all home
+ * variants before every non-home entry (stable partition) satisfies that for
+ * every platform view at once. Moving only the current platform's home is
+ * not enough: once its home already sits at index 0, another platform's home
+ * stays stranded behind a non-home entry that platform can see.
+ *
+ * The guarantee covers entries carrying the internal `type` marker (every
+ * scanned entry does) plus every unmarked variant of the resolved homePath
+ * via the fallback below; the marker itself is never restored on the merged
+ * objects, so the fallback re-derives home status from homePath each run.
  */
 function ensureHomePageFirst(pagesArray: InternalPages | undefined, homePath: string | undefined): void {
   if (!pagesArray || pagesArray.length === 0)
     return
 
   // Entries merged from pages.json may lack the internal `type` marker
-  // (user-written entries never carry it), so match the home page by the
-  // path resolved from scanned metadata; fall back to the `type` marker
-  // for type-bearing entries. A path may appear once per platform with
-  // different home status (per-platform home behind #ifdef blocks), so
-  // prefer the variant that actually carries the home marker — moving a
-  // non-home variant first would leave the platform's real home stranded
-  // behind it after conditional compilation
-  let homeIndex = -1
-  if (homePath) {
-    homeIndex = pagesArray.findIndex((page: InternalPageItem) => page.path === homePath && page.type === 'home')
-    if (homeIndex === -1)
-      homeIndex = pagesArray.findIndex((page: InternalPageItem) => page.path === homePath)
+  // (user-written entries never carry it), so fall back to the path resolved
+  // from scanned metadata when no variant of it carries the home marker.
+  // Scanned entries always carry the marker, so `type === 'home'` alone
+  // already collects every platform's home variant.
+  const isHome = pagesArray.map((page: InternalPageItem) => page.type === 'home')
+  if (homePath && !pagesArray.some((page: InternalPageItem) => page.path === homePath && page.type === 'home')) {
+    // Mark every variant of the home path, not just the first: each
+    // platform's variant may sit behind its own #ifdef block, and marking
+    // only the first one leaves the current platform's variant stranded
+    // behind visible non-home entries until a later self-healing write
+    pagesArray.forEach((page: InternalPageItem, index: number) => {
+      if (page.path === homePath)
+        isHome[index] = true
+    })
   }
-  else {
-    homeIndex = pagesArray.findIndex((page: InternalPageItem) => page.type === 'home')
-  }
-  if (homeIndex <= 0)
+
+  const homeCount = isHome.filter(Boolean).length
+  if (homeCount === 0)
     return
 
-  // `CommentArray#splice`/`unshift` only re-index the surviving elements'
-  // comments: the removed entry's comments stay stranded at its old index
-  // and get attached to whatever element moves into that slot, misplacing
-  // `#ifdef`/`#endif` blocks and the generation marker. Snapshot the home
-  // entry's comments, drop the stranded ones, then re-attach them at 0.
+  // Already partitioned — every home variant precedes every non-home entry:
+  // nothing to move, keep the byte-exact output stable across reruns
+  if (isHome.slice(0, homeCount).every(Boolean))
+    return
+
   const commentArray = pagesArray as unknown as CommentArray<CommentObject>
-  const homeBefore = commentArray[Symbol.for(`before:${homeIndex}`) as CommentSymbol]
-  const homeAfter = commentArray[Symbol.for(`after:${homeIndex}`) as CommentSymbol]
-  // before:0 mixes the generation marker with the previous first entry's
-  // own comments (e.g. its #ifdef block): keep the marker on top and
-  // leave the entry's comments attached to it at its new index 1
-  const firstBefore = commentArray[Symbol.for('before:0') as CommentSymbol] || []
-  const markerTokens = firstBefore.filter(isGenerationMarker)
-  const firstEntryTokens = firstBefore.filter(token => !isGenerationMarker(token))
+  const length = pagesArray.length
 
-  // Drop home's own comment symbols BEFORE splicing: comment-json then
-  // shifts every following element's comments down into the freed slot,
-  // so deleting `before/after:${homeIndex}` afterwards would destroy the
-  // comments of the element that moved into that position. `before:0`
-  // must also be gone before the unshift re-indexes everything by +1.
-  // `after-value:${homeIndex}` needs no handling here: `pagesArray` is the
-  // freshly built output of mergePlatformItems, whose only comment tokens
-  // are `before` entries (#ifdef blocks and the generation marker); user
-  // after-value comments are dropped at that earlier stage and cannot
-  // reach this function (verified empirically).
-  Reflect.deleteProperty(commentArray, Symbol.for(`before:${homeIndex}`))
-  Reflect.deleteProperty(commentArray, Symbol.for(`after:${homeIndex}`))
-  Reflect.deleteProperty(commentArray, Symbol.for('before:0'))
-  const [homePage] = pagesArray.splice(homeIndex, 1)
-  pagesArray.unshift(homePage)
-
-  commentArray[Symbol.for('before:0') as CommentSymbol] = [...markerTokens, ...(homeBefore || [])]
-  if (firstEntryTokens.length > 0) {
-    commentArray[Symbol.for('before:1') as CommentSymbol] = firstEntryTokens
+  // `CommentArray#splice` only re-indexes the surviving elements' comments:
+  // removed slots strand their comments on whatever moves in, misplacing
+  // `#ifdef`/`#endif` blocks and the generation marker. Snapshot every
+  // entry's comment tokens and drop the symbols first, so the reorder runs
+  // on plain array semantics and the tokens are re-attached deliberately.
+  // `after-value` needs no handling: `pagesArray` is the freshly built
+  // output of mergePlatformItems, whose only comment tokens are `before`
+  // entries (#ifdef blocks and the generation marker); user after-value
+  // comments are dropped at that earlier stage and cannot reach this
+  // function (verified empirically).
+  const beforeTokens: Array<CommentToken[]> = []
+  const afterTokens: Array<CommentToken[]> = []
+  for (let i = 0; i < length; i++) {
+    beforeTokens.push(commentArray[Symbol.for(`before:${i}`) as CommentSymbol] || [])
+    afterTokens.push(commentArray[Symbol.for(`after:${i}`) as CommentSymbol] || [])
+    Reflect.deleteProperty(commentArray, Symbol.for(`before:${i}`) as CommentSymbol)
+    Reflect.deleteProperty(commentArray, Symbol.for(`after:${i}`) as CommentSymbol)
   }
-  if (homeAfter) {
-    commentArray[Symbol.for('after:0') as CommentSymbol] = homeAfter
+
+  // before:0 mixes the generation marker with the first entry's own comments
+  // (e.g. its #ifdef block): keep the marker on top of the array, the entry
+  // tokens travel with their entry
+  const markerTokens = beforeTokens[0].filter(isGenerationMarker)
+  beforeTokens[0] = beforeTokens[0].filter(token => !isGenerationMarker(token))
+
+  // Stable partition: home variants first, then the rest, both in their
+  // original relative order
+  const order: number[] = []
+  for (let i = 0; i < length; i++) {
+    if (isHome[i])
+      order.push(i)
+  }
+  for (let i = 0; i < length; i++) {
+    if (!isHome[i])
+      order.push(i)
+  }
+  pagesArray.splice(0, length, ...order.map(i => pagesArray[i]))
+
+  for (let i = 0; i < length; i++) {
+    const sourceIndex = order[i]
+    const before = i === 0 ? [...markerTokens, ...beforeTokens[sourceIndex]] : beforeTokens[sourceIndex]
+    if (before.length > 0)
+      commentArray[Symbol.for(`before:${i}`) as CommentSymbol] = before
+    if (afterTokens[sourceIndex].length > 0)
+      commentArray[Symbol.for(`after:${i}`) as CommentSymbol] = afterTokens[sourceIndex]
   }
 }
 

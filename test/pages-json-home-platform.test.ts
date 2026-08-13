@@ -253,4 +253,135 @@ describe('home page status across concurrent platform runs', () => {
     }, { platform: 'h5' })
     expect(rerun).toBe(final)
   })
+
+  it('keeps every platform home first once a third platform joins', () => {
+    // Same DSL setup as symptom 2, now with a third platform that agrees
+    // with h5: mp-alipay starts after h5 and mp-weixin have converged and
+    // writes twice. The alipay run must not strand the MP-WEIXIN home
+    // behind a MP-WEIXIN-visible non-home entry just because alipay's own
+    // home already sits at index 0.
+    const alipayPages = {
+      pages: [
+        { path: 'pages/index', type: 'home' as const, middlewares: ['auth', 'test'] },
+        { path: 'pages/test', type: 'page' as const, style: { navigationBarTitleText: 'test page' }, middlewares: ['auth'] },
+      ],
+      subPackages: [],
+      homePath: 'pages/index',
+    }
+    const afterH5 = mergePagesJson('', alipayPages, { platform: 'h5' })
+    const afterWeixin = mergePagesJson(afterH5, {
+      pages: [
+        { path: 'pages/test', type: 'home', style: { navigationBarTitleText: 'test page' }, middlewares: ['auth'] },
+        { path: 'pages/index', type: 'page', middlewares: ['auth', 'test'] },
+      ],
+      subPackages: [],
+      homePath: 'pages/test',
+    }, { platform: 'mp-weixin' })
+
+    const afterAlipay = mergePagesJson(afterWeixin, alipayPages, { platform: 'mp-alipay' })
+
+    // The third platform must join the generation marker's union
+    expect(afterAlipay).toContain('PLATFORM: H5 || MP-ALIPAY || MP-WEIXIN')
+
+    const weixinView = entriesForPlatform(afterAlipay, 'MP-WEIXIN')
+    const h5View = entriesForPlatform(afterAlipay, 'H5')
+    const alipayView = entriesForPlatform(afterAlipay, 'MP-ALIPAY')
+    expectNoDuplicatePaths(weixinView)
+    expectNoDuplicatePaths(h5View)
+    expectNoDuplicatePaths(alipayView)
+
+    // MP-WEIXIN must still enter through pages/test even though the alipay
+    // run placed its own home (pages/index) at index 0
+    expect(weixinView[0]).toEqual({ path: 'pages/test', type: 'home' })
+    expect(weixinView.find(e => e.path === 'pages/index')!.type).toBe('page')
+    expect(h5View[0]).toEqual({ path: 'pages/index', type: 'home' })
+    expect(alipayView[0]).toEqual({ path: 'pages/index', type: 'home' })
+    expect(alipayView.find(e => e.path === 'pages/test')!.type).toBe('page')
+
+    // Stable under a further alipay run
+    const rerun = mergePagesJson(afterAlipay, alipayPages, { platform: 'mp-alipay' })
+    expect(rerun).toBe(afterAlipay)
+
+    // ...and under a further weixin run: idempotence must not be specific to
+    // the platform that wrote last
+    const rerunWeixin = mergePagesJson(afterAlipay, {
+      pages: [
+        { path: 'pages/test', type: 'home', style: { navigationBarTitleText: 'test page' }, middlewares: ['auth'] },
+        { path: 'pages/index', type: 'page', middlewares: ['auth', 'test'] },
+      ],
+      subPackages: [],
+      homePath: 'pages/test',
+    }, { platform: 'mp-weixin' })
+    expect(rerunWeixin).toBe(afterAlipay)
+
+    // ...and under a further h5 run: a partition that short-circuits whenever
+    // the current platform's home already sits at index 0 would regress here,
+    // because h5's home is at 0 while the merge emission order is not
+    const rerunH5 = mergePagesJson(afterAlipay, alipayPages, { platform: 'h5' })
+    expect(rerunH5).toBe(afterAlipay)
+  })
+
+  it('marks every unmarked variant of the home path on legacy files', () => {
+    // Hand-written pages.json without the generation marker and without the
+    // internal type markers: every scanned entry merges content-equal into a
+    // legacy variant and loses its marker, so the homePath fallback kicks
+    // in. It must mark every variant of the home path, not just the first:
+    // the first variant may belong to another platform, and leaving the
+    // current platform's own variant unmarked strands it behind visible
+    // non-home entries until a later self-healing write.
+    const legacy = [
+      '{',
+      '  "pages": [',
+      '    // #ifdef APP',
+      '    {',
+      '      "path": "pages/a"',
+      '    },',
+      '    // #endif',
+      '    // #ifdef H5',
+      '    {',
+      '      "path": "pages/index",',
+      '      "style": {',
+      '        "navigationBarTitleText": "h5"',
+      '      }',
+      '    },',
+      '    // #endif',
+      '    // #ifdef MP-WEIXIN || APP',
+      '    {',
+      '      "path": "pages/index",',
+      '      "style": {',
+      '        "navigationBarTitleText": "wx"',
+      '      }',
+      '    }',
+      '    // #endif',
+      '  ]',
+      '}',
+    ].join('\n')
+
+    const scan = {
+      pages: [
+        { path: 'pages/a', type: 'page' as const },
+        { path: 'pages/index', type: 'home' as const, style: { navigationBarTitleText: 'wx' } },
+      ],
+      subPackages: [],
+      homePath: 'pages/index',
+    }
+    const merged = mergePagesJson(legacy, scan, { platform: 'mp-weixin' })
+
+    // MP-WEIXIN enters through pages/index even though the first homePath
+    // variant in the file is H5-only and a visible non-home entry precedes
+    // the weixin variant in the source
+    const weixinView = entriesForPlatform(merged, 'MP-WEIXIN')
+    expectNoDuplicatePaths(weixinView)
+    expect(weixinView[0]?.path).toBe('pages/index')
+    expect(entriesForPlatform(merged, 'H5')[0]?.path).toBe('pages/index')
+
+    // The stable partition keeps the home variants in source order ahead of
+    // the non-home entry: [index(H5), index(APP || MP-WEIXIN), a]
+    expect(parseEntries(merged).map(e => e.path)).toEqual(['pages/index', 'pages/index', 'pages/a'])
+
+    // Byte-stable under a further weixin run: the fallback re-derives home
+    // status from homePath every run, and the partition short-circuit keeps
+    // the already-partitioned output untouched
+    expect(mergePagesJson(merged, scan, { platform: 'mp-weixin' })).toBe(merged)
+  })
 })
