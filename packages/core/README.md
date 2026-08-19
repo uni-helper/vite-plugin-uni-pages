@@ -77,6 +77,40 @@ definePage({
 </script>
 ```
 
+要让编辑器识别 `definePage` 全局宏，需要在项目的声明文件或 `tsconfig.json > types` 引用本包的 `/client` 类型。
+
+<details>
+
+  <summary> 声明文件简单示例 </summary>
+
+  ```ts
+  // env.d.ts
+  /// <reference types="vite/client" />
+  /// <reference types="@uni-helper/vite-plugin-uni-pages/client" />
+  ```
+
+  ```json
+  // tsconfig.json
+  {
+    "include": ["**/*.d.ts"]
+  }
+  ```
+
+</details>
+
+<details>
+
+  <summary> tsconfig.json 简单示例 </summary>
+
+  ```json
+  // tsconfig.json
+  {
+    "types": ["@uni-helper/vite-plugin-uni-pages/client"]
+  }
+  ```
+
+</details>
+
 自 0.5.0 起，`definePage` 支持函数式写法，接收 `{ platform, define }` 上下文（详见 [平台条件页面配置](#平台条件页面配置)）：
 
 ```vue
@@ -133,12 +167,18 @@ definePage(({ define }) =>
 
 > 注意：虚拟模块的导出不保证稳定，可能会在小版本中出现变化。
 
-```ts
-/// <reference types="@uni-helper/vite-plugin-uni-pages/client" />
-import { pages } from 'virtual:uni-pages'
+<details>
 
-console.log(pages)
-```
+  <summary> 虚拟模块使用简单示例 </summary>
+
+  ```ts
+  /// <reference types="@uni-helper/vite-plugin-uni-pages/client" />
+  import { pages } from 'virtual:uni-pages'
+
+  console.log(pages)
+  ```
+
+</details>
 
 ## 插件配置
 
@@ -414,6 +454,8 @@ export default defineConfig({
   | `onAfterWriteFile(ctx)` | `onAfterWriteFile(filePath, content)` |
 
 - **依赖清理**：`json5`、`yaml`、`detect-indent`、`detect-newline` 不再是运行时依赖（配置文件仍支持 `ts/mts/cts/js/cjs/mjs/json`，无行为变化）。
+
+- **类型入口**：包名的 `types` 入口直指构建产物，仅配置 `"types": ["@uni-helper/vite-plugin-uni-pages"]` 不再带入 `definePage` 全局与 `virtual:uni-pages` 模块声明，请改用 `/client` 子路径（见上方「页面级配置 definePage」）。
 
 0.5.0 同时带来以下新能力：
 
