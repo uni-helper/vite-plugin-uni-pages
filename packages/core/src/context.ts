@@ -1,6 +1,6 @@
+import type { Pages, PagesConfig, SubPackage, SubPackages, TabBar, TabBarItem } from '@uni-helper/uni-pages-types'
 import type { FSWatcher } from 'chokidar'
 import type { Logger, ModuleNode, ViteDevServer } from 'vite'
-import type { Pages, PagesConfig, SubPackage, SubPackages, TabBar, TabBarItem } from './config'
 import type { InternalPages, PagePath, ResolvedOptions, UserOptions } from './types'
 import path from 'node:path'
 import process from 'node:process'

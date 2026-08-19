@@ -27,7 +27,7 @@
   "exports": {
     ".": {
       "import": {
-        "types": "./index.d.ts",
+        "types": "./dist/index.d.mts",
         "default": "./dist/index.mjs"
       }
     },
@@ -37,12 +37,11 @@
   },
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
-  "types": "./index.d.ts",
+  "types": "./dist/index.d.mts",
   "files": [
     "client.d.ts",
     "dist",
-    "global.d.ts",
-    "index.d.ts"
+    "global.d.ts"
   ],
   "engines": {
     "node": "^22.22.2 || ^24.15.0 || >=26.0.0"

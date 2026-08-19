@@ -26,7 +26,8 @@ export * from './options'
 export * from './page'
 export * from './pages-json'
 export * from './pipeline'
-export * from './types'
+export type * from './types'
+export type * from '@uni-helper/uni-pages-types'
 
 /**
  * vite-plugin-uni-pages plugin main entry

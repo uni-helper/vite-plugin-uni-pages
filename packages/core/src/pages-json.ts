@@ -1,5 +1,5 @@
+import type { Pages, PagesConfig, SubPackage, SubPackages, TabBar } from '@uni-helper/uni-pages-types'
 import type { CommentLineToken, CommentObject, CommentSymbol, CommentToken } from 'comment-json'
-import type { Pages, PagesConfig, SubPackage, SubPackages, TabBar } from './config'
 import type { ExcludeIndexSignature, InternalPageItem, InternalPages } from './types'
 import fs from 'node:fs'
 import { parse as cjParse, stringify as cjStringify, CommentArray } from 'comment-json'

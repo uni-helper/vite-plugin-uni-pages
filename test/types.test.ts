@@ -22,13 +22,12 @@ const typesPkg = path.join(root, 'packages/types')
  * `definePage` is exposed as a global via `global.d.ts`:
  *   declare global { const definePage: import('.').DefinePage }
  *
- * `import('.')` resolves to the package entry, so the entry must expose
- * `DefinePage` as a resolvable type. In v0.4.2 the entry used
- * `export type * from './dist/index.d.mts'`, which does not constitute a
- * resolvable module surface under `moduleResolution: bundler`, and
- * `package.json` `exports['.'].types` pointed at `./dist/index.d.mts`
- * directly, bypassing `index.d.ts`. Both broke `import('.').DefinePage`,
- * producing `TS2304: Cannot find name 'definePage'`.
+ * The chain is entered through the `/client` subpath: consumers add
+ * `@uni-helper/vite-plugin-uni-pages/client` to their tsconfig `types`
+ * array (or use a triple-slash reference). `client.d.ts` pulls in
+ * `global.d.ts`, whose `import('.')` resolves to the package entry, so the
+ * entry must expose `DefinePage` as a resolvable type. In v0.4.2 the dts
+ * bundle lost that export, producing `TS2304: Cannot find name 'definePage'`.
  *
  * This test reconstructs the published surface (`package.json` + top-level
  * `.d.ts` + built `dist/`) and runs `tsc --noEmit` against a minimal
@@ -56,7 +55,7 @@ describe('definePage global type (issue #281)', () => {
     const typesOut = path.join(tmp, 'node_modules/@uni-helper/uni-pages-types')
     mkdirSync(coreOut, { recursive: true })
     mkdirSync(typesOut, { recursive: true })
-    for (const file of ['package.json', 'index.d.ts', 'client.d.ts', 'global.d.ts'])
+    for (const file of ['package.json', 'client.d.ts', 'global.d.ts'])
       cpSync(path.join(corePkg, file), path.join(coreOut, file))
     cpSync(path.join(corePkg, 'dist'), path.join(coreOut, 'dist'), { recursive: true })
     cpSync(path.join(typesPkg, 'package.json'), path.join(typesOut, 'package.json'))
@@ -83,7 +82,7 @@ describe('definePage global type (issue #281)', () => {
           moduleResolution: 'bundler',
           strict: true,
           skipLibCheck: true,
-          types: ['@uni-helper/vite-plugin-uni-pages'],
+          types: ['@uni-helper/vite-plugin-uni-pages/client'],
         },
         include: ['src/**/*'],
       }, null, 2),

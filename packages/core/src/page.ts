@@ -1,4 +1,4 @@
-import type { TabBarItem } from './config'
+import type { TabBarItem } from '@uni-helper/uni-pages-types'
 import type { PageContext } from './context'
 import type { InternalPageItem, PagePath, UserPageItem } from './types'
 import fs from 'node:fs'

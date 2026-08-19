@@ -1,6 +1,6 @@
+import type { PageItem, PagesConfig, SubPackages, TabBarItem } from '@uni-helper/uni-pages-types'
 import type { LoadConfigSource } from 'unconfig'
 import type { DefineConditional } from './condition'
-import type { PageItem, PagesConfig, SubPackages, TabBarItem } from './config'
 import type { debug } from './logger'
 import type { Page } from './page'
 
@@ -42,6 +42,7 @@ export interface UserTabBarItem extends Partial<TabBarItem> {
    * @default 0
    */
   index?: number
+  [x: string]: any
 }
 
 /**
