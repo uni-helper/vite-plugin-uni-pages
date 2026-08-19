@@ -8,7 +8,8 @@
     "build:web": "unh build web",
     "dev:mp-alipay": "unh dev mp-alipay",
     "dev:mp-weixin": "unh dev mp-weixin",
-    "dev:web": "unh dev web"
+    "dev:web": "unh dev web",
+    "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
     "@dcloudio/uni-app": "catalog:",
@@ -30,6 +31,7 @@
     "@uni-helper/vite-plugin-uni-layouts": "catalog:",
     "@uni-helper/vite-plugin-uni-pages": "workspace:*",
     "typescript": "catalog:",
-    "vite": "catalog:"
+    "vite": "catalog:",
+    "vue-tsc": "catalog:"
   }
 }

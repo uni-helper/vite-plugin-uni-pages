@@ -6,11 +6,15 @@
     "useDefineForClassFields": true,
     "module": "esnext",
     "moduleResolution": "bundler",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
     "resolveJsonModule": true,
-    "types": ["@dcloudio/types", "@uni-helper/vite-plugin-uni-pages"],
+    "types": ["@dcloudio/types", "@uni-helper/vite-plugin-uni-pages/client", "vite/client"],
     "strict": true,
     "sourceMap": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "skipLibCheck": true
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"]
 }
