@@ -17,10 +17,13 @@ import { PageContext } from '../packages/core/src'
  *
  * The fix converges plugin-generated sub-packages like the main package:
  * unmatched roots whose pages array carries the generation marker are
- * re-merged with an empty item list, which strips the current platform's
- * entries while keeping other platforms' #ifdef blocks; roots converging
- * to zero pages are removed entirely. User-written sub-packages carry no
- * marker and stay untouched.
+ * dropped entirely — the current platform has no visible page left in
+ * them, and keeping the root (even with other platforms' entries wrapped)
+ * would ship an empty sub-package to this platform's build output whose
+ * root directory does not even exist on disk. Dropping loses no state:
+ * every platform rewrites its scanned entries on each run, so the other
+ * platforms re-add the root on their next write. User-written
+ * sub-packages carry no marker and stay untouched.
  *
  * Platform model follows pages-json-home-reorder.test.ts: the current
  * platform is injected through the PageContext constructor, while the
@@ -58,22 +61,26 @@ describe('pages.json converges stale plugin-generated sub-packages', () => {
 
   beforeEach(() => {
     // Seed sub-packages as written by previous runs of other platforms,
-    // covering every convergence geometry in one file:
+    // covering every removal geometry in one file. The current platform
+    // (mp-weixin) scans no sub-package here, so EVERY plugin-generated root
+    // has zero visible pages for it and must be removed — including the
+    // multi-platform ones, whose surviving entries would otherwise ship as
+    // an empty sub-package shell in this platform's build output:
     // - pkg-gen-weixin (index 0, FIRST position): generated for MP-WEIXIN
     //   only; must be removed, and the user comment between its `}` and `,`
     //   (an after-value comment) must NOT leak onto the entry shifting into
     //   its slot
     // - pkg-gen-zero2 (index 1): also MP-WEIXIN-only, adjacent to the one
     //   above so the removal exercises two consecutive splices
-    // - pkg-gen-mixed: generated, one default-platform entry + one APP-only
-    //   entry; must survive with its platform blocks recomputed
-    // - pkg-gen-strip: generated for H5 || MP-WEIXIN; the current platform's
-    //   membership must be stripped from the plain entry and the
-    //   MP-WEIXIN-only entry dropped, with the root surviving; also carries
-    //   a plugins property that must survive convergence
+    // - pkg-gen-mixed: generated, one H5 entry + one APP-only entry; other
+    //   platforms still have pages here, but the current platform's view is
+    //   empty, so the root is removed too (H5/APP re-add it on their next
+    //   write)
+    // - pkg-gen-strip: generated for H5 || MP-WEIXIN; same zero-visibility
+    //   removal, carrying a plugins property that goes away with the root
     // - pkg-user: handwritten (no generation marker), with its own comment;
     //   must survive byte-for-byte including the comment attachment after
-    //   the two leading entries were spliced out
+    //   every generated entry was spliced out around it
     // - pkg-gen-tail (LAST position): MP-WEIXIN-only; must be removed
     fs.writeFileSync(
       pagesJsonPath,
@@ -199,63 +206,40 @@ describe('pages.json converges stale plugin-generated sub-packages', () => {
     return fs.readFileSync(pagesJsonPath, 'utf-8')
   }
 
-  it('keeps other platforms\' entries, strips the current one, removes zero-page roots, and never touches handwritten packages', async () => {
+  it('removes every generated root invisible to the current platform and never touches handwritten packages', async () => {
     const content = await run()
 
-    // Removed roots: first position, adjacent middle, and last position
+    // Removed roots: first position, adjacent middle, multi-platform middle
+    // entries, and last position — none of them has a page visible to
+    // MP-WEIXIN, so all of them converge away entirely
     expect(content).not.toContain('"pkg-gen-weixin"')
     expect(content).not.toContain('"w1"')
     expect(content).not.toContain('"pkg-gen-zero2"')
     expect(content).not.toContain('"z1"')
+    expect(content).not.toContain('"pkg-gen-mixed"')
+    expect(content).not.toContain('"p1"')
+    expect(content).not.toContain('"p2"')
+    expect(content).not.toContain('"pkg-gen-strip"')
+    expect(content).not.toContain('"p3"')
+    expect(content).not.toContain('"p4"')
+    // The plugins property seeded on pkg-gen-strip goes away with the root
+    expect(content).not.toContain('"test-plugin"')
     expect(content).not.toContain('"pkg-gen-tail"')
     expect(content).not.toContain('"t1"')
     // The after-value comment of the removed first entry must not leak onto
     // the entry that shifted into its slot
     expect(content).not.toContain('stale note')
 
-    // pkg-gen-mixed survives: the remaining entries tie 1:1 between H5 and
-    // APP, so the platform union is 'APP || H5' and neither variant covers
-    // it — both stay wrapped. Positional chain (scoped to this sub-package's
-    // segment): marker, #ifdef H5 block around p1, then the #ifdef APP
-    // block around p2
-    const mixedSegment = content.slice(content.indexOf('"pkg-gen-mixed"'), content.indexOf('"pkg-gen-strip"'))
-    const markerPos = mixedSegment.indexOf('GENERATED BY UNI-PAGES, PLATFORM: APP || H5\n')
-    const p1IfdefPos = mixedSegment.indexOf('#ifdef H5')
-    const p1Pos = mixedSegment.indexOf('"p1"')
-    const p1EndifPos = mixedSegment.indexOf('#endif', p1IfdefPos)
-    const ifdefPos = mixedSegment.indexOf('#ifdef APP')
-    const p2Pos = mixedSegment.indexOf('"p2"')
-    const endifPos = mixedSegment.indexOf('#endif', ifdefPos)
-    expect(markerPos).toBeGreaterThan(-1)
-    expect(markerPos).toBeLessThan(p1IfdefPos)
-    expect(p1IfdefPos).toBeLessThan(p1Pos)
-    expect(p1Pos).toBeLessThan(p1EndifPos)
-    expect(p1EndifPos).toBeLessThan(ifdefPos)
-    expect(ifdefPos).toBeLessThan(p2Pos)
-    expect(p2Pos).toBeLessThan(endifPos)
-
-    // pkg-gen-strip survives partial stripping: MP-WEIXIN's membership is
-    // removed from the plain entry (which becomes H5-only and covers the
-    // remaining single-platform union, so no #ifdef wrapper remains) and the
-    // MP-WEIXIN-only entry is dropped; the plugins property survives the
-    // convergence
-    const stripSegment = content.slice(content.indexOf('"pkg-gen-strip"'), content.indexOf('"pkg-user"'))
-    expect(stripSegment).toContain('GENERATED BY UNI-PAGES, PLATFORM: H5\n')
-    expect(stripSegment).toContain('"p3"')
-    expect(stripSegment).not.toContain('"p4"')
-    expect(stripSegment).not.toContain('#ifdef')
-    expect(stripSegment).toContain('"test-plugin"')
-
     // pkg-user carries no generation marker and stays untouched, with its
-    // comment still attached directly above it even though the leading
-    // sub-packages were spliced out before it
+    // comment still attached directly above it even though every generated
+    // sub-package around it was spliced out
     expect(content).toContain('"u1"')
     const commentPos = content.indexOf('// user maintained package')
     const userPos = content.indexOf('"pkg-user"')
     expect(commentPos).toBeGreaterThan(-1)
     expect(commentPos).toBeLessThan(userPos)
 
-    // Output stays parseable with exactly the surviving roots in order
+    // Output stays parseable with exactly the handwritten root surviving
     const parsed = cjParse(content) as CommentObject
     const subPackages = parsed.subPackages
     expect(Array.isArray(subPackages)).toBe(true)
@@ -265,7 +249,7 @@ describe('pages.json converges stale plugin-generated sub-packages', () => {
     const roots = subPackages
       .filter((p): p is CommentObject => typeof p === 'object' && p !== null)
       .map(p => p.root)
-    expect(roots).toEqual(['pkg-gen-mixed', 'pkg-gen-strip', 'pkg-user'])
+    expect(roots).toEqual(['pkg-user'])
   })
 
   it('keeps the output stable across consecutive runs', async () => {
@@ -332,22 +316,37 @@ describe('pipeline: skipped sub-package pages converge per platform', () => {
     expect(pages.map(p => (p as CommentObject).path)).toEqual(['alipay-only'])
   })
 
-  it('keeps the entry for other platforms when the page is skipped on the current one', async () => {
+  it('drops the root when the page is skipped on the current platform', async () => {
     const parsed = await run('mp-weixin')
-    // The page is skipped on mp-weixin but still exists on mp-alipay, so
-    // the root must survive with the entry preserved for MP-ALIPAY (the
-    // only remaining platform becomes the default, so no #ifdef wrapper)
-    // instead of freezing or vanishing
+    // The page is skipped on mp-weixin, so the sub-package has no page
+    // visible to this platform. The root must be removed entirely:
+    // keeping it (even with the MP-ALIPAY entry wrapped in #ifdef) would
+    // ship an empty sub-package to the weixin build whose root directory
+    // does not exist in the output. Dropping loses no state — mp-alipay
+    // rewrites the root from its own scan (see the next case)
+    expect(Array.isArray(parsed.subPackages)).toBe(true)
+    expect(subRoots(parsed).length).toBe(0)
+    const content = fs.readFileSync(pagesJsonPath, 'utf-8')
+    expect(content).not.toContain('"alipay-only"')
+    // The main package survives untouched
+    expect(content).toContain('"pages/index"')
+  })
+
+  it('re-adds the root on the next write of a platform that still has pages', async () => {
+    const parsed = await run('mp-alipay')
+    // The scan produces the page again, so the root comes back bare under
+    // the single-platform marker — proof that the earlier drop lost no state
     const roots = subRoots(parsed)
     expect(roots.length).toBe(1)
     const content = fs.readFileSync(pagesJsonPath, 'utf-8')
     expect(content).toContain('GENERATED BY UNI-PAGES, PLATFORM: MP-ALIPAY\n')
     expect(content).toContain('"alipay-only"')
+    expect(content).not.toContain('#ifdef')
   })
 
   it('removes the root once no platform produces pages for it anymore', async () => {
     // Delete the page file, then run mp-alipay again: the scan misses the
-    // root and convergence strips the last remaining platform's entries
+    // root and convergence removes it
     fs.rmSync(path.join(pkgDir, 'alipay-only.vue'))
 
     const parsed = await run('mp-alipay')
@@ -360,5 +359,97 @@ describe('pipeline: skipped sub-package pages converge per platform', () => {
 
     // The main package survives the sub-package removal untouched
     expect(content).toContain('"pages/index"')
+  })
+})
+
+describe('pipeline: a sub-package empty on the current platform stays out of its view', () => {
+  // Regression for the PR #286 review finding: a sub-package whose pages
+  // exist only on H5 and all opt out via definePage(null) on MP-WEIXIN.
+  // resolvePlatformUnion used to collect platforms only from the entries
+  // still present, so after the weixin run contributed zero pages the union
+  // stayed 'H5' and the H5-only entry was judged to cover the full union and
+  // emitted bare — leaking into the weixin conditional-compilation view
+  // (bare entries are visible to every platform). The current platform must
+  // always join the union. On top of that, a plugin-generated sub-package
+  // with no page left for the current platform is dropped entirely: the
+  // weixin build output contains no directory for it, so an app.json entry
+  // (even one whose pages are all wrapped away) would point at nothing.
+  let tmpDir: string
+  let pagesJsonPath: string
+
+  const options = {
+    dir: 'src/pages',
+    outDir: 'src',
+    homePage: 'pages/index',
+    subPackages: ['src/pkg'],
+    dts: false,
+  }
+
+  beforeAll(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-subpkg-empty-platform-'))
+    const pagesDir = path.join(tmpDir, 'src', 'pages')
+    const pkgDir = path.join(tmpDir, 'src', 'pkg')
+    fs.mkdirSync(pagesDir, { recursive: true })
+    fs.mkdirSync(pkgDir, { recursive: true })
+
+    writePage(pagesDir, 'index', 'definePage({ style: { navigationBarTitleText: \'home\' } });')
+    writePage(
+      pkgDir,
+      'h5-only',
+      'definePage(({ platform }) => (platform === \'mp-weixin\' ? null : { style: { navigationBarTitleText: \'h5 only\' } }));',
+    )
+
+    pagesJsonPath = path.join(tmpDir, 'src', 'pages.json')
+  })
+
+  afterAll(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  const run = async (platform: string): Promise<string> => {
+    const ctx = new PageContext(options, tmpDir, platform)
+    await ctx.updatePagesJSON()
+    return fs.readFileSync(pagesJsonPath, 'utf-8')
+  }
+
+  it('emits the sub-package bare while its only platform is the current one', async () => {
+    const content = await run('h5')
+    const segment = content.slice(content.indexOf('"pkg"'))
+    expect(segment).toContain('GENERATED BY UNI-PAGES, PLATFORM: H5\n')
+    expect(segment).toContain('"h5-only"')
+    expect(segment).not.toContain('#ifdef')
+  })
+
+  it('drops the sub-package entirely on the zero-contribution platform', async () => {
+    const content = await run('mp-weixin')
+
+    // No page of this sub-package is visible to MP-WEIXIN, so the root must
+    // not survive in any form — a leftover root (bare or fully wrapped)
+    // would ship an empty sub-package into the weixin build whose root
+    // directory does not exist
+    expect(content).not.toContain('"pkg"')
+    expect(content).not.toContain('"h5-only"')
+    // The main package survives untouched
+    expect(content).toContain('"pages/index"')
+    // Guard against a vacuous pass: subPackages must still serialize as an
+    // (empty) array, not disappear from the output
+    const parsed = cjParse(content) as CommentObject
+    expect(Array.isArray(parsed.subPackages)).toBe(true)
+  })
+
+  it('stays byte-stable across consecutive zero-contribution runs', async () => {
+    const first = fs.readFileSync(pagesJsonPath, 'utf-8')
+    const second = await run('mp-weixin')
+    expect(second).toBe(first)
+  })
+
+  it('re-adds the sub-package once its own platform re-runs', async () => {
+    // The H5 run re-scans the page and rewrites the root bare — the earlier
+    // drop lost no state
+    const content = await run('h5')
+    const segment = content.slice(content.indexOf('"pkg"'))
+    expect(segment).toContain('GENERATED BY UNI-PAGES, PLATFORM: H5\n')
+    expect(segment).toContain('"h5-only"')
+    expect(segment).not.toContain('#ifdef')
   })
 })

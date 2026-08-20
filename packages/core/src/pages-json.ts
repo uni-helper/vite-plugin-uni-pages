@@ -142,21 +142,21 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
     }
     else if (hasGenerationMarker(existing.pages as unknown as CommentArray<CommentObject> | undefined)) {
       // Plugin-generated sub-package missing from this run's scan (every page
-      // opted out via definePage(null) or the directory was removed): converge
-      // it like the main package — strip the current platform's entries while
-      // keeping other platforms' #ifdef blocks. User-written sub-packages
-      // carry no generation marker and stay untouched.
-      const converged = mergePlatformItems(existing.pages as unknown as CommentArray<CommentObject>, currentPlatform, [] as Pages, 'path')
-      if (converged.length > 0) {
-        existing.pages = converged as unknown as Pages
-      }
-      else {
-        staleRoots.push(existing.root)
-      }
+      // opted out via definePage(null) or the directory was removed): the
+      // current platform has no visible page left in it, so drop the root
+      // entirely. Converging instead of dropping would keep the other
+      // platforms' entries wrapped, but the root itself would still ship to
+      // this platform's build output as an empty sub-package (app.json keeps
+      // a root whose pages array is empty). Dropping loses no state: every
+      // platform re-scans and rewrites its own entries on each run, so the
+      // other platforms' processes re-add the root on their next write.
+      // User-written sub-packages carry no generation marker and stay
+      // untouched.
+      staleRoots.push(existing.root)
     }
   }
-  // Drop plugin-generated sub-packages whose pages converged to nothing on
-  // every remaining platform. Iterate backwards and drop the entry's comment
+  // Drop the plugin-generated sub-packages collected above. Iterate
+  // backwards and drop the entry's comment
   // symbols BEFORE splicing, mirroring ensureHomePageFirst: comment-json then
   // shifts the following elements' comments into the freed slot, so the
   // neighbours' #ifdef blocks survive the removal. `after-value:i` (a user
@@ -435,13 +435,32 @@ function extractLastPlatforms(src: CommentArray<CommentObject>, currentPlatform:
  * and decides which variants may be emitted without an `#ifdef` block.
  * Unwrapped entries are visible to every platform under uni-app conditional
  * compilation, so only variants covering the whole union may go unwrapped.
- * The previous most-used-combination default could resolve to a
- * single-platform combination (dominant platform-exclusive pages or usage
- * ties), emitting that platform's variants bare and leaking them into other
- * platforms' views as duplicate routes
+ *
+ * The current platform always joins the union, even when this run
+ * contributes zero items — e.g. main-package pages that exist only on H5
+ * while the MP-WEIXIN run opts every one of them out via definePage(null).
+ * Deriving the union from the surviving entries alone would then leave it
+ * at 'H5', the H5-only variants would look like they cover the full union
+ * and be emitted bare, leaking into this platform's conditional-compilation
+ * view. (Sub-packages in the same situation are dropped entirely by
+ * mergeIntoPagesJson instead, since their build output has no directory
+ * for the empty root.) The previous most-used-combination default had the
+ * same flaw class: it could resolve to a single-platform combination
+ * (dominant platform-exclusive pages or usage ties), emitting that
+ * platform's variants bare and leaking them into other platforms' views as
+ * duplicate routes
+ *
+ * The platforms recorded by the previous run's generation marker join the
+ * union too. Foreign membership can survive only in the marker once every
+ * wrapped variant of that platform was consumed: when the owning platform
+ * re-runs, its own #ifdef variants are replaced by the fresh scan and drop
+ * out of the merged map, so entry-derived membership alone would oscillate
+ * — wrapped after every foreign run, re-emitted bare after every owning
+ * run. Absorbing the marker keeps the union monotonic across runs; stale
+ * members only cause extra wrapping, which never leaks
  */
-function resolvePlatformUnion<T extends object>(mergedMap: Map<string, MultiPlatformItem<T>[]>): string[] {
-  const union = new Set<string>()
+function resolvePlatformUnion<T extends object>(mergedMap: Map<string, MultiPlatformItem<T>[]>, currentPlatform: string, lastPlatforms: string[]): string[] {
+  const union = new Set<string>([currentPlatform, ...lastPlatforms])
   for (const list of mergedMap.values()) {
     for (const { platforms } of list) {
       for (const platform of platforms)
@@ -552,8 +571,12 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
 
   // Only variants covering the full platform union may be emitted without
   // an #ifdef block: unwrapped entries are visible to every platform, so a
-  // narrower variant must stay wrapped to keep other platforms' views clean
-  const platformUnionStr = resolvePlatformUnion(mergedMap).join(' || ') || currentPlatform
+  // narrower variant must stay wrapped to keep other platforms' views clean.
+  // resolvePlatformUnion always seeds the union with the current platform
+  // and the marker's last platforms, so a zero-contribution run still
+  // forces foreign variants to stay wrapped and foreign membership recorded
+  // by an earlier run survives the owning platform's re-run
+  const platformUnionStr = resolvePlatformUnion(mergedMap, currentPlatform, lastPlatforms).join(' || ')
 
   // Add generation identifier comment to result's Symbol.for(`before:0`)
   result[Symbol.for('before:0') as CommentSymbol] = [lineComment(` ${GENERATION_MARKER_PREFIX} ${platformUnionStr}`)]
