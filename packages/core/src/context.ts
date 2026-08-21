@@ -244,6 +244,12 @@ export class PageContext {
     await this.mergeSubPageMetaData()
     this.options.onAfterMergePageMetaData(this.pageMetaData, this.subPageMetaData)
 
+    // vite-plugin-uni-platform page suffixes (e.g. `index.h5.vue` -> `index`).
+    // Note the suffix match is raw `path.includes(this.platform)`, without the
+    // h5/web aliasing the definePage DSL applies (see condition.ts
+    // platformMatches): with UNI_PLATFORM=web, `.h5`-suffixed pages are
+    // filtered out. Pre-existing behaviour, kept for parity with
+    // vite-plugin-uni-platform's own naming.
     const pages = this.withUniPlatform
       ? this.pageMetaData.filter(v => !/\..*$/.test(v.path) || v.path.includes(this.platform)).map((v) => {
           v.path = v.path.replace(/\..*$/, '')

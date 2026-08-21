@@ -46,7 +46,11 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
 
   // TODO: check if the pages.json file is valid
   // config.root is unknown until configResolved, so fall back to the same
-  // root resolution Vite will use; the path rule itself lives in one place
+  // root resolution Vite will use; the path rule itself lives in one place.
+  // Caveat: when Vite's root differs from cwd (and VITE_ROOT_DIR is unset),
+  // this placeholder lands next to the wrong directory — it is only a
+  // placeholder, and the PageContext created in configResolved always
+  // resolves the real path from config.root before any write happens.
   const resolvedPagesJSONPath = resolvePagesJsonPath(
     process.env.VITE_ROOT_DIR || process.cwd(),
     userOptions.outDir ?? 'src',

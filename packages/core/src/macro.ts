@@ -246,7 +246,14 @@ async function parseCode(options: { imports: string[], code: string, filename: s
 
     const dir = path.dirname(filename)
 
-    // Create a new VM context with dynamic import support
+    // Create a new VM context with dynamic import support.
+    // This is NOT a security sandbox: the host `globalThis` is exposed on
+    // purpose (macro code may legitimately read process.env etc.), so macro
+    // code runs with full Node capabilities. The vm boundary only guards
+    // against accidental damage — syntax errors, infinite loops (timeout),
+    // stray globals — not against malicious code. definePage is build-time
+    // user code by design; installing an untrusted project already implies
+    // trusting its dev-time scripts.
     const vmContext = {
       module: {},
       exports: {},
