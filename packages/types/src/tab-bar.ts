@@ -50,8 +50,11 @@ export interface TabBarItem {
    * 当 position 为 "top" 时，此参数无效
    *
    * 不支持网络图片，不支持字体图标
+   *
+   * 支持 `@xxx` 主题变量：微信小程序 darkmode（themeLocation）下可按主题切换图标，
+   * uni-app 会原样透传该字段（官方文档表格只标注 String，但 darkmode 场景依赖主题变量）
    */
-  iconPath?: string
+  iconPath?: string | ThemeVar
 
   /**
    * 选中时的图片路径，icon 大小限制为 40 kb，建议尺寸为 81px * 81px
@@ -59,8 +62,10 @@ export interface TabBarItem {
    * 当 position 为 "top" 时，此参数无效
    *
    * 不支持网络图片，不支持字体图标
+   *
+   * 支持 `@xxx` 主题变量，同 iconPath 的 darkmode 说明
    */
-  selectedIconPath?: string
+  selectedIconPath?: string | ThemeVar
 
   /**
    * 该项是否显示

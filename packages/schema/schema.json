@@ -3566,8 +3566,15 @@
     "TabBarItem": {
       "properties": {
         "iconPath": {
-          "description": "图片路径，icon 大小限制为 40 kb，建议尺寸为 81px * 81px\n\n当 position 为 \"top\" 时，此参数无效\n\n不支持网络图片，不支持字体图标",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "description": "图片路径，icon 大小限制为 40 kb，建议尺寸为 81px * 81px\n\n当 position 为 \"top\" 时，此参数无效\n\n不支持网络图片，不支持字体图标\n\n支持 `@xxx` 主题变量：微信小程序 darkmode（themeLocation）下可按主题切换图标， uni-app 会原样透传该字段（官方文档表格只标注 String，但 darkmode 场景依赖主题变量）"
         },
         "iconfont": {
           "$ref": "#/definitions/TabBarIconFont",
@@ -3578,8 +3585,15 @@
           "type": "string"
         },
         "selectedIconPath": {
-          "description": "选中时的图片路径，icon 大小限制为 40 kb，建议尺寸为 81px * 81px\n\n当 position 为 \"top\" 时，此参数无效\n\n不支持网络图片，不支持字体图标",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "description": "选中时的图片路径，icon 大小限制为 40 kb，建议尺寸为 81px * 81px\n\n当 position 为 \"top\" 时，此参数无效\n\n不支持网络图片，不支持字体图标\n\n支持 `@xxx` 主题变量，同 iconPath 的 darkmode 说明"
         },
         "text": {
           "description": "tab 上按钮文字，在 App 和 H5 平台为非必填，例如中间可放一个没有文字的 + 号图标",
