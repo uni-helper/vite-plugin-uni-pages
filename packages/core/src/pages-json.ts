@@ -457,7 +457,13 @@ function extractLastPlatforms(src: CommentArray<CommentObject>, currentPlatform:
  * out of the merged map, so entry-derived membership alone would oscillate
  * — wrapped after every foreign run, re-emitted bare after every owning
  * run. Absorbing the marker keeps the union monotonic across runs; stale
- * members only cause extra wrapping, which never leaks
+ * members only cause extra wrapping, which never leaks.
+ *
+ * The flip side of monotonicity: a platform that is retired for good (its
+ * dev terminal will never run again) stays in the marker forever and keeps
+ * every diverging entry wrapped. This is harmless but permanent — do not
+ * hand-edit the marker line to clean it up; delete the generated pages.json
+ * instead and let the next run regenerate it from scratch.
  */
 function resolvePlatformUnion<T extends object>(mergedMap: Map<string, MultiPlatformItem<T>[]>, currentPlatform: string, lastPlatforms: string[]): string[] {
   const union = new Set<string>([currentPlatform, ...lastPlatforms])
@@ -514,7 +520,12 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
       }
     }
 
-    // Skip if platforms is empty except for current platform
+    // Skip if platforms is empty except for current platform.
+    // Note: this also drops user-written entries that carry no generation
+    // marker and no #ifdef block when they are absent from the current run's
+    // scan (their platform list resolves to empty). Historical behaviour,
+    // kept as-is; hand-written pages that must survive every run belong in
+    // pages.config.ts `pages`, which is merged in unconditionally.
     if (platforms.length === 0) {
       continue
     }
