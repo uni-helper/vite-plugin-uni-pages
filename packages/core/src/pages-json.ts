@@ -225,8 +225,8 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
     // entry. uni-app's conditional compilation drops a whole wrapped
     // property, so platforms without a tabBar get no section at all — an
     // unwrapped one would ship `tabBar: { "list": [] }` in their build output
-    if (tabBarMerge.owningPlatforms.join(' || ') !== tabBarMerge.platformUnion.join(' || ')) {
-      const tabBarPlatformStr = tabBarMerge.owningPlatforms.join(' || ')
+    const tabBarPlatformStr = tabBarMerge.owningPlatforms.join(' || ')
+    if (tabBarPlatformStr !== tabBarMerge.platformUnion.join(' || ')) {
       const commentPageJson = pageJson as unknown as CommentObject
       commentPageJson[Symbol.for('before:tabBar') as CommentSymbol] = [lineComment(` #ifdef ${tabBarPlatformStr}`)]
       commentPageJson[Symbol.for('after:tabBar') as CommentSymbol] = [lineComment(' #endif')]
@@ -500,14 +500,26 @@ function extractLastPlatforms(src: CommentArray<CommentObject>, currentPlatform:
  * hand-edit the marker line to clean it up; delete the generated pages.json
  * instead and let the next run regenerate it from scratch.
  */
-function resolvePlatformUnion<T extends object>(mergedMap: Map<string, MultiPlatformItem<T>[]>, currentPlatform: string, lastPlatforms: string[]): string[] {
-  const union = new Set<string>([currentPlatform, ...lastPlatforms])
-  for (const list of mergedMap.values()) {
-    for (const { platforms } of list) {
-      for (const platform of platforms)
-        union.add(platform)
+/**
+ * Collect every platform recorded across the merged variants
+ *
+ * The seed-free counterpart of {@link resolvePlatformUnion}: the union seeds
+ * (current platform, marker platforms) are what separate that union from
+ * this set, which is also the owning-platform set of the section
+ */
+function collectVariantPlatforms<T extends object>(mergedMap: Map<string, MultiPlatformItem<T>[]>): Set<string> {
+  const platforms = new Set<string>()
+  for (const variants of mergedMap.values()) {
+    for (const { platforms: variantPlatforms } of variants) {
+      for (const platform of variantPlatforms)
+        platforms.add(platform)
     }
   }
+  return platforms
+}
+
+function resolvePlatformUnion<T extends object>(mergedMap: Map<string, MultiPlatformItem<T>[]>, currentPlatform: string, lastPlatforms: string[]): string[] {
+  const union = new Set<string>([currentPlatform, ...lastPlatforms, ...collectVariantPlatforms(mergedMap)])
   return [...union].sort()
 }
 
@@ -643,13 +655,7 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
   // A platform owns the section iff it owns at least one surviving variant;
   // a bare variant covers the full union by construction, so the plain union
   // of variant platform sets is the owning set
-  const owningPlatforms = new Set<string>()
-  for (const variants of mergedMap.values()) {
-    for (const { platforms } of variants) {
-      for (const platform of platforms)
-        owningPlatforms.add(platform)
-    }
-  }
+  const owningPlatforms = collectVariantPlatforms(mergedMap)
 
   // Add generation identifier comment to result's Symbol.for(`before:0`)
   result[Symbol.for('before:0') as CommentSymbol] = [lineComment(` ${GENERATION_MARKER_PREFIX} ${platformUnionStr}`)]
