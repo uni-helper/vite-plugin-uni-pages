@@ -15,6 +15,12 @@ import { debug } from './logger'
  * marker handling, serialization formatting, file locking and atomic writes.
  * Callers see {@link writePagesJson} and the pure {@link mergePagesJson};
  * comment-json internals never leak past their interface.
+ *
+ * Convergence policy for a section the current platform does not use: keep
+ * and #ifdef-wrap it when uni-app's conditional compilation can strip the
+ * whole thing from this platform's build (the tabBar property); drop it
+ * entirely when the build output would still ship an empty husk (a
+ * sub-package root with no pages).
  */
 
 /** Route data assembled by the scan/merge pipeline */
@@ -38,9 +44,12 @@ export interface PagesJsonData {
 export interface PagesJsonFormatOptions {
   /**
    * Minify the output, takes precedence over `indent`. Single-line JSON
-   * cannot carry comments, so the generation marker and any user comments
-   * are dropped — multi-platform tracking then restarts from scratch on the
-   * next run
+   * cannot carry comments, so the generation marker, any user comments and
+   * every platform-scoped `#ifdef` block are dropped: entries and sections
+   * owned solely by other platforms then ship bare into this platform's
+   * build output (e.g. a foreign tabBar list), and once a minified write
+   * lands, multi-platform tracking restarts from scratch on every subsequent
+   * run. Keep the setting uniform across every platform build of one project
    */
   minify?: boolean
   /** Indentation, number of spaces or string (e.g. '\t') */
@@ -115,7 +124,7 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
 
   // pages
   const oldPagesArray = oldPages as unknown as CommentArray<CommentObject> | undefined
-  pageJson.pages = mergePlatformItems(oldPagesArray, currentPlatform, data.pages, 'path') as unknown as Pages
+  pageJson.pages = mergePlatformItems(oldPagesArray, currentPlatform, data.pages, 'path').items as unknown as Pages
 
   // mergePlatformItems uses a Map internally which may lose the ordering from setHomePage,
   // so we need to ensure the home page is placed first after the merge
@@ -133,7 +142,7 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
   for (const existing of subPackagesArray as unknown as SubPackage[]) {
     const sub = newSubPackages.get(existing.root)
     if (sub) {
-      existing.pages = mergePlatformItems(existing.pages as unknown as CommentArray<CommentObject>, currentPlatform, sub.pages, 'path') as unknown as Pages
+      existing.pages = mergePlatformItems(existing.pages as unknown as CommentArray<CommentObject>, currentPlatform, sub.pages, 'path').items as unknown as Pages
       // Preserve plugins property from user config
       if (sub.plugins) {
         existing.plugins = sub.plugins
@@ -177,7 +186,7 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
   for (const [_, newSub] of newSubPackages) {
     const subPackage: SubPackage = {
       root: newSub.root,
-      pages: mergePlatformItems(undefined, currentPlatform, newSub.pages, 'path') as unknown as Pages,
+      pages: mergePlatformItems(undefined, currentPlatform, newSub.pages, 'path').items as unknown as Pages,
     }
     // Include plugins property if configured
     if (newSub.plugins) {
@@ -188,17 +197,40 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
 
   // tabbar
   const { list, ...tabBarOthers } = data.tabBar || {}
-  if (list) {
-    const oldTabBarObj = oldTabBar as unknown as { list?: CommentArray<CommentObject> } | undefined
-    const { list: oldList } = oldTabBarObj || {}
-    const newList = mergePlatformItems(oldList, currentPlatform, list, 'pagePath')
-    pageJson.tabBar = {
-      ...tabBarOthers, // Always update properties other than list directly
-      list: newList,
-    }
+  const oldTabBarObj = oldTabBar as unknown as ({ list?: CommentArray<CommentObject> } & Partial<TabBar>) | undefined
+  // Converge for the current platform even when this run contributes no
+  // tabBar: entries owned only by this platform drop out of the list while
+  // foreign entries survive behind their #ifdef blocks. pages.json is shared
+  // across platforms, so a tabBar absent on the current platform must not
+  // delete the whole section another platform already generated.
+  const tabBarMerge = mergePlatformItems(oldTabBarObj?.list, currentPlatform, list || [], 'pagePath')
+
+  if (tabBarMerge.items.length === 0) {
+    // No platform owns a tabBar entry anymore: the section converged to empty
+    pageJson.tabBar = undefined
   }
   else {
-    pageJson.tabBar = undefined // Clear directly, currently not supporting platform A having tabBar while platform B does not
+    const { list: _oldList, ...oldTabBarOthers } = oldTabBarObj || {}
+    pageJson.tabBar = {
+      // A run contributing no list entries (no tabBar, or an empty/absent
+      // list) must not wipe the owning platform's look-and-feel properties.
+      // A run with its own entries owns the shared property block: its
+      // config replaces the props wholesale (last-writer-wins), so a
+      // props-declaring platform loses its colors to a later props-less
+      // owner run until it re-runs — per-platform props are not tracked
+      ...(list && list.length ? tabBarOthers : oldTabBarOthers),
+      list: tabBarMerge.items,
+    }
+    // The tabBar is visible only to the platforms owning at least one list
+    // entry. uni-app's conditional compilation drops a whole wrapped
+    // property, so platforms without a tabBar get no section at all — an
+    // unwrapped one would ship `tabBar: { "list": [] }` in their build output
+    if (tabBarMerge.owningPlatforms.join(' || ') !== tabBarMerge.platformUnion.join(' || ')) {
+      const tabBarPlatformStr = tabBarMerge.owningPlatforms.join(' || ')
+      const commentPageJson = pageJson as unknown as CommentObject
+      commentPageJson[Symbol.for('before:tabBar') as CommentSymbol] = [lineComment(` #ifdef ${tabBarPlatformStr}`)]
+      commentPageJson[Symbol.for('after:tabBar') as CommentSymbol] = [lineComment(' #endif')]
+    }
   }
 
   return pageJson as PagesConfig
@@ -448,7 +480,10 @@ function extractLastPlatforms(src: CommentArray<CommentObject>, currentPlatform:
  * same flaw class: it could resolve to a single-platform combination
  * (dominant platform-exclusive pages or usage ties), emitting that
  * platform's variants bare and leaking them into other platforms' views as
- * duplicate routes
+ * duplicate routes. The seeding also guards the tabBar property wrapper:
+ * without it a zero-tabBar run would see owning platforms == union and emit
+ * a foreign-owned tabBar bare, reintroducing exactly the leak the wrapper
+ * exists to prevent
  *
  * The platforms recorded by the previous run's generation marker join the
  * union too. Foreign membership can survive only in the marker once every
@@ -476,6 +511,21 @@ function resolvePlatformUnion<T extends object>(mergedMap: Map<string, MultiPlat
   return [...union].sort()
 }
 
+/** Result of {@link mergePlatformItems}: the merged items plus the platform sets they imply */
+interface MergedPlatformItems {
+  /** Merged configuration items with #ifdef blocks and the generation marker */
+  items: CommentArray<CommentObject>
+  /** Sorted platform union: current platform, the marker's last platforms and every surviving variant's platforms */
+  platformUnion: string[]
+  /**
+   * Sorted union of the platforms owning at least one surviving variant.
+   * Callers scoping a whole section (e.g. the tabBar property) show it only
+   * to these platforms; deriving ownership here keeps the decision on the
+   * structured data instead of re-decoding the emitted `#ifdef` comments.
+   */
+  owningPlatforms: string[]
+}
+
 /**
  * Merge multi-platform page configuration items
  * Handle conditional compilation comments (#ifdef / #endif), merge configuration items from different platforms into one array
@@ -485,9 +535,9 @@ function resolvePlatformUnion<T extends object>(mergedMap: Map<string, MultiPlat
  * @param currentPlatform - Current platform identifier (e.g. H5, MP-WEIXIN)
  * @param items - New configuration item array
  * @param uniqueKeyName - Field name used to identify configuration item uniqueness (e.g. 'path' or 'pagePath')
- * @returns Merged configuration item array with conditional compilation comments
+ * @returns Merged items with #ifdef blocks plus the platform union and owning platforms
  */
-function mergePlatformItems<T extends object = Record<string, unknown>>(source: CommentArray<CommentObject> | undefined, currentPlatform: string, items: T[], uniqueKeyName: keyof ExcludeIndexSignature<T>): CommentArray<CommentObject> {
+function mergePlatformItems<T extends object = Record<string, unknown>>(source: CommentArray<CommentObject> | undefined, currentPlatform: string, items: T[], uniqueKeyName: keyof ExcludeIndexSignature<T>): MergedPlatformItems {
   const src = source || new CommentArray<CommentObject>()
   currentPlatform = currentPlatform.toUpperCase()
 
@@ -587,7 +637,19 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
   // and the marker's last platforms, so a zero-contribution run still
   // forces foreign variants to stay wrapped and foreign membership recorded
   // by an earlier run survives the owning platform's re-run
-  const platformUnionStr = resolvePlatformUnion(mergedMap, currentPlatform, lastPlatforms).join(' || ')
+  const platformUnion = resolvePlatformUnion(mergedMap, currentPlatform, lastPlatforms)
+  const platformUnionStr = platformUnion.join(' || ')
+
+  // A platform owns the section iff it owns at least one surviving variant;
+  // a bare variant covers the full union by construction, so the plain union
+  // of variant platform sets is the owning set
+  const owningPlatforms = new Set<string>()
+  for (const variants of mergedMap.values()) {
+    for (const { platforms } of variants) {
+      for (const platform of platforms)
+        owningPlatforms.add(platform)
+    }
+  }
 
   // Add generation identifier comment to result's Symbol.for(`before:0`)
   result[Symbol.for('before:0') as CommentSymbol] = [lineComment(` ${GENERATION_MARKER_PREFIX} ${platformUnionStr}`)]
@@ -613,5 +675,5 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
     }
   }
 
-  return result
+  return { items: result, platformUnion, owningPlatforms: [...owningPlatforms].sort() }
 }
