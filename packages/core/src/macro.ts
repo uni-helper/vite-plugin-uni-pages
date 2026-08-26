@@ -14,22 +14,21 @@ import { DefineConditional, isConditional } from './condition'
 import { debug } from './logger'
 
 /**
- * definePage macro evaluation module
+ * definePage 宏求值模块
  *
- * Deep module hiding everything needed to understand a definePage macro:
- * SFC parsing, script block parsing with per-block failure isolation, macro
- * location, import collection and sandboxed evaluation. Callers only see two
- * functions: evaluateDefinePage (scan path) and findDefinePageMacro (transform
- * path).
+ * 深模块，封装理解一个 definePage 宏所需的全部细节：SFC 解析、按块
+ * 隔离失败的 script 块解析、宏定位、导入收集与沙箱求值。调用方只见
+ * 两个函数：evaluateDefinePage（扫描路径）与 findDefinePageMacro
+ * （转换路径）。
  */
 
 /**
- * Parse Vue Single File Component (SFC)
- * Compatible with different versions of @vue/compiler-sfc
+ * 解析 Vue 单文件组件（SFC）
+ * 兼容不同版本的 @vue/compiler-sfc
  *
- * @param code - Vue SFC source code
- * @param options - Parse options
- * @returns SFC descriptor object
+ * @param code - Vue SFC 源码
+ * @param options - 解析选项
+ * @returns SFC descriptor 对象
  */
 export function parseSFC(code: string, options?: SFCParseOptions): SFCDescriptor {
   return (
@@ -37,7 +36,7 @@ export function parseSFC(code: string, options?: SFCParseOptions): SFCDescriptor
       pad: 'space',
       ...options,
     }).descriptor
-    // for @vue/compiler-sfc ^2.7
+    // 兼容 @vue/compiler-sfc ^2.7
     || (VueParser as any)({
       source: code,
       ...options,
@@ -46,17 +45,16 @@ export function parseSFC(code: string, options?: SFCParseOptions): SFCDescriptor
 }
 
 /**
- * Evaluate the definePage macro of a Vue SFC and return the page metadata
+ * 求值 Vue SFC 中的 definePage 宏并返回页面元信息
  *
- * Used by the scan path. Parse and evaluation failures propagate so the
- * caller (Page.read) can degrade the page to path-only metadata.
+ * 供扫描路径使用。解析与求值失败会向上传播，调用方（Page.read）据此
+ * 把该页面降级为仅含路径的元信息。
  *
- * @param code - Vue SFC source code
- * @param filename - SFC filename, used for error location and module resolution
- * @param platform - Current platform identifier, injected into function-form macros; defaults to the uni-env platform
- * @returns Page metadata object, `null` when the macro explicitly opts out
- * (definePage(null) or a function returning null), or undefined if definePage
- * is not found
+ * @param code - Vue SFC 源码
+ * @param filename - SFC 文件名，用于错误定位与模块解析
+ * @param platform - 当前平台标识，注入函数式宏；默认取 uni-env 的平台
+ * @returns 页面元信息对象；宏显式退出（definePage(null) 或返回 null 的
+ * 函数）时为 `null`；找不到 definePage 时为 undefined
  */
 export async function evaluateDefinePage(code: string, filename: string, platform: string = uniEnvPlatform): Promise<UserPageItem | null | undefined> {
   const sfc = parseSFC(code, { filename })
@@ -66,10 +64,10 @@ export async function evaluateDefinePage(code: string, filename: string, platfor
     return undefined
   }
 
-  // Import attributes (`with { ... }`) are natively supported by @babel/parser 8.
-  // The deprecated `assert { ... }` syntax has been removed upstream; such files
-  // fail to parse here, the error propagates to Page.read() and the page
-  // degrades to path-only metadata (the definePage macro cannot be evaluated).
+  // 导入属性（`with { ... }`）由 @babel/parser 8 原生支持。已废弃的
+  // `assert { ... }` 语法在上游已被移除；这类文件在这里解析失败，错误
+  // 传播到 Page.read()，页面降级为仅含路径的元信息（definePage 宏
+  // 无法求值）。
   const ast = babelParse(sfcScript.content, sfcScript.lang || 'js')
   const macro = findMacro(ast.body, filename)
   if (!macro) {
@@ -87,18 +85,17 @@ export async function evaluateDefinePage(code: string, filename: string, platfor
     filename,
   })
 
-  // Function-form macros receive the current platform and the conditional
-  // `define` factory so users can branch per platform without reading
-  // process.env.UNI_PLATFORM themselves
+  // 函数式宏接收当前平台与条件化 `define` 工厂，用户无需自己读取
+  // process.env.UNI_PLATFORM 就能按平台分支
   const parsedMeta = typeof parsed === 'function'
     ? await parsed({ platform, define: (base: Record<string, any>) => new DefineConditional(base) })
     : parsed
 
-  // Conditional definitions are resolved for the current platform right here
-  // so downstream stages keep handling plain objects
+  // 条件化定义在这里立即为当前平台解析，下游阶段因此始终只处理普通
+  // 对象
   const resolvedMeta = isConditional(parsedMeta) ? parsedMeta.resolve(platform) : parsedMeta
 
-  // An explicit null opts the page out of pages.json on this platform
+  // 显式 null 表示该页面在本平台退出 pages.json
   if (resolvedMeta === null)
     return null
 
@@ -109,19 +106,18 @@ export async function evaluateDefinePage(code: string, filename: string, platfor
 }
 
 /**
- * Locate the definePage macro call in a Vue SFC without evaluating it
+ * 在 Vue SFC 中定位 definePage 宏调用但不求值
  *
- * Used by the transform path to remove the macro. Each script block is parsed
- * independently: a syntax error in one block (e.g. the deprecated
- * `assert { ... }` import attributes removed in @babel/parser 8) must not
- * skip macro removal in the other block. Failures are reported through
- * `onParseError` instead of throwing.
+ * 供转换路径移除宏使用。每个 script 块独立解析：其中一个块的语法
+ * 错误（例如 @babel/parser 8 移除的旧版 `assert { ... }` 导入属性）
+ * 不能导致另一个块的宏移除被跳过。失败通过 `onParseError` 上报，
+ * 不抛出。
  *
- * @param code - Vue SFC source code
- * @param filename - SFC filename for error reporting
- * @param options - Optional hooks for per-block parse failures
- * @param options.onParseError - Called with the failing script block name and the error
- * @returns definePage call expression, or undefined if not found
+ * @param code - Vue SFC 源码
+ * @param filename - 用于错误上报的 SFC 文件名
+ * @param options - 可选的按块解析失败钩子
+ * @param options.onParseError - 以失败的 script 块名与错误对象调用
+ * @returns definePage 调用表达式，未找到时为 undefined
  */
 export function findDefinePageMacro(
   code: string,
@@ -156,12 +152,12 @@ export function findDefinePageMacro(
 }
 
 /**
- * Find definePage macro call in AST
- * Support function expressions, arrow functions and object expressions as arguments
+ * 在 AST 中查找 definePage 宏调用
+ * 支持函数表达式、箭头函数与对象表达式作为参数
  *
- * @param stmts - AST statement array
- * @param filename - Filename for error reporting
- * @returns definePage call expression, or undefined if not found
+ * @param stmts - AST 语句数组
+ * @param filename - 用于错误上报的文件名
+ * @returns definePage 调用表达式，未找到时为 undefined
  */
 function findMacro(stmts: t.Statement[], filename: string): t.CallExpression | undefined {
   let macro: t.CallExpression | undefined
@@ -180,10 +176,10 @@ function findMacro(stmts: t.Statement[], filename: string): t.CallExpression | u
   if (!macro)
     return
 
-  // Extract the first argument of the macro call
+  // 提取宏调用的第一个参数
   const [opt] = macro.arguments
 
-  // Validate the macro argument: only function, object literal or null are supported
+  // 校验宏参数：仅支持函数、对象字面量或 null
   if (opt && !t.isFunctionExpression(opt) && !t.isArrowFunctionExpression(opt) && !t.isObjectExpression(opt) && !t.isNullLiteral(opt)) {
     debug.definePage(`definePage() only supports a function, object literal or null as argument: ${filename}`)
     return
@@ -193,24 +189,24 @@ function findMacro(stmts: t.Statement[], filename: string): t.CallExpression | u
 }
 
 /**
- * Extract all import declarations from AST
- * Used to provide necessary imports when executing definePage arguments
+ * 从 AST 中提取全部导入声明
+ * 用于在执行 definePage 参数时提供必要的导入
  *
- * @param stmts - AST statement array
- * @returns Import declaration array
+ * @param stmts - AST 语句数组
+ * @returns 导入声明数组
  */
 function findImports(stmts: t.Statement[]): t.ImportDeclaration[] {
   return stmts.filter(t.isImportDeclaration)
 }
 
 /**
- * Convert TypeScript / JavaScript script code to object/function
+ * 将 TypeScript / JavaScript 脚本代码转换为对象/函数
  *
- * @param options - Configuration required for script execution
- * @param options.imports - List of module import statements to include
- * @param options.code - TypeScript code content to execute
- * @param options.filename - Script filename for error location and context
- * @returns Script execution result, if export is a function then execute and return its return value
+ * @param options - 脚本执行所需配置
+ * @param options.imports - 需要包含的模块导入语句列表
+ * @param options.code - 待执行的 TypeScript 代码内容
+ * @param options.filename - 用于错误定位与上下文的脚本文件名
+ * @returns 脚本执行结果，export 为函数时会执行并返回其返回值
  */
 async function parseCode(options: { imports: string[], code: string, filename: string }): Promise<any> {
   const { imports = [], code, filename } = options
@@ -219,41 +215,39 @@ async function parseCode(options: { imports: string[], code: string, filename: s
   try {
     const tmpCode = `${imports.join('\n')}\n export default ${code}`
 
-    // Compile TypeScript code to JavaScript
+    // 将 TypeScript 代码编译为 JavaScript
     jsCode = ts.transpileModule(tmpCode, {
       compilerOptions: {
-        module: ts.ModuleKind.CommonJS, // Generated module format is CommonJS (Node.js default)
-        target: ts.ScriptTarget.ES2022, // Target JavaScript version after compilation
+        module: ts.ModuleKind.CommonJS, // 生成 CommonJS 模块格式（Node.js 默认）
+        target: ts.ScriptTarget.ES2022, // 编译后的目标 JavaScript 版本
 
-        noEmit: true, // Don't generate output files
-        strict: false, // Disable all strict type checking options
-        noImplicitAny: false, // Allow expressions with any type
-        strictNullChecks: false, // Disable strict null and undefined checks
-        strictFunctionTypes: false, // Disable strict contravariant comparison of function parameters
-        strictBindCallApply: false, // Disable strict type checking for bind, call and apply methods
-        strictPropertyInitialization: false, // Disable strict checking of class property initialization
-        noImplicitThis: false, // Allow this expressions to have implicit any type
-        alwaysStrict: false, // Don't parse in strict mode or generate "use strict" directive for each source file
+        noEmit: true, // 不生成输出文件
+        strict: false, // 关闭所有严格类型检查选项
+        noImplicitAny: false, // 允许 any 类型的表达式
+        strictNullChecks: false, // 关闭严格的 null 与 undefined 检查
+        strictFunctionTypes: false, // 关闭函数参数的严格逆变比较
+        strictBindCallApply: false, // 关闭 bind、call、apply 方法的严格类型检查
+        strictPropertyInitialization: false, // 关闭类属性初始化的严格检查
+        noImplicitThis: false, // 允许 this 表达式具有隐式 any 类型
+        alwaysStrict: false, // 不以严格模式解析，也不为每个源文件生成 "use strict" 指令
 
-        allowJs: true, // Allow compiling JavaScript files
-        checkJs: false, // Don't check types in JavaScript files
-        skipLibCheck: true, // Skip type checking of TypeScript declaration files (*.d.ts)
-        esModuleInterop: true, // Enable ES module interoperability, allow importing CommonJS modules with import
-        removeComments: true, // Remove comments
+        allowJs: true, // 允许编译 JavaScript 文件
+        checkJs: false, // 不检查 JavaScript 文件中的类型
+        skipLibCheck: true, // 跳过 TypeScript 声明文件 (*.d.ts) 的类型检查
+        esModuleInterop: true, // 启用 ES 模块互操作，允许以 import 导入 CommonJS 模块
+        removeComments: true, // 移除注释
       },
-      jsDocParsingMode: ts.JSDocParsingMode.ParseNone, // Don't parse JSDoc
+      jsDocParsingMode: ts.JSDocParsingMode.ParseNone, // 不解析 JSDoc
     }).outputText
 
     const dir = path.dirname(filename)
 
-    // Create a new VM context with dynamic import support.
-    // This is NOT a security sandbox: the host `globalThis` is exposed on
-    // purpose (macro code may legitimately read process.env etc.), so macro
-    // code runs with full Node capabilities. The vm boundary only guards
-    // against accidental damage — syntax errors, infinite loops (timeout),
-    // stray globals — not against malicious code. definePage is build-time
-    // user code by design; installing an untrusted project already implies
-    // trusting its dev-time scripts.
+    // 创建支持动态 import 的新 VM 上下文。
+    // 这不是安全沙箱：故意暴露宿主的 `globalThis`（宏代码可能合法地
+    // 读取 process.env 等），宏代码因此拥有完整的 Node 能力。vm 边界
+    // 只防误伤——语法错误、死循环（超时）、意外的全局变量——不防恶意
+    // 代码。definePage 本就是构建期的用户代码；安装一个不受信任的
+    // 项目已经意味着信任它的开发期脚本。
     const vmContext = {
       module: {},
       exports: {},
@@ -262,7 +256,7 @@ async function parseCode(options: { imports: string[], code: string, filename: s
       require: createRequire(dir),
       import: (id: string) => import(id),
 
-      // Timer related
+      // 定时器相关
       setTimeout,
       clearTimeout,
       setInterval,
@@ -270,31 +264,30 @@ async function parseCode(options: { imports: string[], code: string, filename: s
       setImmediate,
       clearImmediate,
 
-      // Console related
+      // 控制台相关
       console,
 
-      // URL handling
+      // URL 处理
       URL,
       URLSearchParams,
 
-      // Process and performance related
+      // 进程与性能相关
       performance,
 
-      // Global object references
+      // 全局对象引用
       global: globalThis,
       globalThis,
     }
 
-    // Execute JavaScript code using vm module
+    // 使用 vm 模块执行 JavaScript 代码
     const script = new vm.Script(jsCode, { filename })
 
     await script.runInNewContext(vmContext, {
-      timeout: 1000, // Set timeout to avoid long-running scripts
+      timeout: 1000, // 设置超时，避免脚本长时间运行
     })
 
-    // Get exported value. `export default null` transpiles to
-    // `exports.default = null`, which the `||` fallback would swallow, so key
-    // on property presence instead of truthiness
+    // 取导出的值。`export default null` 转译为 `exports.default = null`，
+    // 会被 `||` 兜底吞掉，因此按属性存在性取值而非按真值
     const exportsObj = vmContext.exports as any
     return 'default' in exportsObj ? exportsObj.default : exportsObj
   }

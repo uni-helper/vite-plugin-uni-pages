@@ -8,44 +8,44 @@ import { debug } from './logger'
 import { evaluateDefinePage } from './macro'
 
 /**
- * Page class representing a Vue page file
+ * 表示一个 Vue 页面文件的 Page 类
  *
- * Responsibilities:
- * 1. Read page file content
- * 2. Parse page metadata defined by definePage macro
- * 3. Provide tabBar configuration information
- * 4. Track page file change status
+ * 职责：
+ * 1. 读取页面文件内容
+ * 2. 解析 definePage 宏定义的页面元信息
+ * 3. 提供 tabBar 配置信息
+ * 4. 跟踪页面文件变更状态
  */
 export class Page {
-  /** Page context instance */
+  /** 页面上下文实例 */
   ctx: PageContext
 
-  /** Page path information containing relative and absolute paths */
+  /** 页面路径信息，包含相对路径与绝对路径 */
   path: PagePath
-  /** Page URI used for pages.json path field */
+  /** 页面 URI，用于 pages.json 的 path 字段 */
   uri: string
 
-  /** Whether the page has changed, used for incremental update judgment */
+  /** 页面是否发生变化，用于增量更新判断 */
   changed: boolean = true
 
   /**
-   * Whether the page opted out of pages.json via `definePage(null)` or a
-   * function-form macro returning null on the current platform
+   * 页面是否通过 `definePage(null)` 或函数式宏在当前平台返回 null 而
+   * 退出了 pages.json
    */
   skipped: boolean = false
 
-  /** Whether the page file has been read at least once */
+  /** 页面文件是否至少被读取过一次 */
   private loaded: boolean = false
 
-  /** Raw JSON string of page metadata for change detection */
+  /** 页面元信息的原始 JSON 字符串，用于变更检测 */
   private raw: string = ''
-  /** Parsed page metadata */
+  /** 解析后的页面元信息 */
   private meta: UserPageItem | undefined
 
   /**
-   * Create a page instance
-   * @param ctx - Page context instance
-   * @param path - Page path information
+   * 创建页面实例
+   * @param ctx - 页面上下文实例
+   * @param path - 页面路径信息
    */
   constructor(ctx: PageContext, path: PagePath) {
     this.ctx = ctx
@@ -54,11 +54,11 @@ export class Page {
   }
 
   /**
-   * Get page metadata
-   * Parse configuration defined by definePage macro and return metadata for pages.json
+   * 获取页面元信息
+   * 解析 definePage 宏定义的配置并返回用于 pages.json 的元信息
    *
-   * @param forceUpdate - Whether to force update, ignoring cache
-   * @returns Page metadata object
+   * @param forceUpdate - 是否强制更新，忽略缓存
+   * @returns 页面元信息对象
    */
   public async getPageMeta(forceUpdate = false): Promise<InternalPageItem> {
     if (forceUpdate || !this.loaded)
@@ -73,18 +73,18 @@ export class Page {
   }
 
   /**
-   * Get page tabBar configuration
-   * Extract tabBar related configuration from definePage macro
+   * 获取页面 tabBar 配置
+   * 从 definePage 宏中提取 tabBar 相关配置
    *
-   * @param forceUpdate - Whether to force update, ignoring cache
-   * @returns tabBar configuration object, or undefined if page doesn't define tabBar
+   * @param forceUpdate - 是否强制更新，忽略缓存
+   * @returns tabBar 配置对象，页面未定义 tabBar 时返回 undefined
    */
   public async getTabBar(forceUpdate = false): Promise<TabBarItem & { index: number } | undefined> {
     if (forceUpdate || !this.loaded) {
       await this.read()
     }
 
-    // A page that opted out via definePage(null) must not contribute a tabBar item
+    // 通过 definePage(null) 退出的页面不得贡献 tabBar 项
     if (this.skipped)
       return undefined
 
@@ -102,8 +102,8 @@ export class Page {
   }
 
   /**
-   * Ensure the page file has been read at least once, so `skipped` and the
-   * cached metadata reflect the current file content
+   * 确保页面文件至少被读取过一次，使 `skipped` 与缓存的元信息反映
+   * 当前文件内容
    */
   public async ensureLoaded(): Promise<void> {
     if (!this.loaded)
@@ -111,16 +111,16 @@ export class Page {
   }
 
   /**
-   * Check if the page has changed
-   * @returns Whether the page has changed
+   * 检查页面是否发生变化
+   * @returns 页面是否发生变化
    */
   public hasChanged(): boolean {
     return this.changed
   }
 
   /**
-   * Read page file and parse metadata
-   * Extract configuration defined by definePage macro from Vue SFC
+   * 读取页面文件并解析元信息
+   * 从 Vue SFC 中提取 definePage 宏定义的配置
    */
   public async read(): Promise<void> {
     let meta: UserPageItem | undefined
@@ -136,17 +136,17 @@ export class Page {
     }
     catch (err: any) {
       debug.error(err)
-      return // break if read fail
+      return // 读取失败时中断
     }
 
     let raw = ''
     try {
-      // JSON.stringify(undefined) returns undefined for skipped pages, so
-      // normalize to keep `raw` a string and the change check stable
+      // 被跳过的页面 JSON.stringify(undefined) 返回 undefined，统一
+      // 归一化为字符串，保证 `raw` 类型稳定、变更检测可靠
       raw = JSON.stringify(meta) ?? ''
     }
     catch {
-      // ignore stringify error
+      // 忽略序列化错误
     }
 
     this.changed = this.raw !== raw || this.skipped !== skipped
@@ -160,8 +160,8 @@ export class Page {
     try {
       const content = await fs.promises.readFile(this.path.absolutePath, { encoding: 'utf-8' })
       const meta = await evaluateDefinePage(content, this.path.absolutePath, this.ctx.platform)
-      // undefined means no definePage macro: keep the page with default meta.
-      // null is an explicit opt-out and must propagate to the caller untouched.
+      // undefined 表示没有 definePage 宏：保留页面并使用默认元信息。
+      // null 是显式退出，必须原样传递给调用方。
       return meta === undefined ? { type: 'page' } : meta
     }
     catch (err: any) {

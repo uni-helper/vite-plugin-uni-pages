@@ -17,21 +17,21 @@ const corePkg = path.join(root, 'packages/core')
 const typesPkg = path.join(root, 'packages/types')
 
 /**
- * Regression test for https://github.com/uni-helper/vite-plugin-uni-pages/issues/281
+ * https://github.com/uni-helper/vite-plugin-uni-pages/issues/281 的回归测试
  *
- * `definePage` is exposed as a global via `global.d.ts`:
+ * `definePage` 通过 `global.d.ts` 暴露为全局：
  *   declare global { const definePage: import('.').DefinePage }
  *
- * The chain is entered through the `/client` subpath: consumers add
- * `@uni-helper/vite-plugin-uni-pages/client` to their tsconfig `types`
- * array (or use a triple-slash reference). `client.d.ts` pulls in
- * `global.d.ts`, whose `import('.')` resolves to the package entry, so the
- * entry must expose `DefinePage` as a resolvable type. In v0.4.2 the dts
- * bundle lost that export, producing `TS2304: Cannot find name 'definePage'`.
+ * 这条链从 `/client` 子路径进入：消费者把
+ * `@uni-helper/vite-plugin-uni-pages/client` 加进 tsconfig 的 `types`
+ * 数组（或使用三斜线引用）。`client.d.ts` 引入 `global.d.ts`，其中的
+ * `import('.')` 解析到包入口，因此入口必须把 `DefinePage` 暴露为可
+ * 解析的类型。v0.4.2 的 dts 产物丢了该导出，产生 `TS2304: Cannot
+ * find name 'definePage'`。
  *
- * This test reconstructs the published surface (`package.json` + top-level
- * `.d.ts` + built `dist/`) and runs `tsc --noEmit` against a minimal
- * consumer, mirroring how `uni-demo` consumes the package.
+ * 本测试重建发布面（`package.json` + 顶层 `.d.ts` + 构建后的
+ * `dist/`），对一个最小消费者运行 `tsc --noEmit`，模拟 uni-demo
+ * 消费该包的方式。
  */
 describe('definePage global type (issue #281)', () => {
   const dirs: string[] = []
@@ -42,15 +42,15 @@ describe('definePage global type (issue #281)', () => {
   })
 
   it('resolves `definePage` from the published package surface', () => {
-    // Built artifacts must exist; CI runs `build` before `test`.
+    // 构建产物必须存在；CI 在 `test` 之前运行 `build`。
     expect(existsSync(path.join(corePkg, 'dist/index.d.mts')), 'core dist missing, run `pnpm build` first').toBe(true)
     expect(existsSync(path.join(typesPkg, 'dist/index.d.mts')), 'types dist missing, run `pnpm build` first').toBe(true)
 
     const tmp = mkdtempSync(path.join(tmpdir(), 'uni-pages-types-'))
     dirs.push(tmp)
 
-    // Reconstruct the published layout of both packages inside a consumer
-    // `node_modules`, matching how `tsconfig.types` resolves the plugin.
+    // 在消费者 `node_modules` 内重建两个包的发布布局，
+    // 与 `tsconfig.types` 解析插件的方式一致。
     const coreOut = path.join(tmp, 'node_modules/@uni-helper/vite-plugin-uni-pages')
     const typesOut = path.join(tmp, 'node_modules/@uni-helper/uni-pages-types')
     mkdirSync(coreOut, { recursive: true })
@@ -61,14 +61,14 @@ describe('definePage global type (issue #281)', () => {
     cpSync(path.join(typesPkg, 'package.json'), path.join(typesOut, 'package.json'))
     cpSync(path.join(typesPkg, 'dist'), path.join(typesOut, 'dist'), { recursive: true })
 
-    // Minimal consumer project. A plain `.ts` file mirrors the
-    // `<script setup>` definePage macro call; plain `tsc` cannot parse
-    // `.vue` and we only need to assert the global type resolves.
+    // 最小消费者项目。普通 `.ts` 文件模拟 `<script setup>` 中的
+    // definePage 宏调用；原生 `tsc` 无法解析 `.vue`，这里只需断言
+    // 全局类型能解析。
     mkdirSync(path.join(tmp, 'src'))
     writeFileSync(
       path.join(tmp, 'src/page.ts'),
       [
-        '// Mirage of `<script setup>` calling the definePage macro.',
+        '// 模拟 `<script setup>` 中调用 definePage 宏。',
         'definePage({ style: { navigationBarTitleText: \'Home\' } })',
       ].join('\n'),
     )
@@ -95,7 +95,7 @@ describe('definePage global type (issue #281)', () => {
         cwd: root,
         encoding: 'utf-8',
         stdio: ['ignore', 'pipe', 'pipe'],
-        // `npx` is `npx.cmd` on Windows; spawning a `.cmd` requires a shell.
+        // Windows 上 `npx` 是 `npx.cmd`；启动 `.cmd` 需要 shell。
         shell: process.platform === 'win32',
       })
     }
@@ -107,7 +107,7 @@ describe('definePage global type (issue #281)', () => {
     expect(exitCode, `tsc failed:\n${stdout}`).toBe(0)
     expect(stdout).not.toMatch(/TS2304|Cannot find name 'definePage'/)
 
-    // Sanity: the global declaration is actually wired up via global.d.ts.
+    // 健全性检查：全局声明确实通过 global.d.ts 接好了。
     const globalDts = readFileSync(path.join(coreOut, 'global.d.ts'), 'utf-8')
     expect(globalDts).toMatch(/const definePage: import\(['"]\.['"]\)\.DefinePage/)
   })

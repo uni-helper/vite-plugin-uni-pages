@@ -5,15 +5,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { withFileLock } from '../packages/core/src'
 
 /**
- * Regression coverage for the read-modify-write race fixed by `withFileLock`.
+ * `withFileLock` 修复的读-改-写竞态回归覆盖。
  *
- * Before the fix, only the *write* was locked, so two processes could both
- * read pages.json, compute their own merge result, and the second write would
- * silently drop the first one's conditional-compilation (#ifdef) blocks.
+ * 修复前只有「写」被加锁，两个进程可能都读到 pages.json、各自算出
+ * 合并结果，第二次写入会静默丢掉第一次写入的条件编译（#ifdef）块。
  *
- * `withFileLock` holds the lock across the whole critical section. This test
- * proves two concurrent tasks targeting the same file are serialized: their
- * critical sections never overlap.
+ * `withFileLock` 在整个临界区持有锁。本测试证明针对同一文件的两个
+ * 并发任务被串行化：它们的临界区从不重叠。
  */
 describe('withFileLock serialization', () => {
   let tmpDir: string
@@ -30,26 +28,26 @@ describe('withFileLock serialization', () => {
   })
 
   it('runs overlapping critical sections strictly sequentially', async () => {
-    // Overlap log: push the section name when it starts, push 'END' when it ends.
-    // If two sections ever overlapped, we would see A, B, (end A), (end B)
-    // ordering. Sequential execution always yields A, (end A), B, (end B).
+    // 重叠日志：临界区开始时推入名称，结束时推入 'END'。若两个临界区
+    // 重叠，会看到 A、B、(end A)、(end B) 的顺序；串行执行总是
+    // A、(end A)、B、(end B)。
     const log: string[] = []
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
     const task = async (name: string) => {
       return withFileLock(lockFile, async () => {
         log.push(name)
-        // Hold the lock long enough to guarantee the other task has started
-        // waiting on it, so overlap would be observable if the lock failed.
+        // 持锁时间足够长，保证另一个任务已开始等锁——锁失效时重叠
+        // 就能被观察到。
         await sleep(80)
         log.push(`end-${name}`)
       })
     }
 
-    // Kick both off near-simultaneously. They must NOT interleave.
+    // 近乎同时启动两个任务。它们绝不能交错。
     await Promise.all([task('A'), task('B')])
 
-    // Valid serializations: either A-then-B or B-then-A, never interleaved.
+    // 合法的串行化：要么 A 先 B 后，要么 B 先 A 后，绝不交错。
     const ok = log.join(',') === 'A,end-A,B,end-B' || log.join(',') === 'B,end-B,A,end-A'
     expect(ok, `critical sections overlapped: ${log.join(',')}`).toBe(true)
   })
@@ -58,7 +56,7 @@ describe('withFileLock serialization', () => {
     const first = await withFileLock(lockFile, async () => {
       return 'first-value'
     })
-    // A second task must be able to acquire the lock again (no leaked lock).
+    // 第二个任务必须能再次获取锁（锁没有泄漏）。
     const second = await withFileLock(lockFile, async () => {
       return 'second-value'
     })
@@ -68,11 +66,10 @@ describe('withFileLock serialization', () => {
   })
 
   it('serializes a burst of concurrent callers without starving any of them', async () => {
-    // Regression: dev-server startup fires one watcher `add` event per page
-    // file, so dozens of in-process callers race on the lock simultaneously.
-    // With retry-only contention the losers woke up in lockstep, always missed
-    // the brief free window and exhausted their retries ("Failed to acquire
-    // file lock, task aborted"). The per-path queue must run every caller.
+    // 回归：dev server 启动时每个页面文件触发一个监听器 `add` 事件，
+    // 几十个进程内调用方同时在锁上竞争。只有重试机制时，输家们同时
+    // 醒来、总错过短暂的空闲窗口并耗尽重试（"Failed to acquire
+    // file lock, task aborted"）。按路径的队列必须让每个调用方都运行。
     const results = await Promise.all(
       Array.from({ length: 29 }, (_, i) => withFileLock(lockFile, async () => i)),
     )

@@ -1,25 +1,25 @@
 import Debug from 'debug'
 
 /**
- * Debug logging utility
- * Uses debug package for leveled log output
- * Enable via environment variable DEBUG=vite-plugin-uni-pages:*
+ * 调试日志工具
+ * 基于 debug 包做分级日志输出
+ * 通过环境变量 DEBUG=vite-plugin-uni-pages:* 开启
  */
 export const debug = {
-  /** HMR related logs */
+  /** HMR 相关日志 */
   hmr: Debug('vite-plugin-uni-pages:hmr'),
-  /** Configuration options related logs */
+  /** 配置项相关日志 */
   options: Debug('vite-plugin-uni-pages:options'),
-  /** Main package page scanning logs */
+  /** 主包页面扫描日志 */
   pages: Debug('vite-plugin-uni-pages:pages'),
-  /** Sub-package page scanning logs */
+  /** 子包页面扫描日志 */
   subPages: Debug('vite-plugin-uni-pages:subPages'),
-  /** Error logs */
+  /** 错误日志 */
   error: Debug('vite-plugin-uni-pages:error'),
-  /** Cache related logs */
+  /** 缓存相关日志 */
   cache: Debug('vite-plugin-uni-pages:cache'),
-  /** Declaration file generation logs */
+  /** 声明文件生成日志 */
   declaration: Debug('vite-plugin-uni-pages:declaration'),
-  /** definePage macro parsing logs */
+  /** definePage 宏解析日志 */
   definePage: Debug('vite-plugin-uni-pages:definePage'),
 }

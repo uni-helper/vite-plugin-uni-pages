@@ -30,27 +30,26 @@ export type * from './types'
 export type * from '@uni-helper/uni-pages-types'
 
 /**
- * vite-plugin-uni-pages plugin main entry
+ * vite-plugin-uni-pages 插件主入口
  *
- * Automatically scan page directories and generate pages.json configuration file
- * Support definePage macro for defining page metadata
- * Support multi-platform conditional compilation
- * Support sub-package configuration
- * Support TypeScript declaration file generation
+ * 自动扫描页面目录并生成 pages.json 配置文件
+ * 支持 definePage 宏定义页面元信息
+ * 支持多平台条件编译
+ * 支持分包配置
+ * 支持 TypeScript 声明文件生成
  *
- * @param userOptions - User configuration options
- * @returns Vite plugin instance
+ * @param userOptions - 用户配置项
+ * @returns Vite 插件实例
  */
 export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
   let ctx: PageContext
 
-  // TODO: check if the pages.json file is valid
-  // config.root is unknown until configResolved, so fall back to the same
-  // root resolution Vite will use; the path rule itself lives in one place.
-  // Caveat: when Vite's root differs from cwd (and VITE_ROOT_DIR is unset),
-  // this placeholder lands next to the wrong directory — it is only a
-  // placeholder, and the PageContext created in configResolved always
-  // resolves the real path from config.root before any write happens.
+  // TODO: 校验 pages.json 文件是否合法
+  // config.root 在 configResolved 之前未知，这里退回到与 Vite 相同的根目录
+  // 解析规则，让路径规则只维护一份。注意：当 Vite 的 root 与 cwd 不一致
+  // （且未设置 VITE_ROOT_DIR）时，这个占位文件会落在错误的目录旁——
+  // 它只是占位符，configResolved 中创建的 PageContext 在任何写入发生前
+  // 总会基于 config.root 解析出真实路径。
   const resolvedPagesJSONPath = resolvePagesJsonPath(
     process.env.VITE_ROOT_DIR || process.cwd(),
     userOptions.outDir ?? 'src',
@@ -61,8 +60,8 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
     name: 'vite-plugin-uni-pages',
     enforce: 'pre',
     /**
-     * Vite configResolved hook
-     * Initialize PageContext, set logger, generate initial pages.json
+     * Vite configResolved 钩子
+     * 初始化 PageContext，设置 logger，生成初始 pages.json
      */
     async configResolved(config) {
       ctx = new PageContext(userOptions, config.root)
@@ -78,26 +77,24 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
 
       if (config.command === 'build') {
         if (config.build.watch) {
-          // Resolve against the real Vite root: chokidar would otherwise
-          // interpret relative dirs against process.cwd() and watch the wrong
-          // directories whenever root differs from cwd
+          // 必须相对真实的 Vite root 解析：否则 chokidar 会按 process.cwd()
+          // 解释相对目录，在 root 与 cwd 不一致时监听到错误的目录
           ctx.setupWatcher(chokidar.watch([...ctx.options.dirs, ...ctx.options.subPackages].map(v => slash(path.resolve(config.root, v)))))
         }
       }
     },
     /**
-     * Code transform hook
-     * Remove definePage macro calls from Vue SFC to avoid runtime errors
+     * 代码转换钩子
+     * 从 Vue SFC 中移除 definePage 宏调用，避免运行时报错
      */
     async transform(code: string, id: string) {
       if (!FILE_EXTENSIONS.some(ext => id.endsWith(ext))) {
         return null
       }
 
-      // Each script block is parsed independently inside the macro module: a
-      // syntax error in one block (e.g. the deprecated `assert { ... }` import
-      // attributes removed in @babel/parser 8) must not skip macro removal in
-      // the other block
+      // 每个script块在宏模块内部独立解析：其中一个块的语法错误（例如
+      // @babel/parser 8 移除的旧版 `assert { ... }` 导入属性）不能导致
+      // 另一个块的宏移除被跳过
       const macro = findDefinePageMacro(code, id, {
         onParseError: (block, error) => {
           this.warn(`[vite-plugin-uni-pages] Failed to parse ${block} in ${id}, its definePage macro may stay in the output: ${error instanceof Error ? error?.message : error}`)
@@ -113,9 +110,9 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
       if (s.hasChanged()) {
         return {
           code: s.toString(),
-          // magic-string v1 types `sourcesContent` as `(string | null)[]`,
-          // which rollup's `ExistingRawSourceMap` rejects; the serialized JSON
-          // string is accepted by `SourceMapInput` and avoids the mismatch
+          // magic-string v1 把 `sourcesContent` 类型化为 `(string | null)[]`，
+          // 与 rollup 的 `ExistingRawSourceMap` 不兼容；序列化后的 JSON
+          // 字符串可被 `SourceMapInput` 接受，规避了类型不匹配
           map: s.generateMap({
             source: id,
             includeContent: true,
@@ -125,23 +122,23 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
       }
     },
     /**
-     * Configure server hook
-     * Set up file watching and HMR support
+     * 配置开发服务器钩子
+     * 设置文件监听与 HMR 支持
      */
     configureServer(server) {
       ctx.setupViteServer(server)
     },
     /**
-     * Module resolution hook
-     * Resolve virtual module identifier to internal path
+     * 模块解析钩子
+     * 将虚拟模块标识符解析为内部路径
      */
     resolveId(id) {
       if (id === MODULE_ID_VIRTUAL)
         return RESOLVED_MODULE_ID_VIRTUAL
     },
     /**
-     * Module load hook
-     * Return the code content of the virtual module
+     * 模块加载钩子
+     * 返回虚拟模块的代码内容
      */
     load(id) {
       if (id === RESOLVED_MODULE_ID_VIRTUAL)

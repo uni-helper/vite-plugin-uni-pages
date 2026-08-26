@@ -7,23 +7,22 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { PageContext } from '../packages/core/src'
 
 /**
- * Regression coverage for the home page reordering in writePagesJson.
+ * writePagesJson 中首页重排的回归覆盖。
  *
- * Three pre-existing issues combined to corrupt pages.json when the home
- * entry was not already first in the merged array:
+ * 当首页条目在合并后的数组中不在首位时，三个既有缺陷叠加起来破坏
+ * pages.json：
  *
- * 1. `CommentArray#splice`/`unshift` only re-index the surviving elements'
- *    comment symbols: the removed entry's comments stay stranded at its old
- *    index and end up attached to whatever element moves into that slot.
- * 2. A merged entry may keep the object read from pages.json without the
- *    internal `type` marker (this seed does), so the `type === 'home'`
- *    lookup never matched and the reordering silently did not run.
- * 3. When the first merged entry needed an `#ifdef` block, assigning
- *    `before:0` replaced the GENERATED marker instead of appending to it.
+ * 1. `CommentArray#splice`/`unshift` 只重排幸存元素的注释符号：被移除
+ *    条目的注释滞留在旧下标上，最终挂到移入该槽位的元素上。
+ * 2. 合并后的条目可能保留从 pages.json 读出的、没有内部 `type` 标记
+ *    的对象（本用例的种子就是这样），`type === 'home'` 查找因此永远
+ *    不命中，重排静默地没有执行。
+ * 3. 首个合并条目需要 `#ifdef` 块时，赋值 `before:0` 会替换掉
+ *    GENERATED 标记而非追加。
  *
- * Platform model follows concurrent-pages-json.test.ts: the current platform
- * (mp-weixin) is injected through the PageContext constructor, while the
- * pre-seeded file represents another terminal's output.
+ * 平台模型与 concurrent-pages-json.test.ts 一致：当前平台
+ * （mp-weixin）通过 PageContext 构造函数注入，预置文件代表另一个
+ * 终端的输出。
  */
 
 function writePage(pagesDir: string, name: string, title: string): void {
@@ -61,14 +60,12 @@ describe('pages.json home page reordering keeps comment attachment', () => {
   })
 
   beforeEach(() => {
-    // Seed pages.json as written by another platform's run, with the home
-    // entry LAST so the merge result requires reordering. The home entry is
-    // identical to what the scanned page resolves to, so it merges into a
-    // single item covering every recorded platform (APP, H5, MP-WEIXIN).
+    // 按另一个平台的运行结果预置 pages.json，首页条目放在最后，
+    // 强制合并结果需要重排。首页条目与扫描到的页面解析结果一致，
+    // 因此合并为覆盖所有已记录平台（APP、H5、MP-WEIXIN）的单个条目。
     //
-    // The first merged entry (app-only) only covers a subset of the union
-    // and is wrapped, which used to overwrite the GENERATED marker at
-    // before:0.
+    // 首个合并条目（app-only）只覆盖全集的子集并被包裹，
+    // 过去这会覆盖 before:0 上的 GENERATED 标记。
     fs.writeFileSync(
       pagesJsonPath,
       [
@@ -124,13 +121,11 @@ describe('pages.json home page reordering keeps comment attachment', () => {
 
     const content = fs.readFileSync(pagesJsonPath, 'utf-8')
 
-    // The merged home entry exists on APP, H5 and MP-WEIXIN, so it covers
-    // the full platform union and stays unwrapped at index 0. app-only and
-    // about/settings only cover subsets and keep their #ifdef blocks; their
-    // comment tokens must follow the reordering instead of stranding on a
-    // neighbour, and the generation marker must survive at the very top even
-    // though the first merged entry (app-only) is wrapped. Check the full
-    // layout positionally:
+    // 合并后的首页条目存在于 APP、H5 与 MP-WEIXIN，因此覆盖整个平台
+    // 全集并保持在下标 0 不被包裹。app-only 与 about/settings 只覆盖
+    // 子集，保留各自的 #ifdef 块；它们的注释令牌必须跟随重排而不是
+    // 滞留在邻居上，生成标记也必须保留在最顶部——即使首个合并条目
+    // （app-only）是被包裹的。按位置检查完整布局：
     //   marker, pages/index,
     //   #ifdef (app-only), pages/app-only, #endif,
     //   #ifdef (about), pages/about, #endif,
@@ -159,7 +154,7 @@ describe('pages.json home page reordering keeps comment attachment', () => {
     expect(settingsIfdefPos).toBeLessThan(settingsPos)
     expect(settingsPos).toBeLessThan(settingsEndifPos)
 
-    // Output must stay parseable, with home as the first entry.
+    // 输出必须仍可解析，且首页是第一个条目。
     const parsed = cjParse(content) as CommentObject
     const pages = parsed.pages
     expect(Array.isArray(pages)).toBe(true)
@@ -181,8 +176,8 @@ describe('pages.json home page reordering keeps comment attachment', () => {
     await ctx.updatePagesJSON()
     const first = fs.readFileSync(pagesJsonPath, 'utf-8')
 
-    // A second run reads the generated file back; the generation marker must
-    // still be discoverable at before:0 and the layout must not churn.
+    // 第二次运行读回生成的文件；生成标记必须仍能在 before:0 找到，
+    // 布局不得翻腾。
     await ctx.updatePagesJSON()
     const second = fs.readFileSync(pagesJsonPath, 'utf-8')
 
@@ -190,10 +185,9 @@ describe('pages.json home page reordering keeps comment attachment', () => {
   })
 
   it('keeps the #ifdef block of entries behind home intact when home is not last', async () => {
-    // Home in the middle of the seed: after splicing it out, comment-json
-    // shifts the following entries' comments down into its old slot. Deleting
-    // the stranded symbols must happen BEFORE the splice, otherwise this
-    // destroys the #ifdef/#endif of the entry that moved into that slot.
+    // 首页在种子中间：把它 splice 出来后，comment-json 会把后续条目
+    // 的注释下移到它的旧槽位。删除滞留符号必须发生在 splice 之前，
+    // 否则会破坏移入该槽位的条目的 #ifdef/#endif。
     fs.writeFileSync(
       pagesJsonPath,
       [
@@ -240,9 +234,9 @@ describe('pages.json home page reordering keeps comment attachment', () => {
     await ctx.updatePagesJSON()
 
     const content = fs.readFileSync(pagesJsonPath, 'utf-8')
-    // No variant covers the full platform union, so every entry stays
-    // wrapped; home moves first inside its own block and app-only must keep
-    // its recomputed #ifdef block even though it sat behind home's old slot.
+    // 没有变体覆盖整个平台全集，因此每个条目都保持包裹；首页在自己的
+    // 块内移到最前，app-only 尽管排在首页旧槽位之后，也必须保留其
+    // 重新计算出的 #ifdef 块。
     const markerPos = content.indexOf('GENERATED BY UNI-PAGES, PLATFORM: APP || H5 || MP-WEIXIN')
     const homeIfdefPos = content.indexOf('#ifdef H5 || MP-WEIXIN')
     const indexPos = content.indexOf('"pages/index"')
@@ -282,11 +276,9 @@ describe('pages.json home page reordering keeps comment attachment', () => {
   })
 
   it('stays stable when platform usage counts tie', async () => {
-    // Two entries per platform set (2:2 tie). The default platform used to be
-    // picked from map insertion order, and the home reordering changed that
-    // order between runs, flipping the wrapping back and forth. The platform
-    // union is order-independent by construction, so the second run must be
-    // byte-identical.
+    // 每个平台集两个条目（2:2 并列）。过去默认平台按 map 插入顺序挑
+    // 选，首页重排在两次运行间改变这个顺序，包裹关系来回翻转。平台
+    // 全集按构造与顺序无关，因此第二次运行必须字节相同。
     fs.writeFileSync(
       pagesJsonPath,
       [
@@ -339,8 +331,7 @@ describe('pages.json home page reordering keeps comment attachment', () => {
     await ctx.updatePagesJSON()
     const first = fs.readFileSync(pagesJsonPath, 'utf-8')
 
-    // The union-based marker is independent of the entry order the previous
-    // run produced
+    // 基于全集的标记与上一次运行产生的条目顺序无关
     expect(first).toContain('GENERATED BY UNI-PAGES, PLATFORM: APP || H5 || MP-WEIXIN')
 
     await ctx.updatePagesJSON()

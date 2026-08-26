@@ -5,12 +5,12 @@ import { dirname, join } from 'node:path'
 import { normalizePath } from 'vite'
 
 /**
- * Generate TypeScript declaration file content
- * Provide type hints for uni-app navigation APIs (navigateTo, redirectTo, switchTab, reLaunch)
- * Ensure page paths get type checking at compile time
+ * 生成 TypeScript 声明文件内容
+ * 为 uni-app 的导航 API（navigateTo、redirectTo、switchTab、reLaunch）提供类型提示，
+ * 让页面路径在编译期获得类型检查
  *
- * @param ctx - Page context instance
- * @returns Declaration file code string
+ * @param ctx - 页面上下文实例
+ * @returns 声明文件代码字符串
  */
 export function getDeclaration(ctx: PageContext): string {
   const subPagePaths = ctx.subPageMetaData.map((sub) => {
@@ -56,9 +56,9 @@ declare module "virtual:uni-pages" {
 }
 
 /**
- * Write file, automatically create directories
- * @param filePath - File path
- * @param content - File content
+ * 写入文件，自动创建所在目录
+ * @param filePath - 文件路径
+ * @param content - 文件内容
  */
 async function writeFile(filePath: string, content: string): Promise<void> {
   await mkdir(dirname(filePath), { recursive: true })
@@ -66,11 +66,11 @@ async function writeFile(filePath: string, content: string): Promise<void> {
 }
 
 /**
- * Write declaration file to disk
- * Only writes when content changes to avoid unnecessary file operations
+ * 将声明文件写入磁盘
+ * 仅在内容变化时写入，避免不必要的文件操作
  *
- * @param ctx - Page context instance
- * @param filepath - Declaration file output path
+ * @param ctx - 页面上下文实例
+ * @param filepath - 声明文件输出路径
  */
 export async function writeDeclaration(ctx: PageContext, filepath: string): Promise<void> {
   const originalContent = existsSync(filepath) ? await readFile(filepath, 'utf-8') : ''

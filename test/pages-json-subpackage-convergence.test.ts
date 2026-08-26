@@ -7,27 +7,21 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { PageContext } from '../packages/core/src'
 
 /**
- * Regression coverage for stale sub-package convergence in writePagesJson.
+ * writePagesJson 中陈旧子包收敛的回归覆盖。
  *
- * Before this change, a sub-package missing from the current run's scan
- * (every page opted out via definePage(null), or the directory removed)
- * stayed frozen in pages.json forever: the merge loop only updated roots
- * that matched the scan, and read-modify-write deliberately preserves
- * unmatched entries to protect user-written content.
+ * 修复前，本次运行扫描不到的子包（每个页面都通过 definePage(null)
+ * 退出，或目录被删除）会永远冻结在 pages.json 里：合并循环只更新与
+ * 扫描匹配的 root，而读-改-写刻意保留未匹配条目以保护手写内容。
  *
- * The fix converges plugin-generated sub-packages like the main package:
- * unmatched roots whose pages array carries the generation marker are
- * dropped entirely — the current platform has no visible page left in
- * them, and keeping the root (even with other platforms' entries wrapped)
- * would ship an empty sub-package to this platform's build output whose
- * root directory does not even exist on disk. Dropping loses no state:
- * every platform rewrites its scanned entries on each run, so the other
- * platforms re-add the root on their next write. User-written
- * sub-packages carry no marker and stay untouched.
+ * 修复让插件生成的子包像主包一样收敛：pages 数组携带生成标记的未
+ * 匹配 root 被整个丢弃——当前平台在其中已无可见页面，保留 root
+ * （即使其他平台的条目保持包裹）会把一个空子包送进本平台的构建
+ * 产物，其 root 目录在磁盘上甚至不存在。丢弃不丢状态：每个平台
+ * 每次运行都重写自己扫描的条目，其他平台下次写入时会把 root 加
+ * 回来。手写的子包不携带标记，原样保留。
  *
- * Platform model follows pages-json-home-reorder.test.ts: the current
- * platform is injected through the PageContext constructor, while the
- * pre-seeded file represents other platforms' output.
+ * 平台模型与 pages-json-home-reorder.test.ts 一致：当前平台通过
+ * PageContext 构造函数注入，预置文件代表其他平台的输出。
  */
 
 function writePage(pagesDir: string, name: string, macro: string): void {
@@ -60,28 +54,23 @@ describe('pages.json converges stale plugin-generated sub-packages', () => {
   })
 
   beforeEach(() => {
-    // Seed sub-packages as written by previous runs of other platforms,
-    // covering every removal geometry in one file. The current platform
-    // (mp-weixin) scans no sub-package here, so EVERY plugin-generated root
-    // has zero visible pages for it and must be removed — including the
-    // multi-platform ones, whose surviving entries would otherwise ship as
-    // an empty sub-package shell in this platform's build output:
-    // - pkg-gen-weixin (index 0, FIRST position): generated for MP-WEIXIN
-    //   only; must be removed, and the user comment between its `}` and `,`
-    //   (an after-value comment) must NOT leak onto the entry shifting into
-    //   its slot
-    // - pkg-gen-zero2 (index 1): also MP-WEIXIN-only, adjacent to the one
-    //   above so the removal exercises two consecutive splices
-    // - pkg-gen-mixed: generated, one H5 entry + one APP-only entry; other
-    //   platforms still have pages here, but the current platform's view is
-    //   empty, so the root is removed too (H5/APP re-add it on their next
-    //   write)
-    // - pkg-gen-strip: generated for H5 || MP-WEIXIN; same zero-visibility
-    //   removal, carrying a plugins property that goes away with the root
-    // - pkg-user: handwritten (no generation marker), with its own comment;
-    //   must survive byte-for-byte including the comment attachment after
-    //   every generated entry was spliced out around it
-    // - pkg-gen-tail (LAST position): MP-WEIXIN-only; must be removed
+    // 按其他平台此前运行的输出预置子包，一份文件覆盖所有删除几何。
+    // 当前平台（mp-weixin）在这里扫描不到任何子包，因此每个插件生成
+    // 的 root 对它都是零可见页面、都必须删除——包括多平台的那些，
+    // 它们幸存的条目否则会作为空子包外壳进入本平台的构建产物：
+    // - pkg-gen-weixin（下标 0，最前位置）：只为 MP-WEIXIN 生成；必须
+    //   删除，且它 `}` 与 `,` 之间的用户注释（after-value 注释）不得
+    //   泄漏到移入其槽位的条目上
+    // - pkg-gen-zero2（下标 1）：同样仅 MP-WEIXIN，与上面相邻，
+    //   让删除检验连续两次 splice
+    // - pkg-gen-mixed：插件生成，一个 H5 条目 + 一个仅 APP 条目；其他
+    //   平台在这里仍有页面，但当前平台的视图为空，root 同样删除
+    //   （H5/APP 下次写入时把它加回来）
+    // - pkg-gen-strip：为 H5 || MP-WEIXIN 生成；同样的零可见删除，
+    //   附带的 plugins 属性随 root 一起消失
+    // - pkg-user：手写（无生成标记），有自己的注释；在周围所有生成
+    //   条目被 splice 掉之后必须连同注释挂载逐字节幸存
+    // - pkg-gen-tail（最后位置）：仅 MP-WEIXIN；必须删除
     fs.writeFileSync(
       pagesJsonPath,
       [
@@ -209,9 +198,8 @@ describe('pages.json converges stale plugin-generated sub-packages', () => {
   it('removes every generated root invisible to the current platform and never touches handwritten packages', async () => {
     const content = await run()
 
-    // Removed roots: first position, adjacent middle, multi-platform middle
-    // entries, and last position — none of them has a page visible to
-    // MP-WEIXIN, so all of them converge away entirely
+    // 被删除的 root：最前位置、相邻的中间位置、多平台中间条目与最后
+    // 位置——它们都没有 MP-WEIXIN 可见的页面，全部整个收敛消失
     expect(content).not.toContain('"pkg-gen-weixin"')
     expect(content).not.toContain('"w1"')
     expect(content).not.toContain('"pkg-gen-zero2"')
@@ -222,24 +210,22 @@ describe('pages.json converges stale plugin-generated sub-packages', () => {
     expect(content).not.toContain('"pkg-gen-strip"')
     expect(content).not.toContain('"p3"')
     expect(content).not.toContain('"p4"')
-    // The plugins property seeded on pkg-gen-strip goes away with the root
+    // pkg-gen-strip 上预置的 plugins 属性随 root 一起消失
     expect(content).not.toContain('"test-plugin"')
     expect(content).not.toContain('"pkg-gen-tail"')
     expect(content).not.toContain('"t1"')
-    // The after-value comment of the removed first entry must not leak onto
-    // the entry that shifted into its slot
+    // 被删除首条目的 after-value 注释不得泄漏到移入其槽位的条目上
     expect(content).not.toContain('stale note')
 
-    // pkg-user carries no generation marker and stays untouched, with its
-    // comment still attached directly above it even though every generated
-    // sub-package around it was spliced out
+    // pkg-user 不携带生成标记，保持原样；尽管周围所有生成的子包都被
+    // splice 掉，它的注释仍直接挂在它的上方
     expect(content).toContain('"u1"')
     const commentPos = content.indexOf('// user maintained package')
     const userPos = content.indexOf('"pkg-user"')
     expect(commentPos).toBeGreaterThan(-1)
     expect(commentPos).toBeLessThan(userPos)
 
-    // Output stays parseable with exactly the handwritten root surviving
+    // 输出仍可解析，且恰好只有手写的 root 幸存
     const parsed = cjParse(content) as CommentObject
     const subPackages = parsed.subPackages
     expect(Array.isArray(subPackages)).toBe(true)
@@ -260,8 +246,8 @@ describe('pages.json converges stale plugin-generated sub-packages', () => {
 })
 
 describe('pipeline: skipped sub-package pages converge per platform', () => {
-  // The cases below form a sequential cross-platform timeline sharing one
-  // tmpDir: each run builds on the pages.json written by the previous one.
+  // 下面的用例构成共享同一个 tmpDir 的顺序跨平台时间线：每次运行都
+  // 建立在上一次写入的 pages.json 之上。
   let tmpDir: string
   let pkgDir: string
   let pagesJsonPath: string
@@ -318,24 +304,22 @@ describe('pipeline: skipped sub-package pages converge per platform', () => {
 
   it('drops the root when the page is skipped on the current platform', async () => {
     const parsed = await run('mp-weixin')
-    // The page is skipped on mp-weixin, so the sub-package has no page
-    // visible to this platform. The root must be removed entirely:
-    // keeping it (even with the MP-ALIPAY entry wrapped in #ifdef) would
-    // ship an empty sub-package to the weixin build whose root directory
-    // does not exist in the output. Dropping loses no state — mp-alipay
-    // rewrites the root from its own scan (see the next case)
+    // 页面在 mp-weixin 上被跳过，子包因此没有该平台可见的页面。
+    // root 必须整个删除：保留它（即使 MP-ALIPAY 条目包在 #ifdef 里）
+    // 会给微信构建送出一个产物中不存在其 root 目录的空子包。删除不
+    // 丢状态——mp-alipay 会从自己的扫描重写 root（见下一用例）
     expect(Array.isArray(parsed.subPackages)).toBe(true)
     expect(subRoots(parsed).length).toBe(0)
     const content = fs.readFileSync(pagesJsonPath, 'utf-8')
     expect(content).not.toContain('"alipay-only"')
-    // The main package survives untouched
+    // 主包原样幸存
     expect(content).toContain('"pages/index"')
   })
 
   it('re-adds the root on the next write of a platform that still has pages', async () => {
     const parsed = await run('mp-alipay')
-    // The scan produces the page again, so the root comes back bare under
-    // the single-platform marker — proof that the earlier drop lost no state
+    // 扫描再次产出该页面，root 以单平台标记下的裸形式回来——证明
+    // 之前的删除没有丢状态
     const roots = subRoots(parsed)
     expect(roots.length).toBe(1)
     const content = fs.readFileSync(pagesJsonPath, 'utf-8')
@@ -345,35 +329,32 @@ describe('pipeline: skipped sub-package pages converge per platform', () => {
   })
 
   it('removes the root once no platform produces pages for it anymore', async () => {
-    // Delete the page file, then run mp-alipay again: the scan misses the
-    // root and convergence removes it
+    // 删除页面文件后再跑一次 mp-alipay：扫描不到 root，
+    // 收敛把它移除
     fs.rmSync(path.join(pkgDir, 'alipay-only.vue'))
 
     const parsed = await run('mp-alipay')
-    // Guard against a regression dropping the subPackages key entirely,
-    // which an empty-array length check alone would not catch
+    // 防止回归把 subPackages 键整个删掉——
+    // 只检查空数组长度捕捉不到这种问题
     expect(Array.isArray(parsed.subPackages)).toBe(true)
     expect(subRoots(parsed).length).toBe(0)
     const content = fs.readFileSync(pagesJsonPath, 'utf-8')
     expect(content).not.toContain('"alipay-only"')
 
-    // The main package survives the sub-package removal untouched
+    // 主包在子包删除后原样幸存
     expect(content).toContain('"pages/index"')
   })
 })
 
 describe('pipeline: a sub-package empty on the current platform stays out of its view', () => {
-  // Regression for the PR #286 review finding: a sub-package whose pages
-  // exist only on H5 and all opt out via definePage(null) on MP-WEIXIN.
-  // resolvePlatformUnion used to collect platforms only from the entries
-  // still present, so after the weixin run contributed zero pages the union
-  // stayed 'H5' and the H5-only entry was judged to cover the full union and
-  // emitted bare — leaking into the weixin conditional-compilation view
-  // (bare entries are visible to every platform). The current platform must
-  // always join the union. On top of that, a plugin-generated sub-package
-  // with no page left for the current platform is dropped entirely: the
-  // weixin build output contains no directory for it, so an app.json entry
-  // (even one whose pages are all wrapped away) would point at nothing.
+  // PR #286 评审问题的回归：子包的页面只存在于 H5，且在 MP-WEIXIN 上
+  // 全部通过 definePage(null) 退出。resolvePlatformUnion 过去只从仍然
+  // 存在的条目收集平台，微信运行零贡献后全集停留在 'H5'，仅 H5 的
+  // 条目被判定为覆盖全集而裸露输出——泄漏进微信的条件编译视图（裸
+  // 条目对所有平台可见）。当前平台必须始终加入全集。在此基础上，
+  // 对当前平台没有剩余页面的插件生成子包被整个丢弃：微信构建产物
+  // 中没有对应的目录，app.json 条目（即使其页面全被包裹掉）会指向
+  // 不存在的东西。
   let tmpDir: string
   let pagesJsonPath: string
 
@@ -423,16 +404,15 @@ describe('pipeline: a sub-package empty on the current platform stays out of its
   it('drops the sub-package entirely on the zero-contribution platform', async () => {
     const content = await run('mp-weixin')
 
-    // No page of this sub-package is visible to MP-WEIXIN, so the root must
-    // not survive in any form — a leftover root (bare or fully wrapped)
-    // would ship an empty sub-package into the weixin build whose root
-    // directory does not exist
+    // 该子包没有任何 MP-WEIXIN 可见的页面，root 不得以任何形式幸存
+    // ——残留的 root（裸露或全部包裹）都会给微信构建送出一个产物中
+    // 不存在其 root 目录的空子包
     expect(content).not.toContain('"pkg"')
     expect(content).not.toContain('"h5-only"')
-    // The main package survives untouched
+    // 主包原样幸存
     expect(content).toContain('"pages/index"')
-    // Guard against a vacuous pass: subPackages must still serialize as an
-    // (empty) array, not disappear from the output
+    // 防止空转通过：subPackages 必须仍序列化为（空的）数组，
+    // 而不是从输出中消失
     const parsed = cjParse(content) as CommentObject
     expect(Array.isArray(parsed.subPackages)).toBe(true)
   })
@@ -444,8 +424,8 @@ describe('pipeline: a sub-package empty on the current platform stays out of its
   })
 
   it('re-adds the sub-package once its own platform re-runs', async () => {
-    // The H5 run re-scans the page and rewrites the root bare — the earlier
-    // drop lost no state
+    // H5 运行重新扫描该页面并把 root 裸露地写回——之前的删除没有
+    // 丢状态
     const content = await run('h5')
     const segment = content.slice(content.indexOf('"pkg"'))
     expect(segment).toContain('GENERATED BY UNI-PAGES, PLATFORM: H5\n')

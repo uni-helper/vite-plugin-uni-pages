@@ -7,17 +7,17 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { PageContext } from '../packages/core/src'
 
 /**
- * Regression coverage for comment-json v5 blank line handling.
+ * comment-json v5 空行处理的回归覆盖。
  *
- * comment-json v5 emits `BlankLine` tokens (without a `value` property) when
- * the parsed JSON contains blank lines — exactly what a manually formatted
- * pages.json looks like. `mergePlatformItems` used to assume every token in a
- * `before:N` comment array carries `value` and crashed with
- * `Cannot read properties of undefined (reading 'trim')`.
+ * comment-json v5 在解析到的 JSON 含空行时会输出 `BlankLine` 令牌
+ * （不带 `value` 属性）——手工格式化的 pages.json 正是这种样子。
+ * `mergePlatformItems` 过去假设 `before:N` 注释数组中的每个令牌都带
+ * `value`，于是以 `Cannot read properties of undefined (reading
+ * 'trim')` 崩溃。
  *
- * Platform model follows concurrent-pages-json.test.ts: the current platform
- * (mp-weixin) is injected through the PageContext constructor, while the
- * pre-seeded file represents another terminal's (H5) output.
+ * 平台模型与 concurrent-pages-json.test.ts 一致：当前平台
+ * （mp-weixin）通过 PageContext 构造函数注入，预置文件代表另一个
+ * 终端（H5）的输出。
  */
 
 describe('pages.json with blank lines (comment-json v5 BlankLine tokens)', () => {
@@ -48,15 +48,14 @@ describe('pages.json with blank lines (comment-json v5 BlankLine tokens)', () =>
   })
 
   beforeEach(() => {
-    // Seed a manually formatted pages.json: blank lines around the generation
-    // marker, around the conditional compilation comments, and between items.
-    // Each blank line becomes a BlankLine token in some `before:N` array.
+    // 预置一份手工格式化的 pages.json：生成标记周围、条件编译注释
+    // 周围以及条目之间都有空行。每个空行都会变成某个 `before:N`
+    // 数组中的 BlankLine 令牌。
     //
-    // The seeded `pages/index` entry is identical to what the scanned page
-    // resolves to, so it merges into a single item that stays first in the
-    // result. This keeps the test focused on blank line handling; the home
-    // reordering in writePagesJson is covered separately by
-    // pages-json-home-reorder.test.ts.
+    // 预置的 `pages/index` 条目与扫描到的页面解析结果一致，因此合并
+    // 成单个条目并保持在结果首位。这让测试专注于空行处理；
+    // writePagesJson 中的首页重排由 pages-json-home-reorder.test.ts
+    // 单独覆盖。
     fs.writeFileSync(
       pagesJsonPath,
       [
@@ -96,21 +95,20 @@ describe('pages.json with blank lines (comment-json v5 BlankLine tokens)', () =>
       tmpDir,
       'mp-weixin',
     )
-    // Before the BlankLine guard this threw inside mergePlatformItems.
+    // 加入 BlankLine 守卫之前，这里会在 mergePlatformItems 内部抛错。
     await ctx.updatePagesJSON()
 
     const content = fs.readFileSync(pagesJsonPath, 'utf-8')
 
-    // Both entries must survive the merge.
+    // 两个条目都必须在合并后幸存。
     expect(content).toContain('pages/h5-only')
     expect(content).toContain('h5 only')
     expect(content).toContain('pages/index')
 
-    // The merged pages/index entry covers the full platform union
-    // ('H5 || MP-WEIXIN') and stays plain, while the H5-only entry keeps
-    // its #ifdef block. Check positional attachment, not just presence:
-    // pages/index must come before the ifdef block, which must wrap
-    // pages/h5-only.
+    // 合并后的 pages/index 条目覆盖整个平台全集（'H5 || MP-WEIXIN'）
+    // 并保持裸露，仅 H5 的条目保留 #ifdef 块。检查位置挂载而不只是
+    // 出现与否：pages/index 必须在 ifdef 块之前，ifdef 块必须包裹
+    // pages/h5-only。
     const indexPos = content.indexOf('"pages/index"')
     const ifdefPos = content.indexOf('#ifdef H5\n')
     const h5Pos = content.indexOf('"pages/h5-only"')
@@ -120,7 +118,7 @@ describe('pages.json with blank lines (comment-json v5 BlankLine tokens)', () =>
     expect(ifdefPos).toBeLessThan(h5Pos)
     expect(h5Pos).toBeLessThan(endifPos)
 
-    // Output must stay parseable as JSON-with-comments.
+    // 输出必须仍可按带注释的 JSON 解析。
     const parsed = cjParse(content) as CommentObject
     const pages = parsed.pages
     expect(Array.isArray(pages)).toBe(true)

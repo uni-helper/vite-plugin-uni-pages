@@ -2,25 +2,25 @@ import { describe, expect, it } from 'vitest'
 import { mergePagesJson } from '../packages/core/src'
 
 /**
- * Regression coverage: home page status must survive multi-platform merging.
+ * 回归覆盖：首页状态必须在多平台合并中幸存。
  *
- * Reporter scenario: `dev:mp-weixin` and `dev:web` run at the same time
- * against one shared pages.json.
+ * 上报场景：`dev:mp-weixin` 与 `dev:web` 同时运行，共用一份
+ * pages.json。
  *
- * Symptom 1 — marking another page as home (`definePage({ type: 'home' })`
- * in pages/test.vue) moved the page first but kept stale `type` markers:
- * test stayed `"type": "page"` and index kept `"type": "home"`.
+ * 症状 1 —— 把另一个页面标记为首页（pages/test.vue 里的
+ * `definePage({ type: 'home' })`）后，页面被移到最前，但陈旧的
+ * `type` 标记残留：test 仍是 `"type": "page"`，index 还带着
+ * `"type": "home"`。
  *
- * Symptom 2 — platform-scoped home via `define().ifdef('mp-weixin',
- * { type: 'home' })` produced no per-platform entries at all; whichever
- * platform wrote first won and the other platform's home was silently lost.
+ * 症状 2 —— 通过 `define().ifdef('mp-weixin', { type: 'home' })`
+ * 声明平台作用域的首页时，完全没有生成按平台区分的条目；谁先写入谁
+ * 赢，另一个平台的首页被静默丢弃。
  *
- * Both trace back to the merge equality check normalizing the internal
- * `type` marker away, so home-status changes compared "equal" to the stale
- * persisted entry and the stale object survived.
+ * 两个症状都指向合并相等性检查对内部 `type` 标记的归一化：首页状态
+ * 的变化与陈旧的持久化条目比较为「相等」，陈旧对象因此幸存。
  */
 
-/** Parse the generated pages.json text into plain entries plus their #ifdef platform block (if any) */
+/** 把生成的 pages.json 文本解析为普通条目及其 #ifdef 平台块（如有） */
 function parseEntries(content: string): Array<{ path: string, type?: string, ifdef?: string }> {
   const lines = content.split('\n')
   const entries: Array<{ path: string, type?: string, ifdef?: string }> = []
@@ -52,11 +52,10 @@ function parseEntries(content: string): Array<{ path: string, type?: string, ifd
 }
 
 /**
- * Entries a build for `platform` would see after uni-app conditional
- * compilation: unwrapped entries stay visible to every platform, wrapped
- * ones only on the platforms listed in their #ifdef block. This is exactly
- * the invariant the merge must preserve — an unwrapped entry narrower than
- * the full platform set would leak into the other platforms' views.
+ * `platform` 的构建在 uni-app 条件编译后看到的条目：未包裹的条目对
+ * 每个平台可见，包裹的条目只对 #ifdef 块列出的平台可见。这正是合并
+ * 必须保持的不变量——一个比完整平台集更窄的未包裹条目会泄漏进其他
+ * 平台的视图。
  */
 function entriesForPlatform(content: string, platform: string): Array<{ path: string, type?: string }> {
   return parseEntries(content)
@@ -64,16 +63,16 @@ function entriesForPlatform(content: string, platform: string): Array<{ path: st
     .map(({ path, type }) => ({ path, type }))
 }
 
-/** Duplicate paths in one platform view break the uni-app build */
+/** 一个平台视图中出现重复路径会破坏 uni-app 构建 */
 function expectNoDuplicatePaths(view: Array<{ path: string }>): void {
   const paths = view.map(e => e.path)
   expect(new Set(paths).size).toBe(paths.length)
 }
 
 describe('home page status across concurrent platform runs', () => {
-  // Converged state before the edit: index is home (resolved by the homePage
-  // fallback on earlier runs), test is a plain page. Every scanned entry
-  // carries the internal type marker (macro evaluation defaults to 'page').
+  // 编辑前的收敛状态：index 是首页（由更早运行的 homePage 兜底解析），
+  // test 是普通页面。每个扫描条目都携带内部 type 标记（宏求值默认为
+  // 'page'）。
   const converged = [
     '{',
     '  "pages": [',
@@ -103,8 +102,8 @@ describe('home page status across concurrent platform runs', () => {
   ].join('\n')
 
   it('propagates a home switch once both platforms have re-run (symptom 1)', () => {
-    // The user adds `type: 'home'` to pages/test.vue; both dev servers watch
-    // the file and re-scan. mp-weixin merges first against the stale file...
+    // 用户给 pages/test.vue 加了 `type: 'home'`；两个 dev server 都监听
+    // 到文件并重新扫描。mp-weixin 先对陈旧文件合并……
     const afterWeixin = mergePagesJson(converged, {
       pages: [
         { path: 'pages/test', type: 'home', style: { navigationBarTitleText: 'test page' }, middlewares: ['auth'] },
@@ -114,9 +113,8 @@ describe('home page status across concurrent platform runs', () => {
       homePath: 'pages/test',
     }, { platform: 'mp-weixin' })
 
-    // Intermediate state: until h5 re-runs, the stale shared entries
-    // survive as wrapped per-platform variants. Both platform views must
-    // already be leak-free (no duplicate path) with their own home first.
+    // 中间状态：在 h5 重跑之前，陈旧的共享条目以包裹的平台变体幸存。
+    // 两个平台视图必须已经无泄漏（无重复路径），且各自的首页在最前。
     const midWeixinView = entriesForPlatform(afterWeixin, 'MP-WEIXIN')
     const midH5View = entriesForPlatform(afterWeixin, 'H5')
     expectNoDuplicatePaths(midWeixinView)
@@ -124,7 +122,7 @@ describe('home page status across concurrent platform runs', () => {
     expect(midWeixinView[0]).toEqual({ path: 'pages/test', type: 'home' })
     expect(midH5View[0]).toEqual({ path: 'pages/index', type: 'home' })
 
-    // ...then h5 merges the same fresh scan over that intermediate state.
+    // ……随后 h5 把同一份新扫描合并到该中间状态上。
     const final = mergePagesJson(afterWeixin, {
       pages: [
         { path: 'pages/test', type: 'home', style: { navigationBarTitleText: 'test page' }, middlewares: ['auth'] },
@@ -137,13 +135,13 @@ describe('home page status across concurrent platform runs', () => {
     const entries = parseEntries(final)
     expect(entries).toHaveLength(2)
 
-    // The stale markers must not survive: test is home, index is a plain page
+    // 陈旧标记不得幸存：test 是首页，index 是普通页面
     const test = entries.find(e => e.path === 'pages/test')!
     const index = entries.find(e => e.path === 'pages/index')!
     expect(test.type).toBe('home')
     expect(index.type).toBe('page')
 
-    // Home stays first on every platform view, without leaking duplicates
+    // 每个平台视图中首页都在最前，且无重复泄漏
     expect(final.indexOf('"pages/test"')).toBeLessThan(final.indexOf('"pages/index"'))
     const finalH5View = entriesForPlatform(final, 'H5')
     const finalWeixinView = entriesForPlatform(final, 'MP-WEIXIN')
@@ -156,7 +154,7 @@ describe('home page status across concurrent platform runs', () => {
   it('keeps platform-scoped home behind #ifdef blocks (symptom 2)', () => {
     // pages/test.vue: define().ifdef('mp-weixin', { type: 'home' })
     // pages/index.vue: define().ifndef('mp-weixin', { type: 'home' })
-    // h5 starts first and writes its view: index is home there.
+    // h5 先启动并写入自己的视图：index 在那里是首页。
     const afterH5 = mergePagesJson('', {
       pages: [
         { path: 'pages/index', type: 'home', middlewares: ['auth', 'test'] },
@@ -166,7 +164,7 @@ describe('home page status across concurrent platform runs', () => {
       homePath: 'pages/index',
     }, { platform: 'h5' })
 
-    // mp-weixin merges its view where test is home instead.
+    // mp-weixin 合并自己的视图，那里 test 才是首页。
     const final = mergePagesJson(afterH5, {
       pages: [
         { path: 'pages/test', type: 'home', style: { navigationBarTitleText: 'test page' }, middlewares: ['auth'] },
@@ -178,18 +176,16 @@ describe('home page status across concurrent platform runs', () => {
 
     const entries = parseEntries(final)
 
-    // Each page keeps one variant per platform instead of collapsing into
-    // whichever run wrote first
+    // 每个页面为每个平台保留一个变体，而不是折叠进先写入的一方
     expect(entries.filter(e => e.path === 'pages/index')).toHaveLength(2)
     expect(entries.filter(e => e.path === 'pages/test')).toHaveLength(2)
 
-    // No variant covers the full platform union, so nothing may be emitted
-    // unwrapped: a bare single-platform variant would leak into the other
-    // platform's view as a duplicate path
+    // 没有变体覆盖整个平台全集，因此任何条目都不得裸露输出：
+    // 裸露的单平台变体会作为重复路径泄漏进另一个平台的视图
     expect(entries.filter(e => !e.ifdef)).toHaveLength(0)
 
-    // Per-platform views: mp-weixin enters through test, h5 through index,
-    // and neither view carries a duplicate path
+    // 各平台视图：mp-weixin 从 test 进入，h5 从 index 进入，
+    // 两个视图都没有重复路径
     const weixinView = entriesForPlatform(final, 'MP-WEIXIN')
     const h5View = entriesForPlatform(final, 'H5')
     expectNoDuplicatePaths(weixinView)
@@ -199,7 +195,7 @@ describe('home page status across concurrent platform runs', () => {
     expect(h5View[0]).toEqual({ path: 'pages/index', type: 'home' })
     expect(h5View.find(e => e.path === 'pages/test')!.type).toBe('page')
 
-    // The result is stable: another mp-weixin run against it changes nothing
+    // 结果稳定：再次 mp-weixin 运行不会有任何变化
     const rerun = mergePagesJson(final, {
       pages: [
         { path: 'pages/test', type: 'home', style: { navigationBarTitleText: 'test page' }, middlewares: ['auth'] },
@@ -212,9 +208,8 @@ describe('home page status across concurrent platform runs', () => {
   })
 
   it('keeps platform-scoped home stable regardless of which platform writes first', () => {
-    // Mirror of the previous case with the write order reversed: exercises
-    // the comment reattachment path where the displaced first entry keeps
-    // its #ifdef block while the moved home variant lands at index 0.
+    // 上一用例的镜像，写入顺序相反：检验被顶替的首个条目保留其
+    // #ifdef 块、被移动的首页变体落到下标 0 的注释重挂路径。
     const afterWeixin = mergePagesJson('', {
       pages: [
         { path: 'pages/test', type: 'home', style: { navigationBarTitleText: 'test page' }, middlewares: ['auth'] },
@@ -242,7 +237,7 @@ describe('home page status across concurrent platform runs', () => {
     expect(h5View[0]).toEqual({ path: 'pages/index', type: 'home' })
     expect(h5View.find(e => e.path === 'pages/test')!.type).toBe('page')
 
-    // Stable under a further h5 run
+    // 再来一次 h5 运行依然稳定
     const rerun = mergePagesJson(final, {
       pages: [
         { path: 'pages/index', type: 'home', middlewares: ['auth', 'test'] },
@@ -255,11 +250,10 @@ describe('home page status across concurrent platform runs', () => {
   })
 
   it('keeps every platform home first once a third platform joins', () => {
-    // Same DSL setup as symptom 2, now with a third platform that agrees
-    // with h5: mp-alipay starts after h5 and mp-weixin have converged and
-    // writes twice. The alipay run must not strand the MP-WEIXIN home
-    // behind a MP-WEIXIN-visible non-home entry just because alipay's own
-    // home already sits at index 0.
+    // 与症状 2 相同的 DSL 设置，加入一个与 h5 一致的第三平台：
+    // mp-alipay 在 h5 与 mp-weixin 收敛后启动并写入两次。alipay 运行
+    // 不得让 MP-WEIXIN 的首页滞留在 MP-WEIXIN 可见的非首页条目之后，
+    // 仅仅因为 alipay 自己的首页已位于下标 0。
     const alipayPages = {
       pages: [
         { path: 'pages/index', type: 'home' as const, middlewares: ['auth', 'test'] },
@@ -280,7 +274,7 @@ describe('home page status across concurrent platform runs', () => {
 
     const afterAlipay = mergePagesJson(afterWeixin, alipayPages, { platform: 'mp-alipay' })
 
-    // The third platform must join the generation marker's union
+    // 第三平台必须加入生成标记的全集
     expect(afterAlipay).toContain('PLATFORM: H5 || MP-ALIPAY || MP-WEIXIN')
 
     const weixinView = entriesForPlatform(afterAlipay, 'MP-WEIXIN')
@@ -290,20 +284,20 @@ describe('home page status across concurrent platform runs', () => {
     expectNoDuplicatePaths(h5View)
     expectNoDuplicatePaths(alipayView)
 
-    // MP-WEIXIN must still enter through pages/test even though the alipay
-    // run placed its own home (pages/index) at index 0
+    // 尽管 alipay 运行把自己的首页（pages/index）放到下标 0，
+    // MP-WEIXIN 仍必须从 pages/test 进入
     expect(weixinView[0]).toEqual({ path: 'pages/test', type: 'home' })
     expect(weixinView.find(e => e.path === 'pages/index')!.type).toBe('page')
     expect(h5View[0]).toEqual({ path: 'pages/index', type: 'home' })
     expect(alipayView[0]).toEqual({ path: 'pages/index', type: 'home' })
     expect(alipayView.find(e => e.path === 'pages/test')!.type).toBe('page')
 
-    // Stable under a further alipay run
+    // 再来一次 alipay 运行依然稳定
     const rerun = mergePagesJson(afterAlipay, alipayPages, { platform: 'mp-alipay' })
     expect(rerun).toBe(afterAlipay)
 
-    // ...and under a further weixin run: idempotence must not be specific to
-    // the platform that wrote last
+    // ……再来一次 weixin 运行也稳定：幂等性不得只属于最后写入的
+    // 平台
     const rerunWeixin = mergePagesJson(afterAlipay, {
       pages: [
         { path: 'pages/test', type: 'home', style: { navigationBarTitleText: 'test page' }, middlewares: ['auth'] },
@@ -314,21 +308,19 @@ describe('home page status across concurrent platform runs', () => {
     }, { platform: 'mp-weixin' })
     expect(rerunWeixin).toBe(afterAlipay)
 
-    // ...and under a further h5 run: a partition that short-circuits whenever
-    // the current platform's home already sits at index 0 would regress here,
-    // because h5's home is at 0 while the merge emission order is not
+    // ……再来一次 h5 运行也稳定：若分区在当前平台的首页已位于下标 0
+    // 时就短路，这里会回归——h5 的首页在 0，而合并的输出顺序并非
+    // 如此
     const rerunH5 = mergePagesJson(afterAlipay, alipayPages, { platform: 'h5' })
     expect(rerunH5).toBe(afterAlipay)
   })
 
   it('marks every unmarked variant of the home path on legacy files', () => {
-    // Hand-written pages.json without the generation marker and without the
-    // internal type markers: every scanned entry merges content-equal into a
-    // legacy variant and loses its marker, so the homePath fallback kicks
-    // in. It must mark every variant of the home path, not just the first:
-    // the first variant may belong to another platform, and leaving the
-    // current platform's own variant unmarked strands it behind visible
-    // non-home entries until a later self-healing write.
+    // 既无生成标记也无内部 type 标记的手写 pages.json：每个扫描条目
+    // 都与某个遗留变体内容相等地合并并丢失标记，homePath 兜底因此
+    // 启动。它必须标记首页路径的每个变体而不只是第一个：第一个变体
+    // 可能属于另一个平台，留下当前平台自己的变体不标记会让它滞留在
+    // 可见的非首页条目之后，直到之后某次自愈写入。
     const legacy = [
       '{',
       '  "pages": [',
@@ -367,21 +359,19 @@ describe('home page status across concurrent platform runs', () => {
     }
     const merged = mergePagesJson(legacy, scan, { platform: 'mp-weixin' })
 
-    // MP-WEIXIN enters through pages/index even though the first homePath
-    // variant in the file is H5-only and a visible non-home entry precedes
-    // the weixin variant in the source
+    // 尽管文件中第一个 homePath 变体只属于 H5、且源文件中一个可见的
+    // 非首页条目排在微信变体之前，MP-WEIXIN 仍从 pages/index 进入
     const weixinView = entriesForPlatform(merged, 'MP-WEIXIN')
     expectNoDuplicatePaths(weixinView)
     expect(weixinView[0]?.path).toBe('pages/index')
     expect(entriesForPlatform(merged, 'H5')[0]?.path).toBe('pages/index')
 
-    // The stable partition keeps the home variants in source order ahead of
-    // the non-home entry: [index(H5), index(APP || MP-WEIXIN), a]
+    // 稳定分区让首页变体按源顺序排在非首页条目之前：
+    // [index(H5), index(APP || MP-WEIXIN), a]
     expect(parseEntries(merged).map(e => e.path)).toEqual(['pages/index', 'pages/index', 'pages/a'])
 
-    // Byte-stable under a further weixin run: the fallback re-derives home
-    // status from homePath every run, and the partition short-circuit keeps
-    // the already-partitioned output untouched
+    // 再来一次 weixin 运行字节级稳定：兜底每次运行都从 homePath 重新
+    // 推导首页状态，分区短路让已分区的输出原样保留
     expect(mergePagesJson(merged, scan, { platform: 'mp-weixin' })).toBe(merged)
   })
 })

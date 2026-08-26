@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPages } from '../packages/core/src'
 
-// The uni-env platform constant is frozen at module load time and cannot be
-// stubbed, so the platform is injected through the pipeline seam instead.
-// This makes the suite deterministic regardless of the shell's UNI_PLATFORM
-// and lets it verify the platform-dependent fixtures: `platform-injected`
-// renders the injected platform and `skip-on-mp-weixin` is dropped here.
-// The env stub stays for parity with the other platform-specific suites.
+// uni-env 的平台常量在模块加载时冻结、无法 stub，因此平台改由流水线
+// 接缝注入。这让套件与 shell 的 UNI_PLATFORM 无关、行为确定，并能
+// 验证依赖平台的固定用例：`platform-injected` 渲染注入的平台，
+// `skip-on-mp-weixin` 在这里被丢弃。
+// env stub 保留是为了与其他平台专属套件保持一致。
 describe('generate routes - mp-weixin platform', () => {
   beforeEach(() => {
     vi.stubEnv('UNI_PLATFORM', 'mp-weixin')

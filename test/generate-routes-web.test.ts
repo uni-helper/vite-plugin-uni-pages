@@ -21,11 +21,10 @@ const pagesGlobConfig: UserPagesConfig = {
   ],
 }
 
-// The uni-env platform constant is frozen at module load time and cannot be
-// stubbed, so the platform is injected through the pipeline seam instead.
-// This makes the suite deterministic regardless of the shell's UNI_PLATFORM:
-// `platform-injected` renders the injected platform and `skip-on-mp-weixin`
-// stays on web. The env stub stays for parity with the other suites.
+// uni-env 的平台常量在模块加载时冻结、无法 stub，因此平台改由流水线
+// 接缝注入。这让套件与 shell 的 UNI_PLATFORM 无关、行为确定：
+// `platform-injected` 渲染注入的平台，`skip-on-mp-weixin` 在 web 上
+// 保留。env stub 保留是为了与其他套件保持一致。
 describe('generate routes', () => {
   beforeEach(() => {
     vi.stubEnv('UNI_PLATFORM', 'web')
@@ -589,13 +588,13 @@ describe('generate routes', () => {
 
     expect(parsed).toHaveLength(2)
 
-    // String format uses computed relative path
+    // 字符串形式使用计算出的相对路径
     const subActivity = parsed.find((p: any) => p.root === '../playground/src/pages-sub-pages/sub-activity')
     expect(subActivity).toBeDefined()
     expect(subActivity.pages).toHaveLength(2)
     expect(subActivity.pages.map((p: any) => p.path)).toEqual(['pages/about/index', 'pages/home/index'])
 
-    // Object format uses custom root
+    // 对象形式使用自定义 root
     const subMain = parsed.find((p: any) => p.root === 'packages/main/src/pages')
     expect(subMain).toBeDefined()
     expect(subMain.pages).toHaveLength(2)

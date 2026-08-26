@@ -7,12 +7,12 @@ import { slash } from '@antfu/utils'
 import { globSync } from 'tinyglobby'
 
 /**
- * Resolve user configuration options
- * Merge user-provided configuration with default values and handle path resolution
+ * 解析用户配置项
+ * 将用户提供的配置与默认值合并，并处理路径解析
  *
- * @param userOptions - User configuration options
- * @param viteRoot - Vite project root directory
- * @returns Resolved configuration options
+ * @param userOptions - 用户配置项
+ * @param viteRoot - Vite 项目根目录
+ * @returns 解析后的配置项
  */
 export function resolveOptions(userOptions: UserOptions, viteRoot: string = process.cwd()): ResolvedOptions {
   const {
@@ -44,9 +44,9 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
   const root = viteRoot || slash(process.env.VITE_ROOT_DIR || process.cwd())
   const resolvedDirs = resolvePageDirs(dir, root, exclude)
 
-  // Process subPackages: support both string and SubPackageConfig formats
-  // In monorepo projects, users may need custom root paths in pages.json
-  // instead of auto-generated relative paths with '..'
+  // 处理 subPackages：同时支持字符串和 SubPackageConfig 两种格式。
+  // monorepo 项目里，用户可能需要在 pages.json 中使用自定义 root 路径，
+  // 而不是自动生成带 '..' 的相对路径
   const subPackageRootMap = new Map<string, string>()
   const resolvedSubDirs: string[] = []
   for (const sub of subPackages) {
@@ -56,7 +56,7 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
     else {
       const dirPath = slash(sub.dir)
       resolvedSubDirs.push(dirPath)
-      // Store mapping from physical directory to custom root for pages.json
+      // 记录物理目录到 pages.json 自定义 root 的映射
       subPackageRootMap.set(dirPath, sub.root)
     }
   }
@@ -95,11 +95,11 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
 }
 
 /**
- * Resolve page directories from the given glob pattern
- * @param dir - Page directory glob pattern
- * @param root - Project root directory
- * @param exclude - Glob patterns to exclude
- * @returns Matched directory paths
+ * 根据给定的 glob 模式解析页面目录
+ * @param dir - 页面目录 glob 模式
+ * @param root - 项目根目录
+ * @param exclude - 需要排除的 glob 模式
+ * @returns 匹配到的目录路径
  */
 export function resolvePageDirs(dir: string, root: string, exclude: string[]): string[] {
   const dirs = globSync(slash(dir), {

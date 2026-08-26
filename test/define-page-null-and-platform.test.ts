@@ -5,14 +5,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createPages, evaluateDefinePage } from '../packages/core/src'
 
 /**
- * Feature tests for the definePage macro extensions absorbed from
- * @uni-ku/pages-json:
+ * 从 @uni-ku/pages-json 吸收的 definePage 宏扩展的功能测试：
  *
- * 1. An explicit `null` (object form or function return value) opts the page
- *    out of pages.json on the current platform, while a missing macro or a
- *    function returning nothing keeps the page with default metadata.
- * 2. Function-form macros receive `{ platform }` so users can branch on the
- *    current platform without reading process.env.UNI_PLATFORM themselves.
+ * 1. 显式 `null`（对象形式或函数返回值）让页面在当前平台退出
+ *    pages.json；宏缺失或函数不返回任何值时页面以默认元信息保留。
+ * 2. 函数式宏接收 `{ platform }`，用户无需自己读取
+ *    process.env.UNI_PLATFORM 就能按当前平台分支。
  */
 
 function sfc(macro: string): string {
@@ -26,8 +24,8 @@ function sfc(macro: string): string {
   ].join('\n')
 }
 
-// evaluateDefinePage derives module resolution from the filename, so it must
-// be an absolute path even though the file never exists on disk
+// evaluateDefinePage 从文件名推导模块解析，因此即便文件从不在磁盘上
+// 存在，也必须传绝对路径
 const virtualFile = (name: string): string => path.join(os.tmpdir(), name)
 
 describe('evaluateDefinePage: null opt-out and platform injection', () => {
@@ -56,9 +54,8 @@ describe('evaluateDefinePage: null opt-out and platform injection', () => {
   })
 
   it('keeps the page when the macro returns nothing', async () => {
-    // Regression guard: only an explicit null skips; `undefined` must keep
-    // the page with default metadata so existing `definePage(() => {})` usage
-    // is unaffected
+    // 回归防护：只有显式 null 才跳过；`undefined` 必须让页面以默认
+    // 元信息保留，既有 `definePage(() => {})` 用法不受影响
     const meta = await evaluateDefinePage(sfc('definePage(() => {});'), virtualFile('no-return.vue'), 'h5')
     expect(meta).toEqual({ type: 'page' })
   })
@@ -91,15 +88,15 @@ describe('pipeline: definePage(null) drops the page from pages.json', () => {
       'utf-8',
     )
 
-    // Object-form opt-out: skipped on every platform
+    // 对象形式的退出：每个平台都跳过
     fs.writeFileSync(
       path.join(pagesDir, 'always-skipped.vue'),
       sfc('definePage(null);'),
       'utf-8',
     )
 
-    // Function-form opt-out bound to the injected platform, plus a tabBar
-    // item that must disappear together with the page
+    // 绑定注入平台的函数式退出，外加一个必须随页面一起消失的
+    // tabBar 项
     fs.writeFileSync(
       path.join(pagesDir, 'skip-weixin.vue'),
       sfc([

@@ -5,10 +5,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createPages, DefineConditional, evaluateDefinePage, isConditional, resolveConditional } from '../packages/core/src'
 
 /**
- * Feature tests for the platform-conditional DSL absorbed from
- * @uni-ku/pages-json: function-form definePage macros receive a `define`
- * factory, and `define(base).ifdef(...).ifndef(...)` resolves into plain
- * metadata for the current platform at scan time.
+ * 从 @uni-ku/pages-json 吸收的平台条件化 DSL 的功能测试：函数式
+ * definePage 宏接收 `define` 工厂，`define(base).ifdef(...).ifndef(...)`
+ * 在扫描时为当前平台解析为普通元信息。
  */
 
 function sfc(macro: string): string {
@@ -22,8 +21,8 @@ function sfc(macro: string): string {
   ].join('\n')
 }
 
-// evaluateDefinePage derives module resolution from the filename, so it must
-// be an absolute path even though the file never exists on disk
+// evaluateDefinePage 从文件名推导模块解析，因此即便文件从不在磁盘上
+// 存在，也必须传绝对路径
 const virtualFile = (name: string): string => path.join(os.tmpdir(), name)
 
 const DSL = `definePage(({ define }) =>
@@ -67,7 +66,7 @@ describe('conditional definition resolution', () => {
   })
 
   it('treats h5 and web as aliases of the same platform', () => {
-    // uni-env's isH5/isWeb accept both identifiers; the DSL must agree
+    // uni-env 的 isH5/isWeb 接受两种标识；DSL 必须与其一致
     const cond = new DefineConditional({})
       .ifdef('h5', { onBrowser: true })
 
@@ -133,7 +132,7 @@ describe('evaluateDefinePage: conditional DSL', () => {
       middlewares: ['auth'],
     })
 
-    // h5 is excluded by the ifndef branch, and the ifdef branch does not match
+    // h5 被 ifndef 分支排除，ifdef 分支也不匹配
     const h5 = await evaluateDefinePage(sfc(DSL), virtualFile('dsl.vue'), 'h5')
     expect(h5).toEqual({
       type: 'page',

@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPages, PageContext } from '../packages/core/src'
 
-// The uni-env platform constant is frozen at module load time and cannot be
-// stubbed, so the platform is injected through the pipeline seam instead.
-// This keeps the suite deterministic regardless of the shell's UNI_PLATFORM:
-// `skip-on-mp-weixin` stays on web and contributes its tabBar item here.
+// uni-env 的平台常量在模块加载时冻结、无法 stub，因此平台改由流水线
+// 接缝注入。这让套件与 shell 的 UNI_PLATFORM 无关、行为确定：
+// `skip-on-mp-weixin` 在 web 上保留，并在这里贡献它的 tabBar 项。
 describe('generate tabBar', () => {
   beforeEach(() => {
     vi.stubEnv('UNI_PLATFORM', 'web')
