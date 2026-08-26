@@ -460,12 +460,14 @@ export default defineConfig({
 - **类型修正（静默变更）**：以下 `@uni-helper/uni-pages-types` 的类型变更不会产生 TS 报错（接口带索引签名），但行为有差异：
   - `app-plus.softInputMode` / `softInputNavBar` 更名为官方拼写 `softinputMode` / `softinputNavBar`（App-Harmony 同步更名）。旧字段名不再有类型提示；`pages.json` 中已写的旧字段名请手动改为新拼写。
   - `GlobalStyle` 移除 `disableScroll` / `disableSwipeBack`。官方文档注明这两个配置只在页面级 `style` 中有效、在 `globalStyle` 中设置无效，现仅在 `PageStyle` 上保留；写在 `globalStyle` 里的这两个字段会被忽略。
+- **不可用的 `pages.json` 直接报错**：已存在的 `pages.json` 若不是普通文件（例如目录）或缺少读写权限，插件现在抛出错误并停止生成；0.4.x 会把它删除并重建为占位内容，静默丢失手写内容。请先修复权限（如 `chmod u+w`）或自行删除该文件。
 
 0.5.0 同时带来以下新能力：
 
 - `definePage(null)` 按平台跳过页面注册（见上方「页面级配置 definePage」）
 - 函数式 `definePage` 与 `define().ifdef()/.ifndef()` 条件 DSL（见上方「平台条件页面配置」）
 - 插件生成的过期子包自动收敛（见下方「多终端并发开发」）
+- tabBar 顶层属性按平台归属跟踪，多平台取值互不覆盖（见下方「多终端并发开发」）
 - 新增 `indent`、`eol`、`insertFinalNewline` 格式化选项
 
 ## 多终端并发开发
@@ -475,8 +477,10 @@ export default defineConfig({
 本插件默认会：
 
 - 通过文件锁串行化对 `pages.json` 的「读取已有内容 → 合并当前平台配置 → 写回」整个流程，避免并发写入互相覆盖；
-- 保留其他平台已经写入的条件编译块（`#ifdef H5` / `#ifndef MP-WEIXIN` 等），只更新当前平台对应的条目；
-- 对同一 `path`（或 tabBar 的 `pagePath`）的条目按内容去重：内容相同的条目会合并为一条并叠加平台标识（如 `H5 || MP-WEIXIN`），不会因为先后跑过多个平台而产生重复路由。
+- 保留其他平台已经写入的 `#ifdef` 条件编译块，只更新当前平台对应的条目；
+- 对同一 `path`（或 tabBar 的 `pagePath`）的条目按内容去重：内容相同的条目会合并为一条并叠加平台标识（如 `H5 || MP-WEIXIN`），不会因为先后跑过多个平台而产生重复路由；
+- tabBar 的顶层属性（`color`、`selectedColor`、`custom`、`position`、`midButton` 等）同样按平台归属跟踪：各平台取值不同时，每个平台的取值保存在自己的 `#ifdef` 块里（同一属性名会出现多个按平台互斥的副本，uni-app 条件编译后每个平台只剩一份）；取值相同时合并为一条不带条件的属性。只有声明了非空 `list` 的运行才拥有属性块，`list` 为空或未配置 tabBar 的运行不会覆盖其他平台已写入的属性。注意 `minify: true` 的输出无法携带注释，属性会退化为最后写入者胜出，请对同一项目所有平台的构建保持一致的格式化设置；
+- 手写的 `#ifndef` 块（插件自身只会写 `#ifdef`）无法用「平台归属」模型表达，会原样保留、不参与合并与收敛，tabBar 属性上的 `#ifndef` 同样处理。`#ifndef` 按「只包裹紧随其后的那一个条目/属性」解释；扫描结果与某个 `#ifndef` 条目内容相同时，会折叠进该条目，避免当前平台出现重复路由。注意两个边界：当前平台恰好是被否定的平台时，内容相等的配置按 `#ifndef` 语义同样被隐藏；同一 tabBar 属性同时存在 `#ifndef` 副本与各平台不同取值的变体时，被多份副本覆盖的平台视图会出现重复键，按 JSON 后键覆盖前键解析（当前平台自身的变体最后写入、优先生效）。
 
 这样每个终端都能保留各自的平台配置。条件编译注释基于 `comment-json` 写入，最终 `pages.json` 同时包含所有平台的分支。
 

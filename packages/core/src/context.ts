@@ -19,70 +19,67 @@ import { Page } from './page'
 import { writePagesJson } from './pages-json'
 
 /**
- * Page context class responsible for page scanning, config loading, page metadata merging and pages.json generation
+ * 页面上下文类，负责页面扫描、配置加载、页面元信息合并与 pages.json 生成
  *
- * Core responsibilities:
- * 1. Scan page directories and collect page files
- * 2. Load user configuration files (pages.config.ts, etc.)
- * 3. Parse page metadata (definePage macro)
- * 4. Merge page configurations and generate pages.json
- * 5. Provide virtual module and HMR support
+ * 核心职责：
+ * 1. 扫描页面目录并收集页面文件
+ * 2. 加载用户配置文件（pages.config.ts 等）
+ * 3. 解析页面元信息（definePage 宏）
+ * 4. 合并页面配置并生成 pages.json
+ * 5. 提供虚拟模块与 HMR 支持
  *
- * The pipeline runs in a fixed order — load user config, scan, merge, write —
- * orchestrated by {@link updatePagesJSON} (full run) or {@link scanAndMerge}
- * (in-memory only). Callers never need to know the stage order.
+ * 流水线按固定顺序运行——加载用户配置、扫描、合并、写入——由
+ * {@link updatePagesJSON}（完整运行）或 {@link scanAndMerge}（仅内存）
+ * 编排。调用方无需了解阶段顺序。
  */
 export class PageContext {
   private _server: ViteDevServer | undefined
 
-  /** Parsed configuration object from user config file (pages.config.ts) */
+  /** 从用户配置文件（pages.config.ts）解析出的配置对象 */
   pagesGlobConfig: PagesConfig | undefined
-  /** Source path list of user configuration files */
+  /** 用户配置文件的来源路径列表 */
   pagesConfigSourcePaths: string[] = []
 
-  /** Main package page map, key is the absolute path of the page file */
+  /** 主包页面映射，键为页面文件的绝对路径 */
   pages = new Map<string, Page>()
-  /** Sub-package page map, key is the sub-package root directory, value is the page map under that sub-package */
+  /** 子包页面映射，键为子包根目录，值为该子包下的页面映射 */
   subPages = new Map<string, Map<string, Page>>()
-  /** Main package page metadata array for generating pages.json pages field */
+  /** 主包页面元信息数组，用于生成 pages.json 的 pages 字段 */
   pageMetaData: InternalPages = []
-  /** Sub-package page metadata array for generating pages.json subPackages field */
+  /** 子包页面元信息数组，用于生成 pages.json 的 subPackages 字段 */
   subPageMetaData: SubPackages = []
 
-  /** Generated pages.json file path */
+  /** 生成的 pages.json 文件路径 */
   resolvedPagesJSONPath = ''
 
-  /** Project root directory */
+  /** 项目根目录 */
   root: string
-  /** Resolved configuration options */
+  /** 解析后的配置项 */
   options: ResolvedOptions
-  /** Current platform identifier, e.g. 'mp-weixin'; injected so callers are not bound to the env frozen at import time */
+  /** 当前平台标识，如 'mp-weixin'；注入式设计，调用方不绑定模块加载时冻结的环境 */
   readonly platform: string
   logger?: Logger
 
-  /** Whether to work with vite-plugin-uni-platform plugin */
+  /** 是否与 vite-plugin-uni-platform 插件协同工作 */
   withUniPlatform = false
 
-  /** Cached previous pages.json content to avoid redundant writes */
-  private lastPagesJson = ''
-
-  /** Base path that page paths in pages.json are resolved relative to */
+  /** pages.json 中页面路径的解析基准路径 */
   private get basePath(): string {
     return resolveBasePath(this.options)
   }
 
   /**
-   * Create a PageContext instance
-   * @param userOptions - User configuration options
-   * @param viteRoot - Vite project root directory, defaults to current working directory
-   * @param platform - Current platform identifier, defaults to the uni-env platform
+   * 创建 PageContext 实例
+   * @param userOptions - 用户配置项
+   * @param viteRoot - Vite 项目根目录，默认为当前工作目录
+   * @param platform - 当前平台标识，默认取 uni-env 的平台
    */
   constructor(userOptions: UserOptions, viteRoot: string = process.cwd(), platform: string = uniEnvPlatform) {
     this.root = slash(viteRoot)
     this.platform = platform
     debug.options('root', this.root)
     this.options = resolveOptions(userOptions, this.root)
-    // debug logic
+    // 调试日志逻辑
     const debugOption = this.options.debug
     if (debugOption) {
       const prefix = 'vite-plugin-uni-pages:'
@@ -94,16 +91,16 @@ export class PageContext {
   }
 
   /**
-   * Set the Vite logger
-   * @param logger - Vite logger instance
+   * 设置 Vite logger
+   * @param logger - Vite logger 实例
    */
   setLogger(logger: Logger): void {
     this.logger = logger
   }
 
   /**
-   * Load user page configuration file (e.g. pages.config.ts)
-   * Uses unconfig to load configuration, supporting multiple config file formats
+   * 加载用户页面配置文件（如 pages.config.ts）
+   * 使用 unconfig 加载配置，支持多种配置文件格式
    */
   async loadUserPagesConfig(): Promise<void> {
     const configSource = this.options.configSource
@@ -114,9 +111,8 @@ export class PageContext {
   }
 
   /**
-   * Run the scan and merge pipeline in order: scan main and sub-package pages,
-   * then merge their metadata. The stage order lives here so callers and tests
-   * do not have to know it.
+   * 按顺序运行扫描与合并流水线：先扫描主包与子包页面，再合并它们的
+   * 元信息。阶段顺序只维护在这里，调用方与测试无需了解。
    */
   async scanAndMerge(): Promise<void> {
     await this.scanPages()
@@ -126,22 +122,22 @@ export class PageContext {
   }
 
   /**
-   * Set up Vite dev server for HMR and file watching
-   * @param server - Vite dev server instance
+   * 设置 Vite 开发服务器，用于 HMR 与文件监听
+   * @param server - Vite 开发服务器实例
    */
   setupViteServer(server: ViteDevServer): void {
     if (this._server === server)
       return
 
     this._server = server
-    // Vite 5 uses chokidar v3 internally; its watcher is API-compatible with chokidar v5 at runtime
+    // Vite 5 内部使用 chokidar v3；其 watcher 在运行时与 chokidar v5 的 API 兼容
     this.setupWatcher(server.watcher as unknown as FSWatcher)
   }
 
   /**
-   * Set up file watcher to monitor page file and config file changes
-   * Automatically update pages.json when page files or config files change
-   * @param watcher - chokidar file watcher instance
+   * 设置文件监听器，监听页面文件与配置文件变更
+   * 页面文件或配置文件变化时自动更新 pages.json
+   * @param watcher - chokidar 文件监听器实例
    */
   async setupWatcher(watcher: FSWatcher): Promise<void> {
     watcher.add(this.pagesConfigSourcePaths)
@@ -160,8 +156,8 @@ export class PageContext {
     })
 
     watcher.on('change', async (path) => {
-      // Config sources are watched by absolute path; handle them before the
-      // page-file checks so a config change is never dropped by them
+      // 配置来源按绝对路径监听；先于页面文件检查处理，配置变更就不会
+      // 被页面文件的判断漏掉
       if (this.pagesConfigSourcePaths.includes(path)) {
         debug.pages(`Config source changed: ${path}`)
         if (await this.updatePagesJSON())
@@ -190,8 +186,8 @@ export class PageContext {
   }
 
   /**
-   * Page update callback, triggered when page files or configuration changes
-   * Responsible for invalidating virtual modules and notifying the browser to do a full reload
+   * 页面更新回调，页面文件或配置变化时触发
+   * 负责使虚拟模块失效并通知浏览器整页刷新
    */
   onUpdate(): void {
     if (!this._server)
@@ -205,15 +201,15 @@ export class PageContext {
   }
 
   /**
-   * Update pages.json file
-   * This is the core method responsible for coordinating the entire page configuration generation flow:
-   * 1. Check file changes (if filepath is specified)
-   * 2. Load user configuration
-   * 3. Scan page files
-   * 4. Merge page metadata
-   * 5. Generate and write pages.json
-   * @param filepath - Changed file path for incremental update judgment
-   * @returns Whether pages.json was successfully updated
+   * 更新 pages.json 文件
+   * 这是负责协调整个页面配置生成流程的核心方法：
+   * 1. 检查文件变更（指定 filepath 时）
+   * 2. 加载用户配置
+   * 3. 扫描页面文件
+   * 4. 合并页面元信息
+   * 5. 生成并写入 pages.json
+   * @param filepath - 发生变更的文件路径，用于增量更新判断
+   * @returns pages.json 是否成功更新
    */
   async updatePagesJSON(filepath?: string): Promise<boolean> {
     if (filepath) {
@@ -244,12 +240,12 @@ export class PageContext {
     await this.mergeSubPageMetaData()
     this.options.onAfterMergePageMetaData(this.pageMetaData, this.subPageMetaData)
 
-    // vite-plugin-uni-platform page suffixes (e.g. `index.h5.vue` -> `index`).
-    // Note the suffix match is raw `path.includes(this.platform)`, without the
-    // h5/web aliasing the definePage DSL applies (see condition.ts
-    // platformMatches): with UNI_PLATFORM=web, `.h5`-suffixed pages are
-    // filtered out. Pre-existing behaviour, kept for parity with
-    // vite-plugin-uni-platform's own naming.
+    // vite-plugin-uni-platform 的页面后缀（如 `index.h5.vue` -> `index`）。
+    // 注意后缀匹配是原始的 `path.includes(this.platform)`，不带
+    // definePage DSL 中的 h5/web 别名归一（见 condition.ts 的
+    // platformMatches）：UNI_PLATFORM=web 时 `.h5` 后缀的页面会被过滤
+    // 掉。既有行为，为与 vite-plugin-uni-platform 自身的命名保持一致
+    // 而保留。
     const pages = this.withUniPlatform
       ? this.pageMetaData.filter(v => !/\..*$/.test(v.path) || v.path.includes(this.platform)).map((v) => {
           v.path = v.path.replace(/\..*$/, '')
@@ -261,15 +257,14 @@ export class PageContext {
 
     this.options.onBeforeWriteFile(this.resolvedPagesJSONPath)
 
-    // Entries merged from pages.json may lack the internal `type` marker
-    // (user-written entries never carry it), so resolve the home page path
-    // from the scanned metadata and hand it to the pages.json module for
-    // repositioning
+    // 从 pages.json 合并而来的条目可能缺少内部 `type` 标记（手写条目
+    // 从不携带它），因此从扫描出的元信息中解析首页路径，交给
+    // pages.json 模块用于位置调整
     const homePath = this.pageMetaData.find(meta => meta.type === 'home')?.path
 
-    // The whole read-modify-write runs inside one file lock owned by the
-    // pages.json module, so concurrent terminals (e.g. dev:mp-weixin +
-    // dev:mp-alipay) cannot corrupt each other's conditional-compilation output
+    // 整个读-改-写运行在 pages.json 模块持有的同一把文件锁内，并发
+    // 终端（如 dev:mp-weixin + dev:mp-alipay）因此不会破坏彼此的
+    // 条件编译输出
     const result = await writePagesJson(this.resolvedPagesJSONPath, {
       pages: this.pageMetaData,
       subPackages: this.subPageMetaData,
@@ -284,18 +279,14 @@ export class PageContext {
         eol: this.options.eol,
         insertFinalNewline: this.options.insertFinalNewline,
       },
-      // Getter: evaluated inside the lock so an overlapping update sees the
-      // content this instance just wrote, matching the pre-refactor semantics
-      previousContent: () => this.lastPagesJson,
     })
 
-    // Declaration writes a different file (uni-pages.d.ts) and does not need to
-    // be inside the pages.json lock. Mirror the original behaviour: always run
-    // it after the pages.json computation, regardless of whether content changed.
+    // 声明文件写的是另一个文件（uni-pages.d.ts），不需要在 pages.json
+    // 的锁内。保持原有行为：无论内容是否变化，总在 pages.json 计算
+    // 之后运行。
     this.generateDeclaration()
 
     if (result?.updated) {
-      this.lastPagesJson = result.content
       this.options.onAfterWriteFile(this.resolvedPagesJSONPath, result.content)
     }
 
@@ -303,9 +294,9 @@ export class PageContext {
   }
 
   /**
-   * Generate virtual module content
-   * Returns JavaScript code containing pages and subPackages exports
-   * @returns Virtual module code string
+   * 生成虚拟模块内容
+   * 返回包含 pages 与 subPackages 导出的 JavaScript 代码
+   * @returns 虚拟模块代码字符串
    */
   virtualModule(): string {
     const pages = `export const pages = ${this.resolveRoutes()};`
@@ -314,25 +305,25 @@ export class PageContext {
   }
 
   /**
-   * Resolve main package route data to JSON string
-   * @returns JSON string of main package page metadata
+   * 将主包路由数据解析为 JSON 字符串
+   * @returns 主包页面元信息的 JSON 字符串
    */
   resolveRoutes(): string {
     return cjStringify(this.pageMetaData, null, 2)
   }
 
   /**
-   * Resolve sub-package route data to JSON string
-   * @returns JSON string of sub-package page metadata
+   * 将子包路由数据解析为 JSON 字符串
+   * @returns 子包页面元信息的 JSON 字符串
    */
   resolveSubRoutes(): string {
     return cjStringify(this.subPageMetaData, null, 2)
   }
 
   /**
-   * Resolve tabBar configuration
-   * Merges page-defined tabBar items with config-defined tabBar
-   * @returns Merged tabBar configuration object, or undefined if no tabBar exists
+   * 解析 tabBar 配置
+   * 将页面定义的 tabBar 项与配置文件定义的 tabBar 合并
+   * @returns 合并后的 tabBar 配置对象，无 tabBar 时为 undefined
    */
   async resolveTabBar(): Promise<TabBar | undefined> {
     const tabBarItems: (TabBarItem & { index: number })[] = []
@@ -367,8 +358,8 @@ export class PageContext {
   }
 
   /**
-   * Generate TypeScript declaration file
-   * Generate type definitions for page paths to provide type hints during navigation
+   * 生成 TypeScript 声明文件
+   * 为页面路径生成类型定义，导航时提供类型提示
    */
   generateDeclaration(): Promise<void> | undefined {
     if (!this.options.dts)
@@ -379,8 +370,8 @@ export class PageContext {
   }
 
   /**
-   * Scan main package page directories and collect all page file paths
-   * Scan corresponding directories based on the configured dirs option
+   * 扫描主包页面目录并收集所有页面文件路径
+   * 根据配置的 dirs 选项扫描对应目录
    */
   private async scanPages(): Promise<void> {
     const paths = this.options.dirs.flatMap(dir => getPagePaths(dir, this.options))
@@ -396,9 +387,9 @@ export class PageContext {
   }
 
   /**
-   * Find a tracked page (main package or any sub-package) by its absolute file path
-   * @param filepath - Absolute path of the page file
-   * @returns The tracked page, or undefined when the file is not tracked
+   * 按页面文件绝对路径查找被跟踪的页面（主包或任一子包）
+   * @param filepath - 页面文件的绝对路径
+   * @returns 被跟踪的页面，文件未被跟踪时为 undefined
    */
   private findPage(filepath: string): Page | undefined {
     const mainPage = this.pages.get(filepath)
@@ -415,8 +406,8 @@ export class PageContext {
   }
 
   /**
-   * Scan sub-package page directories and collect all sub-package page file paths
-   * Scan corresponding directories based on the configured subPackages option
+   * 扫描子包页面目录并收集所有子包页面文件路径
+   * 根据配置的 subPackages 选项扫描对应目录
    */
   private async scanSubPages(): Promise<void> {
     const paths: Record<string, PagePath[]> = {}
@@ -438,15 +429,15 @@ export class PageContext {
   }
 
   /**
-   * parse pages rules && set page type
-   * @param pages page path array
-   * @param packageType  page package type (main package or sub-package)
-   * @param overrides custom page config
-   * @returns pages rules
+   * 解析 pages 规则并设置页面类型
+   * @param pages 页面路径映射
+   * @param packageType 页面包类型（主包或子包）
+   * @param overrides 自定义页面配置
+   * @returns pages 规则
    */
   private async parsePages(pages: Map<string, Page>, packageType: 'main' | 'sub', overrides?: Pages): Promise<InternalPages> {
-    // Load every page first: the `skipped` flag (definePage(null) opt-out) is
-    // only accurate after the file has been read
+    // 先加载所有页面：`skipped` 标记（definePage(null) 退出）只有在
+    // 文件被读取后才准确
     const allPages = Array.from(pages.values())
     await Promise.all(allPages.map(page => page.ensureLoaded()))
 
@@ -464,21 +455,21 @@ export class PageContext {
   }
 
   /**
-   * set home page
-   * @param result pages rules array
-   * @returns pages rules
+   * 设置首页
+   * @param result pages 规则数组
+   * @returns pages 规则
    */
   private setHomePage(result: InternalPages): InternalPages {
     const hasHome = result.some(({ type }) => type === 'home')
     if (!hasHome) {
-      // Resolve homePage config to the same relative-path format as page paths (relative to basePath)
+      // 将 homePage 配置解析为与页面路径一致的相对路径格式（相对 basePath）
       const basePath = this.basePath
       const resolvedHomePages = this.options.homePage.map((v) => {
         return slash(path.relative(basePath, slash(path.resolve(basePath, v))))
       })
 
-      // Match by exact path first, then fall back to segment-boundary suffix match
-      // to handle cases where dir is outside outDir (e.g. test environments)
+      // 先按路径精确匹配，再退回到分段边界的后缀匹配，
+      // 处理 dir 位于 outDir 之外的情况（如测试环境）
       const matchHomePage = (itemPath: string, configPath: string): boolean => {
         if (itemPath === configPath)
           return true
@@ -508,11 +499,11 @@ export class PageContext {
   }
 
   /**
-   * Merge main package page metadata
-   * Filter out pages belonging to sub-packages, then parse page metadata and merge user configuration
+   * 合并主包页面元信息
+   * 过滤掉属于子包的页面，再解析页面元信息并与用户配置合并
    */
   private async mergePageMetaData(): Promise<void> {
-    // Drop main-package entries that belong to sub-packages
+    // 丢弃属于子包的主包条目
     for (const pages of this.subPages.values()) {
       for (const subPageAbsolutePath of pages.keys())
         this.pages.delete(subPageAbsolutePath)
@@ -525,17 +516,17 @@ export class PageContext {
   }
 
   /**
-   * Merge sub-package page metadata
-   * Parse page metadata for each sub-package and handle sub-package configuration inheritance
-   * Preserves sub-package level properties like plugins from user config
+   * 合并子包页面元信息
+   * 为每个子包解析页面元信息并处理子包配置继承
+   * 保留用户配置中子包级别的属性（如 plugins）
    */
   private async mergeSubPageMetaData(): Promise<void> {
     const packagesByRoot = new Map<string, SubPackage>()
     const subPackages = this.pagesGlobConfig?.subPackages || []
 
     for (const [dir, pages] of this.subPages) {
-      // Use custom root from subPackageRootMap if available, otherwise calculate from path
-      // In monorepo scenarios, custom root avoids '..' in pages.json root path
+      // 优先使用 subPackageRootMap 中的自定义 root，否则按路径计算。
+      // monorepo 场景下，自定义 root 可避免 pages.json 的 root 路径含 '..'
       const root = this.options.subPackageRootMap.get(dir)
         ?? slash(path.relative(this.basePath, path.join(this.options.root, dir)))
 
@@ -545,12 +536,12 @@ export class PageContext {
       packagesByRoot.set(root, {
         root,
         pages: parsedPages,
-        // Preserve plugins config from user config for this sub-package
+        // 为该子包保留用户配置中的 plugins 配置
         ...(globPackage?.plugins && { plugins: globPackage.plugins }),
       })
     }
 
-    // Inherit subPackages that do not exist in the scanned pages
+    // 继承扫描页面中不存在的 subPackages 配置
     for (const { root, pages, plugins } of subPackages) {
       if (root && !packagesByRoot.has(root)) {
         packagesByRoot.set(root, {
@@ -567,19 +558,19 @@ export class PageContext {
 }
 
 /**
- * Resolve the base path that page paths in pages.json are relative to
- * @param options - Resolved configuration options
- * @returns Slashed base path joined from root and outDir
+ * 解析 pages.json 中页面路径的基准路径
+ * @param options - 解析后的配置项
+ * @returns 由 root 与 outDir 拼接并斜杠化后的基准路径
  */
 function resolveBasePath(options: ResolvedOptions): string {
   return slash(path.join(options.root, options.outDir))
 }
 
 /**
- * Get all page paths in the specified directory
- * @param dir - Page directory path
- * @param options - Resolved configuration options
- * @returns Page path array containing relative and absolute paths
+ * 获取指定目录下的全部页面路径
+ * @param dir - 页面目录路径
+ * @param options - 解析后的配置项
+ * @returns 包含相对路径与绝对路径的页面路径数组
  */
 function getPagePaths(dir: string, options: ResolvedOptions): PagePath[] {
   const pagesDirPath = slash(path.resolve(options.root, dir))
@@ -597,9 +588,9 @@ function getPagePaths(dir: string, options: ResolvedOptions): PagePath[] {
 }
 
 /**
- * Deduplicate page metadata by path, keeping the last entry for each path
- * @param pageMetaData - Page metadata array
- * @returns Deduplicated page metadata array in first-seen order
+ * 按路径去重页面元信息，每个路径保留最后一条
+ * @param pageMetaData - 页面元信息数组
+ * @returns 按首次出现顺序去重后的页面元信息数组
  */
 function dedupeByPath<T extends { path: string }>(pageMetaData: T[]): T[] {
   const byPath = new Map<string, T>()
@@ -610,9 +601,9 @@ function dedupeByPath<T extends { path: string }>(pageMetaData: T[]): T[] {
 }
 
 /**
- * merge page meta data array by path and assign style
- * @param pageMetaData  page meta data array
- * TODO: support merge middleware
+ * 按路径合并页面元信息数组并赋值 style
+ * @param pageMetaData 页面元信息数组
+ * TODO: 支持 middleware 合并
  */
 function mergePageMetaDataArray(pageMetaData: InternalPages): InternalPages {
   const pageMetaDataObj = groupBy(pageMetaData, 'path')
@@ -621,15 +612,13 @@ function mergePageMetaDataArray(pageMetaData: InternalPages): InternalPages {
     const group = pageMetaDataObj[path]
     const mergedPage = { ...group[0] }
     for (const page of group) {
-      // Accumulate style for entries without their own style key; an entry
-      // carrying its own style replaces the accumulation outright via the
-      // Object.assign below, mirroring the previous in-place implementation.
-      // Two guards differ from that implementation on purpose: the target is
-      // always a fresh object (the old code mutated style objects shared
-      // with the Page cache, leaking stale keys across runs), and the check
-      // is Object.hasOwn so inherited style keys don't count as the entry's
-      // own — Object.assign never copies inherited keys either. Style
-      // values are plain objects in practice (JSON parse / object literals)
+      // 为没有自带 style 键的条目累积 style；自带 style 的条目通过下方
+      // 的 Object.assign 整体替换累积结果，与之前的原地实现保持一致。
+      // 有两处守卫有意与那个实现不同：目标始终是全新对象（旧代码会
+      // 改动与 Page 缓存共享的 style 对象，导致跨运行的脏键泄漏），
+      // 判断用 Object.hasOwn 而非真值——继承来的 style 键不算条目自身
+      // 的，Object.assign 也从不拷贝继承键。实践中 style 值都是普通
+      // 对象（JSON 解析 / 对象字面量）
       if (!Object.hasOwn(page, 'style'))
         mergedPage.style = Object.assign({ ...(mergedPage.style ?? {}) }, page.style ?? {})
       Object.assign(mergedPage, page)
@@ -640,10 +629,10 @@ function mergePageMetaDataArray(pageMetaData: InternalPages): InternalPages {
 }
 
 /**
- * Invalidate virtual module to trigger HMR update
- * When page configuration changes, the virtual module needs to be invalidated to regenerate content
+ * 使虚拟模块失效以触发 HMR 更新
+ * 页面配置变化时，需要使虚拟模块失效以重新生成内容
  *
- * @param server - Vite dev server instance
+ * @param server - Vite 开发服务器实例
  */
 function invalidatePagesModule(server: ViteDevServer): void {
   const { moduleGraph } = server
