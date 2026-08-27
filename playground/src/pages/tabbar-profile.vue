@@ -5,8 +5,8 @@ definePage({
   },
   tabBar: {
     text: '我的',
-    iconPath: 'static/tab-profile.png',
-    selectedIconPath: 'static/tab-profile-active.png',
+    iconPath: 'static/moon.png',
+    selectedIconPath: 'static/sun.png',
     index: 2,
   },
 });
