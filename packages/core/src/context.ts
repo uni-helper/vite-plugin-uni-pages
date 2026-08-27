@@ -252,27 +252,8 @@ export class PageContext {
     await this.mergeSubPageMetaData()
     this.options.onAfterMergePageMetaData(this.pageMetaData, this.subPageMetaData)
 
-    // vite-plugin-uni-platform 的页面文件名后缀（如 `index.h5.vue`
-    // 转成 `index`）。带点的判断只看路径最后一段（文件名），和
-    // vite-plugin-uni-platform 自己的规则一致（它也只在文件名上判断
-    // 后缀），目录名里的点（如 `pages/v1.2/detail`）不算平台后缀。
-    // 注意后缀匹配仍是原始的 `path.includes(this.platform)`，没有做
-    // definePage 那边 h5/web 的别名换算（见 condition.ts 的
-    // platformMatches）：UNI_PLATFORM=web 时，`.h5` 后缀的页面会被
-    // 过滤掉。这是一直以来的行为，为了和 vite-plugin-uni-platform
-    // 自己的命名规则保持一致而保留
     const pages = this.withUniPlatform
-      ? this.pageMetaData.filter((v) => {
-          const fileName = v.path.slice(v.path.lastIndexOf('/') + 1)
-          return !fileName.includes('.') || v.path.includes(this.platform)
-        }).map((v) => {
-          const slash = v.path.lastIndexOf('/')
-          const fileName = v.path.slice(slash + 1)
-          const dot = fileName.indexOf('.')
-          if (dot !== -1)
-            v.path = `${v.path.slice(0, slash + 1)}${fileName.slice(0, dot)}`
-          return v
-        })
+      ? filterPlatformSuffixPages(this.pageMetaData, this.platform)
       : this.pageMetaData
 
     this.pageMetaData = dedupeByPath(pages)
@@ -635,6 +616,38 @@ function dedupeByPath<T extends { path: string }>(pageMetaData: T[]): T[] {
     byPath.set(page.path, page)
 
   return [...byPath.values()]
+}
+
+/**
+ * 应用 vite-plugin-uni-platform 的页面文件名后缀规则（如 `index.h5.vue`
+ * 对应页面 `index`）：丢弃其他平台的后缀页面，保留当前平台的并把文件名
+ * 里的后缀剥掉。
+ *
+ * 带点的判断只看路径最后一段（文件名），和 vite-plugin-uni-platform
+ * 自己的规则一致（它也只在文件名上判断后缀），目录名里的点（如
+ * `pages/v1.2/detail`）不算平台后缀。
+ *
+ * 注意后缀匹配仍是原始的 `path.includes(platform)`，没有做 definePage
+ * 那边 h5/web 的别名换算（见 condition.ts 的 platformMatches）：
+ * UNI_PLATFORM=web 时，`.h5` 后缀的页面会被过滤掉。这是一直以来的
+ * 行为，为了和 vite-plugin-uni-platform 自己的命名规则保持一致而保留。
+ *
+ * @param pages - 合并后的主包页面配置
+ * @param platform - 当前平台标识
+ * @returns 过滤并剥掉后缀的新数组，入参不被修改
+ */
+export function filterPlatformSuffixPages(pages: InternalPages, platform: string): InternalPages {
+  return pages
+    .filter((page) => {
+      const fileName = page.path.slice(page.path.lastIndexOf('/') + 1)
+      return !fileName.includes('.') || page.path.includes(platform)
+    })
+    .map((page) => {
+      const slash = page.path.lastIndexOf('/')
+      const fileName = page.path.slice(slash + 1)
+      const dot = fileName.indexOf('.')
+      return dot === -1 ? page : { ...page, path: `${page.path.slice(0, slash + 1)}${fileName.slice(0, dot)}` }
+    })
 }
 
 /**
