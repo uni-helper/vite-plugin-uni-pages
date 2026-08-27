@@ -12,10 +12,10 @@ export type ExcludeIndexSignature<T> = {
 }
 
 /**
- * 内部页面元信息
- * 在文档级 PageItem 之上扩展插件内部的 `type` 标记。
- * 插件生成的条目按设计把它保留进 pages.json（供后续运行的首页兜底
- * 使用）；只有跨平台相等性比较会把它归一化掉
+ * 插件内部的页面信息
+ * 在标准 PageItem 之上加了插件自己用的 `type` 标记。
+ * 插件写的条目会带着它进 pages.json（之后的运行靠它找回首页）；
+ * 只有比较两个条目相不相等时，会先把它去掉再比
  */
 export interface InternalPageItem extends PageItem {
   /** 插件用于识别首页的内部标记 */
@@ -45,7 +45,7 @@ export interface UserTabBarItem extends Partial<TabBarItem> {
 }
 
 /**
- * 用户可在 definePage 宏中定义的页面元信息
+ * 用户可在 definePage 宏中定义的页面配置
  * 在文档级 PageItem 之上扩展插件专有字段
  */
 export interface UserPageItem extends Partial<PageItem> {
@@ -80,23 +80,22 @@ export interface DefinePageContext {
   /** 当前平台标识，如 'mp-weixin' */
   platform: string
   /**
-   * 创建平台条件化的页面元信息定义
+   * 开始写"按平台不同"的页面配置
    *
    * 用法：`define(base).ifdef(platforms, partial).ifndef(platforms, partial)`。
-   * 匹配的分支按声明顺序深合并进 `base`：对象递归合并，数组与原始值
-   * 整体替换。`h5` 与 `web` 是同一平台的别名，分支中列出任一个即视为
-   * 覆盖两者。
+   * 匹配的分支按写的顺序合并进 `base`：对象一层层合并，数组和普通值
+   * 整个替换。`h5` 和 `web` 是同一个平台的两个名字，写哪个都算
+   * 两个都匹配。
    */
   define: (base: UserPageItem) => DefineConditional
 }
 
 /**
- * 在 Vue 页面文件中定义页面元信息
+ * 在 Vue 页面文件中定义页面配置
  * 宏调用会在构建时被插件移除
  *
- * 返回 `null`（或直接传 `null`）可将页面从当前平台的 pages.json 中
- * 排除。使用注入的 `define` 工厂编写平台条件化元信息，无需手工按
- * 平台分支。
+ * 返回 `null`（或直接传 `null`）可把页面从当前平台的 pages.json 里
+ * 排除。用传进来的 `define` 就能按平台写不同配置，不用自己判断平台。
  */
 export declare function definePage(options: UserPageItem | null | ((context: DefinePageContext) => MaybePromise<UserPageItem | DefineConditional | null>)): void
 
@@ -118,7 +117,7 @@ export type ConfigSource = string | LoadConfigSource<PagesConfig> | LoadConfigSo
  * 插件配置项接口
  * 定义用户可传入的全部配置选项
  *
- * 内部流水线：加载用户配置 -> 扫描页面文件 -> 合并页面元信息 ->
+ * 内部流水线：加载用户配置 -> 扫描页面文件 -> 合并页面配置 ->
  * 生成并写入 pages.json
  */
 export interface Options {

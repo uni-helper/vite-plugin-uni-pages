@@ -5,9 +5,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createPages, DefineConditional, evaluateDefinePage, isConditional, resolveConditional } from '../packages/core/src'
 
 /**
- * 从 @uni-ku/pages-json 吸收的平台条件化 DSL 的功能测试：函数式
- * definePage 宏接收 `define` 工厂，`define(base).ifdef(...).ifndef(...)`
- * 在扫描时为当前平台解析为普通元信息。
+ * 从 @uni-ku/pages-json 吸收的 define() 写法的功能测试：函数式
+ * definePage 宏拿到 `define`，`define(base).ifdef(...).ifndef(...)`
+ * 在扫描时就按当前平台算成普通配置。
  */
 
 function sfc(macro: string): string {
@@ -66,7 +66,8 @@ describe('conditional definition resolution', () => {
   })
 
   it('treats h5 and web as aliases of the same platform', () => {
-    // uni-env 的 isH5/isWeb 接受两种标识；DSL 必须与其一致
+    // uni-env 的 isH5/isWeb 同时认 h5 和 web 两个写法；define() 必须
+    // 和它一致
     const cond = new DefineConditional({})
       .ifdef('h5', { onBrowser: true })
 

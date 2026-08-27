@@ -31,8 +31,8 @@ describe('issue #283: cross-platform run does not duplicate routes', () => {
     const pagesDir = path.join(tmpDir, 'src', 'pages', 'index')
     fs.mkdirSync(pagesDir, { recursive: true })
 
-    // 一个 definePage 在每个平台都解析出相同元信息的页面，跨运行
-    // 唯一可能变化的就只有平台标签。
+    // 一个 definePage 在每个平台都算出相同的页面配置，跨运行
+    // 唯一可能变化的就是平台标签。
     fs.writeFileSync(
       path.join(pagesDir, 'index.vue'),
       [
@@ -90,8 +90,8 @@ describe('issue #283: cross-platform run does not duplicate routes', () => {
 
     expect(samePath).toHaveLength(1)
 
-    // 幸存的条目必须覆盖两个平台，证明第二次运行合并进了既有条目，
-    // 而非追加重复。
+    // 留下的条目必须盖住两个平台，证明第二次运行并进了已有条目，
+    // 而不是追加了一条重复的。
     const generatorComment = (pages[Symbol.for('before:0') as CommentSymbol] as Array<{ value: string }> | undefined)?.[0]?.value ?? ''
     expect(generatorComment).toContain('H5')
     expect(generatorComment).toContain('MP-WEIXIN')

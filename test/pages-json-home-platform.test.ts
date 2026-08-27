@@ -2,22 +2,23 @@ import { describe, expect, it } from 'vitest'
 import { mergePagesJson } from '../packages/core/src'
 
 /**
- * 回归覆盖：首页状态必须在多平台合并中幸存。
+ * 回归测试：首页状态必须在多平台合并中保得住。
  *
  * 上报场景：`dev:mp-weixin` 与 `dev:web` 同时运行，共用一份
  * pages.json。
  *
  * 症状 1 —— 把另一个页面标记为首页（pages/test.vue 里的
- * `definePage({ type: 'home' })`）后，页面被移到最前，但陈旧的
- * `type` 标记残留：test 仍是 `"type": "page"`，index 还带着
+ * `definePage({ type: 'home' })`）后，页面被移到最前，但过期的
+ * `type` 标记留了下来：test 仍是 `"type": "page"`，index 还带着
  * `"type": "home"`。
  *
  * 症状 2 —— 通过 `define().ifdef('mp-weixin', { type: 'home' })`
- * 声明平台作用域的首页时，完全没有生成按平台区分的条目；谁先写入谁
- * 赢，另一个平台的首页被静默丢弃。
+ * 声明只在某平台生效的首页时，完全没有生成按平台区分的条目；谁先写
+ * 谁赢，另一个平台的首页被悄悄丢掉。
  *
- * 两个症状都指向合并相等性检查对内部 `type` 标记的归一化：首页状态
- * 的变化与陈旧的持久化条目比较为「相等」，陈旧对象因此幸存。
+ * 两个症状的根源相同：比较两条配置相不相等时，内部 `type` 标记被先
+ * 去掉，首页状态的变化和文件里的旧条目比出「相等」，旧对象就留了
+ * 下来。
  */
 
 /** 把生成的 pages.json 文本解析为普通条目及其 #ifdef 平台块（如有） */
@@ -52,10 +53,10 @@ function parseEntries(content: string): Array<{ path: string, type?: string, ifd
 }
 
 /**
- * `platform` 的构建在 uni-app 条件编译后看到的条目：未包裹的条目对
- * 每个平台可见，包裹的条目只对 #ifdef 块列出的平台可见。这正是合并
- * 必须保持的不变量——一个比完整平台集更窄的未包裹条目会泄漏进其他
- * 平台的视图。
+ * `platform` 在 uni-app 条件编译后看到的条目：不带 #ifdef 的条目每个
+ * 平台都看得见，包着的条目只有 #ifdef 列出的平台看得见。这正是合并
+ * 必须守住的规则——一个只属于部分平台的条目如果不包着，就会漏进
+ * 其他平台。
  */
 function entriesForPlatform(content: string, platform: string): Array<{ path: string, type?: string }> {
   return parseEntries(content)
@@ -70,9 +71,9 @@ function expectNoDuplicatePaths(view: Array<{ path: string }>): void {
 }
 
 describe('home page status across concurrent platform runs', () => {
-  // 编辑前的收敛状态：index 是首页（由更早运行的 homePage 兜底解析），
-  // test 是普通页面。每个扫描条目都携带内部 type 标记（宏求值默认为
-  // 'page'）。
+  // 编辑前合并好的状态：index 是首页（由更早运行的 homePage 配置
+  // 解析出来），test 是普通页面。每个扫描出的条目都带内部 type 标记
+  // （宏求值默认是 'page'）。
   const converged = [
     '{',
     '  "pages": [',
@@ -113,8 +114,9 @@ describe('home page status across concurrent platform runs', () => {
       homePath: 'pages/test',
     }, { platform: 'mp-weixin' })
 
-    // 中间状态：在 h5 重跑之前，陈旧的共享条目以包裹的平台变体幸存。
-    // 两个平台视图必须已经无泄漏（无重复路径），且各自的首页在最前。
+    // 中间状态：在 h5 重跑之前，旧的共享条目以包着 #ifdef 的平台变体
+    // 留下。两个平台的视图必须已经没有泄漏（无重复路径），且各自的
+    // 首页在最前。
     const midWeixinView = entriesForPlatform(afterWeixin, 'MP-WEIXIN')
     const midH5View = entriesForPlatform(afterWeixin, 'H5')
     expectNoDuplicatePaths(midWeixinView)
@@ -135,13 +137,13 @@ describe('home page status across concurrent platform runs', () => {
     const entries = parseEntries(final)
     expect(entries).toHaveLength(2)
 
-    // 陈旧标记不得幸存：test 是首页，index 是普通页面
+    // 过期的标记不能留下：test 是首页，index 是普通页面
     const test = entries.find(e => e.path === 'pages/test')!
     const index = entries.find(e => e.path === 'pages/index')!
     expect(test.type).toBe('home')
     expect(index.type).toBe('page')
 
-    // 每个平台视图中首页都在最前，且无重复泄漏
+    // 每个平台的视图里首页都在最前，也没有重复路径
     expect(final.indexOf('"pages/test"')).toBeLessThan(final.indexOf('"pages/index"'))
     const finalH5View = entriesForPlatform(final, 'H5')
     const finalWeixinView = entriesForPlatform(final, 'MP-WEIXIN')
@@ -176,12 +178,12 @@ describe('home page status across concurrent platform runs', () => {
 
     const entries = parseEntries(final)
 
-    // 每个页面为每个平台保留一个变体，而不是折叠进先写入的一方
+    // 每个页面为每个平台各留一个变体，而不是并进先写的一方
     expect(entries.filter(e => e.path === 'pages/index')).toHaveLength(2)
     expect(entries.filter(e => e.path === 'pages/test')).toHaveLength(2)
 
-    // 没有变体覆盖整个平台全集，因此任何条目都不得裸露输出：
-    // 裸露的单平台变体会作为重复路径泄漏进另一个平台的视图
+    // 没有变体盖住全部平台，所以任何条目都不能不加包裹输出：
+    // 不包着的单平台变体会作为重复路径漏进另一个平台
     expect(entries.filter(e => !e.ifdef)).toHaveLength(0)
 
     // 各平台视图：mp-weixin 从 test 进入，h5 从 index 进入，
@@ -208,8 +210,9 @@ describe('home page status across concurrent platform runs', () => {
   })
 
   it('keeps platform-scoped home stable regardless of which platform writes first', () => {
-    // 上一用例的镜像，写入顺序相反：检验被顶替的首个条目保留其
-    // #ifdef 块、被移动的首页变体落到下标 0 的注释重挂路径。
+    // 上一用例反过来写：这回 mp-weixin 先写。要验证的是：原来排第一
+    // 的条目还带着它的 #ifdef 块，被挪到最前的首页变体把注释也挂对了
+    // 位置。
     const afterWeixin = mergePagesJson('', {
       pages: [
         { path: 'pages/test', type: 'home', style: { navigationBarTitleText: 'test page' }, middlewares: ['auth'] },
@@ -250,10 +253,10 @@ describe('home page status across concurrent platform runs', () => {
   })
 
   it('keeps every platform home first once a third platform joins', () => {
-    // 与症状 2 相同的 DSL 设置，加入一个与 h5 一致的第三平台：
-    // mp-alipay 在 h5 与 mp-weixin 收敛后启动并写入两次。alipay 运行
-    // 不得让 MP-WEIXIN 的首页滞留在 MP-WEIXIN 可见的非首页条目之后，
-    // 仅仅因为 alipay 自己的首页已位于下标 0。
+    // 和症状 2 相同的 define() 写法，再加一个和 h5 一致的第三平台：
+    // mp-alipay 在 h5 与 mp-weixin 都写完之后启动并写两次。alipay 运行
+    // 不能让 MP-WEIXIN 的首页排在它看得见的非首页条目后面，哪怕
+    // alipay 自己的首页已经在下标 0。
     const alipayPages = {
       pages: [
         { path: 'pages/index', type: 'home' as const, middlewares: ['auth', 'test'] },
@@ -296,8 +299,7 @@ describe('home page status across concurrent platform runs', () => {
     const rerun = mergePagesJson(afterAlipay, alipayPages, { platform: 'mp-alipay' })
     expect(rerun).toBe(afterAlipay)
 
-    // ……再来一次 weixin 运行也稳定：幂等性不得只属于最后写入的
-    // 平台
+    // ……再跑一次 weixin 也稳定：稳定不能只属于最后写入的平台
     const rerunWeixin = mergePagesJson(afterAlipay, {
       pages: [
         { path: 'pages/test', type: 'home', style: { navigationBarTitleText: 'test page' }, middlewares: ['auth'] },
@@ -308,19 +310,19 @@ describe('home page status across concurrent platform runs', () => {
     }, { platform: 'mp-weixin' })
     expect(rerunWeixin).toBe(afterAlipay)
 
-    // ……再来一次 h5 运行也稳定：若分区在当前平台的首页已位于下标 0
-    // 时就短路，这里会回归——h5 的首页在 0，而合并的输出顺序并非
-    // 如此
+    // ……再跑一次 h5 也稳定：如果重排看到"当前平台的首页已经在
+    // 第 0 位"就偷懒不排，这里会出问题——h5 的首页在第 0 位，但合并
+    // 输出的顺序并不是已经排好的
     const rerunH5 = mergePagesJson(afterAlipay, alipayPages, { platform: 'h5' })
     expect(rerunH5).toBe(afterAlipay)
   })
 
   it('marks every unmarked variant of the home path on legacy files', () => {
-    // 既无生成标记也无内部 type 标记的手写 pages.json：每个扫描条目
-    // 都与某个遗留变体内容相等地合并并丢失标记，homePath 兜底因此
-    // 启动。它必须标记首页路径的每个变体而不只是第一个：第一个变体
-    // 可能属于另一个平台，留下当前平台自己的变体不标记会让它滞留在
-    // 可见的非首页条目之后，直到之后某次自愈写入。
+    // 既没有生成标记、也没有内部 type 标记的手写 pages.json：每个
+    // 扫描条目都和某个旧变体内容相同地合并、标记丢了，于是靠 homePath
+    // 补位。它必须给首页路径的每个变体都打上标记，不能只标第一个：
+    // 第一个变体可能属于别的平台，当前平台自己的变体不标的话会一直
+    // 排在它看得见的非首页条目后面，直到之后某次运行才自己修好。
     const legacy = [
       '{',
       '  "pages": [',
@@ -366,12 +368,12 @@ describe('home page status across concurrent platform runs', () => {
     expect(weixinView[0]?.path).toBe('pages/index')
     expect(entriesForPlatform(merged, 'H5')[0]?.path).toBe('pages/index')
 
-    // 稳定分区让首页变体按源顺序排在非首页条目之前：
+    // 重排把首页变体按文件里的顺序放到非首页条目前面：
     // [index(H5), index(APP || MP-WEIXIN), a]
     expect(parseEntries(merged).map(e => e.path)).toEqual(['pages/index', 'pages/index', 'pages/a'])
 
-    // 再来一次 weixin 运行字节级稳定：兜底每次运行都从 homePath 重新
-    // 推导首页状态，分区短路让已分区的输出原样保留
+    // 再跑一次 weixin，文件一个字节都不变：homePath 每次运行都重新
+    // 找首页，已经排好的输出原样保留
     expect(mergePagesJson(merged, scan, { platform: 'mp-weixin' })).toBe(merged)
   })
 })

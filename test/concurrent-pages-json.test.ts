@@ -32,8 +32,8 @@ describe('concurrent pages.json update preserves other platforms', () => {
     const pagesDir = path.join(srcDir, 'pages')
     fs.mkdirSync(pagesDir, { recursive: true })
 
-    // 一个 definePage 在每个平台都解析出相同元信息的页面。合并因此
-    // 只为它保留单个（默认、无注释的）条目。
+    // 一个 definePage 在每个平台都算出相同的页面配置。合并时
+    // 就只为它留一条（默认、不带注释的）条目。
     fs.writeFileSync(
       path.join(pagesDir, 'index.vue'),
       [
@@ -86,7 +86,7 @@ describe('concurrent pages.json update preserves other platforms', () => {
 
     const content = fs.readFileSync(pagesJsonPath, 'utf-8')
 
-    // 「另一个终端」种下的 H5 块必须幸存。
+    // 「另一个终端」写下的 H5 块必须还在。
     expect(content).toContain('#ifdef H5')
     expect(content).toContain('#endif')
     expect(content).toContain('home H5')

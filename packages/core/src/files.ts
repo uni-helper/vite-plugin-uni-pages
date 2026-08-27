@@ -47,16 +47,17 @@ export function resolvePagesJsonPath(root: string, outDir: string): string {
 }
 
 /**
- * 确保给定路径存在可用的 pages.json 文件。
+ * 确保这个路径上有一个能用的 pages.json 文件。
  *
- * 仅在文件缺失时创建占位文件；占位内容会被下一次 pages.json 生成覆写。
- * 已存在的文件绝不替换：删除它会静默破坏手写内容（只读文件在其所在
- * 目录可写时依然能被 unlink），因此已存在但非常规文件、或不可读写的
- * 路径都是必须由用户修复的硬错误（例如 `chmod u+w`）。
+ * 文件不存在时创建一个占位文件，占位内容很快会被下一次生成覆盖。
+ * 已存在的文件绝不删除重建：删它会悄悄弄丢手写的内容（只读的文件
+ * 也能被删除，只要它所在的目录可写），所以"路径存在但不是普通文件、
+ * 或者读不了也写不了"都算必须由用户自己修的硬错误（例如
+ * `chmod u+w`）。
  *
  * @param path - 待检查的文件路径
- * @throws 路径存在但非常规文件、缺少读写权限，或缺失文件的占位内容
- *          创建失败时抛出
+ * @throws 路径存在但不是普通文件、缺少读写权限，或占位文件创建失败时
+ *          抛出
  */
 export function checkPagesJsonFileSync(path: fs.PathLike): void {
   try {
@@ -87,33 +88,34 @@ export function checkPagesJsonFileSync(path: fs.PathLike): void {
 }
 
 /**
- * 按文件路径组织的进程内 FIFO 锁区段队列。
+ * 同一个进程里按文件路径排的等待队列（先来后到）。
  *
- * 同进程的调用方在这里排队，不去争抢 OS 级锁，因此不会互相饿死
- * （基于重试的争抢会丢掉那些同时醒来却总错过短暂空闲窗口的调用方，
- * 例如 dev server 启动时监听器 `add` 事件的一阵爆发）。下方的 OS 级
- * 锁仍然负责防御其他进程。
+ * 同进程的调用方先在这里排队，不直接去抢 OS 锁：抢锁靠不断重试，
+ * 可能有人运气差总抢不到（比如 dev server 启动时监听器 `add` 事件
+ * 一拥而上）。排队保证人人都轮得到。下面的 OS 锁负责挡住其他进程。
  */
 const lockQueues = new Map<string, Promise<unknown>>()
 
 /**
- * 在持有排他文件锁的前提下运行任务。
+ * 拿到文件的独占锁后运行任务，运行完自动放锁。
  *
- * 保护整个读-改-写临界区。锁从 `task` 开始那一刻持有到其 resolve，
- * 并发进程因此无法观察到或覆写半写入状态。pages.json 生成依赖这一
- * 点：新内容取决于当前内容（其他平台的 `#ifdef` 块）。
+ * 它保护"读文件 → 算新内容 → 写回"的整个过程：锁从 `task` 开始
+ * 一直拿到它结束，别的进程看不到、也覆盖不了写了一半的文件。
+ * pages.json 的生成靠这一点：新内容要根据当前文件来算（里面有其他
+ * 平台的 `#ifdef` 块）。
  *
- * 同进程调用方在触碰 OS 级锁之前先由按路径的 FIFO 队列串行化；下方
- * 的重试/退避只防御其他进程。
+ * 同进程的调用方先在上面那条按路径的队列里排队，再碰 OS 锁；下面的
+ * 重试只用来等其他进程放锁。
  *
- * @param path - 作为锁目标的文件路径
- * @param task - 在锁内运行的异步任务；返回值原样透传
- * @param retry - 获取锁失败时的重试次数，默认 3
- * @returns `task` resolve 的值；获取不到锁时为 `undefined`
+ * @param path - 要加锁的文件路径
+ * @param task - 在锁内运行的异步任务；返回值原样返回给调用方
+ * @param retry - 锁被别人拿着时的重试次数，默认 3
+ * @returns `task` 的结果；一直拿不到锁时为 `undefined`
  */
 export function withFileLock<T>(path: string, task: () => Promise<T>, retry = 3): Promise<T | undefined> {
-  // 接在上一区段完成后（吞掉其结果，失败的前任不会连累后续者），
-  // 按 FIFO 顺序运行。Map 以锁目标为键，目标只有寥寥几个，无需清理。
+  // 排在上一个人做完后开始（忽略他的成败，失败的前一个不会拖累后
+  // 一个），保证先来后到。Map 用文件路径当键，要加锁的文件就几个，
+  // 不用清理
   const previous = lockQueues.get(path) ?? Promise.resolve()
   const current = previous
     .catch(() => {})
@@ -122,7 +124,7 @@ export function withFileLock<T>(path: string, task: () => Promise<T>, retry = 3)
   return current
 }
 
-/** 获取 OS 级锁（对其他进程重试）并运行任务 */
+/** 去拿 OS 级的锁（拿不到就等一会儿再试，防的是其他进程），拿到后运行任务 */
 async function acquireAndRun<T>(path: string, task: () => Promise<T>, retry: number): Promise<T | undefined> {
   for (let attempt = retry; attempt > 0; attempt--) {
     let release: (() => Promise<void>) | undefined
@@ -130,7 +132,7 @@ async function acquireAndRun<T>(path: string, task: () => Promise<T>, retry: num
       release = await lockfile.lock(path, { realpath: false })
     }
     catch {
-      // 其他进程持有锁，退避后重试
+      // 锁被别的进程拿着，等半秒再试
       await sleep(500)
       continue
     }

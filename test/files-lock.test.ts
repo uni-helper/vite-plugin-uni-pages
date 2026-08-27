@@ -5,13 +5,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { withFileLock } from '../packages/core/src'
 
 /**
- * `withFileLock` 修复的读-改-写竞态回归覆盖。
+ * `withFileLock` 修掉的"读-改-写"并发问题的回归测试。
  *
  * 修复前只有「写」被加锁，两个进程可能都读到 pages.json、各自算出
- * 合并结果，第二次写入会静默丢掉第一次写入的条件编译（#ifdef）块。
+ * 合并结果，第二次写入会悄悄丢掉第一次写入的条件编译（#ifdef）块。
  *
- * `withFileLock` 在整个临界区持有锁。本测试证明针对同一文件的两个
- * 并发任务被串行化：它们的临界区从不重叠。
+ * `withFileLock` 在任务全程都拿着锁。本测试证明针对同一个文件的两
+ * 个并发任务会一前一后地跑：拿着锁的时间段从不重叠。
  */
 describe('withFileLock serialization', () => {
   let tmpDir: string
@@ -28,17 +28,17 @@ describe('withFileLock serialization', () => {
   })
 
   it('runs overlapping critical sections strictly sequentially', async () => {
-    // 重叠日志：临界区开始时推入名称，结束时推入 'END'。若两个临界区
-    // 重叠，会看到 A、B、(end A)、(end B) 的顺序；串行执行总是
-    // A、(end A)、B、(end B)。
+    // 重叠日志：任务开始时推入名称，结束时推入 'end-名字'。如果两个
+    // 任务的时间段重叠，会看到 A、B、(end A)、(end B) 的顺序；
+    // 一前一后执行总是 A、(end A)、B、(end B)。
     const log: string[] = []
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
     const task = async (name: string) => {
       return withFileLock(lockFile, async () => {
         log.push(name)
-        // 持锁时间足够长，保证另一个任务已开始等锁——锁失效时重叠
-        // 就能被观察到。
+        // 拿锁的时间足够长，保证另一个任务已经开始等锁——锁失效时
+        // 重叠就能被观察到。
         await sleep(80)
         log.push(`end-${name}`)
       })
@@ -67,9 +67,10 @@ describe('withFileLock serialization', () => {
 
   it('serializes a burst of concurrent callers without starving any of them', async () => {
     // 回归：dev server 启动时每个页面文件触发一个监听器 `add` 事件，
-    // 几十个进程内调用方同时在锁上竞争。只有重试机制时，输家们同时
+    // 几十个进程内的调用方同时抢锁。只有重试机制时，运气差的同时
     // 醒来、总错过短暂的空闲窗口并耗尽重试（"Failed to acquire
-    // file lock, task aborted"）。按路径的队列必须让每个调用方都运行。
+    // file lock, task aborted"）。按路径排的队列必须让每个调用方都
+    // 轮得到。
     const results = await Promise.all(
       Array.from({ length: 29 }, (_, i) => withFileLock(lockFile, async () => i)),
     )

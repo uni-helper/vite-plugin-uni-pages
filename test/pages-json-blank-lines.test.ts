@@ -100,14 +100,14 @@ describe('pages.json with blank lines (comment-json v5 BlankLine tokens)', () =>
 
     const content = fs.readFileSync(pagesJsonPath, 'utf-8')
 
-    // 两个条目都必须在合并后幸存。
+    // 两个条目都得在合并后留下来。
     expect(content).toContain('pages/h5-only')
     expect(content).toContain('h5 only')
     expect(content).toContain('pages/index')
 
-    // 合并后的 pages/index 条目覆盖整个平台全集（'H5 || MP-WEIXIN'）
-    // 并保持裸露，仅 H5 的条目保留 #ifdef 块。检查位置挂载而不只是
-    // 出现与否：pages/index 必须在 ifdef 块之前，ifdef 块必须包裹
+    // 合并后的 pages/index 条目盖住了全部平台（'H5 || MP-WEIXIN'），
+    // 不用包 #ifdef；只有 H5 的条目包着 #ifdef 块。要比位置、不能
+    // 只比有没有：pages/index 必须在 ifdef 块之前，ifdef 块必须包住
     // pages/h5-only。
     const indexPos = content.indexOf('"pages/index"')
     const ifdefPos = content.indexOf('#ifdef H5\n')

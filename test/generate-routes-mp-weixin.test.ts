@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPages } from '../packages/core/src'
 
-// uni-env 的平台常量在模块加载时冻结、无法 stub，因此平台改由流水线
-// 接缝注入。这让套件与 shell 的 UNI_PLATFORM 无关、行为确定，并能
+// uni-env 的平台常量在模块加载时就定死、没法 stub，所以平台改为
+// 从流水线入口传进去。这让套件与 shell 的 UNI_PLATFORM 无关、行为确定，并能
 // 验证依赖平台的固定用例：`platform-injected` 渲染注入的平台，
 // `skip-on-mp-weixin` 在这里被丢弃。
 // env stub 保留是为了与其他平台专属套件保持一致。

@@ -1,19 +1,22 @@
 /**
- * 平台条件化页面元信息 DSL
+ * 按平台写不同页面配置的小工具
  *
- * 深模块，承载从 @uni-ku/pages-json 吸收的 `define().ifdef().ifndef()`
- * 表达式：一个由注入到函数式 definePage 宏的 `define` 工厂构建的可链式
- * 定义对象，以及它的平台作用域解析。插件在宏求值之后立即为当前平台
- * 解析定义，下游（变更检测、pages.json 合并）因此始终只处理普通对象。
+ * 用法来自 @uni-ku/pages-json：define().ifdef().ifndef()。用户在
+ * 函数式 definePage 里调用 define() 拿到可链式写的定义对象，先写
+ * 所有平台共用的配置，再按平台加不同的部分。插件在宏求值完就立刻
+ * 按当前平台算出最终结果，后面的步骤只会看到普通对象。
  */
 
-/** 定义上记录的单个条件分支 */
+/** 记录在定义上的单个条件分支 */
 interface ConditionalBranch {
-  /** 平台在（ifdef）或不在（ifndef）`platforms` 列表中时分支是否生效 */
+  /**
+   * 条件类型：'ifdef' 表示平台在列表里时这个分支生效；
+   * 'ifndef' 表示平台不在列表里时生效
+   */
   condition: 'ifdef' | 'ifndef'
-  /** 该分支限定的平台标识列表 */
+  /** 这个分支限定的平台列表 */
   platforms: string[]
-  /** 分支生效时深合并进基础元信息的部分元信息 */
+  /** 分支生效时合并进去的那部分配置 */
   partial: Record<string, any>
 }
 
@@ -23,10 +26,10 @@ function isPlainObject(val: unknown): val is Record<string, any> {
 }
 
 /**
- * 将 `partial` 深合并进 `base`，不改动任何一侧
+ * 把 `partial` 合并进 `base`，两边都不改动
  *
- * 对象递归合并；数组与原始值整体替换，与 @uni-ku/pages-json 的语义
- * 一致。
+ * 对象一层层往里合并；数组和普通值直接整个替换。规则和
+ * @uni-ku/pages-json 保持一致。
  */
 function deepMerge(base: Record<string, any>, partial: Record<string, any>): Record<string, any> {
   const result: Record<string, any> = { ...base }
@@ -48,10 +51,11 @@ function toPlatforms(platform: string | string[]): string[] {
 const H5_ALIASES = ['h5', 'web']
 
 /**
- * `platform` 是否被 `platforms` 列表覆盖
+ * `platform` 是否匹配 `platforms` 列表
  *
- * uni-env 的 `isH5`/`isWeb` 同时接受 `h5` 和 `web`（较新的 uni-app H5
- * 构建会设置 UNI_PLATFORM=web），因此列表中任一别名都视为覆盖两者。
+ * uni-env 的 `isH5`/`isWeb` 同时认 `h5` 和 `web` 两个写法（较新的
+ * uni-app H5 构建设置的是 UNI_PLATFORM=web），所以列表里写了其中
+ * 任何一个写法，都算匹配。
  */
 function platformMatches(platforms: string[], platform: string): boolean {
   if (platforms.includes(platform))
@@ -60,15 +64,15 @@ function platformMatches(platforms: string[], platform: string): boolean {
 }
 
 /**
- * 可链式的平台条件化页面元信息定义
+ * 可以链式调用的"按平台写配置"对象
  *
- * 通过注入到函数式 definePage 宏的 `define` 工厂创建。匹配的分支按
- * 声明顺序依次应用，后声明的分支会覆盖先声明分支上的同名键。
+ * 用户在函数式 definePage 里通过 define() 创建。分支按写的顺序生效，
+ * 后写的同名键会盖掉先写的。
  */
 export class DefineConditional {
-  /** 所有平台共用的基础元信息 */
+  /** 所有平台共用的基础配置 */
   private readonly base: Record<string, any>
-  /** 按声明顺序记录的条件分支 */
+  /** 按写的顺序记下的条件分支 */
   private readonly branches: ConditionalBranch[] = []
 
   constructor(base: Record<string, any>) {
@@ -88,8 +92,8 @@ export class DefineConditional {
   }
 
   /**
-   * 解析为单个平台的普通元信息：从基础元信息出发，按声明顺序深合并
-   * 每个匹配的分支。分支平台列表中 `h5` 与 `web` 可互换（见
+   * 算出某个平台最终用的普通配置：从基础配置开始，按写的顺序把每个
+   * 匹配的分支合并进去。平台列表里 `h5` 和 `web` 互相通用（见
    * platformMatches）。
    */
   resolve(platform: string): Record<string, any> {
@@ -105,16 +109,16 @@ export class DefineConditional {
   }
 }
 
-/** 判断宏求值结果是否为条件化定义 */
+/** 判断宏求值的结果是不是一个条件定义 */
 export function isConditional(obj: unknown): obj is DefineConditional {
   return obj instanceof DefineConditional
 }
 
 /**
- * 将条件化定义解析为单个平台的普通元信息
+ * 把条件定义算成某个平台的普通配置
  *
- * {@link DefineConditional.resolve} 的轻量函数封装，调用方无需导入
- * 类本身。
+ * 简单包了一层 {@link DefineConditional.resolve}，调用方不用导入
+ * 这个类。
  */
 export function resolveConditional(cond: DefineConditional, platform: string): Record<string, any> {
   return cond.resolve(platform)

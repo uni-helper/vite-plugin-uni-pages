@@ -21,8 +21,8 @@ const pagesGlobConfig: UserPagesConfig = {
   ],
 }
 
-// uni-env 的平台常量在模块加载时冻结、无法 stub，因此平台改由流水线
-// 接缝注入。这让套件与 shell 的 UNI_PLATFORM 无关、行为确定：
+// uni-env 的平台常量在模块加载时就定死、没法 stub，所以平台改为
+// 从流水线入口传进去。这让套件与 shell 的 UNI_PLATFORM 无关、行为确定：
 // `platform-injected` 渲染注入的平台，`skip-on-mp-weixin` 在 web 上
 // 保留。env stub 保留是为了与其他套件保持一致。
 describe('generate routes', () => {
