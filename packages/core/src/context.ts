@@ -106,7 +106,9 @@ export class PageContext {
     const configSource = this.options.configSource
     const { config, sources } = await loadConfig<PagesConfig>({ cwd: this.root, sources: configSource, defaults: {} })
     this.pagesGlobConfig = config.default || config
-    this.pagesConfigSourcePaths = sources
+    // 归一化斜杠：watcher 的事件回调里也归一化，两边比较才对得上
+    // （Windows 上 unconfig 和 chokidar 报的斜杠方向可能不一致）
+    this.pagesConfigSourcePaths = sources.map(normalizePath)
     debug.options(this.pagesGlobConfig)
   }
 
@@ -161,15 +163,14 @@ export class PageContext {
     })
 
     watcher.on('change', async (path) => {
+      path = normalizePath(path)
       // 配置文件按绝对路径监听；先判断它，配置的变更就不会被下面的
-      // 页面文件判断漏掉。两个已知边界（权衡后接受，先记录）：
-      // 1. 这里的比较没有归一化斜杠（normalizePath 在它后面才做），
-      //    Windows 上 watcher 报的路径和 unconfig 记下的 sources
-      //    斜杠方向不一致时会错过配置变更。
-      // 2. sources 在启动时定死：启动时配置文件还不存在，loadConfig
-      //    返回的 sources 是空数组（已实测），watcher.add 拿到空列
-      //    表，之后再创建的配置文件永远不被监听，需要重启开发服
-      //    务器才生效。
+      // 页面文件判断漏掉。两边都归一化过斜杠（sources 在加载配置时、
+      // 事件路径在上面），Windows 上斜杠方向不一致也不会错过配置变更。
+      // 已知边界（权衡后接受）：sources 在启动时定死：启动时配置文件
+      // 还不存在，loadConfig 返回的 sources 是空数组（已实测），
+      // watcher.add 拿到空列表，之后再创建的配置文件永远不被监听，
+      // 需要重启开发服务器才生效。
       if (this.pagesConfigSourcePaths.includes(path)) {
         debug.pages(`Config source changed: ${path}`)
         if (await this.updatePagesJSON())
