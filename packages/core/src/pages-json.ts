@@ -145,7 +145,17 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
     // 题。带上文件外的上下文重新抛出，用户才知道去哪里修
     throw new Error(`[vite-plugin-uni-pages] Failed to parse the existing pages.json, please fix its syntax first: ${error?.message ?? error}`, { cause: error })
   }
+
   const { pages: oldPages, subPackages: oldSubPackages, tabBar: oldTabBar } = oldConfig
+
+  // pages 和 subPackages 必须是数组。手写错型（比如把数组写成了对象）
+  // 时，subPackages 会在后面的遍历里抛出不知所云的 TypeError，
+  // pages 的已有内容则被静默丢掉——这里统一给成和解析错误同样式的
+  // 明确报错
+  for (const [field, value] of Object.entries({ pages: oldPages, subPackages: oldSubPackages })) {
+    if (value != null && !Array.isArray(value))
+      throw new Error(`[vite-plugin-uni-pages] The "${field}" in the existing pages.json must be an array, please fix its syntax first`)
+  }
 
   const { pages: _pages, subPackages: _subPackages, tabBar: _tabBar, ...pageJson } = options.globConfig || {}
 

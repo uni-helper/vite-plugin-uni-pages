@@ -32,6 +32,21 @@ describe('mergePagesJson pure merge seam', () => {
     }, { platform: 'h5' })).toThrowError(/Failed to parse the existing pages\.json/)
   })
 
+  it('throws a recognizable error when pages or subPackages is not an array', () => {
+    // 手写把数组写成了别的类型：subPackages 错型会让后面的遍历抛出
+    // 裸 TypeError、pages 错型会静默丢掉已有内容。统一在这里拦下，
+    // 报错说明是哪个字段出的问题
+    expect(() => mergePagesJson('{ "pages": {}, "subPackages": [] }', {
+      pages: [{ path: 'pages/index/index' }],
+      subPackages: [],
+    }, { platform: 'h5' })).toThrowError(/"pages" in the existing pages\.json must be an array/)
+
+    expect(() => mergePagesJson('{ "pages": [], "subPackages": {} }', {
+      pages: [{ path: 'pages/index/index' }],
+      subPackages: [],
+    }, { platform: 'h5' })).toThrowError(/"subPackages" in the existing pages\.json must be an array/)
+  })
+
   it('survives a truncated generation marker line without inventing a platform', () => {
     // 标记行的平台列表被手改删空（行尾只剩冒号）时，不能拆出空串
     // 平台混进全集：那会让条目包上 `#ifdef  || MP-WEIXIN` 这样的非法
