@@ -1,30 +1,43 @@
-import type { PageContext } from './context'
+import type { PagesConfig, SubPackages, TabBar } from '@uni-helper/uni-pages-types'
+import type { InternalPages } from './types'
 import { existsSync } from 'node:fs'
 import { writeFile as fsWriteFile, mkdir, readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { normalizePath } from 'vite'
+
+/** 声明生成需要的路由数据，从合并结果直接取 */
+export interface DeclarationInput {
+  /** 主包页面配置 */
+  pages: InternalPages
+  /** 子包页面配置 */
+  subPackages: SubPackages
+  /** 合并后的 tabBar（配置文件与 definePage 声明的合体） */
+  tabBar?: TabBar
+  /** 来自 pages.config.ts 的用户配置，tabBar 缺失时的兜底来源 */
+  globConfig?: PagesConfig
+}
 
 /**
  * 生成 TypeScript 声明文件内容
  * 为 uni-app 的导航 API（navigateTo、redirectTo、switchTab、reLaunch）提供类型提示，
  * 让页面路径在编译期获得类型检查
  *
- * @param ctx - 页面上下文实例
+ * @param input - 合并后的路由数据
  * @returns 声明文件代码字符串
  */
-export function getDeclaration(ctx: PageContext): string {
-  const subPagePaths = ctx.subPageMetaData.map((sub) => {
+export function getDeclaration(input: DeclarationInput): string {
+  const subPagePaths = input.subPackages.map((sub) => {
     return sub.pages.map(v => (`"/${normalizePath(join(sub.root, v.path))}"`))
   }).flat()
   // 用裸路径（不带引号和前导斜杠）参与过滤：page.path 也是裸路径，
   // 直接拿包装后的字符串比较永远不相等，tab 页就从未被排除过。
   // 优先取合并后的 tabBar（配置文件 + definePage 声明的合体），
   // definePage 声明的 tab 页才不会被漏掉
-  const tabBarRawPaths = ctx.tabBar?.list?.map(v => v!.pagePath) ?? ctx.pagesGlobConfig?.tabBar?.list?.map(v => v!.pagePath) ?? []
+  const tabBarRawPaths = input.tabBar?.list?.map(v => v!.pagePath) ?? input.globConfig?.tabBar?.list?.map(v => v!.pagePath) ?? []
   const tabBarPathSet = new Set(tabBarRawPaths)
   // tab 页只能 switchTab 进入，不应出现在 navigateTo/redirectTo 的
   // url 类型里
-  const allPagePaths = [...ctx.pageMetaData.filter(page => !tabBarPathSet.has(page.path)).map(v => `"/${v.path}"`), ...subPagePaths]
+  const allPagePaths = [...input.pages.filter(page => !tabBarPathSet.has(page.path)).map(v => `"/${v.path}"`), ...subPagePaths]
   const tabBarPagePaths = tabBarRawPaths.map(p => `"/${p}"`)
   // 一个页面都没有时（全新项目，或所有页面都通过 definePage(null)
   // 退出），没有路径字面量可列：回退成 string，生成的 d.ts 仍然是
@@ -79,13 +92,13 @@ async function writeFile(filePath: string, content: string): Promise<void> {
  * 将声明文件写入磁盘
  * 仅在内容变化时写入，避免不必要的文件操作
  *
- * @param ctx - 页面上下文实例
+ * @param input - 合并后的路由数据
  * @param filepath - 声明文件输出路径
  */
-export async function writeDeclaration(ctx: PageContext, filepath: string): Promise<void> {
+export async function writeDeclaration(input: DeclarationInput, filepath: string): Promise<void> {
   const originalContent = existsSync(filepath) ? await readFile(filepath, 'utf-8') : ''
 
-  const code = getDeclaration(ctx)
+  const code = getDeclaration(input)
   if (!code)
     return
 

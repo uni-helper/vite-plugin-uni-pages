@@ -371,7 +371,12 @@ export class PageContext {
       return
 
     debug.declaration('generating')
-    return writeDeclaration(this, this.options.dts)
+    return writeDeclaration({
+      pages: this.pageMetaData,
+      subPackages: this.subPageMetaData,
+      tabBar: this.tabBar,
+      globConfig: this.pagesGlobConfig,
+    }, this.options.dts)
   }
 
   /**
