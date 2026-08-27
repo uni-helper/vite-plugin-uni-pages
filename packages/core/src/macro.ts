@@ -194,6 +194,9 @@ export function findDefinePageMacro(
  * 在 AST 中查找 definePage 宏调用
  * 支持函数表达式、箭头函数与对象表达式作为参数
  *
+ * 已知限制：只在块的顶层语句里找，包进 if/try 等语句块里的调用
+ * 不在此列（用户侧的说明写在 README 的 definePage 章节）
+ *
  * @param stmts - AST 语句数组
  * @param filename - 用于错误上报的文件名
  * @returns definePage 调用表达式，未找到时为 undefined

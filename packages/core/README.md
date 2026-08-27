@@ -77,6 +77,8 @@ definePage({
 </script>
 ```
 
+> `definePage` 必须写在 `<script>` 块的顶层，不要包进 `if`、`try` 等语句块里。插件只在块的顶层查找这个宏：写在里面的调用既读不到配置，也不会在构建时从代码里移除，运行时会报 `definePage is not defined`。
+
 要让编辑器识别 `definePage` 全局宏，需要在项目的声明文件或 `tsconfig.json > types` 引用本包的 `/client` 类型。
 
 <details>
