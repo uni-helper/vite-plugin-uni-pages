@@ -73,4 +73,13 @@ describe('platformsExcluding', () => {
   it('splits the platform list, drops the current platform, and sorts', () => {
     expect(platformsExcluding('H5 || MP-WEIXIN || MP-ALIPAY', 'MP-WEIXIN')).toEqual(['H5', 'MP-ALIPAY'])
   })
+
+  it('drops empty platform names from corrupted lists', () => {
+    // 残缺的生成标记行（平台列表被手改删空）拆出空串
+    expect(platformsExcluding('', 'MP-WEIXIN')).toEqual([])
+    // 手写的尾巴多一个分隔符的指令也拆出空串
+    expect(platformsExcluding('H5 ||', 'MP-WEIXIN')).toEqual(['H5'])
+    // 空串混进列表同样丢掉，且不算"还有别的平台"
+    expect(platformsExcluding('H5 || || MP-WEIXIN', 'MP-ALIPAY')).toEqual(['H5', 'MP-WEIXIN'])
+  })
 })

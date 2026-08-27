@@ -45,9 +45,15 @@ export interface PlatformVariant<P> {
 
 /**
  * 把 `||` 分隔的平台列表拆开，去掉当前平台，剩下的排好序（规则 1）
+ *
+ * 空平台名一律丢掉：残缺的生成标记行（手改时把平台列表删空了）和
+ * 手写的尾巴多一个分隔符的指令（如 `#ifdef H5 ||`）都会拆出空串。
+ * 若留着它，它会混进平台全集并永久留在标记里，还会让条目包上
+ * `#ifdef  || MP-WEIXIN` 这样的非法指令（空平台名不是一个真实平台，
+ * 过滤掉永远不会出错）
  */
 export function platformsExcluding(platformList: string, currentPlatform: string): string[] {
-  return platformList.split('||').map(p => p.trim()).filter(p => p !== currentPlatform).sort()
+  return platformList.split('||').map(p => p.trim()).filter(p => p && p !== currentPlatform).sort()
 }
 
 /**
