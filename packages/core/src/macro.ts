@@ -20,6 +20,9 @@ import { debug } from './logger'
  * 组件、逐个 script 块解析（单个块失败不影响别的块）、找到宏调用、
  * 收集 import 语句、放进沙箱求值。外部只用两个函数：
  * evaluateDefinePage（扫描时用）和 findDefinePageMacro（转换时用）。
+ *
+ * 两个入口都从 {@link parseSfcBlocks} 的块模型取宏：「两边按同一套
+ * 规则找到同一个宏」由这个共享模型保证，不靠两边各自实现再对齐。
  */
 
 /**
@@ -44,6 +47,50 @@ export function parseSFC(code: string, options?: SFCParseOptions): SFCDescriptor
   )
 }
 
+/** 一个 script 块解析后的产物 */
+interface SfcScriptBlock {
+  /** 块名（'<script setup>' 或 '<script>'），用于错误上报 */
+  name: string
+  /** 块内代码解析出的 AST 语句；解析失败的块为空数组 */
+  body: t.Statement[]
+  /** 块内的 import 声明，宏求值挑 import 时用 */
+  imports: t.ImportDeclaration[]
+  /** 本块解析失败时的错误；失败的块仍占位，错误留给调用方处理 */
+  error?: unknown
+}
+
+/**
+ * 把 SFC 的两个 script 块各自解析成 AST（共享的块模型）。
+ *
+ * 块序固定先 `<script setup>` 后 `<script>`；一个块解析失败不拦另一
+ * 个块（宏多半写在另一个块里，比如 @babel/parser 8 删掉的旧版
+ * `assert { ... }` import 属性会让还在用它的块失败）。失败记录在块
+ * 的 `error` 上，由调用方决定上报还是抛出。
+ *
+ * @param code - Vue SFC 源码
+ * @param filename - 用于错误提示和模块解析的 SFC 文件名
+ * @returns 按固定顺序排列的块列表
+ */
+function parseSfcBlocks(code: string, filename: string): SfcScriptBlock[] {
+  const sfc = parseSFC(code, { filename })
+  const blocks: SfcScriptBlock[] = []
+
+  for (const [name, script] of [['<script setup>', sfc.scriptSetup], ['<script>', sfc.script]] as const) {
+    if (!script)
+      continue
+
+    try {
+      const body = babelParse(script.content, script.lang || 'js').body
+      blocks.push({ name, body, imports: findImports(body) })
+    }
+    catch (error: unknown) {
+      blocks.push({ name, body: [], imports: [], error })
+    }
+  }
+
+  return blocks
+}
+
 /**
  * 求值 Vue SFC 里的 definePage 宏，返回页面信息
  *
@@ -57,34 +104,12 @@ export function parseSFC(code: string, options?: SFCParseOptions): SFCDescriptor
  * null）时为 `null`；没找到 definePage 时为 undefined
  */
 export async function evaluateDefinePage(code: string, filename: string, platform: string = uniEnvPlatform): Promise<UserPageItem | null | undefined> {
-  const sfc = parseSFC(code, { filename })
+  const blocks = parseSfcBlocks(code, filename)
 
-  // 两个 script 块都找（先 setup 后普通，和 findDefinePageMacro 的
-  // 顺序一致）。旧代码只看其中一个：宏写在普通 <script> 里而页面
-  // 还有 <script setup> 时，扫描这边读不到配置，转换那边却会把宏
-  // 删掉——配置悄悄丢掉，还不留任何痕迹
-  let parseError: unknown
-  const blocks: Array<{ body: t.Statement[], imports: t.ImportDeclaration[] }> = []
-  for (const sfcScript of [sfc.scriptSetup, sfc.script]) {
-    if (!sfcScript)
+  for (const { body, error } of blocks) {
+    if (error)
       continue
 
-    // 一个块解析失败不拦另一个块（和 findDefinePageMacro 的做法一
-    // 致）：宏多半写在另一个块里，配置还能读出来。import 属性
-    // （`with { ... }`）@babel/parser 8 直接支持；旧的 `assert { ... }`
-    // 写法已废弃、@babel/parser 8 删掉了支持，还在用这种写法的块会
-    // 在这里失败。错误先记着，哪个块都没读出宏时再抛给 Page.read()，
-    // 页面退回只含路径的信息
-    try {
-      const body = babelParse(sfcScript.content, sfcScript.lang || 'js').body
-      blocks.push({ body, imports: findImports(body) })
-    }
-    catch (error: unknown) {
-      parseError ??= error
-    }
-  }
-
-  for (const { body } of blocks) {
     const macro = findMacro(body, filename)
     if (!macro)
       continue
@@ -125,10 +150,11 @@ export async function evaluateDefinePage(code: string, filename: string, platfor
     }
   }
 
-  // 没有任何块读出宏：有块解析失败时把错误抛出去（调用方会警告并
-  // 退回默认配置），完全没失败就说明文件里本来就没有 definePage
-  if (parseError)
-    throw parseError
+  // 没有任何块读出宏：有块解析失败时把第一个错误抛出去（调用方会警
+  // 告并退回默认配置），完全没失败就说明文件里本来就没有 definePage
+  const failed = blocks.find(block => block.error)
+  if (failed)
+    throw failed.error
 
   return undefined
 }
@@ -136,10 +162,8 @@ export async function evaluateDefinePage(code: string, filename: string, platfor
 /**
  * 在 Vue SFC 中定位 definePage 宏调用但不求值
  *
- * 转换插件用它找到宏再删掉，不求值。每个 script 块单独解析：其中
- * 一个块有语法错误（比如还在用 @babel/parser 8 已删除的旧版
- * `assert { ... }` import 属性）时，另一个块的宏照样能找到、照样删。
- * 解析失败通过 `onParseError` 报出来，不抛错。
+ * 转换插件用它找到宏再删掉，不求值。块解析失败通过 `onParseError`
+ * 报出来，不抛错。
  *
  * @param code - Vue SFC 源码
  * @param filename - 用于错误上报的 SFC 文件名
@@ -152,26 +176,13 @@ export function findDefinePageMacro(
   filename: string,
   options: { onParseError?: (block: string, error: unknown) => void } = {},
 ): CallExpression | undefined {
-  const sfc = parseSFC(code, { filename })
-
-  const tryFindMacro = (content: string, lang: string | undefined, block: string): CallExpression | undefined => {
-    try {
-      return findMacro(babelParse(content, lang || 'js').body, filename)
+  for (const { name, body, error } of parseSfcBlocks(code, filename)) {
+    if (error) {
+      options.onParseError?.(name, error)
+      continue
     }
-    catch (error: unknown) {
-      options.onParseError?.(block, error)
-      return undefined
-    }
-  }
 
-  if (sfc.scriptSetup) {
-    const macro = tryFindMacro(sfc.scriptSetup.content, sfc.scriptSetup.lang, '<script setup>')
-    if (macro)
-      return macro
-  }
-
-  if (sfc.script) {
-    const macro = tryFindMacro(sfc.script.content, sfc.script.lang, '<script>')
+    const macro = findMacro(body, filename)
     if (macro)
       return macro
   }
