@@ -2,6 +2,7 @@ import type { PagesJsonData } from '../packages/core/src'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { parse as cjParse } from 'comment-json'
 import { describe, expect, it } from 'vitest'
 import { mergePagesJson, PageContext, writePagesJson } from '../packages/core/src'
 
@@ -12,6 +13,13 @@ import { mergePagesJson, PageContext, writePagesJson } from '../packages/core/sr
  * 生成标记、首页排前、子包合并、格式化），所以这些用例直接对比生成
  * 的内容，不用建临时目录，也不用碰 comment-json 的内部符号。
  */
+
+/** tabBar 主体序列化前占位的标记（见 pages-json.ts），替换失败时会漏进输出 */
+const TAB_BAR_PLACEHOLDER_TEXT = '"tabBar": "@@uni-pages-tab-bar-placeholder@@"'
+
+function parseJsonc(content: string): any {
+  return cjParse(content)
+}
 
 describe('mergePagesJson pure merge seam', () => {
   it('throws a recognizable error when the existing pages.json is malformed', () => {
@@ -272,6 +280,38 @@ describe('mergePagesJson pure merge seam', () => {
     expect(crlf).toContain('\r\n')
     // 所有换行都是 CRLF，没有落单的 \n
     expect(crlf.replaceAll('\r\n', '').includes('\n')).toBe(false)
+  })
+
+  it('applies the serialization format options to the hand-rendered tabBar block', () => {
+    // tabBar 主体是绕开 comment-json 手工拼出来的（按平台区分的属性
+    // 需要重复键），所以格式化选项（缩进、换行符）必须在那里单独生效；
+    // 替换占位符时还要用函数形式的替换器，正文里出现 `$` 才不会被
+    // 当成特殊的替换模式
+    const data: PagesJsonData = {
+      pages: [{ path: 'pages/index/index', type: 'home' as const }],
+      subPackages: [],
+      tabBar: {
+        color: '#999999',
+        list: [{ pagePath: 'pages/index/index', text: 'Tab ($& me)' }],
+      },
+    }
+
+    const tabbed = mergePagesJson('', data, { platform: 'h5', format: { indent: '\t', insertFinalNewline: true } })
+    expect(tabbed).toContain('\t"tabBar": {')
+    expect(tabbed).toContain('\t\t"color": "#999999",')
+    // `$` / `$&` 原样保留（字符串替换器会把 $& 展开成匹配到的全文）
+    expect(tabbed).toContain('Tab ($& me)')
+    expect(tabbed).not.toContain(TAB_BAR_PLACEHOLDER_TEXT)
+
+    const crlf = mergePagesJson('', data, { platform: 'h5', format: { eol: '\r\n' } })
+    expect(crlf).toContain('\r\n  "tabBar"')
+    expect(crlf.replaceAll('\r\n', '').includes('\n')).toBe(false)
+    expect(crlf).not.toContain(TAB_BAR_PLACEHOLDER_TEXT)
+
+    // 手工渲染的 tabBar 在配置的格式下是合法 JSONC：解析回来 list
+    // 结构完整
+    const parsed = parseJsonc(tabbed)
+    expect(parsed.tabBar.list[0].text).toBe('Tab ($& me)')
   })
 
   it('preserves hand-written #ifndef blocks verbatim', () => {

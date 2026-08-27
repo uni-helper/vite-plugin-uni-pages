@@ -255,7 +255,10 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
     // 该有这个区块——不包 #ifdef 的话，它们的构建产物会带上
     // `tabBar: { "list": [] }` 这样的空壳
     const tabBarPlatformStr = tabBarMerge.owningPlatforms.join(' || ')
-    if (tabBarPlatformStr !== tabBarMerge.platformUnion.join(' || ')) {
+    // owningPlatforms 为空说明 list 里只剩手写 #ifndef 条目：显示与否
+    // 由每个条目自己的包裹决定，此时不能外层再包 #ifdef（会写出没有
+    // 平台名的空指令，把整个 tabBar 从所有平台上剥掉）
+    if (tabBarPlatformStr && tabBarPlatformStr !== tabBarMerge.platformUnion.join(' || ')) {
       const commentPageJson = pageJson as unknown as CommentObject
       commentPageJson[Symbol.for('before:tabBar') as CommentSymbol] = [lineComment(` #ifdef ${tabBarPlatformStr}`)]
       commentPageJson[Symbol.for('after:tabBar') as CommentSymbol] = [lineComment(' #endif')]
@@ -650,11 +653,16 @@ function parseTabBarProps(content: string, interiorStart: number): Map<string, R
       let storedBefore = [...beforeComments]
       let storedAfter = afterComments
       if (condition?.startsWith('#ifndef')) {
-        // #ifndef 属性自带完整包裹：开头指令不在自己的注释里（条件
-        // 块里的后续属性）就补一份；结尾统一用合成的 #endif，真实出
-        // 现在值后面的关闭符已经滤掉
-        if (storedBefore[0]?.trim() !== condition)
-          storedBefore = [condition, ...storedBefore]
+        // #ifndef 属性自带完整包裹：开头指令统一重写为本属性的条件
+        // （块里的后续属性自己的注释里没有它），结尾统一用合成的
+        // #endif。注释里其他属性留下的结构性指令（上一个块的 #endif、
+        // 重复的 #ifndef）全部滤掉——每个属性的包裹都是独立配对的，
+        // 多余的指令只会输出成悬空的空块或没闭合的块；用户写的普通
+        // 注释（说明文字）保留在指令后面
+        storedBefore = [
+          condition,
+          ...beforeComments.filter(c => !/^#(?:ifdef|ifndef|endif)/.test(c.trim())),
+        ]
         storedAfter = ['#endif', ...afterComments.filter(c => !c.trim().startsWith('#endif'))]
       }
       const raw: RawTabBarProp = { key, value, condition, beforeComments: storedBefore, afterComments: storedAfter }
@@ -840,6 +848,11 @@ function platformsExcluding(platformList: string, currentPlatform: string): stri
  * 直接 JSON.stringify 会把同一个页面当成两个不同的条目，多平台
  * 运行时就会生成重复的路由
  * （见 https://github.com/uni-helper/vite-plugin-uni-pages/issues/283）。
+ *
+ * 键的顺序也参与比较（JSON.stringify 按写入顺序输出）：同一页面在
+ * 两个平台下键序不同时不会被合并，会各占一个 #ifdef 块留在文件
+ * 里。代价只是文件里多一份内容相同的变体，构建时每个平台仍然只看
+ * 得见自己那一条、不会出现重复路由，不值得为它做键序归一化。
  */
 function stringifyForCompare<T extends object>(val: T): string {
   if ('type' in val) {
