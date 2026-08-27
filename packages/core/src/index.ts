@@ -2,10 +2,9 @@ import type { Plugin } from 'vite'
 import type { UserOptions } from './types'
 import path from 'node:path'
 import process from 'node:process'
-import { slash } from '@antfu/utils'
 import chokidar from 'chokidar'
 import MagicString from 'magic-string'
-import { createLogger } from 'vite'
+import { createLogger, normalizePath } from 'vite'
 import {
   FILE_EXTENSIONS,
   MODULE_ID_VIRTUAL,
@@ -78,7 +77,7 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
         if (config.build.watch) {
           // 必须相对真实的 Vite root 解析：否则 chokidar 会按 process.cwd()
           // 解释相对目录，在 root 与 cwd 不一致时监听到错误的目录
-          ctx.setupWatcher(chokidar.watch([...ctx.options.dirs, ...ctx.options.subPackages].map(v => slash(path.resolve(config.root, v)))))
+          ctx.setupWatcher(chokidar.watch([...ctx.options.dirs, ...ctx.options.subPackages].map(v => normalizePath(path.resolve(config.root, v)))))
         }
       }
     },

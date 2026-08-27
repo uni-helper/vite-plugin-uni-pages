@@ -9,9 +9,6 @@ catalogs:
     '@antfu/eslint-config':
       specifier: ^9.3.0
       version: 9.3.0
-    '@antfu/utils':
-      specifier: ^9.3.0
-      version: 9.3.0
     '@babel/generator':
       specifier: ^8.0.0
       version: 8.0.0
@@ -227,9 +224,6 @@ importers:
         specifier: 'catalog:'
         version: 8.0.0
     devDependencies:
-      '@antfu/utils':
-        specifier: 'catalog:'
-        version: 9.3.0
       '@types/debug':
         specifier: 'catalog:'
         version: 4.1.13
@@ -397,9 +391,6 @@ packages:
 
   '@antfu/install-pkg@2.0.1':
     resolution: {integrity: sha512-iCKVQcIC0e3oDxEfs3SHQGW+ovhBMZmS1TE+bTk50rVyMCBmCfClv7Qi3HQKlumYwvjb/iIMeWCW2i67q6kFfQ==}
-
-  '@antfu/utils@9.3.0':
-    resolution: {integrity: sha512-9hFT4RauhcUzqOE4f1+frMKLZrgNog5b06I7VmZQV1BkvwvqrbC8EBZf3L1eEL2AKb6rNKjER0sEvJiSP1FXEA==}
 
   '@babel/code-frame@7.24.7':
     resolution: {integrity: sha512-BcYH1CVJBO9tvyIZ2jVeXgSIMvGZ2FDRvDdOIVQyuklNKSsx+eppDEBq/g47Ayw+RqNFE+URvOShmf+f/qwAlA==}
@@ -6051,8 +6042,6 @@ snapshots:
     dependencies:
       package-manager-detector: 1.8.0
       tinyexec: 1.3.0
-
-  '@antfu/utils@9.3.0': {}
 
   '@babel/code-frame@7.24.7':
     dependencies:

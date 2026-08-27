@@ -75,7 +75,6 @@
     "write-file-atomic": "catalog:"
   },
   "devDependencies": {
-    "@antfu/utils": "catalog:",
     "@types/debug": "catalog:",
     "@types/lodash.groupby": "catalog:",
     "@types/node": "catalog:",

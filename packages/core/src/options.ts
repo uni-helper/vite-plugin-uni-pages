@@ -3,8 +3,8 @@ import type { LoadConfigSource } from 'unconfig'
 import type { ResolvedOptions, UserOptions } from './types'
 import { resolve } from 'node:path'
 import process from 'node:process'
-import { slash } from '@antfu/utils'
 import { globSync } from 'tinyglobby'
+import { normalizePath } from 'vite'
 
 /**
  * 解析用户配置项
@@ -41,7 +41,7 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
     onAfterWriteFile = () => {},
   } = userOptions
 
-  const root = viteRoot || slash(process.env.VITE_ROOT_DIR || process.cwd())
+  const root = viteRoot || normalizePath(process.env.VITE_ROOT_DIR || process.cwd())
   const resolvedDirs = resolvePageDirs(dir, root, exclude)
 
   // 处理 subPackages：同时支持字符串和 SubPackageConfig 两种格式。
@@ -51,10 +51,10 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
   const resolvedSubDirs: string[] = []
   for (const sub of subPackages) {
     if (typeof sub === 'string') {
-      resolvedSubDirs.push(slash(sub))
+      resolvedSubDirs.push(normalizePath(sub))
     }
     else {
-      const dirPath = slash(sub.dir)
+      const dirPath = normalizePath(sub.dir)
       resolvedSubDirs.push(dirPath)
       // 记录物理目录到 pages.json 自定义 root 的映射
       subPackageRootMap.set(dirPath, sub.root)
@@ -102,7 +102,7 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
  * @returns 匹配到的目录路径
  */
 export function resolvePageDirs(dir: string, root: string, exclude: string[]): string[] {
-  const dirs = globSync(slash(dir), {
+  const dirs = globSync(normalizePath(dir), {
     ignore: exclude,
     onlyDirectories: true,
     expandDirectories: false,

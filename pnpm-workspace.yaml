@@ -378,7 +378,6 @@ packages:
 
 catalog:
   '@antfu/eslint-config': ^9.3.0
-  '@antfu/utils': ^9.3.0
   '@babel/generator': ^8.0.0
   '@babel/types': ^8.0.4
   '@dcloudio/types': ^3.4.32
