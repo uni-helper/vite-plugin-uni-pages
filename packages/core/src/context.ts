@@ -4,12 +4,12 @@ import type { Logger, ModuleNode, ViteDevServer } from 'vite'
 import type { InternalPages, PagePath, ResolvedOptions, UserOptions } from './types'
 import path from 'node:path'
 import process from 'node:process'
-import { slash } from '@antfu/utils'
 import { platform as uniEnvPlatform } from '@uni-helper/uni-env'
 import { stringify as cjStringify } from 'comment-json'
 import dbg from 'debug'
 import groupBy from 'lodash.groupby'
 import { loadConfig } from 'unconfig'
+import { normalizePath } from 'vite'
 import { RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import { writeDeclaration } from './declaration'
 import { checkPagesJsonFileSync, getPageFiles, isTargetFile, resolvePagesJsonPath } from './files'
@@ -42,6 +42,12 @@ export class PageContext {
   pageMetaData: InternalPages = []
   /** 子包页面配置数组，用于生成 pages.json 的 subPackages 字段 */
   subPageMetaData: SubPackages = []
+  /**
+   * 最近一次合并出的 tabBar（配置文件与 definePage 声明的合体）。
+   * 类型声明生成 tab 页列表时用它，definePage 声明的 tabBar 页才能
+   * 一起从 navigateTo 的 url 类型里排除
+   */
+  tabBar: TabBar | undefined
 
   /** 生成的 pages.json 文件路径 */
   resolvedPagesJSONPath = ''
@@ -69,7 +75,7 @@ export class PageContext {
    * @param platform - 当前平台标识，默认取 uni-env 的平台
    */
   constructor(userOptions: UserOptions, viteRoot: string = process.cwd(), platform: string = uniEnvPlatform) {
-    this.root = slash(viteRoot)
+    this.root = normalizePath(viteRoot)
     this.platform = platform
     debug.options('root', this.root)
     this.options = resolveOptions(userOptions, this.root)
@@ -135,12 +141,17 @@ export class PageContext {
    */
   async setupWatcher(watcher: FSWatcher): Promise<void> {
     watcher.add(this.pagesConfigSourcePaths)
-    const targetDirs = [...this.options.dirs, ...this.options.subPackages].map(v => slash(path.resolve(this.root, v)))
-    const isWatchedPageFile = (filePath: string): boolean =>
-      isTargetFile(filePath) && targetDirs.some(v => slash(path.resolve(this.root, filePath)).startsWith(v))
+    const targetDirs = [...this.options.dirs, ...this.options.subPackages].map(v => normalizePath(path.resolve(this.root, v)))
+    // 前缀判断要吃到目录边界：'src/pages' 不能把隔壁的
+    // 'src/pages-sub/…' 也认成自己的页面（Vite 的 watcher 默认盯整个
+    // 项目，这种兄弟目录的变更事件是会进来的）
+    const isWatchedPageFile = (filePath: string): boolean => {
+      const absolute = normalizePath(path.resolve(this.root, filePath))
+      return isTargetFile(filePath) && targetDirs.some(v => absolute === v || absolute.startsWith(`${v}/`))
+    }
 
     watcher.on('add', async (path) => {
-      path = slash(path)
+      path = normalizePath(path)
       if (!isWatchedPageFile(path))
         return
 
@@ -151,7 +162,14 @@ export class PageContext {
 
     watcher.on('change', async (path) => {
       // 配置文件按绝对路径监听；先判断它，配置的变更就不会被下面的
-      // 页面文件判断漏掉
+      // 页面文件判断漏掉。两个已知边界（权衡后接受，先记录）：
+      // 1. 这里的比较没有归一化斜杠（normalizePath 在它后面才做），
+      //    Windows 上 watcher 报的路径和 unconfig 记下的 sources
+      //    斜杠方向不一致时会错过配置变更。
+      // 2. sources 在启动时定死：启动时配置文件还不存在，loadConfig
+      //    返回的 sources 是空数组（已实测），watcher.add 拿到空列
+      //    表，之后再创建的配置文件永远不被监听，需要重启开发服
+      //    务器才生效。
       if (this.pagesConfigSourcePaths.includes(path)) {
         debug.pages(`Config source changed: ${path}`)
         if (await this.updatePagesJSON())
@@ -159,7 +177,7 @@ export class PageContext {
         return
       }
 
-      path = slash(path)
+      path = normalizePath(path)
       if (!isWatchedPageFile(path))
         return
 
@@ -169,7 +187,7 @@ export class PageContext {
     })
 
     watcher.on('unlink', async (path) => {
-      path = slash(path)
+      path = normalizePath(path)
       if (!isWatchedPageFile(path))
         return
 
@@ -268,11 +286,13 @@ export class PageContext {
 
     // 整个"读 → 合并 → 写"都锁在 pages.json 模块里的同一把文件锁内，
     // 两个终端同时跑（dev:mp-weixin + dev:mp-alipay）也不会把彼此的
-    // 条件编译输出写坏
+    // 条件编译输出写坏。tabBar 在这之前算好、存到 this.tabBar，
+    // 后面的类型声明用同一份结果
+    this.tabBar = await this.resolveTabBar()
     const result = await writePagesJson(this.resolvedPagesJSONPath, {
       pages: this.pageMetaData,
       subPackages: this.subPageMetaData,
-      tabBar: await this.resolveTabBar(),
+      tabBar: this.tabBar,
       homePath,
     }, {
       platform: this.platform,
@@ -469,7 +489,7 @@ export class PageContext {
       // 把 homePage 配置换算成和页面路径一致的相对路径格式（相对 basePath）
       const basePath = this.basePath
       const resolvedHomePages = this.options.homePage.map((v) => {
-        return slash(path.relative(basePath, slash(path.resolve(basePath, v))))
+        return normalizePath(path.relative(basePath, normalizePath(path.resolve(basePath, v))))
       })
 
       // 先按路径精确匹配；匹配不到再退回到"路径以 /配置值 结尾"的
@@ -533,11 +553,23 @@ export class PageContext {
       // monorepo 场景下，自定义 root 可以避免 pages.json 里的 root
       // 出现 '..'
       const root = this.options.subPackageRootMap.get(dir)
-        ?? slash(path.relative(this.basePath, path.join(this.options.root, dir)))
+        ?? normalizePath(path.relative(this.basePath, path.join(this.options.root, dir)))
 
       const globPackage = subPackages?.find(v => v.root === root)
-      const parsedPages = (await this.parsePages(pages, 'sub', globPackage?.pages))
-        .map(page => ({ ...page, path: slash(path.relative(root, page.path)) }))
+      // 用户配置里的子包页面路径按 pages.json 的惯例相对 root 书写
+      // （如 root 为 'pkg' 时写 'detail'）。合并前先换算成和扫描结果
+      // 一样的基准（相对 outDir），两边路径才能对上号，合并后也才能
+      // 统一转回相对 root 的形式；不做这一步，用户路径会被当成相对
+      // root 已换算过的路径再换算一次，得到 '../detail' 这样的坏路径。
+      // 已经带 root 前缀的写法（旧版容许的格式）保持原样，重复拼接
+      // 会把路径弄坏
+      const overrides = globPackage?.pages?.map((page) => {
+        if (!page.path || page.path.startsWith(`${root}/`))
+          return page
+        return { ...page, path: `${root}/${page.path}` }
+      })
+      const parsedPages = (await this.parsePages(pages, 'sub', overrides))
+        .map(page => ({ ...page, path: normalizePath(path.relative(root, page.path)) }))
       packagesByRoot.set(root, {
         root,
         pages: parsedPages,
@@ -568,7 +600,7 @@ export class PageContext {
  * @returns 由 root 与 outDir 拼接并斜杠化后的基准路径
  */
 function resolveBasePath(options: ResolvedOptions): string {
-  return slash(path.join(options.root, options.outDir))
+  return normalizePath(path.join(options.root, options.outDir))
 }
 
 /**
@@ -578,15 +610,15 @@ function resolveBasePath(options: ResolvedOptions): string {
  * @returns 包含相对路径与绝对路径的页面路径数组
  */
 function getPagePaths(dir: string, options: ResolvedOptions): PagePath[] {
-  const pagesDirPath = slash(path.resolve(options.root, dir))
+  const pagesDirPath = normalizePath(path.resolve(options.root, dir))
   const basePath = resolveBasePath(options)
   const files = getPageFiles(pagesDirPath, options)
   debug.pages(dir, files)
   const pagePaths = files
-    .map(file => slash(file))
+    .map(file => normalizePath(file))
     .map(file => ({
-      relativePath: path.relative(basePath, slash(path.resolve(pagesDirPath, file))),
-      absolutePath: slash(path.resolve(pagesDirPath, file)),
+      relativePath: path.relative(basePath, normalizePath(path.resolve(pagesDirPath, file))),
+      absolutePath: normalizePath(path.resolve(pagesDirPath, file)),
     }))
 
   return pagePaths
