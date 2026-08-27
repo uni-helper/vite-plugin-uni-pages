@@ -16,10 +16,14 @@ export function getDeclaration(ctx: PageContext): string {
   const subPagePaths = ctx.subPageMetaData.map((sub) => {
     return sub.pages.map(v => (`"/${normalizePath(join(sub.root, v.path))}"`))
   }).flat()
-  const tabBarPagePaths = ctx.pagesGlobConfig?.tabBar?.list?.map((v) => {
-    return `"/${v!.pagePath}"`
-  }) ?? []
-  const allPagePaths = [...ctx.pageMetaData.filter(page => !tabBarPagePaths.includes(page.path)).map(v => `"/${v.path}"`), ...subPagePaths]
+  // 用裸路径（不带引号和前导斜杠）参与过滤：page.path 也是裸路径，
+  // 直接拿包装后的字符串比较永远不相等，tab 页就从未被排除过
+  const tabBarRawPaths = ctx.pagesGlobConfig?.tabBar?.list?.map(v => v!.pagePath) ?? []
+  const tabBarPathSet = new Set(tabBarRawPaths)
+  // tab 页只能 switchTab 进入，不应出现在 navigateTo/redirectTo 的
+  // url 类型里
+  const allPagePaths = [...ctx.pageMetaData.filter(page => !tabBarPathSet.has(page.path)).map(v => `"/${v.path}"`), ...subPagePaths]
+  const tabBarPagePaths = tabBarRawPaths.map(p => `"/${p}"`)
   const code = `/* eslint-disable */
 /* prettier-ignore */
 /* oxlint-disable */
