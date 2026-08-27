@@ -14,12 +14,12 @@ import { DefineConditional, isConditional } from './condition'
 import { debug } from './logger'
 
 /**
- * definePage 宏求值模块
+ * definePage 宏的解析与求值
  *
- * 深模块，封装理解一个 definePage 宏所需的全部细节：SFC 解析、按块
- * 隔离失败的 script 块解析、宏定位、导入收集与沙箱求值。调用方只见
- * 两个函数：evaluateDefinePage（扫描路径）与 findDefinePageMacro
- * （转换路径）。
+ * 这个文件负责看懂一个 definePage 宏要的全部步骤：解析 Vue 单文件
+ * 组件、逐个 script 块解析（单个块失败不影响别的块）、找到宏调用、
+ * 收集 import 语句、放进沙箱求值。外部只用两个函数：
+ * evaluateDefinePage（扫描时用）和 findDefinePageMacro（转换时用）。
  */
 
 /**
@@ -45,73 +45,83 @@ export function parseSFC(code: string, options?: SFCParseOptions): SFCDescriptor
 }
 
 /**
- * 求值 Vue SFC 中的 definePage 宏并返回页面元信息
+ * 求值 Vue SFC 里的 definePage 宏，返回页面信息
  *
- * 供扫描路径使用。解析与求值失败会向上传播，调用方（Page.read）据此
- * 把该页面降级为仅含路径的元信息。
+ * 扫描时用。解析或求值出错时，错误会交给调用方（Page.read），它会把
+ * 这个页面退回成只含路径的简单信息。
  *
  * @param code - Vue SFC 源码
- * @param filename - SFC 文件名，用于错误定位与模块解析
- * @param platform - 当前平台标识，注入函数式宏；默认取 uni-env 的平台
- * @returns 页面元信息对象；宏显式退出（definePage(null) 或返回 null 的
- * 函数）时为 `null`；找不到 definePage 时为 undefined
+ * @param filename - SFC 文件名，用于错误提示和模块解析
+ * @param platform - 当前平台标识，传给函数式宏；默认取 uni-env 的平台
+ * @returns 页面信息对象；宏明确退出（definePage(null) 或函数返回
+ * null）时为 `null`；没找到 definePage 时为 undefined
  */
 export async function evaluateDefinePage(code: string, filename: string, platform: string = uniEnvPlatform): Promise<UserPageItem | null | undefined> {
   const sfc = parseSFC(code, { filename })
-  const sfcScript = sfc.scriptSetup || sfc.script
 
-  if (!sfcScript) {
-    return undefined
+  // 两个 script 块都找（先 setup 后普通，和 findDefinePageMacro 的
+  // 顺序一致）。旧代码只看其中一个：宏写在普通 <script> 里而页面
+  // 还有 <script setup> 时，扫描这边读不到配置，转换那边却会把宏
+  // 删掉——配置悄悄丢掉，还不留任何痕迹
+  for (const sfcScript of [sfc.scriptSetup, sfc.script]) {
+    if (!sfcScript)
+      continue
+
+    // import 属性（`with { ... }`）@babel/parser 8 直接支持。旧的
+    // `assert { ... }` 写法已废弃、@babel/parser 8 删掉了支持，还在用
+    // 这种写法的文件会在这里解析失败，错误交给 Page.read() 处理，页面
+    // 只保留路径信息（definePage 宏读不出来了）。
+    const ast = babelParse(sfcScript.content, sfcScript.lang || 'js')
+    const macro = findMacro(ast.body, filename)
+    if (!macro)
+      continue
+
+    const imports = findImports(ast.body).filter(imp => !!imp.specifiers.length).map(imp => babelGenerate(imp).code)
+
+    const [macroOption] = macro.arguments
+    // definePage() 没传参数：读不出任何配置，当作没写这个宏处理
+    // （页面用默认配置，宏调用在转换时照样会删掉），而不是把 undefined
+    // 交给 babel 生成器报一个看不懂的错
+    if (!macroOption)
+      return undefined
+    const macroCode = babelGenerate(macroOption).code
+
+    const parsed = await parseCode({
+      imports,
+      code: macroCode,
+      filename,
+    })
+
+    // 写成函数的 definePage 会收到当前平台和一个 define() 帮手，
+    // 用户不用自己读 process.env.UNI_PLATFORM 就能按平台写不同配置
+    const parsedMeta = typeof parsed === 'function'
+      ? await parsed({ platform, define: (base: Record<string, any>) => new DefineConditional(base) })
+      : parsed
+
+    // define() 写的条件配置马上在这里按当前平台算出结果，
+    // 后面的步骤只会见到普通对象
+    const resolvedMeta = isConditional(parsedMeta) ? parsedMeta.resolve(platform) : parsedMeta
+
+    // 显式 null 表示该页面在本平台退出 pages.json
+    if (resolvedMeta === null)
+      return null
+
+    return {
+      type: 'page',
+      ...resolvedMeta,
+    }
   }
 
-  // 导入属性（`with { ... }`）由 @babel/parser 8 原生支持。已废弃的
-  // `assert { ... }` 语法在上游已被移除；这类文件在这里解析失败，错误
-  // 传播到 Page.read()，页面降级为仅含路径的元信息（definePage 宏
-  // 无法求值）。
-  const ast = babelParse(sfcScript.content, sfcScript.lang || 'js')
-  const macro = findMacro(ast.body, filename)
-  if (!macro) {
-    return undefined
-  }
-
-  const imports = findImports(ast.body).filter(imp => !!imp.specifiers.length).map(imp => babelGenerate(imp).code)
-
-  const [macroOption] = macro.arguments
-  const macroCode = babelGenerate(macroOption).code
-
-  const parsed = await parseCode({
-    imports,
-    code: macroCode,
-    filename,
-  })
-
-  // 函数式宏接收当前平台与条件化 `define` 工厂，用户无需自己读取
-  // process.env.UNI_PLATFORM 就能按平台分支
-  const parsedMeta = typeof parsed === 'function'
-    ? await parsed({ platform, define: (base: Record<string, any>) => new DefineConditional(base) })
-    : parsed
-
-  // 条件化定义在这里立即为当前平台解析，下游阶段因此始终只处理普通
-  // 对象
-  const resolvedMeta = isConditional(parsedMeta) ? parsedMeta.resolve(platform) : parsedMeta
-
-  // 显式 null 表示该页面在本平台退出 pages.json
-  if (resolvedMeta === null)
-    return null
-
-  return {
-    type: 'page',
-    ...resolvedMeta,
-  }
+  return undefined
 }
 
 /**
  * 在 Vue SFC 中定位 definePage 宏调用但不求值
  *
- * 供转换路径移除宏使用。每个 script 块独立解析：其中一个块的语法
- * 错误（例如 @babel/parser 8 移除的旧版 `assert { ... }` 导入属性）
- * 不能导致另一个块的宏移除被跳过。失败通过 `onParseError` 上报，
- * 不抛出。
+ * 转换插件用它找到宏再删掉，不求值。每个 script 块单独解析：其中
+ * 一个块有语法错误（比如还在用 @babel/parser 8 已删除的旧版
+ * `assert { ... }` import 属性）时，另一个块的宏照样能找到、照样删。
+ * 解析失败通过 `onParseError` 报出来，不抛错。
  *
  * @param code - Vue SFC 源码
  * @param filename - 用于错误上报的 SFC 文件名
@@ -286,8 +296,9 @@ async function parseCode(options: { imports: string[], code: string, filename: s
       timeout: 1000, // 设置超时，避免脚本长时间运行
     })
 
-    // 取导出的值。`export default null` 转译为 `exports.default = null`，
-    // 会被 `||` 兜底吞掉，因此按属性存在性取值而非按真值
+    // 取导出的值。`export default null` 转出来的结果是
+    // `exports.default = null`；如果用 `||` 取值，null 会被当成
+    // "没有值"而丢掉，所以要看属性在不在，而不是看值是不是真的
     const exportsObj = vmContext.exports as any
     return 'default' in exportsObj ? exportsObj.default : exportsObj
   }
