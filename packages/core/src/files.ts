@@ -129,6 +129,12 @@ async function acquireAndRun<T>(path: string, task: () => Promise<T>, retry: num
   for (let attempt = retry; attempt > 0; attempt--) {
     let release: (() => Promise<void>) | undefined
     try {
+      // proper-lockfile 4.x 的默认规则（源码实测）：锁文件 10 秒没续期
+      // 就算"主人挂了"，别的进程可以夺走；持锁期间它每 5 秒默默续一
+      // 次。万一哪个进程真的冻结超过 10 秒、锁被别人抢走，它干完活
+      // 释放时会直接抛错（onCompromised 默认 throw）。插件锁内只做
+      // "读 pages.json → 合并 → 写回"，毫秒级完事，离 10 秒很远，
+      // 所以不额外调这些参数
       release = await lockfile.lock(path, { realpath: false })
     }
     catch {
