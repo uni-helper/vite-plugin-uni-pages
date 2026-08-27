@@ -12,7 +12,7 @@ import { evaluateDefinePage } from './macro'
  *
  * 职责：
  * 1. 读取页面文件内容
- * 2. 解析 definePage 宏定义的页面元信息
+ * 2. 解析 definePage 宏定义的页面配置
  * 3. 提供 tabBar 配置信息
  * 4. 跟踪页面文件变更状态
  */
@@ -37,9 +37,9 @@ export class Page {
   /** 页面文件是否至少被读取过一次 */
   private loaded: boolean = false
 
-  /** 页面元信息的原始 JSON 字符串，用于变更检测 */
+  /** 页面配置的原始 JSON 字符串，用于变更检测 */
   private raw: string = ''
-  /** 解析后的页面元信息 */
+  /** 解析后的页面配置 */
   private meta: UserPageItem | undefined
 
   /**
@@ -54,11 +54,11 @@ export class Page {
   }
 
   /**
-   * 获取页面元信息
-   * 解析 definePage 宏定义的配置并返回用于 pages.json 的元信息
+   * 获取页面配置
+   * 解析 definePage 宏定义的配置并返回用于 pages.json 的配置
    *
    * @param forceUpdate - 是否强制更新，忽略缓存
-   * @returns 页面元信息对象
+   * @returns 页面配置对象
    */
   public async getPageMeta(forceUpdate = false): Promise<InternalPageItem> {
     if (forceUpdate || !this.loaded)
@@ -84,7 +84,7 @@ export class Page {
       await this.read()
     }
 
-    // 通过 definePage(null) 退出的页面不得贡献 tabBar 项
+    // 通过 definePage(null) 退出的页面不提供 tabBar 项
     if (this.skipped)
       return undefined
 
@@ -102,7 +102,7 @@ export class Page {
   }
 
   /**
-   * 确保页面文件至少被读取过一次，使 `skipped` 与缓存的元信息反映
+   * 确保页面文件至少被读取过一次，使 `skipped` 与缓存的配置反映
    * 当前文件内容
    */
   public async ensureLoaded(): Promise<void> {
@@ -119,7 +119,7 @@ export class Page {
   }
 
   /**
-   * 读取页面文件并解析元信息
+   * 读取页面文件并解析配置
    * 从 Vue SFC 中提取 definePage 宏定义的配置
    */
   public async read(): Promise<void> {
@@ -136,13 +136,16 @@ export class Page {
     }
     catch (err: any) {
       debug.error(err)
+      // 光写进 debug 通道用户看不见：宏求值失败时页面退回默认配置，
+      // 而转换阶段照样会把宏从产物里删掉，必须在正常输出里留下信号
+      this.ctx.logger?.warn(err?.message ?? String(err), { timestamp: true })
       return // 读取失败时中断
     }
 
     let raw = ''
     try {
-      // 被跳过的页面 JSON.stringify(undefined) 返回 undefined，统一
-      // 归一化为字符串，保证 `raw` 类型稳定、变更检测可靠
+      // 页面被跳过时 JSON.stringify(undefined) 返回 undefined，
+      // 统一换成空字符串，`raw` 就一直是字符串，变更检测才靠得住
       raw = JSON.stringify(meta) ?? ''
     }
     catch {
@@ -160,7 +163,7 @@ export class Page {
     try {
       const content = await fs.promises.readFile(this.path.absolutePath, { encoding: 'utf-8' })
       const meta = await evaluateDefinePage(content, this.path.absolutePath, this.ctx.platform)
-      // undefined 表示没有 definePage 宏：保留页面并使用默认元信息。
+      // undefined 表示没有 definePage 宏：保留页面并使用默认配置。
       // null 是显式退出，必须原样传递给调用方。
       return meta === undefined ? { type: 'page' } : meta
     }
