@@ -50,7 +50,11 @@ export class Page {
   constructor(ctx: PageContext, path: PagePath) {
     this.ctx = ctx
     this.path = path
-    this.uri = normalizePath(path.relativePath.replace(extname(path.relativePath), ''))
+    // 只从路径末尾剥掉扩展名。目录名里也可能带点（如
+    // pages/my.vue/index.vue），如果按"第一次出现的位置"替换，目录名
+    // 会被啃掉一块、真正的扩展名反而留着
+    const ext = extname(path.relativePath)
+    this.uri = normalizePath(ext ? path.relativePath.slice(0, -ext.length) : path.relativePath)
   }
 
   /**
