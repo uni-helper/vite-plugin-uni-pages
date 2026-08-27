@@ -8,43 +8,47 @@ import { withFileLock } from './files'
 import { debug } from './logger'
 
 /**
- * pages.json 读-改-写模块
+ * pages.json 的读取、合并、写回
  *
- * 深模块，封装所有 pages.json 专属细节：多平台 #ifdef 合并、带注释
- * 挂载修复的首页重排、生成标记处理、序列化格式化、文件锁与原子写入。
- * 调用方只见 {@link writePagesJson} 与纯函数 {@link mergePagesJson}；
- * comment-json 内部结构从不越过它们的接口泄漏。
+ * 这个文件负责 pages.json 的全部细节：
+ * - 多个平台共用一个文件时，用 #ifdef 注释区分各自的条目
+ * - 合并时保持首页排最前
+ * - 写入"由插件生成"的标记，靠它识别哪些条目是插件写的
+ * - 序列化格式（缩进、换行）
+ * - 文件锁和原子写入，防止并发写坏文件
  *
- * 当前平台不使用的区块的收敛策略：当 uni-app 条件编译能把整个区块
- * 从该平台的构建中剥掉时保留并 #ifdef 包裹（tabBar 属性）；当构建
- * 产物仍会带出空壳时整个丢弃（没有页面的子包 root）。
+ * 外部只需要用 writePagesJson（写文件）和 mergePagesJson（纯计算），
+ * 不用接触 comment-json 的内部结构。
+ *
+ * 当前平台用不到的区块怎么处理，分两种情况：
+ * - tabBar 的外观属性：uni-app 条件编译能把整段剥掉，保留并包上 #ifdef
+ * - 没有任何页面的子包：构建产物里会留下指向不存在目录的空壳，直接删掉
  */
 
 /** 由扫描/合并流水线组装出的路由数据 */
 export interface PagesJsonData {
-  /** 主包页面元信息 */
+  /** 主包页面配置 */
   pages: InternalPages
-  /** 子包页面元信息 */
+  /** 子包页面配置 */
   subPackages: SubPackages
   /** 解析后的 tabBar 配置 */
   tabBar?: TabBar
   /**
-   * 从扫描出的元信息解析出的首页路径。从 pages.json 合并而来的条目
+   * 从扫描出的配置解析出的首页路径。从 pages.json 合并而来的条目
    * 可能缺少内部 `type` 标记（手写条目从不携带它），因此首页条目主要
    * 按路径重新定位；未设置时退回到 `type` 标记。
    */
   homePath?: string
 }
 
-/** 生成 pages.json 的序列化选项 */
+/** 生成 pages.json 时怎么排版 */
 export interface PagesJsonFormatOptions {
   /**
-   * 压缩输出，优先级高于 `indent`。单行 JSON 无法携带注释，生成
-   * 标记、用户注释与所有平台作用域的 `#ifdef` 块都会被丢弃：仅由
-   * 其他平台拥有的条目与区块会裸露地进入本平台的构建产物（如外来的
-   * tabBar list），tabBar 外观属性的跨平台跟踪退化为最后写入者胜出；
-   * 且一旦发生一次压缩写入，多平台跟踪在后续每次运行都从头开始。
-   * 同一项目所有平台的构建应保持该配置一致
+   * 压缩成一行输出，优先级高于 `indent`。单行 JSON 放不下注释，
+   * 生成标记、用户注释、所有 `#ifdef` 块都会丢失：只属于其他平台的
+   * 条目和区块会直接暴露在本平台的构建产物里（如外来的 tabBar
+   * list），tabBar 外观属性也变成"谁最后写谁说了算"。所以同一个
+   * 项目的所有平台要保持这个配置一致
    */
   minify?: boolean
   /** 缩进，空格数或字符串（如 '\t'） */
@@ -58,7 +62,7 @@ export interface PagesJsonFormatOptions {
 export interface WritePagesJsonOptions {
   /** 当前平台标识，如 'mp-weixin' 或 'h5' */
   platform: string
-  /** 来自 pages.config.ts 的用户配置；pages/subPackages/tabBar 之外的字段原样透传到输出 */
+  /** 来自 pages.config.ts 的用户配置；pages/subPackages/tabBar 之外的字段原样写进输出 */
   globConfig?: PagesConfig
   /** 序列化格式 */
   format?: PagesJsonFormatOptions
@@ -68,19 +72,20 @@ export interface WritePagesJsonOptions {
 export type MergePagesJsonOptions = Pick<WritePagesJsonOptions, 'platform' | 'globConfig' | 'format'>
 
 /**
- * tabBar 主体以文本方式渲染时，占位符序列化为 tabBar 的值：按平台
- * 区分的属性变体需要重复键，comment-json 对象无法表达，因此主体在
- * 最终字符串中拼接到这个占位符上（见 {@link mergePagesJson}）
+ * tabBar 主体以文本方式渲染时，先在对象里放这个占位符序列化，最后
+ * 再把渲染好的正文拼上去：按平台区分的属性需要同一个键出现多次，
+ * comment-json 的对象做不到这一点，只能不用它、自己拼字符串
+ * （见 {@link mergePagesJson}）
  */
 const TAB_BAR_PLACEHOLDER = '@@uni-pages-tab-bar-placeholder@@'
 
 /**
- * 将给定路由数据合并进 pages.json 并写回
+ * 把路由数据合并进 pages.json 并写回
  *
- * 整个读-改-写运行在同一把文件锁内：新内容取决于当前内容（其他平台
- * 的 `#ifdef` 块），并发终端（如 dev:mp-weixin + dev:mp-alipay）因此
- * 不会观察到或覆写彼此的半写入状态。写入是原子的（临时文件 +
- * rename），写入中途崩溃不会留下截断的文件。
+ * 整个"读取 → 合并 → 写回"都锁在同一把文件锁里：因为新内容要参考
+ * 当前文件里其他平台的 `#ifdef` 块，两个终端同时跑（比如
+ * dev:mp-weixin + dev:mp-alipay）时才不会互相覆盖或读到写了一半的
+ * 内容。写入用临时文件 + rename，中途崩溃也不会留下截断的文件。
  *
  * @param jsonPath - pages.json 文件路径
  * @param data - 由扫描/合并流水线组装的路由数据
@@ -93,10 +98,10 @@ export async function writePagesJson(jsonPath: string, data: PagesJsonData, opti
 
     const content = mergePagesJson(existingContent, data, options)
 
-    // 与刚从磁盘读到的内容比较，绝不与进程内缓存比较：pages.json 被
-    // 外部覆写（编辑器保存、git checkout、其他工具）时，即使缓存仍
-    // 等于合并结果，也必须被检测到并重写。磁盘已经等于合并结果时，
-    // 写入会是字节相同的空操作，跳过始终安全。
+    // 和刚从磁盘读到的内容比较，不要和进程内的缓存比较：pages.json
+    // 可能被外部改写（编辑器保存、git checkout、其他工具），这时即使
+    // 缓存和合并结果相同，也必须重写。磁盘已经等于合并结果时跳过写入
+    // 永远是安全的
     if (existingContent === content) {
       debug.pages('PagesJson Not have change')
       return { updated: false, content }
@@ -112,10 +117,20 @@ export async function writePagesJson(jsonPath: string, data: PagesJsonData, opti
  *
  * @returns pages.json 对象；美化输出模式下附带预渲染的 tabBar 主体
  * 行，用于替换序列化出的占位符（见 {@link mergePagesJson}）；
- * 行为 undefined 表示没有 tabBar 或为紧凑输出
+ * 为 undefined 表示没有 tabBar 或为紧凑输出
  */
 function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, options: MergePagesJsonOptions): { pageJson: PagesConfig, tabBarBodyLines?: string[] } {
-  const { pages: oldPages, subPackages: oldSubPackages, tabBar: oldTabBar } = cjParse(existingContent || '{}') as CommentObject
+  let oldConfig: CommentObject
+  try {
+    oldConfig = cjParse(existingContent || '{}') as CommentObject
+  }
+  catch (error: any) {
+    // pages.json 手写出错（多半是编辑时少了逗号或引号）时，comment-json
+    // 抛出的原始 SyntaxError 只有位置信息、看不出是哪个文件出的问
+    // 题。带上文件外的上下文重新抛出，用户才知道去哪里修
+    throw new Error(`[vite-plugin-uni-pages] Failed to parse the existing pages.json, please fix its syntax first: ${error?.message ?? error}`, { cause: error })
+  }
+  const { pages: oldPages, subPackages: oldSubPackages, tabBar: oldTabBar } = oldConfig
 
   const { pages: _pages, subPackages: _subPackages, tabBar: _tabBar, ...pageJson } = options.globConfig || {}
 
@@ -125,8 +140,8 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
   const oldPagesArray = oldPages as unknown as CommentArray<CommentObject> | undefined
   pageJson.pages = mergePlatformItems(oldPagesArray, currentPlatform, data.pages, 'path').items as unknown as Pages
 
-  // mergePlatformItems 内部使用 Map，可能丢失 setHomePage 给出的顺序，
-  // 因此合并后需要确保首页排在最前
+  // mergePlatformItems 内部用 Map 保存条目，顺序可能和首页在前的
+  // 要求不一致，所以合并后要把首页挪到最前面
   ensureHomePageFirst(pageJson.pages as unknown as InternalPages | undefined, data.homePath)
 
   // subPackages
@@ -135,36 +150,43 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
   for (const item of data.subPackages) {
     newSubPackages.set(item.root, item)
   }
-  // 用新的元信息更新 pages.json 中已存在的子包
+  // 用新的配置更新 pages.json 中已存在的子包
   const subPackagesArray = pageJson.subPackages as unknown as CommentArray<CommentObject>
   const staleRoots: string[] = []
   for (const existing of subPackagesArray as unknown as SubPackage[]) {
     const sub = newSubPackages.get(existing.root)
     if (sub) {
+      // plugins 来自用户配置，跟着配置走：配置里有就写入，配置里删了
+      // 就清掉。是不是插件生成的要在覆盖 pages 前判断——合并结果一
+      // 律带新的生成标记，看合并后的数组永远为真。手写子包（没有
+      // 标记）的 plugins 不碰
+      const wasGenerated = hasGenerationMarker(existing.pages as unknown as CommentArray<CommentObject> | undefined)
       existing.pages = mergePlatformItems(existing.pages as unknown as CommentArray<CommentObject>, currentPlatform, sub.pages, 'path').items as unknown as Pages
-      // 保留用户配置中的 plugins 属性
       if (sub.plugins) {
         existing.plugins = sub.plugins
+      }
+      else if (wasGenerated) {
+        Reflect.deleteProperty(existing, 'plugins')
       }
       newSubPackages.delete(existing.root)
     }
     else if (hasGenerationMarker(existing.pages as unknown as CommentArray<CommentObject> | undefined)) {
-      // 本次运行扫描不到的插件生成子包（每个页面都通过 definePage(null)
-      // 退出，或目录已被删除）：当前平台在其中已无可见页面，整个 root
-      // 直接丢弃。若选择收敛而非丢弃，其他平台的条目会保持包裹，但
-      // root 本身仍会以空子包的形式进入本平台的构建产物（app.json 中
-      // 保留一个 pages 数组为空的 root）。丢弃不丢状态：每个平台每次
-      // 运行都会重新扫描并重写自己的条目，其他平台的进程会在下次写入
-      // 时把 root 加回来。手写的子包不携带生成标记，原样保留。
+      // 本次运行扫描不到、但确实是插件生成的子包（每个页面都通过
+      // definePage(null) 退出，或目录被删了）：当前平台已经看不到它
+      // 的任何页面，整个删掉。如果不删，这个 root 会以空子包的形式
+      // 进入本平台的构建产物（app.json 里留一个 pages 为空的 root，
+      // 指向不存在的目录）。删掉不丢状态：每个平台每次运行都会重新
+      // 扫描并重写自己的条目，其他平台的进程下次写入时会把它加回来。
+      // 手写的子包没有生成标记，原样保留
       staleRoots.push(existing.root)
     }
   }
-  // 丢弃上面收集的插件生成子包。倒序遍历，先删除条目的注释符号再
-  // splice，与 ensureHomePageFirst 的做法一致：这样 comment-json 会把
-  // 后续元素的注释移入腾出的槽位，邻居的 #ifdef 块因此在删除后得以
-  // 保留。`after-value:i`（条目的 `}` 与 `,` 之间的用户注释）也必须
-  // 删除——splice 只移动幸存元素的注释，不删它就会泄漏给移入该槽位
-  // 的任何条目。
+  // 删掉上面收集的插件生成子包。倒序遍历，先删除条目的注释符号再
+  // splice，和 ensureHomePageFirst 的做法一致：comment-json 会把
+  // 后面元素的注释挪到腾出来的位置上，这样邻居的 #ifdef 块在删除后
+  // 还能保留。`after-value:i`（条目的 `}` 和 `,` 之间的用户注释）也
+  // 必须删掉——splice 只挪注释、不删注释，留着它就会错误地挂到
+  // 挪过来的那个条目上
   for (let i = subPackagesArray.length - 1; i >= 0; i--) {
     const existing = subPackagesArray[i] as unknown as SubPackage
     if (!staleRoots.includes(existing.root))
@@ -190,26 +212,28 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
 
   // tabbar
   const { list, ...tabBarOthers } = data.tabBar || {}
-  // 一次没有贡献 list 条目的运行（无 tabBar，或 list 为空/缺失）同样
-  // 不拥有任何外观属性：它的配置不得抹掉拥有平台的属性（由测试锁定）
+  // 一次没有贡献任何 list 条目的运行（没有 tabBar，或 list 为空）也
+  // 不拥有任何外观属性：它的配置不能抹掉拥有这些属性的平台的取值
+  // （由测试锁定）
   const contributesProps = !!(list && list.length)
   const oldTabBarObj = oldTabBar as unknown as ({ list?: CommentArray<CommentObject> } & Partial<TabBar>) | undefined
-  // 即使本次运行没有贡献 tabBar，也针对当前平台收敛：仅由本平台拥有
-  // 的条目从 list 中退出，外来条目在其 #ifdef 块后幸存。pages.json 为
-  // 各平台共享，当前平台没有 tabBar 不得删掉其他平台已生成的整个区块。
+  // 即使本次运行没有 tabBar，也要针对当前平台清理列表：只属于本平台
+  // 的条目从 list 中退出，其他平台的条目在自己的 #ifdef 块后面继续
+  // 存活。pages.json 是各平台共享的，当前平台没有 tabBar，不代表可以
+  // 删掉其他平台已经生成的整个区块
   const tabBarMerge = mergePlatformItems(oldTabBarObj?.list, currentPlatform, list || [], 'pagePath')
   let tabBarBodyLines: string[] | undefined
 
   if (tabBarMerge.items.length === 0) {
-    // 已无任何平台拥有 tabBar 条目：区块收敛为空
+    // 已经没有任何平台拥有 tabBar 条目：整个区块清空
     pageJson.tabBar = undefined
   }
   else {
     if (isPrettyFormat(options.format)) {
-      // 美化输出可以携带按平台区分的属性变体：分叉的属性以互斥
-      // #ifdef 块下的重复键输出（uni-app 按平台剥掉注释，只留下一个
-      // 值）。comment-json 无法往返重复键，因此已有变体从原始文本中
-      // 恢复，tabBar 主体在 comment-json 序列化之外渲染
+      // 美化输出能带上按平台区分的属性：同一个属性名写多次、各自
+      // 包在互斥的 #ifdef 里（uni-app 按平台剥掉注释后每个平台只剩
+      // 一个值）。comment-json 解不出重复键，所以已有的属性变体从
+      // 原始文本里重新提取，tabBar 主体也绕开 comment-json 手工渲染
       const mergedProps = mergeTabBarProps(existingContent, tabBarOthers, contributesProps, currentPlatform, tabBarMerge.platformUnion)
       tabBarBodyLines = [
         ...renderTabBarPropLines(mergedProps, tabBarMerge.platformUnion, options.format),
@@ -218,17 +242,18 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
       pageJson.tabBar = TAB_BAR_PLACEHOLDER as unknown as TabBar
     }
     else {
-      // 紧凑输出无法携带注释，按平台的属性无从谈起：
-      // 保持历史上的最后写入者胜出语义
+      // 紧凑输出放不下注释，按平台区分属性无从谈起：
+      // 保持历史上的"谁最后写谁说了算"
       const { list: _oldList, ...oldTabBarOthers } = oldTabBarObj || {}
       pageJson.tabBar = {
         ...(contributesProps ? tabBarOthers : oldTabBarOthers),
         list: tabBarMerge.items,
       }
     }
-    // tabBar 只对拥有至少一个 list 条目的平台可见。uni-app 的条件编译
-    // 会剥掉整个被包裹的属性，因此没有 tabBar 的平台根本不该有这个
-    // 区块——不包裹的话，它们的构建产物会带出 `tabBar: { "list": [] }`
+    // tabBar 只对拥有至少一个 list 条目的平台可见。uni-app 的条件
+    // 编译会把整个被包裹的属性剥掉，所以没有 tabBar 的平台本来就不
+    // 该有这个区块——不包 #ifdef 的话，它们的构建产物会带上
+    // `tabBar: { "list": [] }` 这样的空壳
     const tabBarPlatformStr = tabBarMerge.owningPlatforms.join(' || ')
     if (tabBarPlatformStr !== tabBarMerge.platformUnion.join(' || ')) {
       const commentPageJson = pageJson as unknown as CommentObject
@@ -241,32 +266,33 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
 }
 
 /**
- * 把所有首页条目移到最前，同时保持注释挂载完整
+ * 把所有首页条目移到最前面，注释跟着条目一起移动
  *
- * 每个平台可以在 #ifdef 块后声明自己的首页，未包裹的条目对所有平台
- * 可见。一个平台的首页因此必须排在该平台可见的所有条目之前；把全部
- * 首页变体放到所有非首页条目之前（稳定分区）一次性满足所有平台的
- * 视图。只移动当前平台的首页不够：一旦它的首页已位于下标 0，另一个
- * 平台的首页仍可能滞留在该平台可见的某个非首页条目之后。
+ * 每个平台可以在自己的 #ifdef 块里声明自己的首页，没被包裹的条目
+ * 所有平台都能看到。所以一个平台的首页必须排在它可见的所有条目
+ * 之前。解决办法很简单：把所有平台的首页都放到所有非首页条目的
+ * 前面（各组内部顺序不变），一次满足所有平台。
  *
- * 该保证覆盖携带内部 `type` 标记的条目（每个扫描条目都携带），外加
- * 通过下方兜底覆盖 homePath 解析结果的每个未标记变体；标记本身从不
- * 在合并后的对象上恢复，因此兜底每次运行都从 homePath 重新推导首页
- * 状态。
+ * 只移动当前平台的首页是不够的：就算它已经在第 0 位，另一个平台的
+ * 首页可能还排在它自己可见的某个非首页条目后面。
+ *
+ * 判断哪些条目是首页：先看条目自带的 `type: 'home'` 标记（扫描出来
+ * 的条目都带），再看 homePath 路径兜底（手写条目不带标记）。标记在
+ * 合并时不会保留下来，所以每次运行都要重新判断一遍。
  */
 function ensureHomePageFirst(pagesArray: InternalPages | undefined, homePath: string | undefined): void {
   if (!pagesArray || pagesArray.length === 0)
     return
 
   // 从 pages.json 合并而来的条目可能缺少内部 `type` 标记（手写条目
-  // 从不携带它），当 homePath 的任何变体都不携带首页标记时，退回到
-  // 从扫描元信息解析出的路径。扫描条目总携带标记，因此仅凭
-  // `type === 'home'` 就能收集到每个平台的首页变体。
+  // 从不携带它）。当 homePath 的任何变体都不带首页标记时，退回到按
+  // 路径匹配。扫描出的条目总带标记，所以光靠 `type === 'home'` 就能
+  // 收集到每个平台的首页变体
   const isHome = pagesArray.map((page: InternalPageItem) => page.type === 'home')
   if (homePath && !pagesArray.some((page: InternalPageItem) => page.path === homePath && page.type === 'home')) {
-    // 标记首页路径的每个变体，而不只是第一个：每个平台的变体可能位于
-    // 各自的 #ifdef 块后，只标记第一个会让当前平台的变体滞留在可见的
-    // 非首页条目之后，直到后续某次自愈写入
+    // 首页路径的每个变体都要标记，不能只标第一个：各平台的变体在
+    // 各自的 #ifdef 块里，只标第一个的话，其他平台的变体会一直卡在
+    // 非首页条目后面，要等之后的写入才碰巧修复
     pagesArray.forEach((page: InternalPageItem, index: number) => {
       if (page.path === homePath)
         isHome[index] = true
@@ -277,22 +303,21 @@ function ensureHomePageFirst(pagesArray: InternalPages | undefined, homePath: st
   if (homeCount === 0)
     return
 
-  // 已分区——每个首页变体都排在非首页条目之前：无需移动，
-  // 保持重跑间的字节级输出稳定
+  // 首页已经都在前面了：不用移动，保持输出字节不变
   if (isHome.slice(0, homeCount).every(Boolean))
     return
 
   const commentArray = pagesArray as unknown as CommentArray<CommentObject>
   const length = pagesArray.length
 
-  // `CommentArray#splice` 只会重排幸存元素的注释：被移除槽位的注释
-  // 会滞留到移入的元素上，错置 `#ifdef`/`#endif` 块与生成标记。先
-  // 快照每个条目的注释令牌并删除符号，让重排按普通数组语义运行，
-  // 再有意识地重新挂载令牌。`after-value` 无需处理：`pagesArray` 是
-  // mergePlatformItems 刚构建的输出，其注释令牌只有 `before`/`after`
-  // 条目（#ifdef 块、生成标记与原样透传的 #ifndef 包裹层）；用户的
-  // after-value 注释在更早的阶段已被丢弃，到不了这个函数（已实测
-  // 验证）。
+  // `CommentArray#splice` 移动元素时会"聪明地"重排注释，但它的规则
+  // 会把注释挂到错误的条目上（#ifdef/#endif 块和生成标记错位）。
+  // 所以先把每个条目的注释记下来、删掉符号，让重排像普通数组一样
+  // 干净地执行，最后再把注释按新位置挂回去。`after-value`（值后面
+  // 同一行的注释）不用管：进到这个函数的数组是 mergePlatformItems
+  // 刚构建的，只带 before/after 注释（#ifdef 块、生成标记、原样保留
+  // 的 #ifndef 包裹层）；用户的 after-value 注释在更早的阶段已经被
+  // 丢掉了，走不到这里（实测验证过）
   const beforeTokens: Array<CommentToken[]> = []
   const afterTokens: Array<CommentToken[]> = []
   for (let i = 0; i < length; i++) {
@@ -302,12 +327,12 @@ function ensureHomePageFirst(pagesArray: InternalPages | undefined, homePath: st
     Reflect.deleteProperty(commentArray, Symbol.for(`after:${i}`) as CommentSymbol)
   }
 
-  // before:0 把生成标记与第一个条目自己的注释（如它的 #ifdef 块）
-  // 混在一起：标记保持在数组顶部，条目令牌随条目移动
+  // before:0 里混着生成标记和第一个条目自己的注释（比如它的
+  // #ifdef 块）：标记留在数组顶部，条目自己的注释跟着条目走
   const markerTokens = beforeTokens[0].filter(isGenerationMarker)
   beforeTokens[0] = beforeTokens[0].filter(token => !isGenerationMarker(token))
 
-  // 稳定分区：首页变体在前，其余在后，各自保持原有相对顺序
+  // 稳定分区：首页在前、其余在后，两组内部都保持原来的相对顺序
   const order: number[] = []
   for (let i = 0; i < length; i++) {
     if (isHome[i])
@@ -344,23 +369,21 @@ function hasGenerationMarker(src: CommentArray<CommentObject> | undefined): bool
 }
 
 /**
- * 判断该格式是否渲染可携带注释的多行输出（也因此能携带按平台的
- * `#ifdef` 块）。`indent: 0` 或空字符串会让 comment-json 退化为单行
- * 输出，这里与它自身的行为保持一致。
+ * 判断输出是不是带注释的多行格式（只有多行才放得下按平台区分的
+ * `#ifdef` 块）。`indent: 0` 或空字符串会让 comment-json 输出成
+ * 单行，这里和它的行为保持一致。
  */
 function isPrettyFormat(format: PagesJsonFormatOptions | undefined): boolean {
   return !(format?.minify ?? false) && !!(format?.indent ?? 2)
 }
 
 /**
- * 不触碰文件系统，计算合并后的 pages.json 内容字符串
+ * 不碰文件系统，只做计算：把路由数据合并进现有 pages.json 文本
+ * （多平台 `#ifdef` 块、首页重排、生成标记、过期子包清理）并序列化
+ * 成字符串。文件锁、变更检测和原子写入都在 {@link writePagesJson}
+ * 里；测试直接用字符串检查这个函数。
  *
- * 纯读-改-写核心：把路由数据合并进现有 pages.json 文本（多平台
- * `#ifdef` 块、首页重排、生成标记、子包收敛）并序列化。文件锁、
- * 变更检测与原子写入留在 {@link writePagesJson}；测试直接用纯字符串
- * 检验这个接口。
- *
- * @param existingContent - 当前 pages.json 文本，缺失时为空字符串
+ * @param existingContent - 当前 pages.json 文本，没有时传空字符串
  * @param data - 由扫描/合并流水线组装的路由数据
  * @param options - 平台、用户配置与序列化格式
  * @returns 序列化后的 pages.json 内容
@@ -374,8 +397,9 @@ export function mergePagesJson(existingContent: string, data: PagesJsonData, opt
   let content = cjStringify(pageJson, null, minify ? undefined : indent)
 
   if (tabBarBodyLines) {
-    // 把渲染好的 tabBar 主体拼接到占位符值上。使用函数形式的替换器：
-    // 主体可能包含 `$` 序列，字符串替换器会把它们解释为替换模式
+    // 把手工渲染的 tabBar 正文替换掉占位符。替换器必须用函数形式：
+    // 正文里可能有 `$` 字符，字符串形式的替换器会把它们当成特殊
+    // 替换模式处理
     const unit = typeof indent === 'number' ? ' '.repeat(indent) : indent
     content = content.replace(
       `"tabBar": ${JSON.stringify(TAB_BAR_PLACEHOLDER)}`,
@@ -405,21 +429,21 @@ function lineComment(value: string): CommentLineToken {
   }
 }
 
-/** 从现有 pages.json 文本恢复出的一条 tabBar 原始属性 */
+/** 从现有 pages.json 文本里提取出来的一条 tabBar 属性 */
 interface RawTabBarProp {
   key: string
-  /** 保留内部注释的 comment-json 值；用于比较与重新序列化 */
+  /** 属性值（comment-json 解析结果，保留内部注释），用于比较和重新序列化 */
   value: unknown
-  /** 首个条件编译指令载荷（`#ifdef H5 || MP-WEIXIN` / `#ifndef MP-ALIPAY`），未包裹时为 null */
+  /** 紧挨着的第一条条件编译指令（如 `#ifdef H5 || MP-WEIXIN`、`#ifndef MP-ALIPAY`），没有包裹时为 null */
   condition: string | null
-  /** 键之前 / 值之后的注释载荷，用于 #ifndef 的原样重发 */
+  /** 键前面 / 值后面的注释内容，重新原样输出 #ifndef 属性时要用 */
   beforeComments: string[]
   afterComments: string[]
 }
 
 /**
- * 跳过空白与注释；行注释/块注释的载荷（标记之间的文本，去除首尾
- * 空白）在提供 `comments` 时会被收集进去
+ * 跳过空白和注释往前走。遇到行注释或块注释时，注释里的文字（去掉
+ * 首尾空白）会收集到 `comments` 里（如果传了）
  */
 function skipJsoncFiller(content: string, index: number, comments?: string[]): number {
   let i = index
@@ -497,7 +521,7 @@ function scanJsonValue(content: string, start: number): number {
     }
     return content.length
   }
-  // 裸字面量（数字 / true / false / null）：到下一个结构性分隔符结束
+  // 没带引号的字面量（数字 / true / false / null）：读到下一个分隔符为止
   let i = start
   while (i < content.length && !',{}[] \t\r\n"'.includes(content[i]))
     i++
@@ -516,13 +540,14 @@ function readJsonStringToken(content: string, start: number): [string, number] |
 }
 
 /**
- * 文本方式扫描 pages.json 内容中的 tabBar 对象，收集每个顶层属性及
- * 其条件编译包裹层。
+ * 按文本扫描 pages.json 里的 tabBar 对象，把每个顶层属性连同它的
+ * 条件编译包裹一起收集起来。
  *
- * comment-json 在解析时按普通 JS 对象语义折叠重复键，因此按平台区分
- * 的属性变体——互斥 `#ifdef` 块下的重复键——必须在解析破坏它们之前
- * 从原始文本恢复。不存在对象形态的 tabBar 或文档结构无法理解时返回
- * undefined。
+ * 为什么要按文本扫：comment-json 解析时会按普通 JS 对象的规则，
+ * 同一个键出现多次只留最后一个，而"同一个属性按平台写多个值"靠的
+ * 就是重复键。
+ * 这些信息一旦解析就丢了，所以必须从原始文本里捞回来。
+ * tabBar 不是对象、或文件结构看不懂时返回 undefined。
  */
 function extractTabBarProps(content: string): Map<string, RawTabBarProp[]> | undefined {
   let i = skipJsoncFiller(content, 0)
@@ -559,8 +584,27 @@ function extractTabBarProps(content: string): Map<string, RawTabBarProp[]> | und
 function parseTabBarProps(content: string, interiorStart: number): Map<string, RawTabBarProp[]> | undefined {
   const props = new Map<string, RawTabBarProp[]>()
   let beforeComments: string[] = []
-  let lastRegistered: RawTabBarProp | undefined
   let i = skipJsoncFiller(content, interiorStart, beforeComments)
+  // 条件栈：手写的条件块可以一次包住好几个属性（#ifdef 后面跟几行
+  // 属性、最后才 #endif）。栈顶就是当前属性待在哪个条件里。旧代码只
+  // 看每个属性自己紧挨着的注释，块里第二个之后的属性全部当成没有条
+  // 件处理，被别的平台顶掉或漏出去。每个处于条件中的属性注册时都
+  // 带上完整的包裹（开头指令 + 结尾 #endif），互相独立：渲染按键分
+  // 组、按平台排序会把属性的顺序打乱，谁都不依赖邻居，输出才不会
+  // 出现没闭合的 #ifndef
+  const openConditions: string[] = []
+  const applyCommentsToStack = (comments: string[]): void => {
+    for (const comment of comments) {
+      const trimmed = comment.trim()
+      if (trimmed.startsWith('#endif')) {
+        openConditions.pop()
+      }
+      else if (trimmed.startsWith('#ifdef') || trimmed.startsWith('#ifndef')) {
+        openConditions.push(trimmed)
+      }
+    }
+  }
+  applyCommentsToStack(beforeComments)
 
   while (true) {
     if (i >= content.length)
@@ -570,15 +614,12 @@ function parseTabBarProps(content: string, interiorStart: number): Map<string, R
     if (content[i] === ',') {
       const postComma: string[] = []
       i = skipJsoncFiller(content, i + 1, postComma)
-      // 包裹层的 #endif 行输出在值的逗号之后（comment-json 的风格），
-      // 因此前导的 #endif 指令串闭合的是刚注册的属性；其余注释归入
-      // 下一个属性的前置注释
-      let split = 0
-      while (split < postComma.length && postComma[split].startsWith('#endif'))
-        split++
-      if (lastRegistered)
-        lastRegistered.afterComments.push(...postComma.slice(0, split))
-      beforeComments = postComma.slice(split)
+      // 逗号后面的注释在文本上分属两处：开头的 #endif 关掉上一个属性
+      // 待着的条件（comment-json 把 #endif 输出在值的逗号之后），剩下
+      // 的跟着下一个属性走。#endif 不再挂到上一个属性身上：需要闭合
+      // 符的 #ifndef 属性在注册时已经自带了
+      applyCommentsToStack(postComma)
+      beforeComments = postComma
       continue
     }
     if (content[i] !== '"')
@@ -599,41 +640,53 @@ function parseTabBarProps(content: string, interiorStart: number): Map<string, R
     if (content[i] !== ',' && content[i] !== '}')
       return undefined
 
+    // 条件在应用值后面的注释之前读：那些注释（可能有关闭符或新的
+    // 指令）在文本上位于这个属性之后，属于下一个属性的世界
+    const condition = openConditions[openConditions.length - 1] ?? null
+    applyCommentsToStack(afterComments)
+
     try {
       const value = cjParse(rawValue)
-      // 跳过游离的 #endif 行（手写包裹层的闭合符可能出现在下一个属性
-      // 的开启符之前）；只有 #ifdef/#ifndef 会开启包裹层
-      const condition = beforeComments.find(c => c.startsWith('#ifdef') || c.startsWith('#ifndef')) ?? null
-      const raw: RawTabBarProp = { key, value, condition, beforeComments: [...beforeComments], afterComments }
+      let storedBefore = [...beforeComments]
+      let storedAfter = afterComments
+      if (condition?.startsWith('#ifndef')) {
+        // #ifndef 属性自带完整包裹：开头指令不在自己的注释里（条件
+        // 块里的后续属性）就补一份；结尾统一用合成的 #endif，真实出
+        // 现在值后面的关闭符已经滤掉
+        if (storedBefore[0]?.trim() !== condition)
+          storedBefore = [condition, ...storedBefore]
+        storedAfter = ['#endif', ...afterComments.filter(c => !c.trim().startsWith('#endif'))]
+      }
+      const raw: RawTabBarProp = { key, value, condition, beforeComments: storedBefore, afterComments: storedAfter }
       const variants = props.get(key) || []
       variants.push(raw)
       props.set(key, variants)
-      lastRegistered = raw
     }
     catch {
-      // 无法解析的值：丢弃该变体，本次运行会用自己的配置重写该属性
+      // 值解析不出来：丢弃这条，本次运行会用自己的配置重写这个属性
     }
   }
 }
 
-/** 一条已归属平台的 tabBar 属性变体（`list` 之外的一切） */
+/** 一条已经分好平台的 tabBar 属性变体（`list` 以外的所有属性） */
 interface TabBarPropVariant {
-  /** 归一化的比较形态：剥离注释后的值的 JSON.stringify */
+  /** 用来比较的字符串形式：值去掉注释后 JSON.stringify */
   valueStr: string
-  /** 保留内部注释的 comment-json 值，用于重新序列化 */
+  /** 原始的 comment-json 值（保留内部注释），重新序列化时用 */
   value: unknown
-  /** 拥有该变体的平台；null 表示原样透传的手写 `#ifndef` */
+  /** 拥有这个值的平台；null 表示这是手写的 `#ifndef` 属性，原样保留 */
   platforms: string[] | null
-  /** 原样透传重发所需的包裹层注释载荷 */
+  /** 原样保留时需要的包裹注释 */
   passthrough: { before: string[], after: string[] } | null
 }
 
 /**
- * 跨平台合并 tabBar 外观属性（`list` 之外的一切），按属性复刻
- * {@link mergePlatformItems} 的归属语义：`#ifdef` 包裹的属性保留其
- * 列出的平台；未包裹的属性归属平台全集（当前平台之外）的所有平台
- * （本次运行重写自己的）；失去最后一个平台的变体收敛消失。手写的
- * `#ifndef` 属性原样透传且豁免收敛，与数组侧的策略一致。
+ * 跨平台合并 tabBar 的外观属性（`list` 以外的所有属性）。
+ * 规则和数组的 {@link mergePlatformItems} 一致：
+ * - 包在 #ifdef 里的属性，属于注释里列出的那些平台
+ * - 没包裹的属性，属于除当前平台外的所有平台（当前平台会写自己的）
+ * - 一个值最后一个平台都不剩了，就删掉它
+ * - 手写的 #ifndef 属性原样保留、永不删除，和数组侧的处理一致
  */
 function mergeTabBarProps(
   existingContent: string,
@@ -679,9 +732,9 @@ function mergeTabBarProps(
       if (valueStr === undefined)
         continue
       const list = merged.get(key) || []
-      // 内容相等的 #ifndef 透传优先：当前平台不是被否定的平台时，
-      // 透传已覆盖该属性；当前平台正是被否定的平台时，隐藏该属性
-      // 尊重了手写的排除语义。两种情况下都不该再写入单独的变体
+      // 值相同的 #ifndef 属性优先：如果当前平台没被 #ifndef 排除，
+      // 那条手写属性本来就已经覆盖了它；如果当前平台正好被排除，
+      // 尊重手写的隐藏规则。两种情况都不该再单独写一份
       if (list.some(v => v.platforms === null && v.valueStr === valueStr))
         continue
       const equal = list.find((v): v is TabBarPropVariant & { platforms: string[] } => v.platforms !== null && v.valueStr === valueStr)
@@ -695,24 +748,38 @@ function mergeTabBarProps(
     }
   }
 
+  // 和 mergePlatformItems 一样按平台排好序再输出：当前平台原来的属性
+  // 变体是从文件里读出来的，读进来时会被丢掉、再由本次运行补到列表
+  // 末尾。两个平台轮流跑时，顺序就会来回跳，文件每次都有无意义的
+  // 变动。排好序之后不管谁先谁后，写出来的都一样。#ifndef 属性
+  // （platforms 为 null）排最前，这样文档承诺的"当前平台自己的值
+  // 排在后面、优先生效"在与 #ifndef 重复键的场景下依然成立
+  for (const variants of merged.values()) {
+    variants.sort((a, b) => {
+      const keyA = a.platforms === null ? '' : a.platforms.join(' || ')
+      const keyB = b.platforms === null ? '' : b.platforms.join(' || ')
+      return keyA < keyB ? -1 : keyA > keyB ? 1 : 0
+    })
+  }
+
   return merged
 }
 
-/** 最终序列化的单级缩进单位 */
+/** 一层缩进是多少（空格数或字符串） */
 function indentUnitOf(format: PagesJsonFormatOptions | undefined): string {
   const indent = format?.indent ?? 2
   return typeof indent === 'number' ? ' '.repeat(indent) : indent
 }
 
-/** 缩进除首行外的每一行——多行值的内联续行 */
+/** 给除第一行以外的每一行加缩进（用于多行值拼进属性行的场景） */
 function indentContinuation(text: string, extra: string): string {
   return text.split('\n').map((line, index) => index === 0 ? line : extra + line).join('\n')
 }
 
 /**
- * 把 tabBar 外观属性渲染为完整缩进的输出行。覆盖平台全集的变体不
- * 包裹输出；其余每个变体获得自己的 `#ifdef` 块作为重复键，uni-app
- * 的按平台注释剥离会将其解析为单个值。
+ * 把 tabBar 外观属性渲染成带缩进的输出行。所有平台都适用的值直接
+ * 输出；其余每个值都写在自己的 `#ifdef` 块里（同一个键出现多次），
+ * uni-app 按平台剥掉注释后，每个平台只会看到一个值。
  */
 function renderTabBarPropLines(merged: Map<string, TabBarPropVariant[]>, platformUnion: string[], format: PagesJsonFormatOptions | undefined): string[] {
   const unit = indentUnitOf(format)
@@ -749,7 +816,7 @@ function renderTabBarPropLines(merged: Map<string, TabBarPropVariant[]>, platfor
   return lines
 }
 
-/** 把合并后的 tabBar list 渲染为完整缩进的输出行（始终是 tabBar 的最后一个属性） */
+/** 把合并后的 tabBar list 渲染成带缩进的输出行（list 总是 tabBar 的最后一个属性） */
 function renderTabBarListLines(list: CommentArray<CommentObject>, format: PagesJsonFormatOptions | undefined): string[] {
   const unit = indentUnitOf(format)
   const text = cjStringify(list, null, format?.indent ?? 2)
@@ -760,18 +827,19 @@ function renderTabBarListLines(list: CommentArray<CommentObject>, format: PagesJ
   })
 }
 
-/** 解析 `||` 分隔的平台列表，去掉当前平台并把其余排序 */
+/** 把 `||` 分隔的平台列表拆开，去掉当前平台，剩下的排好序 */
 function platformsExcluding(platformList: string, currentPlatform: string): string[] {
   return platformList.split('||').map(p => p.trim()).filter(p => p !== currentPlatform).sort()
 }
 
 /**
- * 条目可能携带内部 `type` 标记（'home' | 'page'），但它不得影响相等
- * 性：从 pages.json 合并而来的条目可能缺少该标记（手写条目从不携带
- * 它），直接用 JSON.stringify 比较会把同一页面当成两个不同条目，在
- * 跨平台运行中产出重复路由
+ * 把条目转成字符串用于比较，比较前要先把内部的 `type` 标记
+ * （'home' | 'page'）拿掉。
+ *
+ * 从 pages.json 读回来的条目可能没有这个标记（手写条目从不带它），
+ * 直接 JSON.stringify 会把同一个页面当成两个不同的条目，多平台
+ * 运行时就会生成重复的路由
  * （见 https://github.com/uni-helper/vite-plugin-uni-pages/issues/283）。
- * 序列化前先剥离 `type` 归一化两侧。
  */
 function stringifyForCompare<T extends object>(val: T): string {
   if ('type' in val) {
@@ -782,13 +850,14 @@ function stringifyForCompare<T extends object>(val: T): string {
 }
 
 /**
- * 两个内容相等的条目是否在首页状态上一致
+ * 两个内容相同的条目，首页状态是否一致？
  *
- * `type` 标记不参与内容比较（见 stringifyForCompare），无标记的条目
- * 仍能与扫描到的对应条目合并。但当两侧都显式携带标记且不一致
- * （'home' 与 'page'）时，它们描述的是各平台不同的首页，必须保持为
- * #ifdef 块后的独立条目，不能折叠进先写入的一方——折叠正是首页切换
- * 后陈旧首页标记残留、平台作用域首页声明被静默丢弃的原因。
+ * `type` 标记不参与内容比较（见 stringifyForCompare），没有标记的
+ * 条目也能和扫描到的条目合并。但如果两边都明确带着标记、而且一个
+ * 是 'home' 一个是 'page'，说明这是两个平台各自声明的不同首页，
+ * 必须作为两个条目待在各自的 #ifdef 块里，不能合并成一条——之前
+ * 的合并正是"切换首页后旧首页标记残留、某个平台的首页声明被悄悄
+ * 丢掉"这两个 bug 的根源。
  */
 function homeStatusCompatible(a: object, b: object): boolean {
   const typeA = (a as InternalPageItem).type
@@ -803,24 +872,24 @@ interface MultiPlatformItem<T extends object> {
   platforms: string[]
   platformStr: string
   /**
-   * 手写 `#ifndef` 块的原样透传载荷：插件的平台全集模型表达不了
-   * 否定式可见性，因此该条目以原始前导注释（去掉生成标记，数组
-   * 会重新生成它）加上合成的 `#endif` 闭合符重新输出——comment-json
-   * 会把数组中间的闭合符（输出在值的逗号之后）挂到下一个条目的
-   * 前置注释上，捕获到的闭合符无法可靠定位。该块解释为只包裹
-   * 本条目。常规条目为 undefined。
+   * 手写 `#ifndef` 块原样保留所需的注释。插件只会记录"这个条目属于
+   * 哪些平台"这种正向列表，表达不了"除了某平台之外"这种否定条件，
+   * 所以此类条目按原样输出：保留它前面的注释（生成标记除外，数组
+   * 会重新生成标记），#endif 闭合符在输出时补一个。这个块只包裹
+   * 它紧跟的那一条。普通条目没有这个字段。
    */
   passthrough?: { before: CommentToken[], after: CommentToken[] }
 }
 
 /**
- * 从 before:0 的生成标记读取上一次运行记录的平台，去掉当前平台
+ * 从 before:0 的生成标记里读出上一次运行记录了哪些平台，
+ * 去掉当前平台后返回
  */
 function extractLastPlatforms(src: CommentArray<CommentObject>, currentPlatform: string): string[] {
   let lastPlatforms: string[] = []
   for (const comment of (src[Symbol.for('before:0') as CommentSymbol] || [])) {
-    // comment-json v5 在源文本包含空行时输出 BlankLine 令牌（不带
-    // `value`），例如手工格式化的 pages.json 文件
+    // comment-json v5 遇到源文本里的空行会给出没有 `value` 的
+    // BlankLine 令牌，比如手工整理过格式的 pages.json
     if (comment.type === 'BlankLine')
       continue
 
@@ -833,40 +902,33 @@ function extractLastPlatforms(src: CommentArray<CommentObject>, currentPlatform:
 }
 
 /**
- * 计算各合并变体记录的全部平台的有序并集
+ * 把所有条目记录的平台合在一起，算出"平台全集"
  *
- * 该并集是文件级的平台集合：它写入生成标记，并决定哪些变体可以不带
- * `#ifdef` 块输出。未包裹的条目在 uni-app 条件编译下对所有平台可见，
- * 因此只有覆盖整个并集的变体才能裸露输出。
+ * 平台全集会写进生成标记，也决定哪些条目可以不加 #ifdef 直接输出：
+ * 没被包裹的条目在 uni-app 条件编译下所有平台都看得见，所以只有
+ * 覆盖了全部平台的条目才能"裸着"输出。
  *
- * 当前平台始终加入并集，即使本次运行贡献零条目——例如主包页面只在
- * H5 存在，而 MP-WEIXIN 运行把每个页面都通过 definePage(null) 退出。
- * 只从幸存条目推导并集的话，它会停留在 'H5'，仅 H5 的变体看起来
- * 覆盖了整个并集而被裸露输出，泄漏进本平台的条件编译视图。（同场景
- * 下的子包由 mergeIntoPagesJson 整个丢弃，因为其构建产物没有目录
- * 对应空的 root。）之前以最常用组合为默认值的做法有同一类缺陷：
- * 它可能解析出单平台组合（主导的平台专属页面或使用并列），把该
- * 平台的变体裸露输出，作为重复路由泄漏进其他平台的视图。这个种子
- * 同样保护 tabBar 属性的包裹层：没有它，零 tabBar 的运行会看到
- * 拥有平台 == 并集，把外来拥有的 tabBar 裸露输出，恰好重新引入了
- * 包裹层要防止的泄漏
+ * 当前平台一定在全集里，哪怕这次运行一个条目都没贡献——比如页面
+ * 只在 H5 存在，而 MP-WEIXIN 运行把每个页面都 definePage(null) 掉了。
+ * 如果只从剩下的条目推全集，全集就只有 'H5'，H5 专属条目看起来
+ * "覆盖了全集"，会不加包裹地输出，泄漏进微信的构建产物。老版本按
+ * "最常用平台组合当默认值"的做法也有同样的问题：可能算出单平台
+ * 组合，把那个平台的条目裸着输出，变成其他平台里的重复路由。这个
+ * 全集同样管着 tabBar 属性的包裹：没有它，一次没有 tabBar 的运行
+ * 会以为"拥有平台 == 全集"，把别的平台的 tabBar 裸着输出出去。
  *
- * 上一次运行生成标记记录的平台也加入并集。当某平台的全部包裹变体
- * 都被消费后，外来成员身份只能存活在标记里：拥有平台重新运行时，
- * 它自己的 #ifdef 变体被新扫描替换、从合并 map 中退出，仅靠条目
- * 推导的成员身份会震荡——外来运行后包裹，拥有运行后又裸露。吸收
- * 标记让并集在运行间单调；陈旧成员只会带来多余的包裹，从不会泄漏。
+ * 上一次运行记在标记里的平台也进全集。否则当某平台的条目都被
+ * 重新扫描替换后，它"来过"这件事只记在标记里：只看条目推全集，
+ * 全集会一会儿大一会儿小，条目一会儿包一会儿裸。把标记也算进来，
+ * 全集就只增不减；多算的平台最多带来多余的包裹，不会泄漏。
  *
- * 单调性的另一面：永久退役的平台（其 dev 终端再也不会运行）会一直
- * 留在标记里，让每个分叉条目保持包裹。这无害但永久——不要手工编辑
- * 标记行来清理；直接删除生成的 pages.json，让下次运行从头重新生成。
+ * 只增不减的代价：彻底不用的平台会一直留在标记里。这无害，但别
+ * 手工去改标记行——想清理就删掉整个生成的 pages.json，下次运行会
+ * 从头生成。
  */
 /**
- * 收集各合并变体记录的全部平台
- *
- * {@link resolvePlatformUnion} 的无种子版本：并集种子（当前平台、
- * 标记平台）正是那个并集与这个集合的差异，这个集合同时也是区块的
- * 拥有平台集
+ * 收集所有条目记录过的平台（不算当前平台和标记里记的平台），这个
+ * 集合同时也是"拥有至少一个条目"的平台集合
  */
 function collectVariantPlatforms<T extends object>(mergedMap: Map<string, MultiPlatformItem<T>[]>): Set<string> {
   const platforms = new Set<string>()
@@ -884,31 +946,34 @@ function resolvePlatformUnion<T extends object>(mergedMap: Map<string, MultiPlat
   return [...union].sort()
 }
 
-/** {@link mergePlatformItems} 的结果：合并后的条目及其隐含的平台集合 */
+/** {@link mergePlatformItems} 的返回结果：合并后的条目和相关的平台集合 */
 interface MergedPlatformItems {
-  /** 带 #ifdef 块与生成标记的合并配置条目 */
+  /** 合并后的条目（带 #ifdef 块和生成标记） */
   items: CommentArray<CommentObject>
-  /** 有序平台全集：当前平台、标记记录的上次平台与所有幸存变体的平台 */
+  /** 平台全集：当前平台、标记里记的上次平台、所有条目的平台，排好序 */
   platformUnion: string[]
   /**
-   * 拥有至少一个幸存变体的平台的有序并集。为整个区块限定可见性的
-   * 调用方（如 tabBar 属性）只对这批平台展示；在这里推导归属让决策
-   * 基于结构化数据，而不必重新解码输出的 `#ifdef` 注释。
+   * 至少还拥有一个条目的平台。tabBar 这种"整块按平台显示隐藏"的
+   * 场景只需要对这些平台展示；在这里直接算好，调用方不用回头去
+   * 解析输出里的 #ifdef 注释。
    */
   owningPlatforms: string[]
 }
 
 /**
- * 合并多平台页面配置条目
- * 处理条件编译注释（#ifdef / #ifndef / #endif），把不同平台的配置条目合并进一个数组。
- * 相同的配置条目自动合并平台标识，不同的配置条目保留条件编译注释。
- * 手写的 `#ifndef` 块原样透传：否定式条件无法表达为正向平台列表，
- * 因此条目保留原始包裹层，平台成员身份永不增减、也永不收敛。
+ * 合并多平台的配置条目。
  *
- * @param source - 现有配置条目数组（来自 pages.json）
+ * 处理条件编译注释（#ifdef / #ifndef / #endif），把 pages.json 里
+ * 已有的条目和本次扫描的条目合并成一个数组：
+ * - 内容相同的条目自动合并，平台标识叠在一起
+ * - 内容不同的条目各写各的 #ifdef 块
+ * - 手写的 `#ifndef` 块原样保留：否定条件翻译不成正向平台列表，
+ *   所以条目连同原始包裹一起输出，永不修改、也永不清理
+ *
+ * @param source - 现有条目数组（来自 pages.json）
  * @param currentPlatform - 当前平台标识（如 H5、MP-WEIXIN）
  * @param items - 新配置条目数组
- * @param uniqueKeyName - 用于识别配置条目唯一性的字段名（如 'path' 或 'pagePath'）
+ * @param uniqueKeyName - 用于识别条目唯一性的字段名（如 'path' 或 'pagePath'）
  * @returns 带 #ifdef 块的合并条目，以及平台全集与拥有平台
  */
 function mergePlatformItems<T extends object = Record<string, unknown>>(source: CommentArray<CommentObject> | undefined, currentPlatform: string, items: T[], uniqueKeyName: keyof ExcludeIndexSignature<T>): MergedPlatformItems {
@@ -918,7 +983,7 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
   // 1. 从生成标记读取上一次运行记录的平台
   const lastPlatforms = extractLastPlatforms(src, currentPlatform)
 
-  // 2. 遍历源数组，逐个判断元素，再以 uniqueKey 的元素值为键加入新的 mergedMap
+  // 2. 遍历现有数组，逐个判断，以 uniqueKey 的值为键放进 mergedMap
   const mergedMap = new Map<string, MultiPlatformItem<T>[]>()
 
   for (let i = 0; i < src.length; i++) {
@@ -929,20 +994,18 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
       continue
     }
 
-    // 检查是否存在条件编译注释
+    // 检查条目前面有没有条件编译注释
     const beforeComments = src[Symbol.for(`before:${i}`) as CommentSymbol]
-    // BlankLine 令牌不带 `value`，匹配前必须跳过。显式匹配
-    // #ifdef/#ifndef：comment-json 会把包裹层的闭合 #endif（输出在值
-    // 的逗号之后）挂到下一个条目的前置注释上，绝不能把它当成开启符
+    // BlankLine 令牌没有 `value`，先跳过再匹配。只认 #ifdef/#ifndef
+    // 开头：comment-json 会把包裹层的 #endif（输出在值的逗号后面）
+    // 挂到下一个条目前面，绝不能把它当成开启符
     const conditionalComment = beforeComments?.find((c): c is CommentLineToken => c.type !== 'BlankLine' && /^#(?:ifdef|ifndef)/.test(c.value.trim()))
 
-    // 手写的 `#ifndef` 块原样透传：否定式条件无法表达为正向平台
-    // 列表，因此条目保留原始前导注释并豁免收敛（与文档承诺的
-    // 「手写内容永不修改」一致）。插件自己从不输出 `#ifndef`，因此
-    // 每个这样的块都出自用户之手。闭合符在输出时合成；滞留在后续
-    // 条目前置注释里的游离 `#endif`（comment-json 把数组中间的闭合
-    // 符挂到下一个条目上）被上面的指令匹配器跳过，并被全新包裹层的
-    // 重建丢弃。
+    // 手写的 `#ifndef` 块原样保留："除了某平台以外"翻译不成正向
+    // 平台列表，所以条目保留原始注释、不参与清理（文档承诺过
+    // 「手写内容永不修改」）。插件自己从不输出 `#ifndef`，所以这种
+    // 块一定出自用户之手。#endif 在输出时补写；挂在后续条目前面的
+    // 游离 #endif 被上面的匹配规则跳过，重建包裹层时自然丢掉
     if (conditionalComment?.value.trim().startsWith('#ifndef')) {
       const existing = mergedMap.get(uniqueKey) || []
       existing.push({
@@ -969,11 +1032,12 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
       }
     }
 
-    // platforms 除当前平台外为空时跳过。
-    // 注意：这也会丢弃既无生成标记又无 #ifdef 块的手写条目——当它们
-    // 不在本次运行的扫描结果中时（其平台列表解析为空）。历史行为，
-    // 原样保留；需要在每次运行中幸存的手写页面应放进 pages.config.ts
-    // 的 `pages`，它会被无条件合并。
+    // 剩下的平台只有当前平台自己（或为空）时，跳过这个条目——
+    // 本次运行会写出自己的版本。
+    // 注意：没有生成标记、也没包 #ifdef 的手写条目也会在这里被丢掉
+    // （当它不在本次扫描结果里时，解析出的平台列表是空的）。这是
+    // 一直以来的行为，保持不变；想每次运行都保留的手写页面，请写进
+    // pages.config.ts 的 `pages`，它会无条件合并进来
     if (platforms.length === 0) {
       continue
     }
@@ -983,10 +1047,10 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
     mergedMap.set(uniqueKey, existing)
   }
 
-  // 3. 把新条目合并进 mergedMap
-  // 内部 `type` 标记按设计保留在扫描条目上（供后续运行中
-  // ensureHomePageFirst 的首页兜底使用）；只有相等性比较会把它归一化
-  // 掉（stringifyForCompare）
+  // 3. 把本次扫描的条目合并进 mergedMap
+  // 扫描条目上的 `type` 标记按设计保留（后面运行里 ensureHomePageFirst
+  // 找首页要用它）；只有比较两条配置相不相等时才把它拿掉
+  // （stringifyForCompare）
   for (const item of items) {
     const uniqueKey = item[uniqueKeyName] as string
 
@@ -995,7 +1059,7 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
     }
 
     if (!mergedMap.has(uniqueKey)) {
-      // 不存在时直接加入 mergedMap
+      // 还没有这个条目：直接加入
       mergedMap.set(uniqueKey, [{
         item,
         itemStr: stringifyForCompare(item),
@@ -1005,14 +1069,14 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
       continue
     }
 
-    // 已存在时检查条目是否相等
+    // 已有同键条目：看看内容是否相同
     const existing = mergedMap.get(uniqueKey)!
 
     const itemStr = stringifyForCompare(item)
-    // 优先折叠进内容相等的 `#ifndef` 透传：当前平台不是被否定的
-    // 平台时，透传已经覆盖它；当前平台正是被否定的平台时，隐藏
-    // 扫描条目尊重了手写的排除语义。无论哪种情况，单独的扫描变体
-    // 都会输出重复路由或覆盖用户的条件
+    // 内容相同的手写 #ifndef 条目优先：当前平台没被排除时，那条
+    // #ifndef 已经覆盖了它；当前平台正好被排除时，隐藏扫描条目正是
+    // 尊重手写的排除规则。两种情况下再单独写一份都会产生重复路由
+    // 或覆盖用户的条件
     if (existing.some(val => val.passthrough && val.itemStr === itemStr && homeStatusCompatible(val.item, item)))
       continue
     const equalObj = existing.find(val => !val.passthrough && val.itemStr === itemStr && homeStatusCompatible(val.item, item))
@@ -1034,19 +1098,31 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
   // 4. 遍历 mergedMap 生成结果：CommentArray<CommentObject>
   const result = new CommentArray<CommentObject>()
 
-  // 只有覆盖平台全集的变体才能不带 #ifdef 块输出：未包裹的条目对
-  // 所有平台可见，较窄的变体必须保持包裹，以保证其他平台的视图干净。
-  // resolvePlatformUnion 总是给并集播种当前平台与标记记录的上次
-  // 平台，因此零贡献的运行也会迫使外来变体保持包裹，早先运行记录的
-  // 外来成员身份也能在拥有平台重跑后幸存
+  // 输出前按平台列表把每个键的变体排好序：当前平台的变体在步骤 2
+  // 里被丢掉、步骤 3 里又补到列表末尾，两个平台轮流运行（dev:h5 和
+  // dev:mp-weixin 交替写）时，同一键的变体顺序就会来回翻转——条件
+  // 编译的结果没变，但文件每次都有无意义的变动。platformStr 由排好
+  // 序的平台列表拼成（platformsExcluding / resolvePlatformUnion 都
+  // 排过序），手写 #ifndef 条目是空串、排最前，所以不管写入顺序
+  // 怎样，输出都一样。排序是稳定的：并列时（同键两组平台列表相同，
+  // 只在手写文件里出现）保持文件里的顺序
+  for (const variants of mergedMap.values()) {
+    variants.sort((a, b) => (a.platformStr < b.platformStr ? -1 : a.platformStr > b.platformStr ? 1 : 0))
+  }
+
+  // 只有覆盖全部平台的条目才能不加 #ifdef 直接输出：没包裹的条目
+  // 所有平台都看得见，覆盖面小的条目必须包起来，免得漏进其他平台。
+  // resolvePlatformUnion 一定会把当前平台和标记里记的平台放进全集，
+  // 所以一次零贡献的运行也会逼着别人的条目保持包裹，早先运行记下
+  // 的平台身份也不会在平台重跑后丢失
   const platformUnion = resolvePlatformUnion(mergedMap, currentPlatform, lastPlatforms)
   const platformUnionStr = platformUnion.join(' || ')
 
-  // 平台拥有该区块当且仅当它拥有至少一个幸存变体；裸变体按构造覆盖
-  // 整个并集，因此变体平台集的普通并集就是拥有集
+  // 一个平台只要还有至少一个条目，就算它拥有这个区块；
+  // 把所有条目的平台直接合在一起，就得到拥有平台的集合
   const owningPlatforms = collectVariantPlatforms(mergedMap)
 
-  // 把生成标识注释加入 result 的 Symbol.for(`before:0`)
+  // 把生成标记写进 result 的 Symbol.for(`before:0`)
   result[Symbol.for('before:0') as CommentSymbol] = [lineComment(` ${GENERATION_MARKER_PREFIX} ${platformUnionStr}`)]
 
   // 按插入顺序处理元素
@@ -1054,8 +1130,8 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
     for (const { item, platformStr, passthrough } of list) {
       result.push(item as unknown as CommentObject)
 
-      // 手写 #ifndef 块：原样重发原始包裹层
-      // （存储的令牌已包含 #ifndef 与 #endif 行）
+      // 手写 #ifndef 块：把原始包裹注释原样放回去
+      // （存下的注释里已包含 #ifndef 和 #endif 行）
       if (passthrough) {
         result[Symbol.for(`before:${result.length - 1}`) as CommentSymbol] = [
           ...(result[Symbol.for(`before:${result.length - 1}`) as CommentSymbol] || []),
@@ -1066,11 +1142,11 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
         continue
       }
 
-      // 检查变体是否覆盖平台全集（两个字符串都已排序）
+      // 这个条目是否覆盖了全部平台（两个字符串都是排好序的）
       if (platformStr !== platformUnionStr) {
-        // 变体只覆盖平台的子集：包裹它，让其他平台的条件编译视图
-        // 跳过它。追加而非替换：before:0 可能已携带生成标记，
-        // 它必须保持在数组顶部
+        // 只覆盖一部分平台：包上 #ifdef，让其他平台看不见它。
+        // 注意是追加而不是覆盖：before:0 里可能已经有生成标记，
+        // 标记必须待在数组最前面
         result[Symbol.for(`before:${result.length - 1}`) as CommentSymbol] = [
           ...(result[Symbol.for(`before:${result.length - 1}`) as CommentSymbol] || []),
           lineComment(` #ifdef ${platformStr}`),

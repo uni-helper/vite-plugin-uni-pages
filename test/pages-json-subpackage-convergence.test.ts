@@ -7,21 +7,22 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { PageContext } from '../packages/core/src'
 
 /**
- * writePagesJson 中陈旧子包收敛的回归覆盖。
+ * writePagesJson 中过期子包被清掉的回归测试。
  *
  * 修复前，本次运行扫描不到的子包（每个页面都通过 definePage(null)
- * 退出，或目录被删除）会永远冻结在 pages.json 里：合并循环只更新与
- * 扫描匹配的 root，而读-改-写刻意保留未匹配条目以保护手写内容。
+ * 退出，或目录被删除）会永远冻在 pages.json 里：合并循环只更新和
+ * 扫描结果匹配的 root，而读-改-写故意保留没匹配上的条目，为的是
+ * 保护手写内容。
  *
- * 修复让插件生成的子包像主包一样收敛：pages 数组携带生成标记的未
- * 匹配 root 被整个丢弃——当前平台在其中已无可见页面，保留 root
- * （即使其他平台的条目保持包裹）会把一个空子包送进本平台的构建
- * 产物，其 root 目录在磁盘上甚至不存在。丢弃不丢状态：每个平台
- * 每次运行都重写自己扫描的条目，其他平台下次写入时会把 root 加
- * 回来。手写的子包不携带标记，原样保留。
+ * 修复让插件生成的子包和主包一样能自动清掉：pages 数组带生成标记
+ * 的、没匹配上的 root 被整个丢弃——当前平台在里面已经没有看得见的
+ * 页面，留着 root（哪怕其他平台的条目都包着 #ifdef）会往本平台的
+ * 构建产物里塞一个空子包，它的 root 目录在磁盘上甚至不存在。丢弃
+ * 不丢状态：每个平台每次运行都重写自己扫描到的条目，其他平台下次
+ * 写入时会把 root 加回来。手写的子包不带标记，原样保留。
  *
- * 平台模型与 pages-json-home-reorder.test.ts 一致：当前平台通过
- * PageContext 构造函数注入，预置文件代表其他平台的输出。
+ * 平台模型和 pages-json-home-reorder.test.ts 一样：当前平台从
+ * PageContext 构造函数传进去，预置文件代表其他平台的输出。
  */
 
 function writePage(pagesDir: string, name: string, macro: string): void {
@@ -54,23 +55,23 @@ describe('pages.json converges stale plugin-generated sub-packages', () => {
   })
 
   beforeEach(() => {
-    // 按其他平台此前运行的输出预置子包，一份文件覆盖所有删除几何。
-    // 当前平台（mp-weixin）在这里扫描不到任何子包，因此每个插件生成
-    // 的 root 对它都是零可见页面、都必须删除——包括多平台的那些，
-    // 它们幸存的条目否则会作为空子包外壳进入本平台的构建产物：
-    // - pkg-gen-weixin（下标 0，最前位置）：只为 MP-WEIXIN 生成；必须
-    //   删除，且它 `}` 与 `,` 之间的用户注释（after-value 注释）不得
-    //   泄漏到移入其槽位的条目上
-    // - pkg-gen-zero2（下标 1）：同样仅 MP-WEIXIN，与上面相邻，
-    //   让删除检验连续两次 splice
+    // 按其他平台此前运行的输出预置子包，一份文件覆盖所有删除位置的
+    // 组合。当前平台（mp-weixin）在这里扫描不到任何子包，所以每个
+    // 插件生成的 root 对它都没有可见页面、都得删——包括多平台的那些，
+    // 它们留下的条目否则会作为空壳子包进入本平台的构建产物：
+    // - pkg-gen-weixin（下标 0，最前面的位置）：只为 MP-WEIXIN 生成；
+    //   必须删除，而且它 `}` 与 `,` 之间的用户注释（after-value 注释）
+    //   不能漏到挪进这个位置的条目身上
+    // - pkg-gen-zero2（下标 1）：同样只有 MP-WEIXIN，和上面相邻，
+    //   检验连续两次删除
     // - pkg-gen-mixed：插件生成，一个 H5 条目 + 一个仅 APP 条目；其他
-    //   平台在这里仍有页面，但当前平台的视图为空，root 同样删除
-    //   （H5/APP 下次写入时把它加回来）
-    // - pkg-gen-strip：为 H5 || MP-WEIXIN 生成；同样的零可见删除，
-    //   附带的 plugins 属性随 root 一起消失
-    // - pkg-user：手写（无生成标记），有自己的注释；在周围所有生成
-    //   条目被 splice 掉之后必须连同注释挂载逐字节幸存
-    // - pkg-gen-tail（最后位置）：仅 MP-WEIXIN；必须删除
+    //   平台在这里还有页面，但当前平台一个也看不见，root 同样删
+    //   （H5/APP 下次写入时会把它加回来）
+    // - pkg-gen-strip：为 H5 || MP-WEIXIN 生成；同样删掉，
+    //   附带的 plugins 属性跟着 root 一起消失
+    // - pkg-user：手写（没有生成标记），有自己的注释；周围生成的
+    //   子包全被删掉之后，它必须连同注释一个字节不动地留下
+    // - pkg-gen-tail（最后的位置）：仅 MP-WEIXIN；必须删除
     fs.writeFileSync(
       pagesJsonPath,
       [
@@ -198,8 +199,8 @@ describe('pages.json converges stale plugin-generated sub-packages', () => {
   it('removes every generated root invisible to the current platform and never touches handwritten packages', async () => {
     const content = await run()
 
-    // 被删除的 root：最前位置、相邻的中间位置、多平台中间条目与最后
-    // 位置——它们都没有 MP-WEIXIN 可见的页面，全部整个收敛消失
+    // 被删除的 root：最前面的位置、相邻的中间位置、多平台的中间条目
+    // 和最后的位置——它们都没有 MP-WEIXIN 看得见的页面，全部整个消失
     expect(content).not.toContain('"pkg-gen-weixin"')
     expect(content).not.toContain('"w1"')
     expect(content).not.toContain('"pkg-gen-zero2"')
@@ -214,18 +215,19 @@ describe('pages.json converges stale plugin-generated sub-packages', () => {
     expect(content).not.toContain('"test-plugin"')
     expect(content).not.toContain('"pkg-gen-tail"')
     expect(content).not.toContain('"t1"')
-    // 被删除首条目的 after-value 注释不得泄漏到移入其槽位的条目上
+    // 被删掉的首条目身上 after-value 位置的注释，不能漏到挪进这个
+    // 位置的条目身上
     expect(content).not.toContain('stale note')
 
-    // pkg-user 不携带生成标记，保持原样；尽管周围所有生成的子包都被
-    // splice 掉，它的注释仍直接挂在它的上方
+    // pkg-user 没有生成标记，保持原样；周围生成的子包全被删掉，
+    // 它的注释还挂在它正上方
     expect(content).toContain('"u1"')
     const commentPos = content.indexOf('// user maintained package')
     const userPos = content.indexOf('"pkg-user"')
     expect(commentPos).toBeGreaterThan(-1)
     expect(commentPos).toBeLessThan(userPos)
 
-    // 输出仍可解析，且恰好只有手写的 root 幸存
+    // 输出仍可解析，而且只剩手写的 root
     const parsed = cjParse(content) as CommentObject
     const subPackages = parsed.subPackages
     expect(Array.isArray(subPackages)).toBe(true)
@@ -304,22 +306,22 @@ describe('pipeline: skipped sub-package pages converge per platform', () => {
 
   it('drops the root when the page is skipped on the current platform', async () => {
     const parsed = await run('mp-weixin')
-    // 页面在 mp-weixin 上被跳过，子包因此没有该平台可见的页面。
-    // root 必须整个删除：保留它（即使 MP-ALIPAY 条目包在 #ifdef 里）
-    // 会给微信构建送出一个产物中不存在其 root 目录的空子包。删除不
-    // 丢状态——mp-alipay 会从自己的扫描重写 root（见下一用例）
+    // 页面在 mp-weixin 上被跳过，子包就没有该平台看得见的页面。root
+    // 必须整个删掉：留着它（哪怕 MP-ALIPAY 条目包在 #ifdef 里）会往
+    // 微信构建产物里塞一个空子包，产物里根本没有它的 root 目录。删掉
+    // 不丢状态——mp-alipay 会用自己的扫描把 root 写回来（见下一用例）
     expect(Array.isArray(parsed.subPackages)).toBe(true)
     expect(subRoots(parsed).length).toBe(0)
     const content = fs.readFileSync(pagesJsonPath, 'utf-8')
     expect(content).not.toContain('"alipay-only"')
-    // 主包原样幸存
+    // 主包原样留下
     expect(content).toContain('"pages/index"')
   })
 
   it('re-adds the root on the next write of a platform that still has pages', async () => {
     const parsed = await run('mp-alipay')
-    // 扫描再次产出该页面，root 以单平台标记下的裸形式回来——证明
-    // 之前的删除没有丢状态
+    // 扫描再次找到该页面，root 不带 #ifdef 地写回来（生成标记里只有
+    // MP-ALIPAY 一个平台）——证明之前的删除没丢状态
     const roots = subRoots(parsed)
     expect(roots.length).toBe(1)
     const content = fs.readFileSync(pagesJsonPath, 'utf-8')
@@ -329,8 +331,7 @@ describe('pipeline: skipped sub-package pages converge per platform', () => {
   })
 
   it('removes the root once no platform produces pages for it anymore', async () => {
-    // 删除页面文件后再跑一次 mp-alipay：扫描不到 root，
-    // 收敛把它移除
+    // 删掉页面文件再跑一次 mp-alipay：扫描不到 root，这回把它移除
     fs.rmSync(path.join(pkgDir, 'alipay-only.vue'))
 
     const parsed = await run('mp-alipay')
@@ -341,20 +342,20 @@ describe('pipeline: skipped sub-package pages converge per platform', () => {
     const content = fs.readFileSync(pagesJsonPath, 'utf-8')
     expect(content).not.toContain('"alipay-only"')
 
-    // 主包在子包删除后原样幸存
+    // 主包在子包删除后原样留下
     expect(content).toContain('"pages/index"')
   })
 })
 
 describe('pipeline: a sub-package empty on the current platform stays out of its view', () => {
-  // PR #286 评审问题的回归：子包的页面只存在于 H5，且在 MP-WEIXIN 上
-  // 全部通过 definePage(null) 退出。resolvePlatformUnion 过去只从仍然
-  // 存在的条目收集平台，微信运行零贡献后全集停留在 'H5'，仅 H5 的
-  // 条目被判定为覆盖全集而裸露输出——泄漏进微信的条件编译视图（裸
-  // 条目对所有平台可见）。当前平台必须始终加入全集。在此基础上，
-  // 对当前平台没有剩余页面的插件生成子包被整个丢弃：微信构建产物
-  // 中没有对应的目录，app.json 条目（即使其页面全被包裹掉）会指向
-  // 不存在的东西。
+  // PR #286 评审问题的回归：子包的页面只存在于 H5，而且在 MP-WEIXIN
+  // 上全都通过 definePage(null) 退出。resolvePlatformUnion 以前只从
+  // 还在的条目收集平台，微信运行什么都没贡献后全集只剩 'H5'，只有
+  // H5 的条目被误认为盖住了全集、不加包裹输出——漏进微信的构建结果
+  // （不包着的条目所有平台都看得见）。当前平台必须始终进全集。在此
+  // 基础上，对当前平台没有剩下页面的插件生成子包被整个丢掉：微信
+  // 构建产物里没有对应的目录，app.json 条目（哪怕它的页面全被包掉）
+  // 会指向不存在的东西。
   let tmpDir: string
   let pagesJsonPath: string
 
@@ -404,15 +405,15 @@ describe('pipeline: a sub-package empty on the current platform stays out of its
   it('drops the sub-package entirely on the zero-contribution platform', async () => {
     const content = await run('mp-weixin')
 
-    // 该子包没有任何 MP-WEIXIN 可见的页面，root 不得以任何形式幸存
-    // ——残留的 root（裸露或全部包裹）都会给微信构建送出一个产物中
-    // 不存在其 root 目录的空子包
+    // 该子包没有任何 MP-WEIXIN 看得见的页面，root 不能以任何形式
+    // 留下——留下的 root（不包着或全包着）都会往微信构建产物里塞
+    // 一个产物里不存在其 root 目录的空子包
     expect(content).not.toContain('"pkg"')
     expect(content).not.toContain('"h5-only"')
-    // 主包原样幸存
+    // 主包原样留下
     expect(content).toContain('"pages/index"')
-    // 防止空转通过：subPackages 必须仍序列化为（空的）数组，
-    // 而不是从输出中消失
+    // 防止空转也通过：subPackages 必须仍然输出成一个（空的）数组，
+    // 不能整个消失
     const parsed = cjParse(content) as CommentObject
     expect(Array.isArray(parsed.subPackages)).toBe(true)
   })
@@ -424,12 +425,129 @@ describe('pipeline: a sub-package empty on the current platform stays out of its
   })
 
   it('re-adds the sub-package once its own platform re-runs', async () => {
-    // H5 运行重新扫描该页面并把 root 裸露地写回——之前的删除没有
-    // 丢状态
+    // H5 运行重新扫描该页面，把 root 不带 #ifdef 地写回来——之前的
+    // 删除没丢状态
     const content = await run('h5')
     const segment = content.slice(content.indexOf('"pkg"'))
     expect(segment).toContain('GENERATED BY UNI-PAGES, PLATFORM: H5\n')
     expect(segment).toContain('"h5-only"')
     expect(segment).not.toContain('#ifdef')
+  })
+})
+
+describe('pipeline: sub-package plugins follow the config', () => {
+  // plugins 残留的回归：合并循环只在配置里有 plugins 时赋值，配置里
+  // 删掉后什么都不做，写进 pages.json 的 plugins 就永远留下——用户
+  // 从 subPackages 配置里移除一个插件，产物里的分包插件却下不去。
+  // 修复后插件生成的子包（pages 带生成标记）跟随配置清理；手写的
+  // 子包没有标记，plugins 原样保留。
+  let tmpDir: string
+  let pagesJsonPath: string
+  let configPath: string
+
+  const options = {
+    dir: 'src/pages',
+    outDir: 'src',
+    homePage: 'pages/index',
+    subPackages: ['src/pkg'],
+    dts: false,
+  }
+
+  beforeAll(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-subpkg-plugins-'))
+    const pagesDir = path.join(tmpDir, 'src', 'pages')
+    const pkgDir = path.join(tmpDir, 'src', 'pkg')
+    fs.mkdirSync(pagesDir, { recursive: true })
+    fs.mkdirSync(pkgDir, { recursive: true })
+
+    writePage(pagesDir, 'index', 'definePage({ style: { navigationBarTitleText: \'home\' } });')
+    writePage(pkgDir, 'p1', 'definePage({ style: { navigationBarTitleText: \'p1\' } });')
+
+    pagesJsonPath = path.join(tmpDir, 'src', 'pages.json')
+    configPath = path.join(tmpDir, 'pages.config.json')
+  })
+
+  afterAll(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  const writeConfig = (subPackages: unknown[]): void => {
+    fs.writeFileSync(configPath, JSON.stringify({ subPackages }), 'utf-8')
+  }
+
+  const run = async (): Promise<string> => {
+    const ctx = new PageContext(options, tmpDir, 'h5')
+    await ctx.updatePagesJSON()
+    return fs.readFileSync(pagesJsonPath, 'utf-8')
+  }
+
+  it('removes plugins from generated packages once the config drops them', async () => {
+    // 第一次运行：配置带 plugins，随生成的子包写进 pages.json
+    writeConfig([{ root: 'pkg', plugins: ['test-plugin'] }])
+    let content = await run()
+    expect(content).toContain('"test-plugin"')
+    expect(content).toContain('"p1"')
+
+    // 配置删掉 plugins 再跑：子包还在（页面还在扫描结果里），但
+    // plugins 不能残留
+    writeConfig([{ root: 'pkg' }])
+    content = await run()
+    expect(content).toContain('"pkg"')
+    expect(content).toContain('"p1"')
+    expect(content).not.toContain('"test-plugin"')
+  })
+
+  it('never strips plugins from a handwritten package without a generation marker', async () => {
+    // 预置一个手写子包：root 不在扫描目录里、pages 没有生成标记，
+    // 但带着 plugins。它既不会被扫描命中也不在配置里，必须原样保留
+    fs.writeFileSync(
+      pagesJsonPath,
+      [
+        '{',
+        '  "pages": [',
+        '    // GENERATED BY UNI-PAGES, PLATFORM: H5',
+        '    {',
+        '      "path": "pages/index",',
+        '      "style": { "navigationBarTitleText": "home" }',
+        '    }',
+        '  ],',
+        '  "subPackages": [',
+        '    {',
+        '      "root": "pkg",',
+        '      "plugins": ["generated-plugin"],',
+        '      "pages": [',
+        '        // GENERATED BY UNI-PAGES, PLATFORM: H5',
+        '        {',
+        '          "path": "p1",',
+        '          "style": { "navigationBarTitleText": "p1" }',
+        '        }',
+        '      ]',
+        '    },',
+        '    {',
+        '      "root": "pkg-hand",',
+        '      "plugins": ["hand-plugin"],',
+        '      "pages": [',
+        '        {',
+        '          "path": "h1",',
+        '          "style": { "navigationBarTitleText": "h1" }',
+        '        }',
+        '      ]',
+        '    }',
+        '  ]',
+        '}',
+      ].join('\n'),
+      'utf-8',
+    )
+
+    // 配置里没有任何 plugins
+    writeConfig([])
+    const content = await run()
+
+    // 生成的子包（带标记）没有配置来源的 plugins，被清掉
+    expect(content).not.toContain('generated-plugin')
+    // 手写子包原样保留，plugins 一个字节不动
+    expect(content).toContain('"pkg-hand"')
+    expect(content).toContain('"hand-plugin"')
+    expect(content).toContain('"h1"')
   })
 })

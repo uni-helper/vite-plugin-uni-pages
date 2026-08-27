@@ -33,7 +33,7 @@ export type * from '@uni-helper/uni-pages-types'
  * vite-plugin-uni-pages 插件主入口
  *
  * 自动扫描页面目录并生成 pages.json 配置文件
- * 支持 definePage 宏定义页面元信息
+ * 支持 definePage 宏定义页面配置
  * 支持多平台条件编译
  * 支持分包配置
  * 支持 TypeScript 声明文件生成
@@ -44,12 +44,11 @@ export type * from '@uni-helper/uni-pages-types'
 export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
   let ctx: PageContext
 
-  // TODO: 校验 pages.json 文件是否合法
-  // config.root 在 configResolved 之前未知，这里退回到与 Vite 相同的根目录
-  // 解析规则，让路径规则只维护一份。注意：当 Vite 的 root 与 cwd 不一致
-  // （且未设置 VITE_ROOT_DIR）时，这个占位文件会落在错误的目录旁——
-  // 它只是占位符，configResolved 中创建的 PageContext 在任何写入发生前
-  // 总会基于 config.root 解析出真实路径。
+  // config.root 要到 configResolved 才知道，这里先用和 Vite 一样的根
+  // 目录规则算个大概，路径规则只维护一份。注意：Vite 的 root 和 cwd
+  // 不一致（又没设 VITE_ROOT_DIR）时，这个占位文件会放错目录——没
+  // 关系，它只是占位，configResolved 里创建的 PageContext 在真正写入
+  // 前总会用 config.root 算出正确路径。
   const resolvedPagesJSONPath = resolvePagesJsonPath(
     process.env.VITE_ROOT_DIR || process.cwd(),
     userOptions.outDir ?? 'src',
@@ -92,9 +91,9 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
         return null
       }
 
-      // 每个script块在宏模块内部独立解析：其中一个块的语法错误（例如
-      // @babel/parser 8 移除的旧版 `assert { ... }` 导入属性）不能导致
-      // 另一个块的宏移除被跳过
+      // 每个 script 块单独解析（在宏模块里）：一个块有语法错误
+      // （比如 @babel/parser 8 删掉的旧 `assert { ... }` 写法），
+      // 另一个块的宏照样能找到、照样删
       const macro = findDefinePageMacro(code, id, {
         onParseError: (block, error) => {
           this.warn(`[vite-plugin-uni-pages] Failed to parse ${block} in ${id}, its definePage macro may stay in the output: ${error instanceof Error ? error?.message : error}`)
@@ -110,9 +109,10 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
       if (s.hasChanged()) {
         return {
           code: s.toString(),
-          // magic-string v1 把 `sourcesContent` 类型化为 `(string | null)[]`，
-          // 与 rollup 的 `ExistingRawSourceMap` 不兼容；序列化后的 JSON
-          // 字符串可被 `SourceMapInput` 接受，规避了类型不匹配
+          // magic-string v1 给 `sourcesContent` 的类型是
+          // `(string | null)[]`，和 rollup 的 `ExistingRawSourceMap`
+          // 对不上；转成 JSON 字符串后 `SourceMapInput` 能收，
+          // 绕开了类型不匹配
           map: s.generateMap({
             source: id,
             includeContent: true,
