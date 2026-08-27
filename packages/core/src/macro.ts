@@ -63,20 +63,31 @@ export async function evaluateDefinePage(code: string, filename: string, platfor
   // 顺序一致）。旧代码只看其中一个：宏写在普通 <script> 里而页面
   // 还有 <script setup> 时，扫描这边读不到配置，转换那边却会把宏
   // 删掉——配置悄悄丢掉，还不留任何痕迹
+  let parseError: unknown
+  const blocks: Array<{ body: t.Statement[], imports: t.ImportDeclaration[] }> = []
   for (const sfcScript of [sfc.scriptSetup, sfc.script]) {
     if (!sfcScript)
       continue
 
-    // import 属性（`with { ... }`）@babel/parser 8 直接支持。旧的
-    // `assert { ... }` 写法已废弃、@babel/parser 8 删掉了支持，还在用
-    // 这种写法的文件会在这里解析失败，错误交给 Page.read() 处理，页面
-    // 只保留路径信息（definePage 宏读不出来了）。
-    const ast = babelParse(sfcScript.content, sfcScript.lang || 'js')
-    const macro = findMacro(ast.body, filename)
+    // 一个块解析失败不拦另一个块（和 findDefinePageMacro 的做法一
+    // 致）：宏多半写在另一个块里，配置还能读出来。import 属性
+    // （`with { ... }`）@babel/parser 8 直接支持；旧的 `assert { ... }`
+    // 写法已废弃、@babel/parser 8 删掉了支持，还在用这种写法的块会
+    // 在这里失败。错误先记着，哪个块都没读出宏时再抛给 Page.read()，
+    // 页面退回只含路径的信息
+    try {
+      const body = babelParse(sfcScript.content, sfcScript.lang || 'js').body
+      blocks.push({ body, imports: findImports(body) })
+    }
+    catch (error: unknown) {
+      parseError ??= error
+    }
+  }
+
+  for (const { body } of blocks) {
+    const macro = findMacro(body, filename)
     if (!macro)
       continue
-
-    const imports = findImports(ast.body).filter(imp => !!imp.specifiers.length).map(imp => babelGenerate(imp).code)
 
     const [macroOption] = macro.arguments
     // definePage() 没传参数：读不出任何配置，当作没写这个宏处理
@@ -87,7 +98,9 @@ export async function evaluateDefinePage(code: string, filename: string, platfor
     const macroCode = babelGenerate(macroOption).code
 
     const parsed = await parseCode({
-      imports,
+      // 宏用到的 import 可能写在另一个 script 块里（宏在 setup、常量
+      // 在普通 <script>），两个块的 import 都参与挑选
+      imports: pickEvalImports(blocks.map(block => block.imports), macroOption),
       code: macroCode,
       filename,
     })
@@ -111,6 +124,11 @@ export async function evaluateDefinePage(code: string, filename: string, platfor
       ...resolvedMeta,
     }
   }
+
+  // 没有任何块读出宏：有块解析失败时把错误抛出去（调用方会警告并
+  // 退回默认配置），完全没失败就说明文件里本来就没有 definePage
+  if (parseError)
+    throw parseError
 
   return undefined
 }
@@ -210,6 +228,69 @@ function findImports(stmts: t.Statement[]): t.ImportDeclaration[] {
 }
 
 /**
+ * 从两个 script 块的全部 import 里，挑出宏参数真正用到的那些语句。
+ *
+ * 挑选按"名字被宏引用"来：没被用到的 import 不进沙箱，免得为了求值
+ * 一个宏，把整个页面的依赖都加载一遍（比如普通 `<script>` 里 import
+ * 的 `.vue` 组件，require 加载不动它，还会让本来好好的页面求值失败）。
+ * 两个块里写了完全相同的 import 时只留一份，不然编译出的代码会重复
+ * 声明同一个名字
+ */
+function pickEvalImports(allBlocks: t.ImportDeclaration[][], macroArg: t.Node): string[] {
+  const referenced = new Set<string>()
+  collectReferencedIdentifiers(macroArg, referenced)
+
+  const codes = new Set<string>()
+  for (const imports of allBlocks) {
+    for (const imp of imports) {
+      if (!imp.specifiers.some(spec => referenced.has(spec.local.name)))
+        continue
+      codes.add(babelGenerate(imp).code)
+    }
+  }
+  return [...codes]
+}
+
+/**
+ * 递归收集节点里出现的标识符名字。
+ *
+ * 故意宁可多收、不可漏收：`obj.key` 里的 key、`{ style: s }` 里的
+ * style 这类"名字位置"的标识符也会被收进来。多收的后果只是多带一条
+ * import（那条语句本来就写在用户自己的文件里），漏收才会让宏求值
+ * 莫名失败
+ */
+function collectReferencedIdentifiers(node: unknown, names: Set<string>): void {
+  if (Array.isArray(node)) {
+    for (const item of node)
+      collectReferencedIdentifiers(item, names)
+    return
+  }
+  if (node === null || typeof node !== 'object')
+    return
+
+  const astNode = node as t.Node
+  if (astNode.type === 'Identifier') {
+    names.add(astNode.name)
+    return
+  }
+  // obj.key（非计算属性）：obj 是引用，key 只是名字，不跟进去
+  if (astNode.type === 'MemberExpression' && !astNode.computed) {
+    collectReferencedIdentifiers(astNode.object, names)
+    return
+  }
+  // { key: value }（非计算属性）：只有 value 一边算引用
+  if (astNode.type === 'ObjectProperty' && !astNode.computed) {
+    collectReferencedIdentifiers(astNode.value, names)
+    return
+  }
+  for (const [key, value] of Object.entries(astNode)) {
+    if (key === 'loc')
+      continue
+    collectReferencedIdentifiers(value, names)
+  }
+}
+
+/**
  * 将 TypeScript / JavaScript 脚本代码转换为对象/函数
  *
  * @param options - 脚本执行所需配置
@@ -263,7 +344,18 @@ async function parseCode(options: { imports: string[], code: string, filename: s
       exports: {},
       __filename: filename,
       __dirname: dir,
-      require: createRequire(dir),
+      // createRequire 的参数按"文件名"解释，require 的相对路径从那个
+      // 文件所在目录算起。要相对页面目录解析，就得给它一个"页面目录
+      // 里的文件"；直接传目录名会让 `./xxx` 全部解析到页面目录的上一
+      // 层（裸包名沿着 node_modules 往上找不受影响，所以这个错一直
+      // 没被发现）。这个文件名只用来定位，不会真的去读它。
+      // 另外 require 按 Node 规则解析：导入要写全扩展名，`./title.mjs`、
+      // `./title.ts` 都行（engines 门槛内的 Node 自带 TS 剥离），TS 里
+      // 省略扩展名的 `./title` 不行——require 不做 TS 的扩展名补全
+      require: createRequire(path.join(dir, 'define-page.mjs')),
+      // 宏代码里的动态 import() 会被上面的 TypeScript 编译改写成
+      // require()，因此实际走不到这个绑定；留着它只是兜底（比如未来
+      // 编译行为变化），注意它按插件自身位置解析、不按页面位置
       import: (id: string) => import(id),
 
       // 定时器相关
