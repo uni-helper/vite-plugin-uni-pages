@@ -12,17 +12,13 @@ type _LocationUrl =
   "/pages/blog/post" |
   "/pages/define-page/async-function" |
   "/pages/define-page/conditional-compilation" |
+  "/pages/define-page/conditional-define" |
   "/pages/define-page/function" |
   "/pages/define-page/nested-function" |
-  "/pages/define-page/object" |
   "/pages/define-page/option-api" |
+  "/pages/define-page/platform-injected" |
   "/pages/define-page/remove-console" |
-  "/pages/define-page/yaml" |
   "/pages/i18n" |
-  "/pages/tabbar-index-zero" |
-  "/pages/tabbar-list" |
-  "/pages/tabbar-no-index" |
-  "/pages/tabbar-profile" |
   "/pages/test-json" |
   "/pages/test-jsonc-with-comment" |
   "/pages/test-yaml" |
@@ -38,7 +34,7 @@ interface NavigateToOptions {
 interface RedirectToOptions extends NavigateToOptions {}
 
 interface SwitchTabOptions {
-  
+  url: "/pages/define-page/object" | "/pages/tabbar-index-zero" | "/pages/tabbar-no-index" | "/pages/tabbar-list" | "/pages/tabbar-profile"
 }
 
 type ReLaunchOptions = NavigateToOptions | SwitchTabOptions;

@@ -1,16 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { PageContext } from '../packages/core/src'
+import { createPages } from '../packages/core/src'
 
+// uni-env 的平台常量在模块加载时就定死、没法 stub，所以平台改为
+// 从流水线入口传进去。这让套件与 shell 的 UNI_PLATFORM 无关、行为确定，并能
+// 验证依赖平台的固定用例：`platform-injected` 渲染注入的平台，
+// `skip-on-mp-weixin` 在 alipay 上保留。
+// env stub 保留是为了与其他平台专属套件保持一致。
 describe('generate routes - mp-alipay platform', () => {
   beforeEach(() => {
     vi.stubEnv('UNI_PLATFORM', 'mp-alipay')
   })
 
   it('vue - pages snapshot', async () => {
-    const ctx = new PageContext({ dir: 'playground/src/pages', homePage: 'pages/index', subPackages: ['playground/src/pages/pages-internal-sub'] })
-    await ctx.scanPages()
-    await ctx.scanSubPages()
-    await ctx.mergePageMetaData()
+    const ctx = await createPages({ dir: 'playground/src/pages', homePage: 'pages/index', subPackages: ['playground/src/pages/pages-internal-sub'] }, { platform: 'mp-alipay' })
 
     const routes = ctx.resolveRoutes()
 
@@ -57,6 +59,14 @@ describe('generate routes - mp-alipay platform', () => {
           ]
         },
         {
+          "path": "../playground/src/pages/define-page/conditional-define",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "conditional base",
+            "enablePullDownRefresh": true
+          }
+        },
+        {
           "path": "../playground/src/pages/define-page/function",
           "type": "page",
           "style": {
@@ -94,6 +104,13 @@ describe('generate routes - mp-alipay platform', () => {
           }
         },
         {
+          "path": "../playground/src/pages/define-page/platform-injected",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "platform: mp-alipay"
+          }
+        },
+        {
           "path": "../playground/src/pages/define-page/remove-console",
           "type": "page",
           "style": {
@@ -101,10 +118,10 @@ describe('generate routes - mp-alipay platform', () => {
           }
         },
         {
-          "path": "../playground/src/pages/define-page/yaml",
+          "path": "../playground/src/pages/define-page/skip-on-mp-weixin",
           "type": "page",
           "style": {
-            "navigationBarTitleText": "yaml test"
+            "navigationBarTitleText": "skip on mp-weixin"
           }
         },
         {
@@ -185,9 +202,7 @@ describe('generate routes - mp-alipay platform', () => {
   })
 
   it('conditional-compilation page should show mp-alipay specific title', async () => {
-    const ctx = new PageContext({ dir: 'playground/src/pages/define-page' })
-    await ctx.scanPages()
-    await ctx.mergePageMetaData()
+    const ctx = await createPages({ dir: 'playground/src/pages/define-page' })
 
     const routes = JSON.parse(ctx.resolveRoutes())
     const conditionalPage = routes.find((r: any) => r.path.includes('conditional-compilation'))
@@ -197,9 +212,7 @@ describe('generate routes - mp-alipay platform', () => {
   })
 
   it('test-jsonc-with-comment page should not have H5-specific content', async () => {
-    const ctx = new PageContext({ dir: 'playground/src/pages' })
-    await ctx.scanPages()
-    await ctx.mergePageMetaData()
+    const ctx = await createPages({ dir: 'playground/src/pages' })
 
     const routes = JSON.parse(ctx.resolveRoutes())
     const jsoncPage = routes.find((r: any) => r.path.includes('test-jsonc-with-comment'))

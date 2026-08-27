@@ -1,5 +1,8 @@
-import type { PageMetaDatum } from './page-meta'
+import type { Pages } from './pages'
 
+/**
+ * subPackages 数组的元素类型，即应用的子包
+ */
 export interface SubPackage {
   /**
    * 子包的根目录
@@ -9,22 +12,17 @@ export interface SubPackage {
   /**
    * 子包由哪些页面组成，参数同 pages
    */
-  pages: PageMetaDatum[]
+  pages: Pages
 
   /**
-   * 分包插件
+   * 子包的插件
    */
-  plugins?: {
-    [pluginName: string]: {
-      version: string
+  plugins?: Record<string, any>
 
-      provider: string
-
-      export?: string
-
-      [key: string]: any
-    }
-  }
+  [x: string]: any
 }
 
+/**
+ * 分包加载配置，H5 不支持
+ */
 export type SubPackages = SubPackage[]

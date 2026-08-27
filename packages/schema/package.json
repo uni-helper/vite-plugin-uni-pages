@@ -3,13 +3,6 @@
   "version": "0.4.9",
   "description": "Schema for uni-app pages.json",
   "author": "KeJun",
-  "maintainers": [
-    {
-      "email": "wurui.dev@gmail.com",
-      "name": "ModyQyW",
-      "url": "https://modyyw.top"
-    }
-  ],
   "license": "MIT",
   "funding": [
     "https://afdian.net/a/kejun",
@@ -24,8 +17,15 @@
   "keywords": [
     "jsonschema"
   ],
+  "maintainers": [
+    {
+      "name": "ModyQyW",
+      "email": "wurui.dev@gmail.com",
+      "url": "https://modyyw.top"
+    }
+  ],
   "scripts": {
-    "build": "ts-json-schema-generator -p \"../types/src/pages-config.ts\" -t \"PagesConfig\" -o \"schema.json\" --no-type-check",
+    "build": "ts-json-schema-generator -p \"../types/src/index.ts\" -t \"PagesConfig\" -o \"schema.json\" --no-type-check",
     "build-post": "exit 0",
     "dev": "pnpm build",
     "prepublishOnly": "pnpm build"

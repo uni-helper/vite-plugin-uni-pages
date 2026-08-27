@@ -4,13 +4,6 @@
   "version": "0.4.9",
   "description": "Type definitions for uni-app pages.json",
   "author": "KeJun",
-  "maintainers": [
-    {
-      "email": "wurui.dev@gmail.com",
-      "name": "ModyQyW",
-      "url": "https://modyyw.top"
-    }
-  ],
   "license": "MIT",
   "funding": [
     "https://afdian.com/a/kejun",
@@ -23,20 +16,23 @@
   },
   "bugs": "https://github.com/uni-helper/vite-plugin-uni-pages/issues",
   "keywords": [],
+  "maintainers": [
+    {
+      "name": "ModyQyW",
+      "email": "wurui.dev@gmail.com",
+      "url": "https://modyyw.top"
+    }
+  ],
   "sideEffects": false,
   "exports": {
     ".": {
       "import": {
         "types": "./dist/index.d.mts",
         "default": "./dist/index.mjs"
-      },
-      "require": {
-        "types": "./dist/index.d.cts",
-        "default": "./dist/index.cjs"
       }
     }
   },
-  "main": "./dist/index.cjs",
+  "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "files": [
@@ -47,6 +43,14 @@
     "build-post": "exit 0",
     "dev": "tsdown --watch",
     "prepublishOnly": "pnpm build"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "tsdown": "catalog:",

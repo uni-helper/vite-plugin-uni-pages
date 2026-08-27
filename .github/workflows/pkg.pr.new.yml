@@ -1,0 +1,47 @@
+name: Publish Any Commit
+
+on:
+  pull_request:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '!**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # 最小权限：发布走 pkg.pr.new 自己的 GitHub App，不需要
+    # GITHUB_TOKEN 的写权限，安装/构建/发布步骤（会运行第三方依赖
+    # 脚本）因此不得看到可写令牌
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Setup corepack
+        run: npm install -f -g npm@latest corepack@latest && corepack enable
+
+      - name: Install Dependencies
+        run: pnpm install
+
+      - name: Build
+        run: pnpm build
+
+      - name: Release
+        run: pnpx pkg-pr-new publish --compact --pnpm './packages/*'

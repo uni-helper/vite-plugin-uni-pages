@@ -18,11 +18,15 @@ export interface TabBarIconFont {
 
   /**
    * 字体图标颜色
+   *
+   * @format color
    */
   color?: HEXColor
 
   /**
    * 字体图标选中颜色
+   *
+   * @format color
    */
   selectedColor?: HEXColor
 
@@ -46,6 +50,9 @@ export interface TabBarItem {
    * 当 position 为 "top" 时，此参数无效
    *
    * 不支持网络图片，不支持字体图标
+   *
+   * 支持 `@xxx` 主题变量：微信小程序 darkmode（themeLocation）下可按主题切换图标，
+   * uni-app 会原样透传该字段（官方文档表格只标注 String，但 darkmode 场景依赖主题变量）
    */
   iconPath?: string | ThemeVar
 
@@ -55,11 +62,15 @@ export interface TabBarItem {
    * 当 position 为 "top" 时，此参数无效
    *
    * 不支持网络图片，不支持字体图标
+   *
+   * 支持 `@xxx` 主题变量，同 iconPath 的 darkmode 说明
    */
   selectedIconPath?: string | ThemeVar
 
   /**
-   * 该项是否显示，默认显示
+   * 该项是否显示
+   *
+   * @default true
    *
    * @desc App (3.2.10+)、H5 (3.2.10+)
    */
@@ -77,7 +88,7 @@ export interface TabBarItem {
 
 export interface TabBarMidButton {
   /**
-   * 中间按钮的宽度，tabBar 其它项为减去此宽度后平分，默认值为与其它项平分宽度
+   * 中间按钮的宽度，tabBar 其它项为减去此宽度后平分
    *
    * @default "80px"
    */
@@ -122,6 +133,9 @@ export interface TabBarMidButton {
   [x: string]: any
 }
 
+/**
+ * 设置底部 tab 的表现
+ */
 export interface TabBar {
   /**
    * tab 上的文字默认颜色
@@ -149,14 +163,14 @@ export interface TabBar {
    *
    * @default "black"
    *
-   * @desc App 2.3.4+、H5 3.0.0+
+   * @desc App 2.3.4+、H5 3.0.0+、微信小程序、小红书小程序、京东小程序
    *
    * @format color
    */
   borderStyle?: 'black' | 'white' | HEXColor | ThemeVar
 
   /**
-   * iOS 高斯模糊效果，参考 [使用说明](https://ask.dcloud.net.cn/article/36617)
+   * iOS 高斯模糊效果，参考 [使用说明](https://uniapp.dcloud.net.cn/tutorial/app-blureffect.html)
    *
    * @default "none"
    *
@@ -232,6 +246,8 @@ export interface TabBar {
 
   /**
    * 设置背景图片，优先级高于 backgroundColor
+   *
+   * @desc App
    */
   backgroundImage?: string
 
@@ -247,11 +263,15 @@ export interface TabBar {
    * "no-repeat" 背景图片在垂直方向和水平方向都拉伸
    *
    * @default "no-repeat"
+   *
+   * @desc App
    */
   backgroundRepeat?: 'no-repeat' | 'repeat' | 'repeat-x' | 'repeat-y'
 
   /**
    * tabBar上红点颜色
+   *
+   * @desc App
    *
    * @format color
    */

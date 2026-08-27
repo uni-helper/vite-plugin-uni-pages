@@ -4,29 +4,23 @@ import os from 'node:os'
 import path from 'node:path'
 import { parse as cjParse } from 'comment-json'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { PageContext } from '../packages/core/src'
 
 /**
- * Regression test for https://github.com/uni-helper/vite-plugin-uni-pages/issues/283
+ * https://github.com/uni-helper/vite-plugin-uni-pages/issues/283 的回归测试
  *
- * Symptom: running `dev:h5` then `dev:mp-weixin` (or any two platforms in
- * sequence against the same pages.json) produced duplicate entries for the
- * same page path, breaking the build.
+ * 症状：先跑 `dev:h5` 再跑 `dev:mp-weixin`（或任意两个平台先后对着
+ * 同一份 pages.json 运行）后，同一路径出现重复条目，破坏构建。
  *
- * Root cause: items coming from `pageMetaData` carry an internal `type`
- * marker (`'home'` / `'page'`), while entries already written to pages.json
- * have had `type` stripped. `mergePlatformItems` compared the two sides via
- * `JSON.stringify`, so the marker made every cross-platform item look
- * different and a duplicate was appended instead of merged.
+ * 根因：来自 `pageMetaData` 的条目携带内部 `type` 标记（`'home'` /
+ * `'page'`），而 pages.json 中已有的条目可能没有（遗留输出或用户
+ * 编辑）。`mergePlatformItems` 用 `JSON.stringify` 比较两侧，标记让
+ * 每个跨平台条目看起来都不同，于是追加了重复条目而非合并。
  *
- * This test models the exact on-disk sequence (H5 run writes the file first,
- * mp-weixin run reads and merges it) in-process to keep it fast and
- * deterministic. `process.env.UNI_PLATFORM` is set before importing
- * PageContext because `@uni-helper/uni-env` captures the platform at module
- * load time.
+ * 本测试在进程内模拟磁盘上的真实时序（H5 运行先写文件，mp-weixin
+ * 运行读取并合并），保证快速且确定。平台通过 PageContext 构造函数
+ * 注入，不依赖 `process.env.UNI_PLATFORM`。
  */
-process.env.UNI_PLATFORM = 'mp-weixin'
-
-const { PageContext } = await import('../packages/core/src')
 
 describe('issue #283: cross-platform run does not duplicate routes', () => {
   let tmpDir: string
@@ -37,8 +31,8 @@ describe('issue #283: cross-platform run does not duplicate routes', () => {
     const pagesDir = path.join(tmpDir, 'src', 'pages', 'index')
     fs.mkdirSync(pagesDir, { recursive: true })
 
-    // A page whose definePage resolves to identical metadata on every platform,
-    // so the only thing that can vary across runs is the platform tag.
+    // 一个 definePage 在每个平台都算出相同的页面配置，跨运行
+    // 唯一可能变化的就是平台标签。
     fs.writeFileSync(
       path.join(pagesDir, 'index.vue'),
       [
@@ -54,8 +48,8 @@ describe('issue #283: cross-platform run does not duplicate routes', () => {
 
     pagesJsonPath = path.join(tmpDir, 'src', 'pages.json')
 
-    // Seed the file as if the H5 terminal just finished writing it: a single
-    // entry tagged H5 via the GENERATED comment, no `type` marker.
+    // 以 H5 运行的遗留形态预置文件：单个条目通过 GENERATED 注释标记
+    // 为 H5，没有 `type` 标记。
     fs.writeFileSync(
       pagesJsonPath,
       [
@@ -85,6 +79,7 @@ describe('issue #283: cross-platform run does not duplicate routes', () => {
     const ctx = new PageContext(
       { dir: 'src/pages', outDir: 'src', homePage: 'pages/index/index', dts: false, mergePages: true },
       tmpDir,
+      'mp-weixin',
     )
     await ctx.updatePagesJSON()
 
@@ -95,8 +90,8 @@ describe('issue #283: cross-platform run does not duplicate routes', () => {
 
     expect(samePath).toHaveLength(1)
 
-    // The surviving entry must now cover both platforms, proving the second
-    // run merged into the existing one instead of appending a duplicate.
+    // 留下的条目必须盖住两个平台，证明第二次运行并进了已有条目，
+    // 而不是追加了一条重复的。
     const generatorComment = (pages[Symbol.for('before:0') as CommentSymbol] as Array<{ value: string }> | undefined)?.[0]?.value ?? ''
     expect(generatorComment).toContain('H5')
     expect(generatorComment).toContain('MP-WEIXIN')

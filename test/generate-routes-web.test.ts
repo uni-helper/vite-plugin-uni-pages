@@ -1,6 +1,6 @@
 import type { UserPagesConfig } from '../packages/core/src'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { PageContext } from '../packages/core/src'
+import { createPages, PageContext } from '../packages/core/src'
 
 const pagesGlobConfig: UserPagesConfig = {
   globalStyle: {
@@ -21,16 +21,17 @@ const pagesGlobConfig: UserPagesConfig = {
   ],
 }
 
+// uni-env 的平台常量在模块加载时就定死、没法 stub，所以平台改为
+// 从流水线入口传进去。这让套件与 shell 的 UNI_PLATFORM 无关、行为确定：
+// `platform-injected` 渲染注入的平台，`skip-on-mp-weixin` 在 web 上
+// 保留。env stub 保留是为了与其他套件保持一致。
 describe('generate routes', () => {
   beforeEach(() => {
     vi.stubEnv('UNI_PLATFORM', 'web')
   })
 
   it('vue - pages snapshot', async () => {
-    const ctx = new PageContext({ dir: 'playground/src/pages', homePage: 'pages/index', subPackages: ['playground/src/pages/pages-internal-sub'] })
-    await ctx.scanPages()
-    await ctx.scanSubPages()
-    await ctx.mergePageMetaData()
+    const ctx = await createPages({ dir: 'playground/src/pages', homePage: 'pages/index', subPackages: ['playground/src/pages/pages-internal-sub'] }, { platform: 'web' })
 
     const routes = ctx.resolveRoutes()
 
@@ -77,6 +78,13 @@ describe('generate routes', () => {
           ]
         },
         {
+          "path": "../playground/src/pages/define-page/conditional-define",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "conditional base"
+          }
+        },
+        {
           "path": "../playground/src/pages/define-page/function",
           "type": "page",
           "style": {
@@ -114,6 +122,13 @@ describe('generate routes', () => {
           }
         },
         {
+          "path": "../playground/src/pages/define-page/platform-injected",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "platform: web"
+          }
+        },
+        {
           "path": "../playground/src/pages/define-page/remove-console",
           "type": "page",
           "style": {
@@ -121,10 +136,10 @@ describe('generate routes', () => {
           }
         },
         {
-          "path": "../playground/src/pages/define-page/yaml",
+          "path": "../playground/src/pages/define-page/skip-on-mp-weixin",
           "type": "page",
           "style": {
-            "navigationBarTitleText": "yaml test"
+            "navigationBarTitleText": "skip on mp-weixin"
           }
         },
         {
@@ -205,11 +220,9 @@ describe('generate routes', () => {
   })
 
   it('vue - not merge pages snapshot', async () => {
-    const ctx = new PageContext({ dir: 'playground/src/pages', mergePages: false, subPackages: ['playground/src/pages/pages-internal-sub'] })
-    await ctx.scanPages()
+    const ctx = new PageContext({ dir: 'playground/src/pages', mergePages: false, subPackages: ['playground/src/pages/pages-internal-sub'] }, process.cwd(), 'web')
     ctx.pagesGlobConfig = pagesGlobConfig
-    await ctx.scanSubPages()
-    await ctx.mergePageMetaData()
+    await ctx.scanAndMerge()
     const routes = ctx.resolveRoutes()
 
     expect(routes).toMatchInlineSnapshot(`
@@ -258,6 +271,13 @@ describe('generate routes', () => {
           ]
         },
         {
+          "path": "../playground/src/pages/define-page/conditional-define",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "conditional base"
+          }
+        },
+        {
           "path": "../playground/src/pages/define-page/function",
           "type": "page",
           "style": {
@@ -295,6 +315,13 @@ describe('generate routes', () => {
           }
         },
         {
+          "path": "../playground/src/pages/define-page/platform-injected",
+          "type": "page",
+          "style": {
+            "navigationBarTitleText": "platform: web"
+          }
+        },
+        {
           "path": "../playground/src/pages/define-page/remove-console",
           "type": "page",
           "style": {
@@ -302,10 +329,10 @@ describe('generate routes', () => {
           }
         },
         {
-          "path": "../playground/src/pages/define-page/yaml",
+          "path": "../playground/src/pages/define-page/skip-on-mp-weixin",
           "type": "page",
           "style": {
-            "navigationBarTitleText": "yaml test"
+            "navigationBarTitleText": "skip on mp-weixin"
           }
         },
         {
@@ -395,14 +422,12 @@ describe('generate routes', () => {
   })
 
   it('fix subPackage cannot match the second-level dir', async () => {
-    const ctx = new PageContext({
+    const ctx = await createPages({
       subPackages: [
         'playground/src/pages-sub-pages/sub-activity',
         'playground/src/pages-sub-pages/sub-main',
       ],
     })
-    await ctx.scanSubPages()
-    await ctx.mergeSubPageMetaData()
     const routes = ctx.resolveSubRoutes()
     expect(routes).toMatchInlineSnapshot(`
       "[
@@ -437,14 +462,12 @@ describe('generate routes', () => {
   })
 
   it('check pages is exist', async () => {
-    const ctx = new PageContext({
+    const ctx = await createPages({
       subPackages: [
         'playground/src/pages-sub-empty',
         'playground/src/pages-sub-pages/sub-main',
       ],
     })
-    await ctx.scanSubPages()
-    await ctx.mergeSubPageMetaData()
     const routes = ctx.resolveSubRoutes()
 
     expect(routes).toMatchInlineSnapshot(`
@@ -487,8 +510,7 @@ describe('generate routes', () => {
         },
       ],
     }
-    await ctx.scanSubPages()
-    await ctx.mergeSubPageMetaData()
+    await ctx.scanAndMerge()
     const routes = ctx.resolveSubRoutes()
 
     const parsed = JSON.parse(routes)
@@ -506,7 +528,7 @@ describe('generate routes', () => {
   })
 
   it('subPackages with custom root (monorepo support)', async () => {
-    const ctx = new PageContext({
+    const ctx = await createPages({
       subPackages: [
         {
           dir: 'playground/src/pages-sub-pages/sub-activity',
@@ -518,8 +540,6 @@ describe('generate routes', () => {
         },
       ],
     })
-    await ctx.scanSubPages()
-    await ctx.mergeSubPageMetaData()
     const routes = ctx.resolveSubRoutes()
     expect(routes).toMatchInlineSnapshot(`
       "[
@@ -554,7 +574,7 @@ describe('generate routes', () => {
   })
 
   it('subPackages with mixed string and custom root formats', async () => {
-    const ctx = new PageContext({
+    const ctx = await createPages({
       subPackages: [
         'playground/src/pages-sub-pages/sub-activity',
         {
@@ -563,20 +583,18 @@ describe('generate routes', () => {
         },
       ],
     })
-    await ctx.scanSubPages()
-    await ctx.mergeSubPageMetaData()
     const routes = ctx.resolveSubRoutes()
     const parsed = JSON.parse(routes)
 
     expect(parsed).toHaveLength(2)
 
-    // String format uses computed relative path
+    // 字符串形式使用计算出的相对路径
     const subActivity = parsed.find((p: any) => p.root === '../playground/src/pages-sub-pages/sub-activity')
     expect(subActivity).toBeDefined()
     expect(subActivity.pages).toHaveLength(2)
     expect(subActivity.pages.map((p: any) => p.path)).toEqual(['pages/about/index', 'pages/home/index'])
 
-    // Object format uses custom root
+    // 对象形式使用自定义 root
     const subMain = parsed.find((p: any) => p.root === 'packages/main/src/pages')
     expect(subMain).toBeDefined()
     expect(subMain.pages).toHaveLength(2)
@@ -605,8 +623,7 @@ describe('generate routes', () => {
         },
       ],
     }
-    await ctx.scanSubPages()
-    await ctx.mergeSubPageMetaData()
+    await ctx.scanAndMerge()
     const routes = ctx.resolveSubRoutes()
     const parsed = JSON.parse(routes)
 

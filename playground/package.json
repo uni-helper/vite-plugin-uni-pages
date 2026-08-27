@@ -3,10 +3,13 @@
   "version": "0.3.24",
   "private": true,
   "scripts": {
-    "dev:web": "unh dev web",
+    "build:mp-alipay": "unh build mp-alipay",
+    "build:mp-weixin": "unh build mp-weixin",
     "build:web": "unh build web",
+    "dev:mp-alipay": "unh dev mp-alipay",
     "dev:mp-weixin": "unh dev mp-weixin",
-    "build:mp-weixin": "unh build mp-weixin"
+    "dev:web": "unh dev web",
+    "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
     "@dcloudio/uni-app": "catalog:",
@@ -15,17 +18,20 @@
     "@dcloudio/uni-mp-weixin": "catalog:",
     "@uni-helper/uni-env": "catalog:",
     "vue": "catalog:",
-    "vue-i18n": "catalog:",
-    "yaml": "catalog:"
+    "vue-i18n": "catalog:"
   },
   "devDependencies": {
     "@dcloudio/types": "catalog:",
     "@dcloudio/uni-automator": "catalog:",
     "@dcloudio/uni-cli-shared": "catalog:",
     "@dcloudio/vite-plugin-uni": "catalog:",
+    "@types/node": "catalog:",
+    "@uni-helper/plugin-uni": "catalog:",
     "@uni-helper/unh": "catalog:",
     "@uni-helper/vite-plugin-uni-layouts": "catalog:",
     "@uni-helper/vite-plugin-uni-pages": "workspace:*",
-    "vite": "catalog:"
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vue-tsc": "catalog:"
   }
 }

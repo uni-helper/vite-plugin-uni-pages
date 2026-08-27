@@ -5,8 +5,8 @@ definePage({
   },
   tabBar: {
     text: '零索引',
-    iconPath: 'static/tab-zero.png',
-    selectedIconPath: 'static/tab-zero-active.png',
+    iconPath: 'static/moon.png',
+    selectedIconPath: 'static/sun.png',
     index: 0,
   },
 });

@@ -5,8 +5,8 @@ definePage({
   },
   tabBar: {
     text: '列表',
-    iconPath: 'static/tab-list.png',
-    selectedIconPath: 'static/tab-list-active.png',
+    iconPath: 'static/moon.png',
+    selectedIconPath: 'static/sun.png',
     index: 1,
   },
 });
