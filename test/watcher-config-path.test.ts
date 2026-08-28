@@ -29,9 +29,9 @@ describe('watcher normalizes config change paths before matching sources', () =>
   beforeAll(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-watch-config-'))
     ctx = new PageContext({ dir: 'src/pages', outDir: 'src', dts: false }, tmpDir, 'h5')
-    // sources 的真实来源是 unconfig；这里直接写公共字段，取和
-    // 事件路径不同写法、但指向同一个文件的形态
-    ctx.pagesConfigSourcePaths = [`${tmpDir}/pages.config.ts`]
+    // sources 的真实来源是 loadUserPagesConfig，它存的是归一化后的
+    // 形态；这里模拟同样的事情（os.tmpdir 在 Windows 上是反斜杠路径）
+    ctx.pagesConfigSourcePaths = [`${tmpDir.replace(/\\/g, '/')}/pages.config.ts`]
     vi.spyOn(ctx, 'updatePagesJSON').mockResolvedValue(false)
     await ctx.setupWatcher(watcherStub as any)
   })
