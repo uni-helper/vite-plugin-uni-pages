@@ -87,6 +87,8 @@ export class PagesConfigLoader {
   constructor(private readonly root: string) {}
 
   async load(sources: LoadConfigSource<PagesConfig>[]): Promise<LoadedPagesConfig> {
+    this.recoveryCandidates.clear()
+    this.recoveryDirectories.clear()
     const dependencies = new Set<string>()
     const attemptedPaths = new Set<string>()
     const normalize = (filepath: string): string => normalizeConfigPath(filepath, this.root)

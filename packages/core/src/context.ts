@@ -42,6 +42,9 @@ export class PageContext {
   private targetDirsCache: { pageDirs: string[], excluded: string[] } | undefined
   private pendingUpdate: Promise<void> = Promise.resolve()
 
+  /** 失败恢复以此为基准，避免混入前几轮失败的临时路径 */
+  private lastSuccessfulConfigDependencyPaths: string[] = []
+
   /** 当前配置本地依赖及加载失败后仍需监听的恢复路径 */
   pagesConfigDependencyPaths: string[] = []
 
@@ -131,15 +134,16 @@ export class PageContext {
       this.pagesGlobConfig = config.default || config
       this.pagesConfigSourcePaths = sources
       this.pagesConfigDependencyPaths = dependencies
+      this.lastSuccessfulConfigDependencyPaths = [...dependencies]
       this.configRecoveryCandidates = []
       this.configRecoveryDirectories = []
       debug.options(this.pagesGlobConfig)
     }
     catch (error) {
-      // 失败时保留上次成功的依赖，并补上本次缺的文件；成功后这些会被替换掉
+      // 保留上次成功的依赖，只补入本轮失败的恢复路径
       this.configRecoveryCandidates = [...this.configLoader.recoveryCandidates]
       this.configRecoveryDirectories = [...this.configLoader.recoveryDirectories]
-      this.pagesConfigDependencyPaths = [...new Set([...this.pagesConfigDependencyPaths, ...this.configLoader.recoveryPaths])]
+      this.pagesConfigDependencyPaths = [...new Set([...this.lastSuccessfulConfigDependencyPaths, ...this.configLoader.recoveryPaths])]
       throw error
     }
     finally {
