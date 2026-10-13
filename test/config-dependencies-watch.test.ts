@@ -54,7 +54,6 @@ async function start(mode: 'dev' | 'build', extraFiles: string[] = []): Promise<
   }
   let watched: FSWatcher | undefined
   let registrationCount = (): number => 0
-  const lastChanges = new Map<string, number>()
   const history = new Map<string, object[]>()
   const record = (kind: string, event: string, file: string, watchedPath?: string): void => {
     const key = path.basename(file)
@@ -84,7 +83,6 @@ async function start(mode: 'dev' | 'build', extraFiles: string[] = []): Promise<
     watched = watcher as unknown as FSWatcher
     const add = vi.spyOn(watched, 'add')
     registrationCount = () => add.mock.calls.length
-    watched.on('change', file => lastChanges.set(normalizePath(file), performance.now()))
     watched.on('all', (event, file) => record('all', event, file))
     watched.on('raw', (event, file, details) => record('raw', event, file, details?.watchedPath))
     watched.once('ready', ready)
@@ -132,10 +130,6 @@ async function start(mode: 'dev' | 'build', extraFiles: string[] = []): Promise<
   await settleUpdates()
   const save = async (file: string, content: string, stage = 'save'): Promise<void> => {
     const absolute = normalizePath(path.join(root, file))
-    const previous = lastChanges.get(absolute)
-    // chokidar 会丢弃同一文件 50 ms 内的重复 change；模拟两次独立保存
-    if (previous !== undefined)
-      await delay(Math.max(0, 60 - (performance.now() - previous)))
     let observed = false
     const onEvent = (event: string, filepath: string): void => {
       if ((event === 'add' || event === 'change') && normalizePath(filepath) === absolute)
@@ -143,8 +137,14 @@ async function start(mode: 'dev' | 'build', extraFiles: string[] = []): Promise<
     }
     watched!.on('all', onEvent)
     try {
+      // chokidar 只在 mtimeMs 变化时才发 change；同一次轮询里的两次写入 mtime
+      // 相同就会被吞掉。写入后显式把 mtime 往前推到一个它尚未见过的值，
+      // 而不是猜一个延时，也不再依赖“写的那一刻时间会前进”
+      const absoluteStat = fs.existsSync(absolute) ? fs.statSync(absolute) : undefined
+      const nextMtime = Math.max(Date.now(), (absoluteStat?.mtimeMs ?? 0) + 1)
       record('write', stage, absolute)
       write(file, content)
+      fs.utimesSync(absolute, new Date(nextMtime), new Date(nextMtime))
       await vi.waitFor(() => expect(observed, `${stage}: watcher event for ${file}`).toBe(true), { timeout: 10000, interval: 10 })
     }
     catch (error) {
