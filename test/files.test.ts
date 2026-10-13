@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { checkPagesJsonFileSync, getPageFiles, resolveOptions } from '../packages/core/src'
 
 const options = resolveOptions({}, process.cwd())
@@ -54,6 +54,24 @@ describe('checkPagesJsonFileSync', () => {
 
     expect(fs.readFileSync(jsonPath, 'utf-8')).toContain('"pages"')
     fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it('保留检查之后由其他进程创建的内容', () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-check-race-'))
+    const jsonPath = path.join(tmpDir, 'pages.json')
+    const content = '{"pages":[{"path":"pages/index"}]}'
+    const access = vi.spyOn(fs, 'accessSync').mockImplementationOnce(() => {
+      fs.writeFileSync(jsonPath, content)
+      throw Object.assign(new Error('not found'), { code: 'ENOENT' })
+    })
+    try {
+      checkPagesJsonFileSync(jsonPath)
+      expect(fs.readFileSync(jsonPath, 'utf8')).toBe(content)
+    }
+    finally {
+      access.mockRestore()
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
   })
 
   it('throws on a read-only file and preserves its content', () => {

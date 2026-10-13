@@ -1,6 +1,6 @@
 import type { FSWatcher } from 'chokidar'
-import type { Plugin } from 'vite'
-import type { UserOptions } from './types'
+import type { InitializationSource, UniPagesPlugin, UserOptions } from './types'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import chokidar from 'chokidar'
@@ -42,39 +42,55 @@ export type * from '@uni-helper/uni-pages-types'
  * @param userOptions - 用户配置项
  * @returns Vite 插件实例
  */
-export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
+export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugin {
   let ctx: PageContext
   let buildWatcher: FSWatcher | undefined
+  /**
+   * 当前初始化状态：`{ root, platform, platformSuffix }` 是它的参数，
+   * 同时记下这次初始化是谁发起的（`source`）。
+   *
+   * `source` 用来区分两种“参数变了”：
+   * - `'prepare'` 发起的，参数变了是真冲突，要报错（调用方明确指定了
+   *   一套参数，却被另一套接管）
+   * - `'vite'` 发起的，参数变了只是 Vite 又跑了一次 `resolveConfig`
+   *   （嵌套构建、`build()` 复用一个插件实例、用户换了 root 或平台），
+   *   这种情况下重建上下文，和这个钩子以前的行为一致
+   */
+  let initialization: {
+    root: string
+    platform: string
+    platformSuffix: boolean
+    source: InitializationSource
+    promise: Promise<UniPagesPlugin>
+  } | undefined
 
-  // config.root 要到 configResolved 才知道，这里先用和 Vite 一样的根
-  // 目录规则算个大概，路径规则只维护一份。注意：Vite 的 root 和 cwd
-  // 不一致（又没设 VITE_ROOT_DIR）时，这个占位文件会放错目录——没
-  // 关系，它只是占位，configResolved 里创建的 PageContext 在真正写入
-  // 前总会用 config.root 算出正确路径。
+  // 保留普通用法的同步占位；推导目录不存在时跳过占位，不在可能错误的
+  // 根目录创建目录。这里的 root 只能从 VITE_ROOT_DIR 或 cwd 猜，真正的
+  // root 要等 prepare({ root }) 或 Vite 的 configResolved 才知道，占位
+  // 留给那时用真实 root 跑的完整生成；root 真的不存在时，生成会以
+  // ENOENT 失败并指明路径
   const resolvedPagesJSONPath = resolvePagesJsonPath(
     process.env.VITE_ROOT_DIR || process.cwd(),
     userOptions.outDir ?? 'src',
   )
-  checkPagesJsonFileSync(resolvedPagesJSONPath)
+  if (existsSync(path.dirname(resolvedPagesJSONPath)))
+    checkPagesJsonFileSync(resolvedPagesJSONPath)
 
-  return {
+  const plugin: UniPagesPlugin = {
     name: 'vite-plugin-uni-pages',
     enforce: 'pre',
+    prepare(options) {
+      if (typeof options?.platformSuffix !== 'boolean') {
+        return Promise.reject(new TypeError('[vite-plugin-uni-pages] prepare() requires an explicit boolean platformSuffix option.'))
+      }
+      return initialize(options.root ?? process.env.VITE_ROOT_DIR ?? process.cwd(), options.platformSuffix, 'prepare')
+    },
     /**
      * Vite configResolved 钩子
      * 初始化 PageContext，设置 logger，生成初始 pages.json
      */
     async configResolved(config) {
-      ctx = new PageContext(userOptions, config.root)
-
-      if (config.plugins.some(v => v.name === 'vite-plugin-uni-platform'))
-        ctx.withUniPlatform = true
-
-      const logger = createLogger(undefined, {
-        prefix: '[vite-plugin-uni-pages]',
-      })
-      ctx.setLogger(logger)
-      await ctx.updatePagesJSON()
+      await initialize(config.root, config.plugins.some(v => v.name === 'vite-plugin-uni-platform'), 'vite')
 
       if (config.command === 'build') {
         if (config.build.watch) {
@@ -165,6 +181,57 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): Plugin {
         return ctx.virtualModule()
     },
   }
+
+  function initialize(root: string, platformSuffix: boolean, source: InitializationSource): Promise<UniPagesPlugin> {
+    const resolvedRoot = normalizePath(path.resolve(root))
+    const platform = process.env.UNI_PLATFORM
+    if (!platform) {
+      return Promise.reject(new Error('[vite-plugin-uni-pages] UNI_PLATFORM must be set before initializing pages. Run through the uni-app CLI or set the compilation platform before calling the plugin.'))
+    }
+
+    if (initialization) {
+      const params = { root: resolvedRoot, platform, platformSuffix }
+      const mismatched = (Object.entries(params) as [keyof typeof params, string | boolean][]).find(([key, value]) => initialization![key] !== value)?.[0]
+
+      if (!mismatched)
+        return initialization.promise
+
+      // 已经跑完、且两边都不是 prepare() 发起的：Vite 自己又配了一次，
+      // 按新参数重建。以前的代码每次 configResolved 都新建上下文，
+      // 这里恢复那个行为
+      if (initialization.source === 'vite' && source === 'vite') {
+        initialization = undefined
+      }
+      else {
+        return Promise.reject(new Error(`[vite-plugin-uni-pages] ${mismatched} does not match the initialized pages context. Use the same root, UNI_PLATFORM and UniPlatform setting for prepare() and Vite.`))
+      }
+    }
+
+    const state = {
+      root: resolvedRoot,
+      platform,
+      platformSuffix,
+      source,
+      // 先保存进行中状态，再开始生成，重复调用共享一次初始化
+      promise: Promise.resolve().then(async () => {
+        const context = new PageContext(userOptions, resolvedRoot, platform)
+        context.withUniPlatform = platformSuffix
+        context.setLogger(createLogger(undefined, { prefix: '[vite-plugin-uni-pages]' }))
+        await context.updatePagesJSON()
+        ctx = context
+        return plugin
+      }).catch((error) => {
+        // 失败的上下文可能已有部分缓存，重试时重新创建
+        if (initialization === state)
+          initialization = undefined
+        throw error
+      }),
+    }
+    initialization = state
+    return state.promise
+  }
+
+  return plugin
 }
 
 export default VitePluginUniPages
