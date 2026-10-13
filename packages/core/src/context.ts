@@ -158,8 +158,7 @@ export class PageContext {
         return
 
       debug.pages(`File added: ${path}`)
-      if (await this.updatePagesJSON())
-        this.onUpdate()
+      await this.updatePagesAndNotify()
     })
 
     watcher.on('change', async (path) => {
@@ -173,8 +172,7 @@ export class PageContext {
       // 需要重启开发服务器才生效。
       if (this.pagesConfigSourcePaths.includes(path)) {
         debug.pages(`Config source changed: ${path}`)
-        if (await this.updatePagesJSON())
-          this.onUpdate()
+        await this.updatePagesAndNotify()
         return
       }
 
@@ -183,8 +181,7 @@ export class PageContext {
         return
 
       debug.pages(`File changed: ${path}`)
-      if (await this.updatePagesJSON(path))
-        this.onUpdate()
+      await this.updatePagesAndNotify(path)
     })
 
     watcher.on('unlink', async (path) => {
@@ -193,9 +190,29 @@ export class PageContext {
         return
 
       debug.pages(`File removed: ${path}`)
-      if (await this.updatePagesJSON())
-        this.onUpdate()
+      await this.updatePagesAndNotify()
     })
+  }
+
+  /**
+   * 监听事件里的"更新并通知"：失败只记录，不让 Promise 拒绝。
+   *
+   * watcher 的回调是 async 函数，没人接它的 Promise。一旦
+   * {@link updatePagesJSON} 拒绝（拿不到文件锁、声明文件写不进去），
+   * 就成了未处理的拒绝，Node 默认直接终止进程——开发时正在编辑文件，
+   * 一次偶发的锁冲突不该把 dev server 打死。用户改一次文件就会再触发
+   * 一次事件，所以这里报错即可。
+   *
+   * @param filepath - 发生变更的文件路径，透传给 {@link updatePagesJSON}
+   */
+  private async updatePagesAndNotify(filepath?: string): Promise<void> {
+    try {
+      if (await this.updatePagesJSON(filepath))
+        this.onUpdate()
+    }
+    catch (error) {
+      this.logger?.error(`[vite-plugin-uni-pages] Failed to update pages.json after a file change: ${error instanceof Error ? error.message : error}`, { timestamp: true, error: error instanceof Error ? error : undefined })
+    }
   }
 
   /**
@@ -286,17 +303,29 @@ export class PageContext {
         insertFinalNewline: this.options.insertFinalNewline,
       },
     })
+    if (!result)
+      throw new Error(`[vite-plugin-uni-pages] Failed to acquire the pages.json file lock: ${this.resolvedPagesJSONPath}`)
 
     // 声明文件写的是另一个文件（uni-pages.d.ts），不需要和 pages.json
     // 用同一把锁。保持原有行为：不管内容变没变，都在 pages.json 计算
     // 之后运行
-    this.generateDeclaration()
+    try {
+      await this.generateDeclaration()
+    }
+    catch (error) {
+      // pages.json 已提交，声明失败也不能丢失写入回调和页面更新通知
+      if (result.updated) {
+        this.options.onAfterWriteFile(this.resolvedPagesJSONPath, result.content)
+        this.onUpdate()
+      }
+      throw error
+    }
 
-    if (result?.updated) {
+    if (result.updated) {
       this.options.onAfterWriteFile(this.resolvedPagesJSONPath, result.content)
     }
 
-    return result?.updated ?? false
+    return result.updated
   }
 
   /**

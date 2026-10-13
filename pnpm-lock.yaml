@@ -169,6 +169,9 @@ importers:
       unrun:
         specifier: 'catalog:'
         version: 0.3.1(synckit@0.11.13)
+      vite:
+        specifier: 'catalog:'
+        version: 5.4.21(@types/node@24.13.3)(terser@5.49.2)
       vitest:
         specifier: 'catalog:'
         version: 3.2.7(@types/debug@4.1.13)(@types/node@24.13.3)(jiti@2.7.0)(jsdom@16.7.0(bufferutil@4.1.0))(terser@5.49.2)(yaml@2.9.0)
