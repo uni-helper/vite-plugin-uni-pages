@@ -9,7 +9,7 @@ import { loadConfig } from 'unconfig'
 import { normalizePath } from 'vite'
 
 const scriptExtensions = /\.[cm]?[jt]sx?$/
-/** 可能改变配置内容的文件类型；watcher 回调先按它丢弃无关事件，避免逐个解析路径 */
+/** 目录恢复监听接受的文件类型；已知配置入口与依赖不受此限制 */
 export const configFileExtensions = /\.(?:[cm]?[jt]sx?|json)$/
 /** 省略扩展名时 esbuild 会依次尝试的后缀，用于列举恢复候选文件 */
 const candidateExtensions = ['', '.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.json']
@@ -80,7 +80,7 @@ export class PagesConfigLoader {
   readonly recoveryPaths = new Set<string>()
   /** 本次失败中具体缺哪个文件；优先按它判断，命中时不看目录 */
   readonly recoveryCandidates = new Set<string>()
-  /** 候选文件无法列出时的兜底目录（目录入口、非相对说明符） */
+  /** 目录导入的恢复范围，覆盖 package.json 和自定义入口 */
   readonly recoveryDirectories = new Set<string>()
   private readonly knownSources = new Set<string>()
 
@@ -191,10 +191,10 @@ export class PagesConfigLoader {
                 if (args.kind === 'entry-point' || args.pluginData?.resolvingPackage)
                   return
                 if (args.path.startsWith('.') || path.isAbsolute(args.path)) {
-                  const directory = normalizeConfigPath(path.dirname(path.resolve(args.resolveDir, args.path)), path.dirname(sourcePath))
+                  const directory = normalizeConfigPath(path.resolve(args.resolveDir, args.path), root)
                   if (!isNodeModulesPath(directory)) {
+                    // 导入目标可能是尚未创建的目录；仅保留其内部范围，不放宽到父目录
                     importDirectories.add(directory)
-                    // 列不出具体候选时（目录尚未创建、写法极不常规）才靠目录兜底
                     for (const candidate of recoveryCandidatesFor(args.path, args.resolveDir))
                       recoveryCandidates.add(normalizeConfigPath(candidate, root))
                   }
@@ -238,17 +238,14 @@ export class PagesConfigLoader {
     }
     catch (error) {
       if (Array.isArray((error as { errors?: unknown })?.errors)) {
-        // 编译失败时记下具体的恢复候选文件，只在候选缺失时才放宽到目录；
-        // 按文件匹配可以让无关文件不再触发整次重新生成
+        // 编译失败时保留缺失文件的精确候选
         for (const candidate of recoveryCandidates) {
           if (!existsSync(candidate))
             this.recoveryCandidates.add(candidate)
         }
-        // 目录入口（如 './config'）和路径写错时列不出候选，保留目录兜底
-        for (const directory of importDirectories) {
-          if (![...recoveryCandidates].some(candidate => candidate.startsWith(`${directory}/`)))
-            this.recoveryDirectories.add(directory)
-        }
+        // package.json 的 main 可能指向非 index 文件，目录内补建清单或入口也需触发恢复
+        for (const directory of importDirectories)
+          this.recoveryDirectories.add(directory)
       }
       throw error
     }

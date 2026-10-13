@@ -51,7 +51,7 @@ export class PageContext {
   /** 装载失败时具体缺哪个文件；命中时不看兜底目录 */
   private configRecoveryCandidates: string[] = []
 
-  /** 候选文件列不出来时的兜底目录；只在装载失败时非空 */
+  /** 目录导入的恢复范围；只在装载失败时非空 */
   private configRecoveryDirectories: string[] = []
 
   /** 从用户配置文件（pages.config.ts）解析出的配置对象 */
@@ -203,23 +203,30 @@ export class PageContext {
     if (this.watchers.has(watcher))
       return
 
+    const { pageDirs, excluded } = this.getPathMatchers()
     const handleEvent = (event: 'add' | 'change' | 'unlink', filepath: string): void => {
-      // 廉价过滤放在路径解析之前：页面文件只可能是页面扩展名，其他文件
-      // 先按配置扩展名和临时产物名剔掉，剩下才值得真实路径解析
-      const basename = path.basename(filepath)
       const mightBePage = isTargetFile(filepath)
+      const eventPath = normalizePath(path.resolve(this.root, normalizePath(filepath)))
+      if (!mightBePage && excluded.includes(eventPath))
+        return
+
+      const basename = path.basename(filepath)
       const mightBeConfig = configFileExtensions.test(basename)
         && !basename.includes('.bundled_')
         && !basename.startsWith('__unconfig_')
-      if (!mightBePage && !mightBeConfig)
-        return
 
-      const absolute = normalizeConfigPath(filepath, this.root)
-      const { pageDirs, excluded } = this.getPathMatchers()
+      // 未直接命中的路径仍需解析，以识别符号链接别名
       const index = this.watchedConfigIndex.get(watcher)
-      const isConfigPath = !!index && !excluded.includes(absolute)
-        && (index.files.has(absolute) || index.directories.some(dir => absolute.startsWith(`${dir}/`)))
-      const configChanged = mightBeConfig && isConfigPath
+      const absolute = index?.files.has(eventPath) && !excluded.includes(eventPath)
+        ? eventPath
+        : normalizeConfigPath(filepath, this.root)
+
+      // 已知配置不限扩展名，文件类型过滤只用于目录恢复
+      const isConfigPath = !!index && (
+        index.files.has(absolute)
+        || (mightBeConfig && index.directories.some(dir => absolute.startsWith(`${dir}/`)))
+      )
+      const configChanged = !excluded.includes(absolute) && isConfigPath
       const pageChanged = mightBePage && pageDirs.some(dir => absolute.startsWith(`${dir}/`))
       if (!configChanged && !pageChanged)
         return

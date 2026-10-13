@@ -1,4 +1,5 @@
 import type { FSWatcher } from 'vite'
+import type { UserOptions } from '../packages/core/src/types'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -51,7 +52,7 @@ interface WatcherSession {
   remove: (file: string) => Promise<void>
 }
 
-async function start(mode: 'dev' | 'build', extraFiles: string[] = []): Promise<WatcherSession> {
+async function start(mode: 'dev' | 'build', extraFiles: string[] = [], userOptions: UserOptions = {}): Promise<WatcherSession> {
   const updates = vi.spyOn(PageContext.prototype, 'updatePagesJSON')
   const settleUpdates = async (): Promise<void> => {
     await Promise.allSettled(updates.mock.results.map(result => result.value))
@@ -95,7 +96,7 @@ async function start(mode: 'dev' | 'build', extraFiles: string[] = []): Promise<
       expect(add).not.toHaveBeenCalled()
     return result
   })
-  const plugin = UniPages({ dts: true })
+  const plugin = UniPages({ dts: true, ...userOptions })
   if (mode === 'dev') {
     const server = await createServer({
       root,
@@ -202,6 +203,59 @@ async function start(mode: 'dev' | 'build', extraFiles: string[] = []): Promise<
 }
 
 describe('真实配置依赖 watcher', () => {
+  describe.each(['dev', 'build'] as const)('%s', (mode) => {
+    it.each(['pages.config', 'pages.custom', 'pages.config.ts', 'pages.config.json'])('配置入口 %s 修改后更新产物', async (filename) => {
+      fs.unlinkSync(path.join(root, 'pages.config.ts'))
+      const serialize = (title: string): string => {
+        const config = JSON.stringify({ globalStyle: { navigationBarTitleText: title } })
+        return filename.endsWith('.ts') ? `export default ${config}` : config
+      }
+      write(filename, serialize('entry-initial'))
+      const options: UserOptions = filename === 'pages.custom'
+        ? { configSource: { files: filename, extensions: [], parser: file => JSON.parse(fs.readFileSync(file, 'utf8')) } }
+        : {}
+      const { save, settleUpdates } = await start(mode, [filename], options)
+      expect(output().globalStyle.navigationBarTitleText).toBe('entry-initial')
+
+      await save(filename, serialize('entry-updated'))
+      await settleUpdates()
+      expect(output().globalStyle.navigationBarTitleText).toBe('entry-updated')
+    }, 30000)
+
+    it.each(['config/custom.ts', 'config/package.json'])('目录导入在补建 %s 后恢复', async (missingFile) => {
+      fs.mkdirSync(path.join(root, 'config'))
+      const files: Record<string, string> = {
+        'config/package.json': '{"main":"./custom.ts"}',
+        'config/custom.ts': `export const title = 'directory-recovered'`,
+      }
+      const existingFile = missingFile === 'config/custom.ts' ? 'config/package.json' : 'config/custom.ts'
+      write(existingFile, files[existingFile])
+      const { save, settleUpdates } = await start(mode, [existingFile])
+      expect(output().globalStyle.navigationBarTitleText).toBe('initial')
+      const load = PageContext.prototype.loadUserPagesConfig
+      let failed = false
+      vi.spyOn(PageContext.prototype, 'loadUserPagesConfig').mockImplementation(async function (this: PageContext) {
+        try {
+          await load.call(this)
+        }
+        catch (error) {
+          failed = true
+          throw error
+        }
+      })
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      await save('pages.config.ts', `import { title } from './config'; export default { globalStyle: { navigationBarTitleText: title } }`)
+      await settleUpdates()
+      expect(failed).toBe(true)
+      expect(output().globalStyle.navigationBarTitleText).toBe('initial')
+
+      await save(missingFile, files[missingFile])
+      await settleUpdates()
+      expect(output().globalStyle.navigationBarTitleText).toBe('directory-recovered')
+    }, 30000)
+  })
+
   it.each(['dev', 'build'] as const)('%s 监听根目录外的 workspace 包真实路径', async (mode) => {
     const workspace = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-workspace-config-')))
     try {
