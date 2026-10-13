@@ -33,6 +33,14 @@ export interface UniPagesPlugin extends Plugin {
 }
 
 /**
+ * 谁发起了这次初始化。
+ *
+ * `'prepare'` 是调用方主动指定了一套参数，参数不一致属于错误；`'vite'`
+ * 是 Vite 自己跑钩子，参数变了只说明它又配置了一次，按新参数重建即可。
+ */
+export type InitializationSource = 'prepare' | 'vite'
+
+/**
  * 从对象类型中排除索引签名键，仅保留显式键
  */
 export type ExcludeIndexSignature<T> = {

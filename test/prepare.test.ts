@@ -174,6 +174,37 @@ describe('pages.prepare()', () => {
     await expect(resolveConfig({ root: path.dirname(root), configFile: false, logLevel: 'silent', plugins: [pages] }, 'serve')).rejects.toThrow('root does not match')
   })
 
+  // prepare() 没参与时，同一个插件实例被 Vite 用另一套参数再配一次
+  // （嵌套构建、build() 复用实例、换了 root 或平台）应当照旧重建上下文，
+  // 不能变成硬报错
+  it('未被 prepare 接管时允许 Vite 换 root 重建', async () => {
+    const root = fixture()
+    const pages = UniPages({ dts: false })
+    await resolveConfig({ root, configFile: false, logLevel: 'silent', plugins: [pages] }, 'serve')
+    const second = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-prepare-')))
+    roots.push(second)
+    fs.mkdirSync(path.join(second, 'src/pages'), { recursive: true })
+    vi.stubEnv('VITE_ROOT_DIR', second)
+    await expect(resolveConfig({ root: second, configFile: false, logLevel: 'silent', plugins: [pages] }, 'serve')).resolves.toBeTruthy()
+  })
+
+  it('未被 prepare 接管时允许 Vite 换平台重建', async () => {
+    const root = fixture()
+    const pages = UniPages({ dts: false })
+    await resolveConfig({ root, configFile: false, logLevel: 'silent', plugins: [pages] }, 'serve')
+    vi.stubEnv('UNI_PLATFORM', 'mp-weixin')
+    await expect(resolveConfig({ root, configFile: false, logLevel: 'silent', plugins: [pages] }, 'serve')).resolves.toBeTruthy()
+  })
+
+  // 反向的情形仍要拦住：Vite 先初始化，随后 prepare() 给出一套不同的参数，
+  // 说明调用方对当前上下文的理解是错的
+  it('vite 接管后 prepare 参数不一致仍然报错', async () => {
+    const root = fixture()
+    const pages = UniPages({ dts: false })
+    await resolveConfig({ root, configFile: false, logLevel: 'silent', plugins: [pages] }, 'serve')
+    await expect(pages.prepare({ root, platformSuffix: true })).rejects.toThrow('platformSuffix does not match')
+  })
+
   it.each([false, true])('接管时校验 UniPlatform 状态：prepare=%s', async (platformSuffix) => {
     const root = fixture()
     const pages = await UniPages({ dts: false }).prepare({ platformSuffix })
