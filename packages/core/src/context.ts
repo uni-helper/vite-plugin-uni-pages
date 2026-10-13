@@ -143,7 +143,7 @@ export class PageContext {
       throw error
     }
     finally {
-      await this.refreshConfigWatchers()
+      this.refreshConfigWatchers()
     }
   }
 
@@ -240,7 +240,7 @@ export class PageContext {
     })
     this.watchedConfigPaths.set(watcher, new Set())
     this.watchedConfigIndex.set(watcher, { files: new Set(), directories: [] })
-    await this.refreshConfigWatchers()
+    this.refreshConfigWatchers()
   }
 
   /** 解绑本插件回调；共享 watcher 的关闭仍由 Vite 负责 */
@@ -260,7 +260,7 @@ export class PageContext {
    * 依赖换掉后旧文件必须 unwatch，否则一个反复改 `pages.config.ts`
    * 的开发会话会一直挂着早已移除的路径，过滤器也跟着变慢。
    */
-  private async refreshConfigWatchers(): Promise<void> {
+  private refreshConfigWatchers(): void {
     const files = [...this.pagesConfigSourcePaths, ...this.pagesConfigDependencyPaths, ...this.configRecoveryCandidates]
     // 监听现存父目录可发现新建文件；事件仍按当前依赖集合过滤
     const paths = [...new Set([
@@ -284,8 +284,9 @@ export class PageContext {
         && ![...added].some(existing => file === existing || file.startsWith(`${existing}/`)))
       if (wanted.length) {
         try {
-          // chokidar 5 返回 Promise，chokidar 3 返回 this
-          await watcher.add(wanted)
+          // add() 不是 Promise（chokidar 3 和 5 都返回 this），只能捕获同步抛出；
+          // 注册本身异步完成，没有可等的完成信号
+          watcher.add(wanted)
           for (const file of wanted)
             added.add(file)
         }

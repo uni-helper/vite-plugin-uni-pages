@@ -7,9 +7,13 @@ import { parse } from 'comment-json'
 import { build, createServer, normalizePath } from 'vite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import UniPages from '../packages/core/src'
+import { normalizeConfigPath } from '../packages/core/src/config-loader'
 import { PageContext } from '../packages/core/src/context'
 
 vi.hoisted(() => vi.stubEnv('UNI_PLATFORM', 'h5'))
+
+/** chokidar 丢弃同一路径 50 ms 内的重复 change，重试前必须等过这个窗口 */
+const CHANGE_THROTTLE_MS = 60
 
 let root: string
 let close: (() => Promise<unknown>) | undefined
@@ -118,14 +122,16 @@ async function start(mode: 'dev' | 'build', extraFiles: string[] = []): Promise<
   }
   await readyPromise
   expect(watched).toBeDefined()
-  // Vite 5 的缺失 .env 候选会使 chokidar 提前 ready；等待文件实际注册后再写盘
+  // Vite 5 的缺失 .env 候选会使 chokidar 提前 ready；等待文件实际注册后再写盘。
+  // 两边都按真实路径比较：workspace 依赖经由 node_modules 符号链接引入，
+  // 而 chokidar 的 getWatched() 报的是链接目标的真实路径
   await vi.waitFor(() => {
     const watchedFiles = Object.entries(watched!.getWatched()).flatMap(([directory, files]) =>
-      files.map(file => normalizePath(path.resolve(directory, file))),
+      files.map(file => normalizeConfigPath(path.resolve(directory, file), root)),
     )
     const targets = ['pages.config.ts', 'leaf.ts', 'old-leaf.ts', 'src/pages/index.vue', ...extraFiles].filter(file => fs.existsSync(path.join(root, file)))
     for (const file of targets)
-      expect(watchedFiles).toContain(normalizePath(path.join(root, file)))
+      expect(watchedFiles).toContain(normalizeConfigPath(path.join(root, file), root))
   }, { timeout: 10000 })
   await settleUpdates()
   const save = async (file: string, content: string, stage = 'save'): Promise<void> => {
@@ -137,15 +143,31 @@ async function start(mode: 'dev' | 'build', extraFiles: string[] = []): Promise<
     }
     watched!.on('all', onEvent)
     try {
-      // chokidar 只在 mtimeMs 变化时才发 change；同一次轮询里的两次写入 mtime
-      // 相同就会被吞掉。写入后显式把 mtime 往前推到一个它尚未见过的值，
-      // 而不是猜一个延时，也不再依赖“写的那一刻时间会前进”
-      const absoluteStat = fs.existsSync(absolute) ? fs.statSync(absolute) : undefined
-      const nextMtime = Math.max(Date.now(), (absoluteStat?.mtimeMs ?? 0) + 1)
+      // chokidar 只在 mtimeMs 变化时才发 change，而且对同一路径 50 ms 内的重复 change
+      // 直接丢弃。写完把 mtime 推到比原值大，并在被节流时等过窗口再推一次；
+      // Date 会把毫秒截成整数，所以推进后的值必须比原值大，不能只加一次
+      const previousStat = fs.existsSync(absolute) ? fs.statSync(absolute) : undefined
+      let nextMtime = Math.max(Date.now() + 1, (previousStat?.mtimeMs ?? 0) + 1)
       record('write', stage, absolute)
       write(file, content)
       fs.utimesSync(absolute, new Date(nextMtime), new Date(nextMtime))
-      await vi.waitFor(() => expect(observed, `${stage}: watcher event for ${file}`).toBe(true), { timeout: 10000, interval: 10 })
+      const waitForEvent = (): Promise<void> =>
+        vi.waitFor(() => expect(observed, `${stage}: watcher event for ${file}`).toBe(true), { timeout: 10000, interval: 10 })
+      try {
+        await waitForEvent()
+      }
+      catch (initialFailure) {
+        // 上一次 change 还在节流窗口里，等到窗口过去后用更大的 mtime 再触发一次
+        await delay(CHANGE_THROTTLE_MS)
+        nextMtime = Math.max(Date.now() + 1, fs.statSync(absolute).mtimeMs + 1)
+        fs.utimesSync(absolute, new Date(nextMtime), new Date(nextMtime))
+        try {
+          await waitForEvent()
+        }
+        catch {
+          throw initialFailure
+        }
+      }
     }
     catch (error) {
       throw new Error(`Config watcher failed: ${diagnose(stage, file)}`, { cause: error })
