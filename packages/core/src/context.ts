@@ -9,7 +9,7 @@ import { stringify as cjStringify } from 'comment-json'
 import dbg from 'debug'
 import groupBy from 'lodash.groupby'
 import { normalizePath } from 'vite'
-import { configWatchDirectory, normalizeConfigPath, PagesConfigLoader } from './config-loader'
+import { configFileExtensions, configWatchDirectory, normalizeConfigPath, PagesConfigLoader } from './config-loader'
 import { RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import { writeDeclaration } from './declaration'
 import { checkPagesJsonFileSync, getPageFiles, isTargetFile, resolvePagesJsonPath } from './files'
@@ -31,10 +31,25 @@ export class PageContext {
   private readonly configLoader: PagesConfigLoader
   private readonly watchers = new Map<FSWatcher, () => void>()
   private readonly watchedConfigPaths = new Map<FSWatcher, Set<string>>()
+  /**
+   * 每次事件都要比对的绝对路径，按 watcher 缓存
+   *
+   * 配置装载完成前为空，那时还没有依赖可比；装载后会刷新，
+   * 回调里不再逐个调 realpathSync
+   */
+  private readonly watchedConfigIndex = new Map<FSWatcher, { files: Set<string>, directories: string[] }>()
+  /** 页面目录与 pages.json、d.ts 的绝对路径，只在选项变化时重算 */
+  private targetDirsCache: { pageDirs: string[], excluded: string[] } | undefined
   private pendingUpdate: Promise<void> = Promise.resolve()
 
   /** 当前配置本地依赖及加载失败后仍需监听的恢复路径 */
   pagesConfigDependencyPaths: string[] = []
+
+  /** 装载失败时具体缺哪个文件；命中时不看兜底目录 */
+  private configRecoveryCandidates: string[] = []
+
+  /** 候选文件列不出来时的兜底目录；只在装载失败时非空 */
+  private configRecoveryDirectories: string[] = []
 
   /** 从用户配置文件（pages.config.ts）解析出的配置对象 */
   pagesGlobConfig: PagesConfig | undefined
@@ -116,14 +131,19 @@ export class PageContext {
       this.pagesGlobConfig = config.default || config
       this.pagesConfigSourcePaths = sources
       this.pagesConfigDependencyPaths = dependencies
+      this.configRecoveryCandidates = []
+      this.configRecoveryDirectories = []
       debug.options(this.pagesGlobConfig)
     }
     catch (error) {
+      // 失败时保留上次成功的依赖，并补上本次缺的文件；成功后这些会被替换掉
+      this.configRecoveryCandidates = [...this.configLoader.recoveryCandidates]
+      this.configRecoveryDirectories = [...this.configLoader.recoveryDirectories]
       this.pagesConfigDependencyPaths = [...new Set([...this.pagesConfigDependencyPaths, ...this.configLoader.recoveryPaths])]
       throw error
     }
     finally {
-      this.refreshConfigWatchers()
+      await this.refreshConfigWatchers()
     }
   }
 
@@ -152,6 +172,25 @@ export class PageContext {
   }
 
   /**
+   * 取当前事件要比对的页面目录与需排除的绝对路径，结果缓存
+   *
+   * 只依赖构造后不再变化的 `options`，所以算一次就够，不必每个
+   * 事件重新解析一遍 realpath
+   */
+  private getPathMatchers(): { pageDirs: string[], excluded: string[] } {
+    if (!this.targetDirsCache) {
+      this.targetDirsCache = {
+        pageDirs: [...this.options.dirs, ...this.options.subPackages].map(dir => normalizeConfigPath(dir, this.root)),
+        excluded: [
+          normalizeConfigPath(this.resolvedPagesJSONPath, this.root),
+          ...this.options.dts ? [normalizeConfigPath(this.options.dts, this.root)] : [],
+        ],
+      }
+    }
+    return this.targetDirsCache
+  }
+
+  /**
    * 设置文件监听器，监听页面文件与配置文件变更
    * 页面文件或配置文件变化时自动更新 pages.json
    * @param watcher - chokidar 文件监听器实例
@@ -161,18 +200,23 @@ export class PageContext {
       return
 
     const handleEvent = (event: 'add' | 'change' | 'unlink', filepath: string): void => {
+      // 廉价过滤放在路径解析之前：页面文件只可能是页面扩展名，其他文件
+      // 先按配置扩展名和临时产物名剔掉，剩下才值得真实路径解析
+      const basename = path.basename(filepath)
+      const mightBePage = isTargetFile(filepath)
+      const mightBeConfig = configFileExtensions.test(basename)
+        && !basename.includes('.bundled_')
+        && !basename.startsWith('__unconfig_')
+      if (!mightBePage && !mightBeConfig)
+        return
+
       const absolute = normalizeConfigPath(filepath, this.root)
-      const recoveryChanged = /\.(?:[cm]?[jt]sx?|json)$/.test(absolute)
-        && !path.basename(absolute).includes('.bundled_')
-        && !path.basename(absolute).startsWith('__unconfig_')
-        && absolute !== normalizeConfigPath(this.resolvedPagesJSONPath, this.root)
-        && (!this.options.dts || absolute !== normalizeConfigPath(this.options.dts, this.root))
-        && [...this.configLoader.recoveryDirectories].some(dir => absolute.startsWith(`${dir}/`))
-      const configChanged = recoveryChanged || [...this.pagesConfigSourcePaths, ...this.pagesConfigDependencyPaths]
-        .some(file => normalizeConfigPath(file, this.root) === absolute)
-      const targetDirs = [...this.options.dirs, ...this.options.subPackages]
-        .map(dir => normalizeConfigPath(dir, this.root))
-      const pageChanged = isTargetFile(filepath) && targetDirs.some(dir => absolute.startsWith(`${dir}/`))
+      const { pageDirs, excluded } = this.getPathMatchers()
+      const index = this.watchedConfigIndex.get(watcher)
+      const isConfigPath = !!index && !excluded.includes(absolute)
+        && (index.files.has(absolute) || index.directories.some(dir => absolute.startsWith(`${dir}/`)))
+      const configChanged = mightBeConfig && isConfigPath
+      const pageChanged = mightBePage && pageDirs.some(dir => absolute.startsWith(`${dir}/`))
       if (!configChanged && !pageChanged)
         return
 
@@ -195,7 +239,8 @@ export class PageContext {
       watcher.off('unlink', onUnlink)
     })
     this.watchedConfigPaths.set(watcher, new Set())
-    this.refreshConfigWatchers()
+    this.watchedConfigIndex.set(watcher, { files: new Set(), directories: [] })
+    await this.refreshConfigWatchers()
   }
 
   /** 解绑本插件回调；共享 watcher 的关闭仍由 Vite 负责 */
@@ -204,26 +249,53 @@ export class PageContext {
       dispose()
     this.watchers.clear()
     this.watchedConfigPaths.clear()
+    this.watchedConfigIndex.clear()
     this._server = undefined
     await this.pendingUpdate
   }
 
-  private refreshConfigWatchers(): void {
-    const files = [...this.pagesConfigSourcePaths, ...this.pagesConfigDependencyPaths]
-    // 监听现存父目录可发现删除后的恢复；事件仍按当前依赖集合过滤
-    const recoveryDirectories = [...this.configLoader.recoveryDirectories]
-    const paths = [...new Set([...files, ...files.map(configWatchDirectory), ...recoveryDirectories.map(dir => configWatchDirectory(path.join(dir, '_')))])]
+  /**
+   * 让监听路径与当前配置依赖保持一致
+   *
+   * 依赖换掉后旧文件必须 unwatch，否则一个反复改 `pages.config.ts`
+   * 的开发会话会一直挂着早已移除的路径，过滤器也跟着变慢。
+   */
+  private async refreshConfigWatchers(): Promise<void> {
+    const files = [...this.pagesConfigSourcePaths, ...this.pagesConfigDependencyPaths, ...this.configRecoveryCandidates]
+    // 监听现存父目录可发现新建文件；事件仍按当前依赖集合过滤
+    const paths = [...new Set([
+      ...files,
+      ...files.map(configWatchDirectory),
+      ...this.configRecoveryDirectories.map(dir => configWatchDirectory(path.join(dir, '_'))),
+    ])]
+    // 父目录（尤其是项目 root）会覆盖其下所有路径，过滤事件时只看真实依赖，
+    // 否则 root 会把任何路径都当成需要保留的
+    const index = {
+      files: new Set(files.map(file => normalizeConfigPath(file, this.root))),
+      directories: this.configRecoveryDirectories.map(dir => normalizeConfigPath(dir, this.root)),
+    }
     for (const watcher of this.watchers.keys()) {
       const added = this.watchedConfigPaths.get(watcher)!
       const sharedRoot = this._server && watcher === (this._server.watcher as unknown as FSWatcher)
         ? normalizeConfigPath(this._server.config.root, this.root)
         : undefined
-      const newPaths = paths.filter(file => ![...added].some(existing => file === existing || file.startsWith(`${existing}/`)) && (!sharedRoot || (file !== sharedRoot && !file.startsWith(`${sharedRoot}/`))))
-      if (newPaths.length) {
-        watcher.add(newPaths)
-        for (const file of newPaths)
-          added.add(file)
+      // sharedRoot 由 Vite 自己监听，不重复添加也不能撤销
+      const wanted = paths.filter(file => (!sharedRoot || (file !== sharedRoot && !file.startsWith(`${sharedRoot}/`)))
+        && ![...added].some(existing => file === existing || file.startsWith(`${existing}/`)))
+      if (wanted.length) {
+        try {
+          // chokidar 5 返回 Promise，chokidar 3 返回 this
+          await watcher.add(wanted)
+          for (const file of wanted)
+            added.add(file)
+        }
+        catch (error) {
+          this.logger?.error(`[vite-plugin-uni-pages] Failed to watch pages config dependencies: ${error instanceof Error ? error.message : error}`, { timestamp: true, error: error instanceof Error ? error : undefined })
+        }
       }
+      // 不主动 unwatch：chokidar 对文件调用 unwatch 会连带拆掉父目录监听，
+      // 新建文件就再也发现不了；监听集合按目录收敛，不会随会话无界增长
+      this.watchedConfigIndex.set(watcher, index)
     }
   }
 

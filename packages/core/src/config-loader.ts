@@ -9,9 +9,36 @@ import { loadConfig } from 'unconfig'
 import { normalizePath } from 'vite'
 
 const scriptExtensions = /\.[cm]?[jt]sx?$/
+/** 可能改变配置内容的文件类型；watcher 回调先按它丢弃无关事件，避免逐个解析路径 */
+export const configFileExtensions = /\.(?:[cm]?[jt]sx?|json)$/
+/** 省略扩展名时 esbuild 会依次尝试的后缀，用于列举恢复候选文件 */
+const candidateExtensions = ['', '.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.json']
+/** TS 约定里 `./x.js` 指向的就是 `./x.ts`，恢复候选也得列上 */
+const typescriptAliases: Record<string, string[]> = { '.cjs': ['.cts'], '.js': ['.ts', '.tsx'], '.mjs': ['.mts'] }
 
 function isNodeModulesPath(filepath: string): boolean {
   return normalizePath(filepath).split('/').includes('node_modules')
+}
+
+/**
+ * 由失败的导入说明符推出可能出现的文件
+ *
+ * @description `./missing/title` 这种缺扩展名的写法，创建 `title.ts`
+ * 或 `title/index.ts` 都算恢复，所以两种形态都要列出来
+ */
+function recoveryCandidatesFor(specifier: string, importerDirectory: string): string[] {
+  const base = path.resolve(importerDirectory, specifier)
+  const candidates = candidateExtensions.map(extension => `${base}${extension}`)
+  for (const extension of candidateExtensions.slice(1))
+    candidates.push(path.join(base, `index${extension}`))
+  // `./typed.js` 在 TS 里落到 typed.ts；写死扩展名时只剩这一种可能
+  for (const [extension, aliases] of Object.entries(typescriptAliases)) {
+    if (base.endsWith(extension)) {
+      for (const alias of aliases)
+        candidates.push(`${base.slice(0, -extension.length)}${alias}`)
+    }
+  }
+  return candidates
 }
 
 /** 将已存在和暂时缺失的文件统一到同一绝对路径 */
@@ -49,7 +76,11 @@ interface LoadedPagesConfig {
  * @description 自定义 parser 仍由调用方负责加载；失败路径只用于恢复监听，不替换上次成功配置
  */
 export class PagesConfigLoader {
+  /** 装载失败时仍需监听重建的入口与已尝试路径 */
   readonly recoveryPaths = new Set<string>()
+  /** 本次失败中具体缺哪个文件；优先按它判断，命中时不看目录 */
+  readonly recoveryCandidates = new Set<string>()
+  /** 候选文件无法列出时的兜底目录（目录入口、非相对说明符） */
   readonly recoveryDirectories = new Set<string>()
   private readonly knownSources = new Set<string>()
 
@@ -101,6 +132,7 @@ export class PagesConfigLoader {
     try {
       const result = await loadConfig<PagesConfig>({ cwd: this.root, sources: adapted, defaults: {} })
       this.recoveryPaths.clear()
+      this.recoveryCandidates.clear()
       this.recoveryDirectories.clear()
       for (const source of result.sources)
         this.knownSources.add(normalize(source))
@@ -116,6 +148,8 @@ export class PagesConfigLoader {
       }
     }
     catch (error) {
+      // 每次失败都按本轮的尝试重建，避免多次失败把上一次的范围累积下来
+      this.recoveryPaths.clear()
       for (const filepath of attemptedPaths)
         this.recoveryPaths.add(filepath)
       throw error
@@ -126,6 +160,8 @@ export class PagesConfigLoader {
     const targetPath = normalizeConfigPath(target, this.root)
     const sourcePath = normalizeConfigPath(source, this.root)
     const importDirectories = new Set<string>()
+    const recoveryCandidates = new Set<string>()
+    const root = this.root
     const toSourcePath = (file: string): string => {
       const absolute = normalizeConfigPath(file, this.root)
       return absolute === targetPath ? sourcePath : absolute
@@ -154,8 +190,12 @@ export class PagesConfigLoader {
                   return
                 if (args.path.startsWith('.') || path.isAbsolute(args.path)) {
                   const directory = normalizeConfigPath(path.dirname(path.resolve(args.resolveDir, args.path)), path.dirname(sourcePath))
-                  if (!isNodeModulesPath(directory))
+                  if (!isNodeModulesPath(directory)) {
                     importDirectories.add(directory)
+                    // 列不出具体候选时（目录尚未创建、写法极不常规）才靠目录兜底
+                    for (const candidate of recoveryCandidatesFor(args.path, args.resolveDir))
+                      recoveryCandidates.add(normalizeConfigPath(candidate, root))
+                  }
                   return
                 }
                 const result = await build.resolve(args.path, {
@@ -196,9 +236,17 @@ export class PagesConfigLoader {
     }
     catch (error) {
       if (Array.isArray((error as { errors?: unknown })?.errors)) {
-        // 编译失败时临时放宽到导入所在目录，覆盖省略扩展名和目录入口的恢复
-        for (const directory of importDirectories)
-          this.recoveryDirectories.add(directory)
+        // 编译失败时记下具体的恢复候选文件，只在候选缺失时才放宽到目录；
+        // 按文件匹配可以让无关文件不再触发整次重新生成
+        for (const candidate of recoveryCandidates) {
+          if (!existsSync(candidate))
+            this.recoveryCandidates.add(candidate)
+        }
+        // 目录入口（如 './config'）和路径写错时列不出候选，保留目录兜底
+        for (const directory of importDirectories) {
+          if (![...recoveryCandidates].some(candidate => candidate.startsWith(`${directory}/`)))
+            this.recoveryDirectories.add(directory)
+        }
       }
       throw error
     }
