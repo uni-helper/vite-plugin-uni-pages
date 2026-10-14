@@ -1,9 +1,12 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { createServer } from 'vite'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { PageContext } from '../packages/core/src'
+import UniPages, { PageContext } from '../packages/core/src'
 import { isConfigLoaderArtifact } from '../packages/core/src/config-loader'
+
+vi.hoisted(() => vi.stubEnv('UNI_PLATFORM', 'h5'))
 
 /**
  * 配置加载的临时产物不能被监听。
@@ -58,5 +61,46 @@ describe('config loader temporary artifacts never reach the watcher', () => {
 
     expect(added.some(file => file.includes('pages.config.bundled_stale.mjs'))).toBe(false)
     expect(added.some(file => file.includes('leaf.ts'))).toBe(true)
+  })
+
+  // 过滤监听列表躲不开目录遍历：chokidar 读到新文件就会去 fs.watch 它，
+  // 所以临时产物必须一开始就不写在配置入口旁边。产物写完就删，事后
+  // 看目录里没有它并不能说明问题 —— 这里真开一个 watcher 跑一遍装载，
+  // 看有没有哪个 watch 落在临时产物上
+  it('never asks the OS to watch a config loader temp file', async () => {
+    const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-bundle-out-')))
+    fs.mkdirSync(path.join(root, 'src/pages'), { recursive: true })
+    fs.writeFileSync(path.join(root, 'src/pages/index.vue'), '<template><view/></template>')
+    fs.writeFileSync(path.join(root, 'package.json'), '{"type":"module"}')
+    fs.writeFileSync(path.join(root, 'pages.config.ts'), `export default { globalStyle: { navigationBarTitleText: 'ok' } }`)
+
+    // watch 目标整个落在 root 上：chokidar 会读目录、逐个文件 fs.watch，
+    // 临时产物只要写在 root 里就有机会被它盯上
+    const realWatch = fs.watch
+    const watched: string[] = []
+    const spy = vi.spyOn(fs, 'watch').mockImplementation(((target: any, ...rest: any[]) => {
+      watched.push(String(target))
+      return (realWatch as any)(target, ...rest)
+    }) as typeof fs.watch)
+
+    const server = await createServer({
+      root,
+      configFile: false,
+      plugins: [UniPages({ dts: false })],
+      css: { postcss: {} },
+      server: { middlewareMode: true, hmr: false },
+      logLevel: 'silent',
+    })
+    try {
+      await server.pluginContainer.buildStart({})
+      await new Promise(resolve => setTimeout(resolve, 500))
+    }
+    finally {
+      await server.close()
+      spy.mockRestore()
+    }
+
+    expect(watched.filter(target => target.includes('.bundled_') || target.includes('__unconfig_'))).toEqual([])
+    fs.rmSync(root, { recursive: true, force: true })
   })
 })

@@ -1,6 +1,6 @@
 import type { PagesConfig } from '@uni-helper/uni-pages-types'
 import type { LoadConfigSource } from 'unconfig'
-import { existsSync, realpathSync } from 'node:fs'
+import { existsSync, mkdirSync, realpathSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -177,6 +177,18 @@ export class PagesConfigLoader {
     const importDirectories = new Set<string>()
     const recoveryCandidates = new Set<string>()
     const root = this.root
+    // 临时产物必须写在监听范围之外
+    //
+    // 默认位置是配置入口旁边，chokidar 读到它、准备监听时文件已经删了，
+    // Windows 上 `fs.watch` 抛 EPERM；这个异常从异步目录遍历里冒出来，
+    // 没人接，进程直接退出。node_modules 各平台的监听器都跳过，
+    // 放这里既避开了监听，又不改变 node_modules 查找起点。
+    const bundleDirectory = path.join(this.root, 'node_modules/.cache/uni-pages')
+    const outputFile = (file: string): string => {
+      mkdirSync(bundleDirectory, { recursive: true })
+      const name = `${path.basename(file).replace(/[^\w.-]/g, '_')}.bundled_${Math.random().toString(36).slice(2)}.mjs`
+      return path.join(bundleDirectory, name)
+    }
     const toSourcePath = (file: string): string => {
       const absolute = normalizeConfigPath(file, this.root)
       return absolute === targetPath ? sourcePath : absolute
@@ -188,6 +200,7 @@ export class PagesConfigLoader {
         format: 'esm',
         tsconfig: false,
         preserveTemporaryFile: false,
+        getOutputFile: outputFile,
         // 外部包先按原导入位置解析，避免临时产物改变 node_modules 查找起点
         notExternal: [/.*/],
         esbuildOptions: {
