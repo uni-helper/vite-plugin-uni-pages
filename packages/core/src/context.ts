@@ -9,7 +9,7 @@ import { stringify as cjStringify } from 'comment-json'
 import dbg from 'debug'
 import groupBy from 'lodash.groupby'
 import { normalizePath } from 'vite'
-import { configFileExtensions, configWatchDirectory, normalizeConfigPath, PagesConfigLoader } from './config-loader'
+import { configFileExtensions, configWatchDirectory, isConfigLoaderArtifact, normalizeConfigPath, PagesConfigLoader } from './config-loader'
 import { RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import { writeDeclaration } from './declaration'
 import { isPageDirectoryEvent, isPageFileInDirectories, refreshPageDirectories, resolvePageWatchDirectories } from './directories'
@@ -206,8 +206,7 @@ export class PageContext {
       const index = this.watchedConfigIndex.get(watcher)
       const basename = path.basename(filepath)
       const mightBeConfig = configFileExtensions.test(basename)
-        && !basename.includes('.bundled_')
-        && !basename.startsWith('__unconfig_')
+        && !isConfigLoaderArtifact(basename)
 
       const eventPath = normalizePath(path.resolve(this.root, normalizePath(filepath)))
       const excluded = this.generatedFilePaths()
@@ -292,7 +291,10 @@ export class PageContext {
    * 故意留的兜底）。
    */
   private refreshConfigWatchers(): void {
+    // 配置加载的临时产物不能进监听集合：它们写完就删，Windows 上
+    // chokidar 对消失了的目标调 fs.watch 会抛 EPERM
     const files = [...this.pagesConfigSourcePaths, ...this.pagesConfigDependencyPaths, ...this.configRecoveryCandidates]
+      .filter(file => !isConfigLoaderArtifact(path.basename(file)))
     // 监听现存父目录可发现新建文件；事件仍按当前依赖集合过滤
     const paths = [...new Set([
       ...files,
