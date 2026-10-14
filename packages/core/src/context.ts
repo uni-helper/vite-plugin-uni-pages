@@ -268,8 +268,11 @@ export class PageContext {
   /**
    * 让监听路径与当前配置依赖保持一致
    *
-   * 依赖换掉后旧文件必须 unwatch，否则一个反复改 `pages.config.ts`
-   * 的开发会话会一直挂着早已移除的路径，过滤器也跟着变慢。
+   * 只新增路径，从不 unwatch：chokidar 对文件调用 unwatch 会连带
+   * 拆掉父目录监听，新建文件就再也发现不了。因此监听集合是并集，
+   * 会随着会话累积；每次刷新都按当前依赖重建 `watchedConfigIndex`，
+   * 真正决定是否触发的始终是当前依赖集合（恢复目录除外，那是
+   * 故意留的兜底）。
    */
   private refreshConfigWatchers(): void {
     const files = [...this.pagesConfigSourcePaths, ...this.pagesConfigDependencyPaths, ...this.configRecoveryCandidates]
@@ -305,8 +308,6 @@ export class PageContext {
           this.logger?.error(`[vite-plugin-uni-pages] Failed to watch pages config dependencies: ${error instanceof Error ? error.message : error}`, { timestamp: true, error: error instanceof Error ? error : undefined })
         }
       }
-      // 不主动 unwatch：chokidar 对文件调用 unwatch 会连带拆掉父目录监听，
-      // 新建文件就再也发现不了；监听集合按目录收敛，不会随会话无界增长
       this.watchedConfigIndex.set(watcher, index)
     }
   }
