@@ -1,5 +1,5 @@
 import type { FSWatcher } from 'vite'
-import type { UserOptions } from '../packages/core/src'
+import type { ResolvedOptions, UserOptions } from '../packages/core/src'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -30,6 +30,44 @@ function read(root: string): any {
 function watchedFiles(watcher: FSWatcher, directory: string): string[] | undefined {
   return Object.entries(watcher.getWatched()).find(([dir]) => normalizePath(dir) === normalizePath(directory))?.[1]
 }
+/**
+ * 等待 setupWatcher 内 watcher.add() 的扫描完成。
+ *
+ * 只等 root 下的 pages.config.json 不够：glob 基准目录落在 root 之外时
+ * （如 `../external/deep` 下的 glob），要监听的是外部祖先目录。
+ *
+ * 目录键出现不代表注册完成：chokidar 写 _watched 图是同步的，但 OS 层订阅
+ * （FSEvents / inotify / kqueue）可能还在启动中。这里用哨兵文件：先等 ready，
+ * 再写一个哨兵文件并等它的 add 事件，确认监听真正生效后删掉。
+ *
+ * 先等 ready 是因为 chokidar 5 在 ready 之前会把 ignoreInitial 事件丢掉；
+ * _readyEmitted 是私有字段，只能 as any 读。
+ */
+async function waitForWatchDirectories(watcher: FSWatcher, options: ResolvedOptions): Promise<void> {
+  const directories = resolvePageWatchDirectories(options)
+  if (directories.length === 0)
+    return
+  // shortcut: 读 chokidar 5 的私有字段 _readyEmitted，等它暴露公开 api 后换掉
+  if (!(watcher as any)._readyEmitted)
+    await new Promise<void>(resolve => watcher.once('ready', resolve))
+  for (const directory of directories) {
+    const sentinel = normalizePath(path.join(directory, `.watch-ready-${Math.random().toString(36).slice(2)}`))
+    let seen = false
+    const onAll = (_event: string, filepath: string): void => {
+      if (normalizePath(filepath) === sentinel)
+        seen = true
+    }
+    watcher.on('all', onAll)
+    try {
+      fs.writeFileSync(sentinel, '')
+      await vi.waitFor(() => expect(seen, `OS watcher inactive for ${directory}`).toBe(true), { timeout: 10000, interval: 25 })
+    }
+    finally {
+      watcher.off('all', onAll)
+      fs.rmSync(sentinel, { force: true })
+    }
+  }
+}
 async function waitForPackages(root: string, expected: string[]): Promise<void> {
   await vi.waitFor(() => expect((read(root).subPackages ?? []).map((pkg: any) => pkg.root)).toEqual(expected), { timeout: 10000, interval: 25 })
 }
@@ -56,10 +94,12 @@ async function start(root: string, mode: 'serve' | 'build', overrides: UserOptio
   let scans = 0
   const updates = vi.spyOn(PageContext.prototype, 'updatePagesJSON')
   let observedWatcher: FSWatcher | undefined
+  let observedOptions: ResolvedOptions | undefined
   const events: string[] = []
   const setup = PageContext.prototype.setupWatcher
   const setupSpy = vi.spyOn(PageContext.prototype, 'setupWatcher').mockImplementation(function (this: PageContext, watcher) {
     observedWatcher = watcher as unknown as FSWatcher
+    observedOptions = this.options
     observedWatcher.on('all', (event, file) => events.push(`${event}:${normalizePath(path.relative(root, file))}`))
     return setup.call(this, watcher)
   })
@@ -77,6 +117,7 @@ async function start(root: string, mode: 'serve' | 'build', overrides: UserOptio
     closers.push(close)
     await vi.waitFor(() => expect(scans).toBeGreaterThanOrEqual(2), { timeout: 10000 })
     await vi.waitFor(() => expect(watchedFiles(observedWatcher!, root)).toContain('pages.config.json'), { timeout: 10000 })
+    await waitForWatchDirectories(observedWatcher!, observedOptions!)
     await Promise.allSettled(updates.mock.results.map(result => result.value))
     updates.mockRestore()
     setupSpy.mockRestore()
@@ -97,6 +138,7 @@ async function start(root: string, mode: 'serve' | 'build', overrides: UserOptio
   await vi.waitFor(() => expect(fs.existsSync(path.join(root, 'dist/entry.mjs'))).toBe(true), { timeout: 10000 })
   await vi.waitFor(() => expect(scans).toBeGreaterThanOrEqual(2), { timeout: 10000 })
   await vi.waitFor(() => expect(watchedFiles(observedWatcher!, root)).toContain('pages.config.json'), { timeout: 10000 })
+  await waitForWatchDirectories(observedWatcher!, observedOptions!)
   await Promise.allSettled(updates.mock.results.map(result => result.value))
   updates.mockRestore()
   setupSpy.mockRestore()
@@ -114,7 +156,7 @@ describe.each(['serve', 'build'] as const)('%s 真实目录监听', (mode) => {
     })
     await waitForPackages(root, [])
     fs.mkdirSync(path.join(root, 'nested/deep/packages/account/pages'), { recursive: true })
-    await vi.waitFor(() => expect(foundEmptyDirectory).toBe(true))
+    await vi.waitFor(() => expect(foundEmptyDirectory).toBe(true), { timeout: 10000, interval: 25 })
     await waitForPackages(root, [])
     page(root, 'nested/deep/packages/account/pages/profile.vue', '初始')
     await waitForPackages(root, ['nested/deep/packages/account'])
@@ -128,7 +170,7 @@ describe.each(['serve', 'build'] as const)('%s 真实目录监听', (mode) => {
     page(root, 'nested/deep/packages/account/pages/profile.vue', '重建')
     page(root, 'nested/deep/packages/account/pages/detail.vue', '详情')
     await waitForPackages(root, ['nested/deep/packages/account'])
-    await vi.waitFor(() => expect(read(root).subPackages[0].pages).toHaveLength(2))
+    await vi.waitFor(() => expect(read(root).subPackages[0].pages).toHaveLength(2), { timeout: 10000 })
     await vi.waitFor(() => {
       expect(events).toContain('add:nested/deep/packages/account/pages/profile.vue')
       expect(events).toContain('add:nested/deep/packages/account/pages/detail.vue')
@@ -137,7 +179,7 @@ describe.each(['serve', 'build'] as const)('%s 真实目录监听', (mode) => {
     page(root, 'nested/deep/packages/account/pages/detail.vue', '修改二')
     await vi.waitFor(() => expect(read(root).subPackages[0].pages.map((page: any) => page.style.navigationBarTitleText).sort()).toEqual(['修改一', '修改二']), { timeout: 10000 })
     page(root, 'main/account/pages/index.vue')
-    await vi.waitFor(() => expect(read(root).pages.some((page: any) => page.path === 'main/account/pages/index')).toBe(true))
+    await vi.waitFor(() => expect(read(root).pages.some((page: any) => page.path === 'main/account/pages/index')).toBe(true), { timeout: 10000 })
   }, 30000)
 
   it('目录重命名后重新发现分包，Windows 使用 polling 后端', async () => {
