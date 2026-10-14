@@ -8,8 +8,8 @@ import { platform as uniEnvPlatform } from '@uni-helper/uni-env'
 import { stringify as cjStringify } from 'comment-json'
 import dbg from 'debug'
 import groupBy from 'lodash.groupby'
-import { loadConfig } from 'unconfig'
 import { normalizePath } from 'vite'
+import { configFileExtensions, configWatchDirectory, normalizeConfigPath, PagesConfigLoader } from './config-loader'
 import { RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import { writeDeclaration } from './declaration'
 import { checkPagesJsonFileSync, getPageFiles, isTargetFile, resolvePagesJsonPath } from './files'
@@ -28,6 +28,31 @@ import { writePagesJson } from './pages-json'
  */
 export class PageContext {
   private _server: ViteDevServer | undefined
+  private readonly configLoader: PagesConfigLoader
+  private readonly watchers = new Map<FSWatcher, () => void>()
+  private readonly watchedConfigPaths = new Map<FSWatcher, Set<string>>()
+  /**
+   * 每次事件都要比对的绝对路径，按 watcher 缓存
+   *
+   * 配置装载完成前为空，那时还没有依赖可比；装载后会刷新，
+   * 回调里不再逐个调 realpathSync
+   */
+  private readonly watchedConfigIndex = new Map<FSWatcher, { files: Set<string>, directories: string[] }>()
+  /** 页面目录与 pages.json、d.ts 的绝对路径，只在选项变化时重算 */
+  private targetDirsCache: { pageDirs: string[], excluded: string[] } | undefined
+  private pendingUpdate: Promise<void> = Promise.resolve()
+
+  /** 失败恢复以此为基准，避免混入前几轮失败的临时路径 */
+  private lastSuccessfulConfigDependencyPaths: string[] = []
+
+  /** 当前配置本地依赖及加载失败后仍需监听的恢复路径 */
+  pagesConfigDependencyPaths: string[] = []
+
+  /** 装载失败时具体缺哪个文件；命中时不看兜底目录 */
+  private configRecoveryCandidates: string[] = []
+
+  /** 目录导入的恢复范围；只在装载失败时非空 */
+  private configRecoveryDirectories: string[] = []
 
   /** 从用户配置文件（pages.config.ts）解析出的配置对象 */
   pagesGlobConfig: PagesConfig | undefined
@@ -76,6 +101,7 @@ export class PageContext {
    */
   constructor(userOptions: UserOptions, viteRoot: string = process.cwd(), platform: string = uniEnvPlatform) {
     this.root = normalizePath(viteRoot)
+    this.configLoader = new PagesConfigLoader(this.root)
     this.platform = platform
     debug.options('root', this.root)
     this.options = resolveOptions(userOptions, this.root)
@@ -103,13 +129,26 @@ export class PageContext {
    * 使用 unconfig 加载配置，支持多种配置文件格式
    */
   async loadUserPagesConfig(): Promise<void> {
-    const configSource = this.options.configSource
-    const { config, sources } = await loadConfig<PagesConfig>({ cwd: this.root, sources: configSource, defaults: {} })
-    this.pagesGlobConfig = config.default || config
-    // 归一化斜杠：watcher 的事件回调里也归一化，两边比较才对得上
-    // （Windows 上 unconfig 和 chokidar 报的斜杠方向可能不一致）
-    this.pagesConfigSourcePaths = sources.map(normalizePath)
-    debug.options(this.pagesGlobConfig)
+    try {
+      const { config, sources, dependencies } = await this.configLoader.load(this.options.configSource)
+      this.pagesGlobConfig = config.default || config
+      this.pagesConfigSourcePaths = sources
+      this.pagesConfigDependencyPaths = dependencies
+      this.lastSuccessfulConfigDependencyPaths = [...dependencies]
+      this.configRecoveryCandidates = []
+      this.configRecoveryDirectories = []
+      debug.options(this.pagesGlobConfig)
+    }
+    catch (error) {
+      // 保留上次成功的依赖，只补入本轮失败的恢复路径
+      this.configRecoveryCandidates = [...this.configLoader.recoveryCandidates]
+      this.configRecoveryDirectories = [...this.configLoader.recoveryDirectories]
+      this.pagesConfigDependencyPaths = [...new Set([...this.lastSuccessfulConfigDependencyPaths, ...this.configLoader.recoveryPaths])]
+      throw error
+    }
+    finally {
+      this.refreshConfigWatchers()
+    }
   }
 
   /**
@@ -137,71 +176,150 @@ export class PageContext {
   }
 
   /**
+   * 取当前事件要比对的页面目录与需排除的绝对路径，结果缓存
+   *
+   * 只依赖构造后不再变化的 `options`，所以算一次就够，不必每个
+   * 事件重新解析一遍 realpath
+   */
+  private getPathMatchers(): { pageDirs: string[], excluded: string[] } {
+    if (!this.targetDirsCache) {
+      this.targetDirsCache = {
+        pageDirs: [...this.options.dirs, ...this.options.subPackages].map(dir => normalizeConfigPath(dir, this.root)),
+        excluded: [
+          normalizeConfigPath(this.resolvedPagesJSONPath, this.root),
+          ...this.options.dts ? [normalizeConfigPath(this.options.dts, this.root)] : [],
+        ],
+      }
+    }
+    return this.targetDirsCache
+  }
+
+  /**
    * 设置文件监听器，监听页面文件与配置文件变更
    * 页面文件或配置文件变化时自动更新 pages.json
    * @param watcher - chokidar 文件监听器实例
    */
   async setupWatcher(watcher: FSWatcher): Promise<void> {
-    watcher.add(this.pagesConfigSourcePaths)
-    const targetDirs = [...this.options.dirs, ...this.options.subPackages].map(v => normalizePath(path.resolve(this.root, v)))
-    // 前缀判断要吃到目录边界：'src/pages' 不能把隔壁的
-    // 'src/pages-sub/…' 也认成自己的页面（Vite 的 watcher 默认盯整个
-    // 项目，这种兄弟目录的变更事件是会进来的）
-    const isWatchedPageFile = (filePath: string): boolean => {
-      const absolute = normalizePath(path.resolve(this.root, filePath))
-      return isTargetFile(filePath) && targetDirs.some(v => absolute === v || absolute.startsWith(`${v}/`))
+    if (this.watchers.has(watcher))
+      return
+
+    const { pageDirs, excluded } = this.getPathMatchers()
+    const handleEvent = (event: 'add' | 'change' | 'unlink', filepath: string): void => {
+      const mightBePage = isTargetFile(filepath)
+      const eventPath = normalizePath(path.resolve(this.root, normalizePath(filepath)))
+      if (!mightBePage && excluded.includes(eventPath))
+        return
+
+      const basename = path.basename(filepath)
+      const mightBeConfig = configFileExtensions.test(basename)
+        && !basename.includes('.bundled_')
+        && !basename.startsWith('__unconfig_')
+
+      // 未直接命中的路径仍需解析，以识别符号链接别名
+      const index = this.watchedConfigIndex.get(watcher)
+      const absolute = index?.files.has(eventPath) && !excluded.includes(eventPath)
+        ? eventPath
+        : normalizeConfigPath(filepath, this.root)
+
+      // 已知配置不限扩展名，文件类型过滤只用于目录恢复
+      const isConfigPath = !!index && (
+        index.files.has(absolute)
+        || (mightBeConfig && index.directories.some(dir => absolute.startsWith(`${dir}/`)))
+      )
+      const configChanged = !excluded.includes(absolute) && isConfigPath
+      const pageChanged = mightBePage && pageDirs.some(dir => absolute.startsWith(`${dir}/`))
+      if (!configChanged && !pageChanged)
+        return
+
+      if (configChanged)
+        debug.pages(`Config changed: ${absolute}`)
+      else
+        debug.pages(`File changed: ${absolute}`)
+
+      void this.updatePagesAndNotify(!configChanged && event === 'change' ? absolute : undefined)
     }
-
-    watcher.on('add', async (path) => {
-      path = normalizePath(path)
-      if (!isWatchedPageFile(path))
-        return
-
-      debug.pages(`File added: ${path}`)
-      await this.updatePagesAndNotify()
+    const onAdd = (file: string): void => handleEvent('add', file)
+    const onChange = (file: string): void => handleEvent('change', file)
+    const onUnlink = (file: string): void => handleEvent('unlink', file)
+    watcher.on('add', onAdd)
+    watcher.on('change', onChange)
+    watcher.on('unlink', onUnlink)
+    this.watchers.set(watcher, () => {
+      watcher.off('add', onAdd)
+      watcher.off('change', onChange)
+      watcher.off('unlink', onUnlink)
     })
+    this.watchedConfigPaths.set(watcher, new Set())
+    this.watchedConfigIndex.set(watcher, { files: new Set(), directories: [] })
+    this.refreshConfigWatchers()
+  }
 
-    watcher.on('change', async (path) => {
-      path = normalizePath(path)
-      // 配置文件按绝对路径监听；先判断它，配置的变更就不会被下面的
-      // 页面文件判断漏掉。两边都归一化过斜杠（sources 在加载配置时、
-      // 事件路径在上面），Windows 上斜杠方向不一致也不会错过配置变更。
-      // 已知边界（权衡后接受）：sources 在启动时定死：启动时配置文件
-      // 还不存在，loadConfig 返回的 sources 是空数组（已实测），
-      // watcher.add 拿到空列表，之后再创建的配置文件永远不被监听，
-      // 需要重启开发服务器才生效。
-      if (this.pagesConfigSourcePaths.includes(path)) {
-        debug.pages(`Config source changed: ${path}`)
-        await this.updatePagesAndNotify()
-        return
+  /** 解绑本插件回调；共享 watcher 的关闭仍由 Vite 负责 */
+  async disposeWatchers(): Promise<void> {
+    for (const dispose of this.watchers.values())
+      dispose()
+    this.watchers.clear()
+    this.watchedConfigPaths.clear()
+    this.watchedConfigIndex.clear()
+    this._server = undefined
+    await this.pendingUpdate
+  }
+
+  /**
+   * 让监听路径与当前配置依赖保持一致
+   *
+   * 只新增路径，从不 unwatch：chokidar 对文件调用 unwatch 会连带
+   * 拆掉父目录监听，新建文件就再也发现不了。因此监听集合是并集，
+   * 会随着会话累积；每次刷新都按当前依赖重建 `watchedConfigIndex`，
+   * 真正决定是否触发的始终是当前依赖集合（恢复目录除外，那是
+   * 故意留的兜底）。
+   */
+  private refreshConfigWatchers(): void {
+    const files = [...this.pagesConfigSourcePaths, ...this.pagesConfigDependencyPaths, ...this.configRecoveryCandidates]
+    // 监听现存父目录可发现新建文件；事件仍按当前依赖集合过滤
+    const paths = [...new Set([
+      ...files,
+      ...files.map(configWatchDirectory),
+      ...this.configRecoveryDirectories.map(dir => configWatchDirectory(path.join(dir, '_'))),
+    ])]
+    // 父目录（尤其是项目 root）会覆盖其下所有路径，过滤事件时只看真实依赖，
+    // 否则 root 会把任何路径都当成需要保留的
+    const index = {
+      files: new Set(files.map(file => normalizeConfigPath(file, this.root))),
+      directories: this.configRecoveryDirectories.map(dir => normalizeConfigPath(dir, this.root)),
+    }
+    for (const watcher of this.watchers.keys()) {
+      const added = this.watchedConfigPaths.get(watcher)!
+      const sharedRoot = this._server && watcher === (this._server.watcher as unknown as FSWatcher)
+        ? normalizeConfigPath(this._server.config.root, this.root)
+        : undefined
+      // sharedRoot 由 Vite 自己监听，不重复添加也不能撤销
+      const wanted = paths.filter(file => (!sharedRoot || (file !== sharedRoot && !file.startsWith(`${sharedRoot}/`)))
+        && ![...added].some(existing => file === existing || file.startsWith(`${existing}/`)))
+      if (wanted.length) {
+        try {
+          // add() 不是 Promise（chokidar 3 和 5 都返回 this），只能捕获同步抛出；
+          // 注册本身异步完成，没有可等的完成信号
+          watcher.add(wanted)
+          for (const file of wanted)
+            added.add(file)
+        }
+        catch (error) {
+          this.logger?.error(`[vite-plugin-uni-pages] Failed to watch pages config dependencies: ${error instanceof Error ? error.message : error}`, { timestamp: true, error: error instanceof Error ? error : undefined })
+        }
       }
-
-      path = normalizePath(path)
-      if (!isWatchedPageFile(path))
-        return
-
-      debug.pages(`File changed: ${path}`)
-      await this.updatePagesAndNotify(path)
-    })
-
-    watcher.on('unlink', async (path) => {
-      path = normalizePath(path)
-      if (!isWatchedPageFile(path))
-        return
-
-      debug.pages(`File removed: ${path}`)
-      await this.updatePagesAndNotify()
-    })
+      this.watchedConfigIndex.set(watcher, index)
+    }
   }
 
   /**
    * 监听事件里的"更新并通知"：失败只记录，不让 Promise 拒绝。
    *
-   * watcher 的回调是 async 函数，没人接它的 Promise。一旦
-   * {@link updatePagesJSON} 拒绝（拿不到文件锁、声明文件写不进去），
-   * 就成了未处理的拒绝，Node 默认直接终止进程——开发时正在编辑文件，
-   * 一次偶发的锁冲突不该把 dev server 打死。用户改一次文件就会再触发
-   * 一次事件，所以这里报错即可。
+   * watcher 的回调走这里而不是直接调 {@link updatePagesJSON}：一旦
+   * 它拒绝（拿不到文件锁、声明文件写不进去），就成了未处理的拒绝，
+   * Node 默认直接终止进程——开发时正在编辑文件，一次偶发的锁冲突
+   * 不该把 dev server 打死。用户改一次文件就会再触发一次事件，
+   * 所以这里报错即可。
    *
    * @param filepath - 发生变更的文件路径，透传给 {@link updatePagesJSON}
    */
@@ -242,6 +360,12 @@ export class PageContext {
    * @returns pages.json 是否成功更新
    */
   async updatePagesJSON(filepath?: string): Promise<boolean> {
+    const update = this.pendingUpdate.then(() => this.generatePagesJSON(filepath))
+    this.pendingUpdate = update.then(() => {}, () => {})
+    return update
+  }
+
+  private async generatePagesJSON(filepath?: string): Promise<boolean> {
     if (filepath) {
       const page = this.findPage(filepath)
       if (page) {
@@ -442,6 +566,13 @@ export class PageContext {
         return subPage
     }
 
+    const normalized = normalizeConfigPath(filepath, this.root)
+    for (const pages of [this.pages, ...this.subPages.values()]) {
+      for (const [file, page] of pages) {
+        if (normalizeConfigPath(file, this.root) === normalized)
+          return page
+      }
+    }
     return undefined
   }
 

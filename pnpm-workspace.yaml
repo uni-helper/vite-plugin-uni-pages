@@ -400,9 +400,11 @@ catalog:
   '@vue/compiler-sfc': ~3.4.38
   ast-kit: ^3.0.0
   bumpp: ^12.2.1
+  bundle-require: ^5.1.0
   chokidar: ^5.0.0
   comment-json: ^5.0.0
   debug: ^4.4.3
+  esbuild: ^0.28.2
   eslint: ^10.8.1
   lodash.groupby: ^4.6.0
   magic-string: ^1.2.0

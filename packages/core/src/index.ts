@@ -1,3 +1,4 @@
+import type { FSWatcher } from 'chokidar'
 import type { InitializationSource, UniPagesPlugin, UserOptions } from './types'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
@@ -5,6 +6,7 @@ import process from 'node:process'
 import chokidar from 'chokidar'
 import MagicString from 'magic-string'
 import { createLogger, normalizePath } from 'vite'
+import { normalizeConfigPath } from './config-loader'
 import {
   FILE_EXTENSIONS,
   MODULE_ID_VIRTUAL,
@@ -42,6 +44,7 @@ export type * from '@uni-helper/uni-pages-types'
  */
 export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugin {
   let ctx: PageContext
+  let buildWatcher: FSWatcher | undefined
   /**
    * 当前初始化状态：`{ root, platform, platformSuffix }` 是它的参数，
    * 同时记下这次初始化是谁发起的（`source`）。
@@ -93,9 +96,27 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
         if (config.build.watch) {
           // 必须相对真实的 Vite root 解析：否则 chokidar 会按 process.cwd()
           // 解释相对目录，在 root 与 cwd 不一致时监听到错误的目录
-          ctx.setupWatcher(chokidar.watch([...ctx.options.dirs, ...ctx.options.subPackages].map(v => normalizePath(path.resolve(config.root, v)))))
+          const lockDirectory = normalizeConfigPath(`${ctx.resolvedPagesJSONPath}.lock`, config.root)
+          buildWatcher = chokidar.watch([...ctx.options.dirs, ...ctx.options.subPackages].map(v => normalizePath(path.resolve(config.root, v))), {
+            ignoreInitial: true,
+            ignored: (file) => {
+              const absolute = normalizeConfigPath(file, config.root)
+              return absolute.split('/').some(part => part === 'node_modules' || part === '.git')
+                || absolute === lockDirectory || absolute.startsWith(`${lockDirectory}/`)
+            },
+          })
+          await ctx.setupWatcher(buildWatcher)
         }
       }
+    },
+    async closeWatcher() {
+      await ctx?.disposeWatchers()
+      await buildWatcher?.close()
+      buildWatcher = undefined
+    },
+    async closeBundle() {
+      if (!buildWatcher)
+        await ctx?.disposeWatchers()
     },
     /**
      * 代码转换钩子
