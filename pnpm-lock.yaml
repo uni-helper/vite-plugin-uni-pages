@@ -78,6 +78,9 @@ catalogs:
     bumpp:
       specifier: ^12.2.1
       version: 12.2.1
+    bundle-require:
+      specifier: ^5.1.0
+      version: 5.1.0
     chokidar:
       specifier: ^5.0.0
       version: 5.0.0
@@ -87,6 +90,9 @@ catalogs:
     debug:
       specifier: ^4.4.3
       version: 4.4.3
+    esbuild:
+      specifier: ^0.28.2
+      version: 0.28.2
     eslint:
       specifier: ^10.8.1
       version: 10.8.1
@@ -202,6 +208,9 @@ importers:
       ast-kit:
         specifier: 'catalog:'
         version: 3.0.0
+      bundle-require:
+        specifier: 'catalog:'
+        version: 5.1.0(esbuild@0.28.2)
       chokidar:
         specifier: 'catalog:'
         version: 5.0.0
@@ -211,6 +220,9 @@ importers:
       debug:
         specifier: 'catalog:'
         version: 4.4.3
+      esbuild:
+        specifier: 'catalog:'
+        version: 0.28.2
       lodash.groupby:
         specifier: 'catalog:'
         version: 4.6.0
@@ -2961,6 +2973,12 @@ packages:
     engines: {node: ^22.18.0 || ^24.11.0 || >=26.0.0}
     hasBin: true
 
+  bundle-require@5.1.0:
+    resolution: {integrity: sha512-3WrrOuZiyaaZPWiEt4G3+IffISVC9HYlWueJEBWED4ZH4aIAC2PnkdnuRrR94M+w6yGWn4AglWtJtBI8YqvgoA==}
+    engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
+    peerDependencies:
+      esbuild: '>=0.18'
+
   bytes@3.1.2:
     resolution: {integrity: sha512-/Nf7TyzTx6S3yRJObOAV7956r8cr2+Oj8AC5dt8wSP3BQAoeX58NoHyCU8P8zGkNXStjTSi6fzO6F0pBdcYbEg==}
     engines: {node: '>= 0.8'}
@@ -4341,6 +4359,10 @@ packages:
 
   load-bmfont@1.4.2:
     resolution: {integrity: sha512-qElWkmjW9Oq1F9EI5Gt7aD9zcdHb9spJCW1L/dmPf7KzCCEJxq8nhHz5eCgI9aMf7vrG/wyaCqdsI+Iy9ZTlog==}
+
+  load-tsconfig@0.2.5:
+    resolution: {integrity: sha512-IXO6OCs9yg8tMKzfPZ1YmheJbZCiEsnBdcB03l0OcfK9prKnJb96siuHCr5Fl37/yo9DnKU+TLpxzTUspw9shg==}
+    engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
   loader-utils@3.3.1:
     resolution: {integrity: sha512-FMJTLMXfCLMLfJxcX9PFqX5qD88Z5MRGaZCVzfuqeZSPsyiBzs+pahDQjbIWz2QIzPZz0NX9Zy4FX3lmK6YHIg==}
@@ -9106,6 +9128,11 @@ snapshots:
       verkit: 0.3.2
       yaml: 2.9.0
 
+  bundle-require@5.1.0(esbuild@0.28.2):
+    dependencies:
+      esbuild: 0.28.2
+      load-tsconfig: 0.2.5
+
   bytes@3.1.2: {}
 
   c12@1.11.2:
@@ -10764,6 +10791,8 @@ snapshots:
       xtend: 4.0.2
     transitivePeerDependencies:
       - debug
+
+  load-tsconfig@0.2.5: {}
 
   loader-utils@3.3.1: {}
 

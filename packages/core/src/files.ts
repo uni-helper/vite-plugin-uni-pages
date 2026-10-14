@@ -66,12 +66,19 @@ export function checkPagesJsonFileSync(path: fs.PathLike): void {
   catch {
     // 文件不存在：创建占位文件。此处失败（父目录缺失、目录不可写）时
     // 带着原始错误中止生成，而不是被吞掉后继续一次残缺的运行
-    fs.writeFileSync(
-      path,
-      JSON.stringify({ pages: [{ path: '' }] }, null, 2),
-      { encoding: 'utf-8' },
-    )
-    return
+    try {
+      fs.writeFileSync(
+        path,
+        JSON.stringify({ pages: [{ path: '' }] }, null, 2),
+        { encoding: 'utf-8', flag: 'wx' },
+      )
+      return
+    }
+    catch (error) {
+      // 其他进程可能已经生成完整内容，不能再用占位内容覆盖
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST')
+        throw error
+    }
   }
 
   const stats = fs.statSync(path)

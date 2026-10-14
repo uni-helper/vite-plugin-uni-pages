@@ -1,8 +1,44 @@
 import type { PageItem, PagesConfig, SubPackages, TabBarItem } from '@uni-helper/uni-pages-types'
 import type { LoadConfigSource } from 'unconfig'
+import type { Plugin } from 'vite'
 import type { DefineConditional } from './condition'
 import type { debug } from './logger'
 import type { Page } from './page'
+
+/** 提前生成页面配置所需的运行环境 */
+export interface PrepareOptions {
+  /**
+   * Vite 项目根目录，相对路径以当前工作目录为基准
+   *
+   * @default process.env.VITE_ROOT_DIR || process.cwd()
+   */
+  root?: string
+  /** 是否采用 UniPlatform 文件名后缀规则，必须与最终插件列表一致 */
+  platformSuffix: boolean
+}
+
+/** 支持提前生成页面配置的 Vite 插件实例 */
+export interface UniPagesPlugin extends Plugin {
+  /**
+   * 等待页面配置与已启用的声明文件生成，返回当前插件实例
+   *
+   * @description
+   * - 在创建需要读取 pages.json 的下游插件之前等待此方法完成
+   * - 使用调用时的 UNI_PLATFORM；根目录、平台和后缀规则必须与 Vite 初始化一致
+   * - 相同参数的并发或重复调用只初始化一次，失败后可重试
+   *
+   * @throws 参数冲突、编译平台缺失或生成失败时拒绝 Promise
+   */
+  prepare: (options: PrepareOptions) => Promise<UniPagesPlugin>
+}
+
+/**
+ * 谁发起了这次初始化。
+ *
+ * `'prepare'` 是调用方主动指定了一套参数，参数不一致属于错误；`'vite'`
+ * 是 Vite 自己跑钩子，参数变了只说明它又配置了一次，按新参数重建即可。
+ */
+export type InitializationSource = 'prepare' | 'vite'
 
 /**
  * 从对象类型中排除索引签名键，仅保留显式键
