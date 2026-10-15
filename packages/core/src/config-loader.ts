@@ -1,6 +1,6 @@
 import type { PagesConfig } from '@uni-helper/uni-pages-types'
 import type { LoadConfigSource } from 'unconfig'
-import { existsSync, realpathSync } from 'node:fs'
+import { existsSync, mkdirSync, realpathSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -61,6 +61,19 @@ export function configWatchDirectory(filepath: string): string {
   while (!existsSync(directory) && path.dirname(directory) !== directory)
     directory = path.dirname(directory)
   return normalizePath(directory)
+}
+
+/**
+ * 判断文件名是否为配置加载过程的临时产物
+ *
+ * `bundle-require` 在配置入口旁写 `*.bundled_<id>.mjs` 后立刻删除，unconfig
+ * 会写 `__unconfig_*`。这些文件存在时间极短，监听它们有两个后果：
+ * 事件会被误当成配置变更；Windows 上 chokidar 对已删除的文件调 `fs.watch`
+ * 会抛 EPERM，作为未处理的拒绝直接让进程退出。因此监听路径和事件过滤
+ * 都要排除它们。
+ */
+export function isConfigLoaderArtifact(basename: string): boolean {
+  return basename.includes('.bundled_') || basename.startsWith('__unconfig_')
 }
 
 /** 配置加载结果及本次成功求值涉及的文件 */
@@ -164,6 +177,18 @@ export class PagesConfigLoader {
     const importDirectories = new Set<string>()
     const recoveryCandidates = new Set<string>()
     const root = this.root
+    // 临时产物必须写在监听范围之外
+    //
+    // 默认位置是配置入口旁边，chokidar 读到它、准备监听时文件已经删了，
+    // Windows 上 `fs.watch` 抛 EPERM；这个异常从异步目录遍历里冒出来，
+    // 没人接，进程直接退出。node_modules 各平台的监听器都跳过，
+    // 放这里既避开了监听，又不改变 node_modules 查找起点。
+    const bundleDirectory = path.join(this.root, 'node_modules/.cache/uni-pages')
+    const outputFile = (file: string): string => {
+      mkdirSync(bundleDirectory, { recursive: true })
+      const name = `${path.basename(file).replace(/[^\w.-]/g, '_')}.bundled_${Math.random().toString(36).slice(2)}.mjs`
+      return path.join(bundleDirectory, name)
+    }
     const toSourcePath = (file: string): string => {
       const absolute = normalizeConfigPath(file, this.root)
       return absolute === targetPath ? sourcePath : absolute
@@ -175,6 +200,7 @@ export class PagesConfigLoader {
         format: 'esm',
         tsconfig: false,
         preserveTemporaryFile: false,
+        getOutputFile: outputFile,
         // 外部包先按原导入位置解析，避免临时产物改变 node_modules 查找起点
         notExternal: [/.*/],
         esbuildOptions: {

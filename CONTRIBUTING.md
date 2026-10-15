@@ -5,7 +5,7 @@
 ## 前置条件
 
 - [Node.js](https://nodejs.org/) 24（见仓库根目录 `.nvmrc` / `.node-version`）
-- [pnpm](https://pnpm.io/) 10.34.4（由 `package.json` 的 `packageManager` 字段锁定，建议配合 Corepack 使用）
+- [pnpm](https://pnpm.io/) 10.34.5（由 `package.json` 的 `packageManager` 字段锁定，建议配合 Corepack 使用）
 
 ## 常用命令
 
@@ -47,9 +47,28 @@ test/
 ├── generate-routes-*.test.ts            各平台（web / mp-weixin / mp-alipay）路由生成
 ├── generate-tabbar-web.test.ts          tabBar 生成
 ├── define-page-*.test.ts                definePage 宏：条件 DSL、null、平台行为
+├── macro-*.test.ts                      宏解析：单个 script 块失败隔离、跨块导入
+├── page-macro-failure-warn.test.ts      宏求值失败只告警不中断
+├── page-uri-dot-directory.test.ts       页面 path 只在末尾去扩展名
+├── platform-suffix-*.test.ts            平台后缀页面的筛选与优先级
+├── platform-variants.test.ts            平台变体表的合并与排序规则
+├── uni-platform-dots.test.ts            文件名中的点只有后缀位才算平台后缀
+├── pages-json-*.test.ts                 pages.json 生成细节（空行、首页排序与平台、
+│                                        纯合并 seam、子包收敛、tabBar 按平台、EPERM 重试）
+├── subpackage-glob.test.ts              分包 glob、root 映射与冲突检查
+├── subpackage-glob-watcher.test.ts      目录监听边界与 watch 就绪
+├── subpackage-user-pages-path.test.ts   配置里的分包 pages 按 root 写相对 path
 ├── concurrent-pages-json.test.ts        多终端并发读写 pages.json
 ├── files*.test.ts                       文件工具与文件锁
-├── pages-json-*.test.ts                 pages.json 生成细节（空行、首页排序、子包收敛、纯合并 seam）
+├── config-dependencies*.test.ts         配置本地依赖加载与 unconfig 回调兼容
+├── config-artifact-watch.test.ts        配置加载临时产物不进监听
+├── config-recovery-watch.test.ts        连续失败后的配置恢复监听
+├── config-watch-fast-path.test.ts       配置 watcher 路径匹配开销
+├── watcher-config-path.test.ts          watcher 归一化配置变更路径
+├── watcher-dir-boundary.test.ts         页面文件只在配置目录内匹配
+├── watcher-update-failure.test.ts       监听更新失败只记日志不抛出
+├── declaration-*.test.ts                声明生成：tab 页过滤与失败后的通知
+├── prepare.test.ts                      pages.prepare()
 ├── repro-dup.test.ts                    重复路由回归
 └── types.test.ts                        类型断言
 ```

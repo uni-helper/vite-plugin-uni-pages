@@ -9,9 +9,10 @@ import { stringify as cjStringify } from 'comment-json'
 import dbg from 'debug'
 import groupBy from 'lodash.groupby'
 import { normalizePath } from 'vite'
-import { configFileExtensions, configWatchDirectory, normalizeConfigPath, PagesConfigLoader } from './config-loader'
+import { configFileExtensions, configWatchDirectory, isConfigLoaderArtifact, normalizeConfigPath, PagesConfigLoader } from './config-loader'
 import { RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import { writeDeclaration } from './declaration'
+import { isPageDirectoryEvent, isPageFileInDirectories, refreshPageDirectories, resolvePageWatchDirectories } from './directories'
 import { checkPagesJsonFileSync, getPageFiles, isTargetFile, resolvePagesJsonPath } from './files'
 import { debug } from './logger'
 import { resolveOptions } from './options'
@@ -38,8 +39,8 @@ export class PageContext {
    * 回调里不再逐个调 realpathSync
    */
   private readonly watchedConfigIndex = new Map<FSWatcher, { files: Set<string>, directories: string[] }>()
-  /** 页面目录与 pages.json、d.ts 的绝对路径，只在选项变化时重算 */
-  private targetDirsCache: { pageDirs: string[], excluded: string[] } | undefined
+  /** 生成物（pages.json、d.ts）的绝对路径，只在首次事件时算一次 */
+  private generatedPathsCache: string[] | undefined
   private pendingUpdate: Promise<void> = Promise.resolve()
 
   /** 失败恢复以此为基准，避免混入前几轮失败的临时路径 */
@@ -156,6 +157,7 @@ export class PageContext {
    * 信息。步骤顺序只维护在这里，调用方和测试都不用关心。
    */
   async scanAndMerge(): Promise<void> {
+    refreshPageDirectories(this.options)
     await this.scanPages()
     await this.scanSubPages()
     await this.mergePageMetaData()
@@ -176,22 +178,19 @@ export class PageContext {
   }
 
   /**
-   * 取当前事件要比对的页面目录与需排除的绝对路径，结果缓存
+   * 生成物（pages.json 与 d.ts）的绝对路径
    *
-   * 只依赖构造后不再变化的 `options`，所以算一次就够，不必每个
-   * 事件重新解析一遍 realpath
+   * 只依赖构造后不再变化的 `options` 与 `resolvedPagesJSONPath`，
+   * 算一次缓存即可，不必每个事件重新解析
    */
-  private getPathMatchers(): { pageDirs: string[], excluded: string[] } {
-    if (!this.targetDirsCache) {
-      this.targetDirsCache = {
-        pageDirs: [...this.options.dirs, ...this.options.subPackages].map(dir => normalizeConfigPath(dir, this.root)),
-        excluded: [
-          normalizeConfigPath(this.resolvedPagesJSONPath, this.root),
-          ...this.options.dts ? [normalizeConfigPath(this.options.dts, this.root)] : [],
-        ],
-      }
+  private generatedFilePaths(): string[] {
+    if (!this.generatedPathsCache) {
+      this.generatedPathsCache = [
+        normalizeConfigPath(this.resolvedPagesJSONPath, this.root),
+        ...this.options.dts ? [normalizeConfigPath(this.options.dts, this.root)] : [],
+      ]
     }
-    return this.targetDirsCache
+    return this.generatedPathsCache
   }
 
   /**
@@ -203,23 +202,22 @@ export class PageContext {
     if (this.watchers.has(watcher))
       return
 
-    const { pageDirs, excluded } = this.getPathMatchers()
     const handleEvent = (event: 'add' | 'change' | 'unlink', filepath: string): void => {
-      const mightBePage = isTargetFile(filepath)
-      const eventPath = normalizePath(path.resolve(this.root, normalizePath(filepath)))
-      if (!mightBePage && excluded.includes(eventPath))
-        return
-
+      const index = this.watchedConfigIndex.get(watcher)
       const basename = path.basename(filepath)
       const mightBeConfig = configFileExtensions.test(basename)
-        && !basename.includes('.bundled_')
-        && !basename.startsWith('__unconfig_')
+        && !isConfigLoaderArtifact(basename)
 
-      // 未直接命中的路径仍需解析，以识别符号链接别名
-      const index = this.watchedConfigIndex.get(watcher)
-      const absolute = index?.files.has(eventPath) && !excluded.includes(eventPath)
-        ? eventPath
-        : normalizeConfigPath(filepath, this.root)
+      const eventPath = normalizePath(path.resolve(this.root, normalizePath(filepath)))
+      const excluded = this.generatedFilePaths()
+      // 自己写的生成物不参与任何匹配，先走这步，免得为每个
+      // pages.json 事件白做一次路径解析
+      if (!isTargetFile(filepath) && excluded.includes(eventPath))
+        return
+
+      // 未直接命中的路径仍需解析，以识别符号链接别名；直接命中就不查文件系统
+      const knownConfig = !!index?.files.has(eventPath) && !excluded.includes(eventPath)
+      const absolute = knownConfig ? eventPath : normalizeConfigPath(filepath, this.root)
 
       // 已知配置不限扩展名，文件类型过滤只用于目录恢复
       const isConfigPath = !!index && (
@@ -227,31 +225,49 @@ export class PageContext {
         || (mightBeConfig && index.directories.some(dir => absolute.startsWith(`${dir}/`)))
       )
       const configChanged = !excluded.includes(absolute) && isConfigPath
-      const pageChanged = mightBePage && pageDirs.some(dir => absolute.startsWith(`${dir}/`))
+      // 页面规则每次事件重算：glob 匹配出的目录会在运行中增减，
+      // 缓存下来就会漏掉新出现的目录
+      const pageChanged = isTargetFile(filepath) && isPageFileInDirectories(filepath, this.options)
       if (!configChanged && !pageChanged)
         return
 
-      if (configChanged)
-        debug.pages(`Config changed: ${absolute}`)
-      else
-        debug.pages(`File changed: ${absolute}`)
-
-      void this.updatePagesAndNotify(!configChanged && event === 'change' ? absolute : undefined)
+      debug.pages(configChanged ? `Config changed: ${absolute}` : `File changed: ${absolute}`)
+      void this.updatePagesAndNotify(!configChanged && event === 'change' ? filepath : undefined)
     }
     const onAdd = (file: string): void => handleEvent('add', file)
     const onChange = (file: string): void => handleEvent('change', file)
     const onUnlink = (file: string): void => handleEvent('unlink', file)
+    // glob 规则下的目录增删会改变扫描目录集合（如新增 pkg-a 命中 src/pkg-*）
+    const onDirectory = (directory: string): void => {
+      if (isPageDirectoryEvent(directory, this.options))
+        void this.updatePagesAndNotify()
+    }
+    // 初始扫描期间新增的路径可能被 ignoreInitial 吞掉，ready 后再收敛一次
+    const onReady = (): void => void this.updatePagesAndNotify()
     watcher.on('add', onAdd)
     watcher.on('change', onChange)
     watcher.on('unlink', onUnlink)
+    watcher.on('addDir', onDirectory)
+    watcher.on('unlinkDir', onDirectory)
+    watcher.on('ready', onReady)
     this.watchers.set(watcher, () => {
       watcher.off('add', onAdd)
       watcher.off('change', onChange)
       watcher.off('unlink', onUnlink)
+      watcher.off('addDir', onDirectory)
+      watcher.off('unlinkDir', onDirectory)
+      watcher.off('ready', onReady)
     })
     this.watchedConfigPaths.set(watcher, new Set())
     this.watchedConfigIndex.set(watcher, { files: new Set(), directories: [] })
     this.refreshConfigWatchers()
+    // 尚未命中的 glob 目录要监听它已存在的祖先目录，否则新建目录
+    // 不会产生任何事件；Vite 自己已递归监听的项目根不重复 add
+    const serverRoot = (this._server?.watcher as unknown) === watcher ? normalizePath(this._server!.config.root) : undefined
+    const directories = resolvePageWatchDirectories(this.options)
+      .filter(dir => !serverRoot || (dir !== serverRoot && !dir.startsWith(`${serverRoot}/`)))
+    if (directories.length)
+      watcher.add(directories)
   }
 
   /** 解绑本插件回调；共享 watcher 的关闭仍由 Vite 负责 */
@@ -275,7 +291,10 @@ export class PageContext {
    * 故意留的兜底）。
    */
   private refreshConfigWatchers(): void {
+    // 配置加载的临时产物不能进监听集合：它们写完就删，Windows 上
+    // chokidar 对消失了的目标调 fs.watch 会抛 EPERM
     const files = [...this.pagesConfigSourcePaths, ...this.pagesConfigDependencyPaths, ...this.configRecoveryCandidates]
+      .filter(file => !isConfigLoaderArtifact(path.basename(file)))
     // 监听现存父目录可发现新建文件；事件仍按当前依赖集合过滤
     const paths = [...new Set([
       ...files,
@@ -313,7 +332,7 @@ export class PageContext {
   }
 
   /**
-   * 监听事件里的"更新并通知"：失败只记录，不让 Promise 拒绝。
+   * 监听事件里的“更新并通知”：失败只记录，不让 Promise 拒绝。
    *
    * watcher 的回调走这里而不是直接调 {@link updatePagesJSON}：一旦
    * 它拒绝（拿不到文件锁、声明文件写不进去），就成了未处理的拒绝，
@@ -383,6 +402,7 @@ export class PageContext {
     this.options.onAfterLoadUserConfig(this.pagesGlobConfig)
 
     if (this.options.mergePages) {
+      refreshPageDirectories(this.options)
       this.options.onBeforeScanPages()
       await this.scanPages()
       await this.scanSubPages()
@@ -717,9 +737,10 @@ export class PageContext {
       })
       const parsedPages = (await this.parsePages(pages, 'sub', overrides))
         .map(page => ({ ...page, path: normalizePath(path.relative(root, page.path)) }))
+      const previous = this.options.dynamicSubPackageRoots.has(root) ? packagesByRoot.get(root) : undefined
       packagesByRoot.set(root, {
         root,
-        pages: parsedPages,
+        pages: previous ? mergePageMetaDataArray([...previous.pages, ...parsedPages]) : parsedPages,
         // 为该子包保留用户配置中的 plugins 配置
         ...(globPackage?.plugins && { plugins: globPackage.plugins }),
       })

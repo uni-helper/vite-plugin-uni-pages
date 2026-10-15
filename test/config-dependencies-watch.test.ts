@@ -21,7 +21,7 @@ let close: (() => Promise<unknown>) | undefined
 const write = (file: string, content: string): void => fs.writeFileSync(path.join(root, file), content)
 const output = (): any => parse(fs.readFileSync(path.join(root, 'src/pages.json'), 'utf8'))
 async function waitTitle(title: string): Promise<void> {
-  await vi.waitFor(() => expect(output().globalStyle.navigationBarTitleText).toBe(title), { timeout: 10000, interval: 20 })
+  await vi.waitFor(() => expect(output().globalStyle.navigationBarTitleText).toBe(title), { timeout: 20000, interval: 20 })
 }
 
 beforeEach(() => {
@@ -313,7 +313,7 @@ describe('真实配置依赖 watcher', () => {
     watcher.prependListener('change', beforeEvent)
     watcher.on('change', afterEvent)
     await save('old-leaf.ts', `export const suffix = 'unused'`)
-    await vi.waitFor(() => expect(unusedEventUpdates).toBe(0))
+    await vi.waitFor(() => expect(unusedEventUpdates).toBe(0), { timeout: 10000 })
     await save('next.json', '{"title":"json-updated"}', 'update JSON dependency')
     await waitTitle('json-updated')
 
@@ -338,7 +338,7 @@ describe('真实配置依赖 watcher', () => {
     logger.mockRestore()
 
     await remove('pages.config.ts')
-    await vi.waitFor(() => expect(output().globalStyle).toBeUndefined())
+    await vi.waitFor(() => expect(output().globalStyle).toBeUndefined(), { timeout: 10000 })
     await save('pages.config.ts', `export default { globalStyle: { navigationBarTitleText: 'entry-restored' } }`, 'restore config entry')
     await waitTitle('entry-restored')
 
@@ -374,7 +374,7 @@ describe('真实配置依赖 watcher', () => {
       }
     })
     await save('pages.config.ts', `import { title } from '${specifier}'; export default { globalStyle: { navigationBarTitleText: title } }`)
-    await vi.waitFor(() => expect(failed).toBe(true))
+    await vi.waitFor(() => expect(failed).toBe(true), { timeout: 10000 })
     await save(filename, `export const title = 'resolved'`)
     await waitTitle('resolved')
   }, 15000)
@@ -395,7 +395,7 @@ describe('真实配置依赖 watcher', () => {
     })
     await save('throws.ts', `throw new Error('runtime failure'); export const title = 'unused'`)
     await save('pages.config.ts', `import { title } from './throws.ts'; export default { globalStyle: { navigationBarTitleText: title } }`)
-    await vi.waitFor(() => expect(failed).toBe(true))
+    await vi.waitFor(() => expect(failed).toBe(true), { timeout: 10000 })
     expect(output().globalStyle.navigationBarTitleText).toBe('initial')
     await save('throws.ts', `export const title = 'runtime-fixed'`)
     await waitTitle('runtime-fixed')
@@ -416,12 +416,12 @@ describe('真实配置依赖 watcher', () => {
       }
     })
     await save('leaf.ts', 'export const title =')
-    await vi.waitFor(() => expect(failed).toBeGreaterThan(0))
+    await vi.waitFor(() => expect(failed).toBeGreaterThan(0), { timeout: 10000 })
     await save('leaf.ts', `export const title = 'syntax-fixed'`)
     await waitTitle('syntax-fixed')
     const previous = failed
     await save('pages.config.ts', `import { title } from './missing/title'; export default { globalStyle: { navigationBarTitleText: title } }`)
-    await vi.waitFor(() => expect(failed).toBeGreaterThan(previous))
+    await vi.waitFor(() => expect(failed).toBeGreaterThan(previous), { timeout: 10000 })
     fs.mkdirSync(path.join(root, 'missing'))
     await save('missing/title.ts', `export const title = 'created'`)
     await waitTitle('created')

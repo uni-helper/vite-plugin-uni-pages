@@ -322,12 +322,12 @@ interface UserOptions {
   /**
    * 分包页面目录的根目录列表
    * 用于 uni-app 的分包加载功能
-   * 支持字符串格式（目录路径）或对象格式（自定义 pages.json 中的 root）
+   * 字符串和对象的 dir 均支持 glob，root 可通过同步回调计算
    * 更多上下文参考 <https://github.com/uni-helper/vite-plugin-uni-pages/issues/271>
    * @default []
    * @since 0.1.8
    */
-  subPackages?: (string | { dir: string, root: string })[]
+  subPackages?: (string | { dir: string, root: string | ((dir: string) => string) })[]
 
   /**
    * pages.json 所在目录
@@ -491,6 +491,50 @@ export default defineConfig({
 
 文件名内不能带有额外的 `.` 分隔符，如 `index.v1.vue` 不合法。这是小程序的限制，并非本插件的限制。
 
+### 如何自动发现分包？
+
+`subPackages` 的字符串和对象 `dir` 都支持目录 glob。例如，`subPackages: ['src/packages/*/pages']` 会把每个匹配的 `pages` 目录作为分包目录，生成的默认 `root` 相对 `outDir` 计算。每条规则的匹配结果按路径排序，规则之间保留配置顺序。
+
+如需让分包 `root` 指向扫描目录的上级，可以使用同步回调：
+
+```ts
+import { posix } from 'node:path'
+import UniPages from '@uni-helper/vite-plugin-uni-pages'
+
+UniPages({
+  subPackages: [{
+    dir: 'src/packages/*/pages',
+    root: dir => posix.relative('src', posix.dirname(dir)),
+  }],
+})
+```
+
+对于 `src/packages/account/pages/profile.vue`，回调收到 `src/packages/account/pages`，生成：
+
+```json
+{
+  "subPackages": [{
+    "root": "packages/account",
+    "pages": [{ "path": "pages/profile" }]
+  }]
+}
+```
+
+回调参数始终相对 Vite 项目 `root`，使用 `/` 分隔且不带末尾斜杠；传入绝对 glob 时也遵守这一规则。返回值必须是非空相对路径，不能是 `.`、绝对路径或包含 `..`。每次重新发现目录时都会调用回调，不能返回 Promise。
+
+目录与路径规则：
+
+- glob 和回调规则匹配到相同物理目录时会去重；同一目录得到不同的 `root` 会报错
+- 多个目录通过 glob 或回调得到同一 `root` 时会合并页面，用户配置中的页面覆盖和 `plugins` 继续生效
+- 排除目录或文件使用 `exclude`；`subPackages` 不接受以 `!` 开头的否定规则
+- 字符串形式的自定义 `root` 保留既有路径计算规则；设置 `root` 不会移动页面文件
+
+H5 开发服务器和 `vite build --watch` 都会重新发现主包 `dir` 与分包目录，支持启动时目录尚不存在，以及运行中的新增、删除、重命名和重建。空目录会被发现，在包含页面之前不生成空分包。目录可以位于 Vite 项目根目录之外，路径仍相对 Vite `root` 解析，不受命令执行目录影响。`mergePages: false` 时不扫描或监听页面目录；H5 的监听范围仍受 Vite `server.watch` 配置约束。
+
+Windows 下，当前 Chokidar 原生监听会持有子目录句柄，重命名其父目录可能报 `EPERM`，详见 [Chokidar #1380](https://github.com/paulmillr/chokidar/issues/1380)。需要在运行期间重命名这类目录时，可在启动命令前设置环境变量 `CHOKIDAR_USEPOLLING=true`，为 H5 和 `build --watch` 启用 [Chokidar 轮询后端](https://github.com/paulmillr/chokidar/blob/5.0.0/README.md#performance)。轮询会增加 CPU 和文件系统访问开销，插件不会默认启用。
+
+动态发现会更新 `pages.json`。如果下游插件只在创建时缓存分包信息，它仍需要重启才能使用新增分包；自动重新发现不会改变其他插件的缓存策略。
+
 ### 支持 monorepo 吗？
 
 在 monorepo 项目中，如果页面分布在多个 package 中，可以使用 `subPackages` 配置的对象格式来自定义生成的 `root` 路径。
@@ -613,14 +657,18 @@ export default defineConfig({
 index.ts          Vite 插件入口 — configResolved / transform / configureServer / resolveId / load
 context.ts        PageContext 编排核心 — 配置加载、扫描、合并、监听、虚拟模块与 HMR
 pipeline.ts       纯流水线入口 — createPages / generateAll，root 和 platform 从外部传入，测试直接走这里
+config-loader.ts  配置加载 — unconfig 装载、本地依赖与恢复候选收集、监听路径归一化
+directories.ts    目录发现 — glob 展开、subPackages root 映射与监听边界
 pages-json.ts     pages.json 读-改-写 — 多平台 #ifdef 合并、首页排前、
                   生成标记与过期子包清理、序列化格式化、文件锁与原子写入
+platform-variants.ts 平台变体表 — 跨平台合并的共享规则，数组侧与对象侧两类适配器共用tab-bar.ts        tabBar 外观属性的跨平台合并与渲染（对象侧适配器）
+jsonc-scan.ts     从 pages.json 原始文本里捞回 comment-json 解析时丢掉的重复键
 files.ts          文件工具 — 页面扫描、路径解析、文件锁（withFileLock）、pages.json 合法性检查
 macro.ts          definePage 宏解析 — SFC 解析、单个 script 块失败不影响别的块、
                   对象 / 函数 / 异步函数三种形态求值
 condition.ts      按平台写配置 — define().ifdef()/.ifndef()，扫描时就算成当前平台的普通对象
 page.ts           页面实体 — 文件读取、宏求值、变更检测、跳过状态
-options.ts        选项解析 — 默认值合并、glob 目录解析、subPackages root 映射
+options.ts        选项解析 — 默认值合并与扫描规则保留
 declaration.ts    uni-pages.d.ts 生成，为导航 API 提供路径类型检查
 config.ts         defineUniPages 辅助函数 + 类型重导出
 constant.ts       常量 — 虚拟模块 ID、页面文件扩展名（vue / nvue / uvue）
@@ -632,13 +680,18 @@ types.ts          公共类型定义（Options / UserOptions / ResolvedOptions�
 
 ```shell
 index.ts
-  └─ context.ts（编排核心）
-       ├─ options.ts                  选项解析
-       ├─ files.ts                    扫描与文件锁
-       ├─ page.ts ── macro.ts ── condition.ts
-       ├─ pages-json.ts               read-modify-write（内含文件锁）
-       └─ declaration.ts
-pipeline.ts ── context.ts             测试与外部调用的流水线入口
+  ├─ context.ts（编排核心）
+  │    ├─ config-loader.ts             配置装载与恢复监听
+  │    ├─ options.ts ── directories.ts 选项解析与目录发现
+  │    ├─ files.ts                     扫描与文件锁
+  │    ├─ page.ts ── macro.ts ── condition.ts
+  │    ├─ pages-json.ts                读-改-写，内含文件锁
+  │    ├─ platform-variants.ts         平台变体表（两者按类型互相引用）
+  │    ├─ tab-bar.ts ── jsonc-scan.ts  tabBar 属性合并与原文重复键扫描
+  │    └─ declaration.ts
+  ├─ config-loader.ts                  插件工厂预检的路径归一化
+  └─ files.ts                          pages.json 预检与路径解析
+pipeline.ts ── context.ts              测试与外部调用的流水线入口
 ```
 
 ### 插件生命周期

@@ -70,6 +70,7 @@
     "esbuild": "catalog:",
     "lodash.groupby": "catalog:",
     "magic-string": "catalog:",
+    "picomatch": "catalog:",
     "proper-lockfile": "catalog:",
     "tinyglobby": "catalog:",
     "typescript": "catalog:",
@@ -80,6 +81,7 @@
     "@types/debug": "catalog:",
     "@types/lodash.groupby": "catalog:",
     "@types/node": "catalog:",
+    "@types/picomatch": "catalog:",
     "@types/proper-lockfile": "catalog:",
     "@types/write-file-atomic": "catalog:",
     "vite": "catalog:"

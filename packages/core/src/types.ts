@@ -212,7 +212,9 @@ export interface Options {
   /**
    * uni-app 分包加载的子包页面目录
    *
-   * 支持字符串形式（目录路径）或对象形式（pages.json 中的自定义 root）
+   * @description
+   * 支持字符串或对象形式的目录 glob，开发期间自动发现新增、删除和重命名的目录
+   * 对象的 root 可用同步回调根据匹配目录计算
    *
    * monorepo 项目中页面可能位于项目根目录之外。使用对象形式指定
    * 出现在 pages.json 中的自定义 root，避免生成的 root 路径含 '..'。
@@ -308,9 +310,9 @@ export type UserOptions = Partial<Options>
 
 /**
  * 解析后的配置项接口
- * 经 resolveOptions 处理的配置，所有路径均解析为绝对路径
+ * 保留原始扫描规则、展开后的目录和生成选项
  */
-export interface ResolvedOptions extends Omit<Options, 'dir' | 'homePage' | 'configSource' | 'dts' | 'subPackages'> {
+export interface ResolvedOptions extends Omit<Options, 'homePage' | 'configSource' | 'dts' | 'subPackages'> {
   /**
    * 解析为 Vite 配置中的 `root` 值。
    * @default config.root
@@ -334,6 +336,12 @@ export interface ResolvedOptions extends Omit<Options, 'dir' | 'homePage' | 'con
    * 解析后的子包目录列表
    */
   subPackages: string[]
+
+  /** 原始子包目录规则，用于重新发现目录 */
+  subPackagePatterns: (string | SubPackageConfig)[]
+
+  /** 由 glob 或 root 回调产生的子包 root，同 root 的目录合并页面 */
+  dynamicSubPackageRoots: Set<string>
 
   /**
    * 子包的自定义 root 映射（目录 -> root）
@@ -361,10 +369,16 @@ export interface ResolvedOptions extends Omit<Options, 'dir' | 'homePage' | 'con
  * ```
  */
 export interface SubPackageConfig {
-  /** 扫描页面文件的实际物理目录路径 */
+  /** 扫描页面文件的物理目录或 glob，相对 Vite root 解析 */
   dir: string
-  /** 出现在 pages.json subPackages.root 中的自定义根路径 */
-  root: string
+  /**
+   * 出现在 pages.json subPackages.root 中的自定义根路径
+   *
+   * @description
+   * 回调同步接收相对 Vite root、使用 `/` 分隔且无末尾斜杠的匹配目录
+   * 返回值须为非空相对路径，不能包含 `..`；每次重新发现目录时会再次调用
+   */
+  root: string | ((dir: string) => string)
 }
 
 /**

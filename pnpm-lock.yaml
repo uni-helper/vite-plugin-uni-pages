@@ -48,6 +48,9 @@ catalogs:
     '@types/node':
       specifier: ^24.13.3
       version: 24.13.3
+    '@types/picomatch':
+      specifier: ^4.0.3
+      version: 4.0.3
     '@types/proper-lockfile':
       specifier: ^4.1.4
       version: 4.1.4
@@ -99,6 +102,9 @@ catalogs:
     magic-string:
       specifier: ^1.2.0
       version: 1.2.0
+    picomatch:
+      specifier: ^4.0.5
+      version: 4.0.5
     proper-lockfile:
       specifier: ^4.1.2
       version: 4.1.2
@@ -223,6 +229,9 @@ importers:
       magic-string:
         specifier: 'catalog:'
         version: 1.2.0
+      picomatch:
+        specifier: 'catalog:'
+        version: 4.0.5
       proper-lockfile:
         specifier: 'catalog:'
         version: 4.1.2
@@ -248,6 +257,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.3
+      '@types/picomatch':
+        specifier: 'catalog:'
+        version: 4.0.3
       '@types/proper-lockfile':
         specifier: 'catalog:'
         version: 4.1.4
@@ -2314,6 +2326,9 @@ packages:
 
   '@types/node@26.2.0':
     resolution: {integrity: sha512-5IviulTZeRNp2vAJ514cc/HUlY5nZ9fCbq9DMyC52BrhFZACo3nI0R7qBxhQmo/d27NFe96ur/b7Wwxklda+kg==}
+
+  '@types/picomatch@4.0.3':
+    resolution: {integrity: sha512-iG0T6+nYJ9FAPmx9SsUlnwcq1ZVRuCXcVEvWnntoPlrOpwtSTKNDC9uVAxTsC3PUvJ+99n4RpAcNgBbHX3JSnQ==}
 
   '@types/prettier@2.7.3':
     resolution: {integrity: sha512-+68kP9yzs4LMp7VNh8gdzMSPZFL44MLGqiHWvttYJe+6qnuVr4Ek9wSBQoveqY/r+LwjCcU29kNVkidwim+kYA==}
@@ -8338,6 +8353,8 @@ snapshots:
   '@types/node@26.2.0':
     dependencies:
       undici-types: 8.3.0
+
+  '@types/picomatch@4.0.3': {}
 
   '@types/prettier@2.7.3': {}
 

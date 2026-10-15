@@ -3,8 +3,8 @@ import type { LoadConfigSource } from 'unconfig'
 import type { ResolvedOptions, UserOptions } from './types'
 import { resolve } from 'node:path'
 import process from 'node:process'
-import { globSync } from 'tinyglobby'
 import { normalizePath } from 'vite'
+import { resolvePageDirs, resolveSubPackageDirs } from './directories'
 
 /**
  * 解析用户配置项
@@ -44,22 +44,7 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
   const root = viteRoot || normalizePath(process.env.VITE_ROOT_DIR || process.cwd())
   const resolvedDirs = resolvePageDirs(dir, root, exclude)
 
-  // 处理 subPackages：同时支持字符串和 SubPackageConfig 两种格式。
-  // monorepo 项目里，用户可能需要在 pages.json 中使用自定义 root 路径，
-  // 而不是自动生成带 '..' 的相对路径
-  const subPackageRootMap = new Map<string, string>()
-  const resolvedSubDirs: string[] = []
-  for (const sub of subPackages) {
-    if (typeof sub === 'string') {
-      resolvedSubDirs.push(normalizePath(sub))
-    }
-    else {
-      const dirPath = normalizePath(sub.dir)
-      resolvedSubDirs.push(dirPath)
-      // 记录物理目录到 pages.json 自定义 root 的映射
-      subPackageRootMap.set(dirPath, sub.root)
-    }
-  }
+  const resolvedSubPackages = resolveSubPackageDirs(subPackages, root, outDir, exclude)
 
   const resolvedHomePage = typeof homePage === 'string' ? [homePage] : homePage
   const resolvedConfigSource = typeof configSource === 'string' ? [{ files: configSource } as LoadConfigSource<PagesConfig>] : configSource
@@ -70,9 +55,10 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
     configSource: Array.isArray(resolvedConfigSource) ? resolvedConfigSource : [resolvedConfigSource],
     homePage: resolvedHomePage,
     mergePages,
+    dir,
     dirs: resolvedDirs,
-    subPackages: resolvedSubDirs,
-    subPackageRootMap,
+    subPackagePatterns: subPackages,
+    ...resolvedSubPackages,
     outDir,
     exclude,
     root,
@@ -92,22 +78,4 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
   }
 
   return resolvedOptions
-}
-
-/**
- * 根据给定的 glob 模式解析页面目录
- * @param dir - 页面目录 glob 模式
- * @param root - 项目根目录
- * @param exclude - 需要排除的 glob 模式
- * @returns 匹配到的目录路径
- */
-export function resolvePageDirs(dir: string, root: string, exclude: string[]): string[] {
-  const dirs = globSync(normalizePath(dir), {
-    ignore: exclude,
-    onlyDirectories: true,
-    expandDirectories: false,
-    dot: true,
-    cwd: root,
-  })
-  return dirs
 }
