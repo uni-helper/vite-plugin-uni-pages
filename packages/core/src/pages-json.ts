@@ -122,9 +122,33 @@ export async function writePagesJson(jsonPath: string, data: PagesJsonData, opti
       return { updated: false, content }
     }
 
-    await writeFileAtomic(jsonPath, content)
+    // Windows: chokidar may hold pages.json open with a sharing mode that
+    // blocks write-file-atomic's rename; retry up to 3 times before giving up.
+    await retryOnEperm(() => writeFileAtomic(jsonPath, content))
     return { updated: true, content }
   })
+}
+
+/**
+ * Retries an async operation up to 3 times on EPERM, waiting 50ms between
+ * attempts. Other errors propagate immediately.
+ *
+ * Windows file rename (used by write-file-atomic) can fail with EPERM when
+ * another process holds the destination open with a sharing mode that excludes
+ * rename (e.g. chokidar's watcher). The lock clears in under a frame.
+ */
+export async function retryOnEperm(operation: () => Promise<unknown>): Promise<void> {
+  for (let attempt = 3; attempt > 0; attempt--) {
+    try {
+      await operation()
+      return
+    }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EPERM' || attempt === 1)
+        throw error
+      await new Promise<void>(resolve => setTimeout(resolve, 50))
+    }
+  }
 }
 
 /**
