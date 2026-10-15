@@ -657,15 +657,18 @@ export default defineConfig({
 index.ts          Vite 插件入口 — configResolved / transform / configureServer / resolveId / load
 context.ts        PageContext 编排核心 — 配置加载、扫描、合并、监听、虚拟模块与 HMR
 pipeline.ts       纯流水线入口 — createPages / generateAll，root 和 platform 从外部传入，测试直接走这里
+config-loader.ts  配置加载 — unconfig 装载、本地依赖与恢复候选收集、监听路径归一化
+directories.ts    目录发现 — glob 展开、subPackages root 映射与监听边界
 pages-json.ts     pages.json 读-改-写 — 多平台 #ifdef 合并、首页排前、
                   生成标记与过期子包清理、序列化格式化、文件锁与原子写入
+platform-variants.ts 平台变体表 — 跨平台合并的共享规则，数组侧与对象侧两类适配器共用tab-bar.ts        tabBar 外观属性的跨平台合并与渲染（对象侧适配器）
+jsonc-scan.ts     从 pages.json 原始文本里捞回 comment-json 解析时丢掉的重复键
 files.ts          文件工具 — 页面扫描、路径解析、文件锁（withFileLock）、pages.json 合法性检查
 macro.ts          definePage 宏解析 — SFC 解析、单个 script 块失败不影响别的块、
                   对象 / 函数 / 异步函数三种形态求值
 condition.ts      按平台写配置 — define().ifdef()/.ifndef()，扫描时就算成当前平台的普通对象
 page.ts           页面实体 — 文件读取、宏求值、变更检测、跳过状态
 options.ts        选项解析 — 默认值合并与扫描规则保留
-directories.ts    目录发现 — glob 展开、subPackages root 映射与监听边界
 declaration.ts    uni-pages.d.ts 生成，为导航 API 提供路径类型检查
 config.ts         defineUniPages 辅助函数 + 类型重导出
 constant.ts       常量 — 虚拟模块 ID、页面文件扩展名（vue / nvue / uvue）
@@ -677,13 +680,18 @@ types.ts          公共类型定义（Options / UserOptions / ResolvedOptions�
 
 ```shell
 index.ts
-  └─ context.ts（编排核心）
-       ├─ options.ts                  选项解析
-       ├─ files.ts                    扫描与文件锁
-       ├─ page.ts ── macro.ts ── condition.ts
-       ├─ pages-json.ts               read-modify-write（内含文件锁）
-       └─ declaration.ts
-pipeline.ts ── context.ts             测试与外部调用的流水线入口
+  ├─ context.ts（编排核心）
+  │    ├─ config-loader.ts             配置装载与恢复监听
+  │    ├─ options.ts ── directories.ts 选项解析与目录发现
+  │    ├─ files.ts                     扫描与文件锁
+  │    ├─ page.ts ── macro.ts ── condition.ts
+  │    ├─ pages-json.ts                读-改-写，内含文件锁
+  │    ├─ platform-variants.ts         平台变体表（两者按类型互相引用）
+  │    ├─ tab-bar.ts ── jsonc-scan.ts  tabBar 属性合并与原文重复键扫描
+  │    └─ declaration.ts
+  ├─ config-loader.ts                  插件工厂预检的路径归一化
+  └─ files.ts                          pages.json 预检与路径解析
+pipeline.ts ── context.ts              测试与外部调用的流水线入口
 ```
 
 ### 插件生命周期
