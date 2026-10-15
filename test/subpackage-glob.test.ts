@@ -70,13 +70,21 @@ describe('分包 glob', () => {
     expect(ctx.subPageMetaData).toEqual([])
   })
 
-  it('重复的物理目录与 root 去重，冲突的动态 root 报错', async () => {
+  it('重复的物理目录与 root 去重，冲突的 root 报错', async () => {
     const root = fixture()
     page(root, 'src/packages/account/pages/profile.vue')
     const ctx = await createPages({ subPackages: [...subPackages!, ...subPackages!] }, { root })
     expect(ctx.subPageMetaData).toHaveLength(1)
     expect(ctx.subPageMetaData[0].pages).toHaveLength(1)
     expect(() => resolveOptions({ subPackages: [...subPackages!, { dir: 'src/packages/account/pages', root: 'conflict' }] }, root)).toThrow('Conflicting subpackage roots')
+    // 纯静态规则之间也要报错：否则 root 由声明顺序决定，写错时静默生效
+    expect(() => resolveOptions({
+      subPackages: [
+        { dir: 'src/packages/account/pages', root: 'first' },
+        { dir: 'src/packages/account/pages', root: 'second' },
+      ],
+    }, root)).toThrow('Conflicting subpackage roots')
+    expect(resolveOptions({ subPackages: [{ dir: 'src/packages/account/pages', root: 'same' }, { dir: 'src/packages/account/pages', root: 'same' }] }, root).subPackages).toEqual(['src/packages/account/pages'])
   })
 
   it('多个动态目录使用同一 root 时合并页面', async () => {

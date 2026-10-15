@@ -34,8 +34,10 @@ export function resolveSubPackageDirs(patterns: (string | SubPackageConfig)[], r
         throw new Error(`[vite-plugin-uni-pages] Invalid subpackage root returned for "${relative}": expected a non-empty relative path without "..".`)
       }
       const packageRoot = resolvedRoot === undefined ? normalizePath(path.relative(path.resolve(root, outDir), absolute)) : normalizePath(resolvedRoot)
+      // 同一物理目录得到不同的 root 一律报错：静态规则之间也会静默取
+      // 最后一条，配置写错时 pages.json 的 root 取决于声明顺序
       const previous = entries.get(absolute)
-      if (previous && (dynamic || previous.dynamic) && previous.root !== packageRoot) {
+      if (previous && previous.root !== packageRoot) {
         throw new Error(`[vite-plugin-uni-pages] Conflicting subpackage roots for "${relative}": "${previous.root}" and "${packageRoot}".`)
       }
       entries.set(absolute, {
