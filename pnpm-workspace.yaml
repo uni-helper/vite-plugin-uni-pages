@@ -9,8 +9,10 @@ configDependencies:
   '@pnpm/plugin-trusted-deps': 0.2.2+sha512-+ZupiXKJhW2fbSilfyRp+wrAY54MKg+c0JWSFGdeb/y9bUoYN5u4XLOZ0Txk7O2bBa6NMhWrX5mwmsHP3/nm9Q==
 
 allowBuilds:
+  bufferutil: true
   core-js: true
   core-js-pure: true
+  esbuild: true
 
 catalog:
   '@antfu/eslint-config': ^9.5.1
