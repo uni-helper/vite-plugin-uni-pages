@@ -5,7 +5,7 @@
 ## 前置条件
 
 - [Node.js](https://nodejs.org/) 24（见仓库根目录 `.nvmrc` / `.node-version`）
-- [pnpm](https://pnpm.io/) 10.34.5（由 `package.json` 的 `packageManager` 字段锁定，建议配合 Corepack 使用）
+- [pnpm](https://pnpm.io/) 12.14.0（由 `package.json` 的 `packageManager` 字段锁定，建议配合 Corepack 使用）
 
 ## 常用命令
 
