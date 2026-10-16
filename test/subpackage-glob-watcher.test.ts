@@ -37,8 +37,10 @@ function watchedFiles(watcher: FSWatcher, directory: string): string[] | undefin
  * （如 `../external/deep` 下的 glob），要监听的是外部祖先目录。
  *
  * 目录键出现不代表注册完成：chokidar 写 _watched 图是同步的，但 OS 层订阅
- * （FSEvents / inotify / kqueue）可能还在启动中。这里用哨兵文件：先等 ready，
- * 再写一个哨兵文件并等它的 add 事件，确认监听真正生效后删掉。
+ * （FSEvents / inotify / kqueue）可能在 ready 之后还有一小段窗口才生效。
+ * 落在窗口里的写入既进不了 chokidar 的首次 readdir 快照，也没有订阅去接住，
+ * 事件就永久丢了。哨兵只写一次时，撞上窗口就必然超时（CI 上 macos + node 24
+ * 高负载下复现过）。这里改成反复写新哨兵：订阅一旦生效，下一次写入就能被看到。
  *
  * 先等 ready 是因为 chokidar 5 在 ready 之前会把 ignoreInitial 事件丢掉；
  * _readyEmitted 是私有字段，只能 as any 读。
@@ -51,20 +53,28 @@ async function waitForWatchDirectories(watcher: FSWatcher, options: ResolvedOpti
   if (!(watcher as any)._readyEmitted)
     await new Promise<void>(resolve => watcher.once('ready', resolve))
   for (const directory of directories) {
-    const sentinel = normalizePath(path.join(directory, `.watch-ready-${Math.random().toString(36).slice(2)}`))
-    let seen = false
+    const prefix = `${directory}/.watch-ready-`
+    let subscribed = false
     const onAll = (_event: string, filepath: string): void => {
-      if (normalizePath(filepath) === sentinel)
-        seen = true
+      if (normalizePath(filepath).startsWith(prefix))
+        subscribed = true
     }
     watcher.on('all', onAll)
+    const sentinels: string[] = []
     try {
-      fs.writeFileSync(sentinel, '')
-      await vi.waitFor(() => expect(seen, `OS watcher inactive for ${directory}`).toBe(true), { timeout: 10000, interval: 25 })
+      // 单次写入可能落在订阅生效前的窗口里，此后永远不会重试。
+      // 每个轮次写一个新哨兵，任意一个被看到就说明订阅已生效。
+      await vi.waitFor(() => {
+        const sentinel = normalizePath(path.join(directory, `.watch-ready-${Math.random().toString(36).slice(2)}`))
+        sentinels.push(sentinel)
+        fs.writeFileSync(sentinel, '')
+        expect(subscribed, `OS watcher inactive for ${directory}`).toBe(true)
+      }, { timeout: 10000, interval: 100 })
     }
     finally {
       watcher.off('all', onAll)
-      fs.rmSync(sentinel, { force: true })
+      for (const sentinel of sentinels)
+        fs.rmSync(sentinel, { force: true })
     }
   }
 }
