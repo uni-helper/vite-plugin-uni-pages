@@ -20,6 +20,22 @@ import { Page } from './page'
 import { writePagesJson } from './pages-json'
 
 /**
+ * 在 watcher 回调里查页面规则
+ *
+ * 规则会在声明变化后重新编译，编译失败属于配置错误；此时记日志并按
+ * “不是页面事件”处理，异常不能穿过 watcher 回调，否则会崩在事件循环里。
+ */
+function queryPageRules<T>(fallback: T, query: () => T): T {
+  try {
+    return query()
+  }
+  catch (error) {
+    debug.error('Failed to evaluate page rules, the event is ignored:', error)
+    return fallback
+  }
+}
+
+/**
  * 页面上下文：负责扫描页面、加载配置、合并页面信息、生成 pages.json
  *
  * 做的事情按固定顺序是：加载用户配置 → 扫描页面文件 → 合并页面
@@ -227,7 +243,7 @@ export class PageContext {
       const configChanged = !excluded.includes(absolute) && isConfigPath
       // 规则的编译结果按声明（dir/subPackages/exclude）缓存，glob 展开的
       // 目录和 root 回调仍在每轮扫描重算，所以新出现的目录不会漏掉
-      const pageChanged = isTargetFile(filepath) && isPageFileInDirectories(filepath, this.options)
+      const pageChanged = isTargetFile(filepath) && queryPageRules(false, () => isPageFileInDirectories(filepath, this.options))
       if (!configChanged && !pageChanged)
         return
 
@@ -239,7 +255,7 @@ export class PageContext {
     const onUnlink = (file: string): void => handleEvent('unlink', file)
     // glob 规则下的目录增删会改变扫描目录集合（如新增 pkg-a 命中 src/pkg-*）
     const onDirectory = (directory: string): void => {
-      if (isPageDirectoryEvent(directory, this.options))
+      if (queryPageRules(false, () => isPageDirectoryEvent(directory, this.options)))
         void this.updatePagesAndNotify()
     }
     // 初始扫描期间新增的路径可能被 ignoreInitial 吞掉，ready 后再收敛一次

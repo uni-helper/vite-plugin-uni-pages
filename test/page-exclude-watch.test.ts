@@ -190,4 +190,20 @@ describe.each(['serve', 'build'] as const)('%s 页面排除规则', (mode) => {
       }])
     }, { timeout: 10000 })
   }, 30000)
+
+  it('运行时改出非法排除规则不会把异常抛给 watcher 回调', async () => {
+    const root = fixture()
+    page(root, 'src/pages/index.vue')
+    // 传入的数组就是解析后的 exclude，运行时改动会触发规则重新编译
+    const exclude: string[] = []
+    const { watcher, events, settleUpdates, scheduledUpdates } = await start(root, mode, { exclude })
+    await waitForSubscription(watcher, path.join(root, 'src/pages'))
+    const before = scheduledUpdates()
+    exclude.push('!src/pages/index.vue')
+    page(root, 'src/pages/index.vue', '非法规则之后')
+    await vi.waitFor(() => expect(events).toContain('change:src/pages/index.vue'), { timeout: 10000 })
+    await settleUpdates()
+    expect(scheduledUpdates()).toBe(before)
+    expect(output(root).pages.map((page: any) => page.path)).toEqual(['src/pages/index'])
+  }, 30000)
 })
