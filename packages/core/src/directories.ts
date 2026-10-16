@@ -1,16 +1,32 @@
 import type { ResolvedOptions, SubPackageConfig } from './types'
 import fs from 'node:fs'
 import path from 'node:path'
+import process from 'node:process'
 import picomatch from 'picomatch'
 import { globSync, isDynamicPattern } from 'tinyglobby'
 import { normalizePath } from 'vite'
 import { compilePageRules, getPageRules } from './page-rules'
 
+/**
+ * 用户写的 `dir`/`subPackages` 是 glob 模式
+ *
+ * Windows 上要把路径分隔符换成 `/`，但不能用 vite 的 normalizePath：它会把
+ * `\[` 这类转义一起换掉，字面目录名就再也匹配不到了。
+ */
+function normalizePagePattern(pattern: string): string {
+  return process.platform === 'win32' ? pattern.replace(/\\(?![()[\]{}!+@])/g, '/') : pattern
+}
+
+/** 把选择器里的转义还原，用作真实路径前的处理 */
+function unescapePagePattern(pattern: string): string {
+  return pattern.replace(/\\(?=[[\](){}!*+?@|])/g, '')
+}
+
 function findPageDirs(dir: string, root: string, rules: ReturnType<typeof compilePageRules>): string[] {
-  const scan = picomatch.scan(normalizePath(dir))
-  if (rules.isExcluded(path.resolve(root, scan.base || '.')))
+  const scan = picomatch.scan(normalizePagePattern(dir))
+  if (rules.isExcluded(path.resolve(root, unescapePagePattern(scan.base || '.'))))
     return []
-  return globSync(normalizePath(dir), {
+  return globSync(normalizePagePattern(dir), {
     ignore: rules.traversalIgnores,
     onlyDirectories: true,
     expandDirectories: false,
@@ -29,14 +45,16 @@ export function resolveSubPackageDirs(patterns: (string | SubPackageConfig)[], r
   const rules = compilePageRules(root, [], exclude)
   const entries = new Map<string, { dir: string, root: string, customRoot?: string, dynamic: boolean }>()
   for (const pattern of patterns) {
-    const dir = normalizePath(typeof pattern === 'string' ? pattern : pattern.dir)
+    const dir = normalizePagePattern(typeof pattern === 'string' ? pattern : pattern.dir)
     if (picomatch.scan(dir).negated)
       throw new Error('[vite-plugin-uni-pages] Use exclude for negative subpackage patterns.')
     const customRoot = typeof pattern === 'string' ? undefined : pattern.root
     const dynamic = isDynamicPattern(dir) || typeof customRoot === 'function'
     const dirs = dynamic ? findPageDirs(dir, root, rules) : [dir]
     for (const matched of dirs) {
-      const absolute = normalizePath(path.resolve(root, matched))
+      // 静态规则的匹配结果就是配置里的路径，可能带 `\[` 这类转义，用前还原
+      const resolved = dynamic ? matched : unescapePagePattern(matched)
+      const absolute = normalizePath(path.resolve(root, resolved))
       if (rules.isExcluded(absolute))
         continue
       const relative = normalizePath(path.relative(root, absolute)) || '.'
@@ -52,7 +70,7 @@ export function resolveSubPackageDirs(patterns: (string | SubPackageConfig)[], r
         throw new Error(`[vite-plugin-uni-pages] Conflicting subpackage roots for "${relative}": "${previous.root}" and "${packageRoot}".`)
       }
       entries.set(absolute, {
-        dir: dynamic ? relative : matched,
+        dir: dynamic ? relative : resolved,
         root: packageRoot,
         customRoot: resolvedRoot === undefined ? undefined : packageRoot,
         dynamic: dynamic || previous?.dynamic === true,
@@ -115,8 +133,8 @@ export function resolvePageWatchDirectories(options: ResolvedOptions): string[] 
     return []
   const rules = getPageRules(options)
   const roots = rules.patterns.flatMap((pattern) => {
-    const scan = picomatch.scan(normalizePath(pattern))
-    const base = normalizePath(path.resolve(options.root, scan.isGlob ? scan.base || '.' : pattern))
+    const scan = picomatch.scan(normalizePagePattern(pattern))
+    const base = normalizePath(path.resolve(options.root, unescapePagePattern(scan.isGlob ? scan.base || '.' : pattern)))
     // 整条规则被排除时不会有页面，不必再为它保留监听祖先
     if (rules.isExcluded(base))
       return []

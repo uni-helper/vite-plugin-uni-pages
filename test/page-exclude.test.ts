@@ -349,15 +349,17 @@ describe('页面排除规则', () => {
     expect(isPageFileInDirectories(included, ctx.options)).toBe(true)
   })
 
-  it('字面目录名里的 glob 元字符需要转义', async () => {
-    const root = path.join(fixture(), 'app[prod]')
-    page(root, 'src/pages/index.vue')
-    const dir = normalizePath(path.join(root, 'src/pages'))
-    const plain = await createPages({ dir, dts: false }, { root })
-    const escaped = await createPages({ dir: dir.replace(/[[\]]/g, '\\$&'), dts: false }, { root })
+  it('转义后的字面目录名按目录名本身匹配', async () => {
+    const root = fixture()
+    page(root, 'packages/app[prod]/pages/index.vue')
+    // 字符类会误伤的同名邻居，转义后不应该被选中
+    page(root, 'packages/appp/pages/index.vue')
+    const pattern = 'packages/app\\[prod\\]/pages'
+    const main = await createPages({ dir: pattern, outDir: '.', dts: false }, { root })
+    const sub = await createPages({ subPackages: [pattern], outDir: '.', dts: false }, { root })
 
-    expect(plain.pageMetaData).toEqual([])
-    expect(escaped.pageMetaData.map(page => page.path)).toEqual(['pages/index'])
+    expect(main.pageMetaData.map(page => page.path)).toEqual(['packages/app[prod]/pages/index'])
+    expect(sub.subPageMetaData.map(pkg => pkg.pages.map(page => page.path))).toEqual([['index']])
   })
 
   it.each(['!src/pages/index.vue', '!**/index.vue', '!!src/pages/index.vue'])('初始化时明确拒绝否定排除项 %s', (exclude) => {
