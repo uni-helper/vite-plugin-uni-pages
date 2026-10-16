@@ -6,7 +6,7 @@ import path from 'node:path'
 import process from 'node:process'
 import { normalizePath } from 'vite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createPages, getPageFiles, isPageDirectoryEvent, isPageFileInDirectories, resolveOptions } from '../packages/core/src'
+import { createPages, getPageFiles, isPageDirectoryEvent, isPageFileInDirectories, resolveOptions, resolvePageWatchDirectories } from '../packages/core/src'
 
 const roots: string[] = []
 
@@ -394,6 +394,18 @@ describe('页面排除规则', () => {
     expect(getPageFiles(path.join(root, 'included'), ctx.options)).toEqual(['index.vue'])
     expect(isPageFileInDirectories(path.join(root, 'excluded/index.vue'), ctx.options)).toBe(false)
     expect(isPageFileInDirectories(path.join(root, 'included/index.vue'), ctx.options)).toBe(true)
+  })
+
+  it('整条规则被排除后不再为它保留监听祖先目录', () => {
+    const workspace = fixture()
+    const root = path.join(workspace, 'app')
+    page(root, 'src/pages/index.vue')
+    const kept = resolveOptions({ subPackages: ['../shared/pages'], exclude: ['../shared/pages'] }, root)
+    const watched = resolveOptions({ subPackages: ['../shared/pages'], exclude: [] }, root)
+
+    expect(resolvePageWatchDirectories(kept)).toEqual([normalizePath(path.join(root, 'src'))])
+    // 未排除时规则仍需要监听，根外来源的祖先目录是项目根的上级
+    expect(resolvePageWatchDirectories(watched)).toEqual([normalizePath(workspace)])
   })
 
   it('绝对排除模式可以在项目根所在的路径段使用 glob', async () => {

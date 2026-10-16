@@ -113,9 +113,13 @@ export function isPageFileInDirectories(file: string, options: ResolvedOptions):
 export function resolvePageWatchDirectories(options: ResolvedOptions): string[] {
   if (!options.mergePages)
     return []
-  const roots = getPageRules(options).patterns.map((pattern) => {
+  const rules = getPageRules(options)
+  const roots = rules.patterns.flatMap((pattern) => {
     const scan = picomatch.scan(normalizePath(pattern))
     const base = normalizePath(path.resolve(options.root, scan.isGlob ? scan.base || '.' : pattern))
+    // 整条规则被排除时不会有页面，不必再为它保留监听祖先
+    if (rules.isExcluded(base))
+      return []
     let directory = base === normalizePath(options.root) ? base : path.dirname(base)
     while (!fs.existsSync(directory) || !fs.statSync(directory).isDirectory()) {
       const parent = path.dirname(directory)
@@ -123,7 +127,7 @@ export function resolvePageWatchDirectories(options: ResolvedOptions): string[] 
         break
       directory = parent
     }
-    return normalizePath(directory)
+    return [normalizePath(directory)]
   })
   return [...new Set(roots)].filter(root => !roots.some(parent => parent !== root && contains(parent, root)))
 }
