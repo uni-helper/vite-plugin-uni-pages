@@ -344,12 +344,13 @@ export interface ResolvedOptions extends Omit<Options, 'homePage' | 'configSourc
   /** 原始子包目录规则，用于重新发现目录 */
   subPackagePatterns: (string | SubPackageConfig)[]
 
-  /** 由 glob 或 root 回调产生的子包 root，同 root 的目录合并页面 */
+  /** 由 glob 或 root 回调产生的子包 root，保留用于兼容现有读取方 */
   dynamicSubPackageRoots: Set<string>
 
   /**
-   * 子包的自定义 root 映射（目录 -> root）
-   * 用于 monorepo 支持，指定 pages.json 中的自定义 root 路径
+   * 子包目录的 root 映射（目录 -> 最终 root）
+   *
+   * @description 未登记的目录继续使用相对 outDir 的默认 root
    */
   subPackageRootMap: Map<string, string>
 }

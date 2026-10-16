@@ -44,18 +44,69 @@ export function resolvePageDirs(dir: string, root: string, exclude: string[]): s
   return findPageDirs(dir, root, compilePageRules(root, [dir], exclude))
 }
 
-/** 展开子包规则，保留旧静态目录的自定义 root 语义 */
-export function resolveSubPackageDirs(patterns: (string | SubPackageConfig)[], root: string, outDir: string, exclude: string[]): Pick<ResolvedOptions, 'subPackages' | 'subPackageRootMap' | 'dynamicSubPackageRoots'> {
+/** 一轮目录发现中保留的词法来源，identity 仅用于目录归组 */
+export interface SubPackageDirectorySource {
+  dir: string
+  absolute: string
+  identity?: string
+  root: string
+  explicitRoot: boolean
+  ruleIndex: number
+  matchIndex: number
+  rootSource: { dir: string, ruleIndex: number, explicitRoot: boolean }
+}
+
+interface DirectoryCandidate extends SubPackageDirectorySource {
+  defaultRoot: string
+  dynamic: boolean
+}
+
+type SubPackageDirectoryProjection = Pick<ResolvedOptions, 'subPackages' | 'subPackageRootMap' | 'dynamicSubPackageRoots'>
+
+const subPackageSources = new WeakMap<ResolvedOptions, readonly SubPackageDirectorySource[]>()
+
+function directoryIdentity(absolute: string): string | undefined {
+  try {
+    if (fs.statSync(absolute, { throwIfNoEntry: false })?.isDirectory())
+      return normalizePath(fs.realpathSync.native(absolute))
+  }
+  catch (error) {
+    if (!['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? ''))
+      throw error
+  }
+}
+
+function findCallbackDirectory(dir: string, root: string, rules: ReturnType<typeof compilePageRules>): string[] {
+  if (dir === '')
+    return []
+  const absolute = path.resolve(root, unescapePagePattern(path.posix.normalize(dir)))
+  if (rules.isExcluded(absolute))
+    return []
+  try {
+    // tinyglobby 不返回符号链接目录本身；字面回调规则仍须按该词法来源求值
+    if (fs.statSync(absolute, { throwIfNoEntry: false })?.isDirectory())
+      return [normalizePath(path.relative(root, absolute)) || '.']
+  }
+  catch (error) {
+    if (!['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? ''))
+      throw error
+  }
+  return []
+}
+
+function discoverSubPackageDirectories(patterns: (string | SubPackageConfig)[], root: string, outDir: string, exclude: string[]): { sources: SubPackageDirectorySource[], projection: SubPackageDirectoryProjection } {
   const rules = compilePageRules(root, [], exclude)
-  const entries = new Map<string, { dir: string, root: string, customRoot?: string, dynamic: boolean }>()
-  for (const pattern of patterns) {
+  const candidates: DirectoryCandidate[] = []
+  const groups = new Map<string, DirectoryCandidate[]>()
+  for (const [ruleIndex, pattern] of patterns.entries()) {
     const dir = normalizePagePattern(typeof pattern === 'string' ? pattern : pattern.dir)
     if (picomatch.scan(dir).negated)
       throw new Error('[vite-plugin-uni-pages] Use exclude for negative subpackage patterns.')
     const customRoot = typeof pattern === 'string' ? undefined : pattern.root
-    const dynamic = isDynamicPattern(dir) || typeof customRoot === 'function'
-    const dirs = dynamic ? findPageDirs(dir, root, rules) : [dir]
-    for (const matched of dirs) {
+    const glob = isDynamicPattern(dir)
+    const dynamic = glob || typeof customRoot === 'function'
+    const dirs = glob ? findPageDirs(dir, root, rules) : typeof customRoot === 'function' ? findCallbackDirectory(dir, root, rules) : [dir]
+    for (const [matchIndex, matched] of dirs.entries()) {
       // 静态规则的匹配结果就是配置里的路径，可能带 `\[` 这类转义，用前还原
       const resolved = dynamic ? matched : unescapePagePattern(matched)
       const absolute = normalizePath(path.resolve(root, resolved))
@@ -66,33 +117,79 @@ export function resolveSubPackageDirs(patterns: (string | SubPackageConfig)[], r
       if (typeof customRoot === 'function' && (typeof resolvedRoot !== 'string' || !resolvedRoot || resolvedRoot === '.' || path.posix.isAbsolute(resolvedRoot) || path.win32.isAbsolute(resolvedRoot) || resolvedRoot.replace(/\\/g, '/').split('/').includes('..'))) {
         throw new Error(`[vite-plugin-uni-pages] Invalid subpackage root returned for "${relative}": expected a non-empty relative path without "..".`)
       }
-      const packageRoot = resolvedRoot === undefined ? normalizePath(path.relative(path.resolve(root, outDir), absolute)) : normalizePath(resolvedRoot)
-      // 同一物理目录得到不同的 root 一律报错：静态规则之间也会静默取
-      // 最后一条，配置写错时 pages.json 的 root 取决于声明顺序
-      const previous = entries.get(absolute)
-      if (previous && previous.root !== packageRoot) {
-        throw new Error(`[vite-plugin-uni-pages] Conflicting subpackage roots for "${relative}": "${previous.root}" and "${packageRoot}".`)
-      }
-      entries.set(absolute, {
+      const defaultRoot = normalizePath(path.relative(path.resolve(root, outDir), absolute))
+      const identity = directoryIdentity(absolute)
+      const candidate: DirectoryCandidate = {
         dir: dynamic ? relative : resolved,
-        root: packageRoot,
-        customRoot: resolvedRoot === undefined ? undefined : packageRoot,
-        dynamic: dynamic || previous?.dynamic === true,
-      })
+        absolute,
+        identity,
+        root: resolvedRoot === undefined ? defaultRoot : normalizePath(resolvedRoot),
+        explicitRoot: resolvedRoot !== undefined,
+        ruleIndex,
+        matchIndex,
+        rootSource: { dir: dynamic ? relative : resolved, ruleIndex, explicitRoot: resolvedRoot !== undefined },
+        defaultRoot,
+        dynamic,
+      }
+      candidates.push(candidate)
+      const key = identity ?? absolute
+      const group = groups.get(key) ?? []
+      group.push(candidate)
+      groups.set(key, group)
     }
   }
-  return {
-    subPackages: [...entries.values()].map(entry => entry.dir),
-    subPackageRootMap: new Map([...entries.values()].filter(entry => entry.customRoot !== undefined).map(entry => [entry.dir, entry.customRoot!])),
-    dynamicSubPackageRoots: new Set([...entries.values()].filter(entry => entry.dynamic).map(entry => entry.root)),
+
+  for (const group of groups.values()) {
+    const explicit = group.filter(candidate => candidate.explicitRoot)
+    const selected = explicit[0] ?? group[0]!
+    for (const candidate of explicit) {
+      if (candidate.root !== selected.root) {
+        throw new Error(`[vite-plugin-uni-pages] Conflicting subpackage roots: "${selected.dir}" (subPackages[${selected.ruleIndex}]) uses "${selected.root}", but "${candidate.dir}" (subPackages[${candidate.ruleIndex}]) uses "${candidate.root}".`)
+      }
+    }
+    // 仅统一归属，不移除别名来源；文件排除仍需分别使用各自的词法路径
+    for (const candidate of group) {
+      candidate.root = selected.root
+      candidate.rootSource = selected.rootSource
+    }
   }
+
+  const roots = new Map<string, string>()
+  for (const candidate of candidates) {
+    if (candidate.explicitRoot || candidate.root !== candidate.defaultRoot)
+      roots.set(candidate.dir, candidate.root)
+  }
+  return {
+    sources: candidates.map(({ defaultRoot: _defaultRoot, dynamic: _dynamic, ...source }) => source),
+    projection: {
+      subPackages: [...new Set(candidates.map(candidate => candidate.dir))],
+      subPackageRootMap: roots,
+      dynamicSubPackageRoots: new Set(candidates.filter(candidate => candidate.dynamic).map(candidate => candidate.root)),
+    },
+  }
+}
+
+/** 展开子包规则，默认 root 让位于同一目录的显式 root */
+export function resolveSubPackageDirs(patterns: (string | SubPackageConfig)[], root: string, outDir: string, exclude: string[]): SubPackageDirectoryProjection {
+  return discoverSubPackageDirectories(patterns, root, outDir, exclude).projection
+}
+
+/** 读取本轮目录来源，不跨扫描缓存目录展开或物理身份 */
+export function getSubPackageDirectorySources(options: ResolvedOptions): readonly SubPackageDirectorySource[] {
+  let sources = subPackageSources.get(options)
+  if (!sources) {
+    sources = discoverSubPackageDirectories(options.subPackagePatterns, options.root, options.outDir, options.exclude).sources
+    subPackageSources.set(options, sources)
+  }
+  return sources
 }
 
 /** 在一次扫描前刷新目录和 root 映射，避免沿用启动时的 glob 结果 */
 export function refreshPageDirectories(options: ResolvedOptions): void {
-  const subPackages = resolveSubPackageDirs(options.subPackagePatterns, options.root, options.outDir, options.exclude)
+  const { sources, projection } = discoverSubPackageDirectories(options.subPackagePatterns, options.root, options.outDir, options.exclude)
   options.dirs = resolvePageDirs(options.dir, options.root, options.exclude)
-  Object.assign(options, subPackages)
+  Object.assign(options, projection)
+  subPackageSources.set(options, sources)
 }
 
 function contains(directory: string, entry: string): boolean {

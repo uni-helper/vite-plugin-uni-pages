@@ -57,6 +57,8 @@ test/
 │                                        纯合并 seam、子包收敛、tabBar 按平台、EPERM 重试）
 ├── subpackage-glob.test.ts              分包 glob、root 映射与冲突检查
 ├── subpackage-glob-watcher.test.ts      目录监听边界与 watch 就绪
+├── scan-ownership.test.ts               目录 root 决议、页面身份归属与生成路由冲突
+├── scan-ownership-output.test.ts        聚合配置元数据与 pages.json、虚拟模块、声明一致性
 ├── page-exclude.test.ts                 页面排除基准、模式语义与目录发现一致性
 ├── page-exclude-watch.test.ts           页面排除与配置依赖在真实 watcher 下的隔离
 ├── subpackage-user-pages-path.test.ts   配置里的分包 pages 按 root 写相对 path
