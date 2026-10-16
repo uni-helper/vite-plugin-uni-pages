@@ -225,8 +225,8 @@ export class PageContext {
         || (mightBeConfig && index.directories.some(dir => absolute.startsWith(`${dir}/`)))
       )
       const configChanged = !excluded.includes(absolute) && isConfigPath
-      // 页面规则每次事件重算：glob 匹配出的目录会在运行中增减，
-      // 缓存下来就会漏掉新出现的目录
+      // 规则的编译结果按声明（dir/subPackages/exclude）缓存，glob 展开的
+      // 目录和 root 回调仍在每轮扫描重算，所以新出现的目录不会漏掉
       const pageChanged = isTargetFile(filepath) && isPageFileInDirectories(filepath, this.options)
       if (!configChanged && !pageChanged)
         return
