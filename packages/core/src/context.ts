@@ -48,6 +48,7 @@ export class PageContext {
   private readonly configLoader: PagesConfigLoader
   private readonly watchers = new Map<FSWatcher, () => void>()
   private readonly watchedConfigPaths = new Map<FSWatcher, Set<string>>()
+  private readonly watchedPageDirectories = new Map<FSWatcher, Set<string>>()
   /**
    * 每次事件都要比对的绝对路径，按 watcher 缓存
    *
@@ -174,6 +175,7 @@ export class PageContext {
    */
   async scanAndMerge(): Promise<void> {
     refreshPageDirectories(this.options)
+    this.refreshPageWatchers()
     await this.scanPages()
     await this.scanSubPages()
     await this.mergePageMetaData()
@@ -276,14 +278,9 @@ export class PageContext {
     })
     this.watchedConfigPaths.set(watcher, new Set())
     this.watchedConfigIndex.set(watcher, { files: new Set(), directories: [] })
+    this.watchedPageDirectories.set(watcher, new Set())
     this.refreshConfigWatchers()
-    // 尚未命中的 glob 目录要监听它已存在的祖先目录，否则新建目录
-    // 不会产生任何事件；Vite 自己已递归监听的项目根不重复 add
-    const serverRoot = (this._server?.watcher as unknown) === watcher ? normalizePath(this._server!.config.root) : undefined
-    const directories = resolvePageWatchDirectories(this.options)
-      .filter(dir => !serverRoot || (dir !== serverRoot && !dir.startsWith(`${serverRoot}/`)))
-    if (directories.length)
-      watcher.add(directories)
+    this.refreshPageWatchers()
   }
 
   /** 解绑本插件回调；共享 watcher 的关闭仍由 Vite 负责 */
@@ -293,8 +290,32 @@ export class PageContext {
     this.watchers.clear()
     this.watchedConfigPaths.clear()
     this.watchedConfigIndex.clear()
+    this.watchedPageDirectories.clear()
     this._server = undefined
     await this.pendingUpdate
+  }
+
+  /** 补扫后补齐新生效的页面监听根；保留旧订阅以免影响共享 watcher */
+  private refreshPageWatchers(): void {
+    if (!this.watchers.size)
+      return
+    const directories = resolvePageWatchDirectories(this.options)
+    for (const watcher of this.watchers.keys()) {
+      const added = this.watchedPageDirectories.get(watcher)!
+      const serverRoot = (this._server?.watcher as unknown) === watcher ? normalizePath(this._server!.config.root) : undefined
+      const wanted = directories.filter(dir => (!serverRoot || (dir !== serverRoot && !dir.startsWith(`${serverRoot}/`)))
+        && ![...added].some(existing => dir === existing || dir.startsWith(`${existing}/`)))
+      if (!wanted.length)
+        continue
+      try {
+        watcher.add(wanted)
+        for (const directory of wanted)
+          added.add(directory)
+      }
+      catch (error) {
+        this.logger?.error(`[vite-plugin-uni-pages] Failed to watch page directories: ${error instanceof Error ? error.message : error}`, { timestamp: true, error: error instanceof Error ? error : undefined })
+      }
+    }
   }
 
   /**
@@ -419,6 +440,7 @@ export class PageContext {
 
     if (this.options.mergePages) {
       refreshPageDirectories(this.options)
+      this.refreshPageWatchers()
       this.options.onBeforeScanPages()
       await this.scanPages()
       await this.scanSubPages()

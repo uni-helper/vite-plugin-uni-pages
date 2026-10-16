@@ -67,9 +67,11 @@ async function start(root: string, mode: 'serve' | 'build', options: UserOptions
   const updates = vi.spyOn(PageContext.prototype, 'updatePagesJSON')
   const events: string[] = []
   let watcher: FSWatcher | undefined
+  let updatePages: (() => Promise<boolean>) | undefined
   let scans = 0
   const setup = PageContext.prototype.setupWatcher
   vi.spyOn(PageContext.prototype, 'setupWatcher').mockImplementation(function (this: PageContext, observed) {
+    updatePages = this.updatePagesJSON.bind(this)
     watcher = observed as unknown as FSWatcher
     watcher.on('all', (event, file) => events.push(`${event}:${normalizePath(path.relative(root, file))}`))
     return setup.call(this, observed)
@@ -111,7 +113,7 @@ async function start(root: string, mode: 'serve' | 'build', options: UserOptions
     await Promise.allSettled(updates.mock.results.map(result => result.value))
   }
   await settleUpdates()
-  return { watcher: watcher!, events, settleUpdates, scheduledUpdates: () => updates.mock.calls.length }
+  return { watcher: watcher!, updatePages: updatePages!, events, settleUpdates, scheduledUpdates: () => updates.mock.calls.length }
 }
 
 afterEach(async () => {
@@ -203,5 +205,37 @@ describe.each(['serve', 'build'] as const)('%s 页面排除规则', (mode) => {
     await settleUpdates()
     expect(scheduledUpdates()).toBe(before)
     expect(output(root).pages.map((page: any) => page.path)).toEqual(['src/pages/index'])
+  }, 30000)
+
+  it('解除外部目录排除并完成补扫后，继续发现新增页面', async () => {
+    const workspace = fixture()
+    const root = path.join(workspace, 'app')
+    const externalPages = path.join(workspace, 'external/account/pages')
+    page(root, 'src/pages/index.vue')
+    page(workspace, 'external/account/pages/existing.vue')
+    const exclude = ['../external']
+    const { watcher, updatePages, settleUpdates } = await start(root, mode, {
+      subPackages: ['../external/*/pages'],
+      exclude,
+    })
+    expect(output(root).subPackages ?? []).toEqual([])
+    const watchedDirectories = Object.keys(watcher.getWatched()).map(normalizePath)
+    expect(watchedDirectories).not.toContain(normalizePath(externalPages))
+
+    exclude.splice(0)
+    await updatePages()
+    await settleUpdates()
+    expect(output(root).subPackages).toMatchObject([{
+      root: '../external/account/pages',
+      pages: [{ path: 'existing' }],
+    }])
+
+    // 哨兵只检测订阅，不承担页面更新；失败时仍只创建一次目标页面以验证遗漏
+    const subscribed = await waitForSubscription(watcher, externalPages).then(() => true, () => false)
+    page(workspace, 'external/account/pages/added.vue')
+    await vi.waitFor(() => {
+      const pages = output(root).subPackages[0].pages.map((page: any) => page.path).sort()
+      expect(pages, subscribed ? '外部页面新增后应自动发现' : '补扫后仍未注册外部目录的原生监听').toEqual(['added', 'existing'])
+    }, { timeout: 10000 })
   }, 30000)
 })

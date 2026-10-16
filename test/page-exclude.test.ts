@@ -421,6 +421,18 @@ describe('页面排除规则', () => {
     expect(resolvePageWatchDirectories(watched)).toEqual([normalizePath(workspace)])
   })
 
+  it.each(['main', 'subpackage'] as const)('%s 规范化选择器后再判断扫描和监听基准是否被排除', async (kind) => {
+    const root = fixture()
+    const included = page(root, 'src/pages/index.vue')
+    const pattern = 'src/excluded/*/../../pages'
+    const options: UserOptions = kind === 'main' ? { dir: pattern } : { dir: 'src/excluded/main', subPackages: [pattern] }
+    const ctx = await createPages({ ...options, exclude: ['src/excluded'] }, { root })
+
+    expect(kind === 'main' ? ctx.pageMetaData : ctx.subPageMetaData.flatMap(pkg => pkg.pages)).toHaveLength(1)
+    expect(isPageFileInDirectories(included, ctx.options)).toBe(true)
+    expect(resolvePageWatchDirectories(ctx.options)).toContain(normalizePath(path.join(root, 'src')))
+  })
+
   it('绝对排除模式可以在项目根所在的路径段使用 glob', async () => {
     const workspace = fixture()
     const root = path.join(workspace, 'app')

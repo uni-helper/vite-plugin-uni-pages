@@ -23,10 +23,14 @@ function unescapePagePattern(pattern: string): string {
 }
 
 function findPageDirs(dir: string, root: string, rules: ReturnType<typeof compilePageRules>): string[] {
-  const scan = picomatch.scan(normalizePagePattern(dir))
+  if (dir === '' || picomatch.scan(dir).negated)
+    return []
+  // 与 tinyglobby 和 matcher 一样先消解 .、..，再推导可安全剪枝的基准
+  const pattern = path.posix.normalize(normalizePagePattern(dir))
+  const scan = picomatch.scan(pattern)
   if (rules.isExcluded(path.resolve(root, unescapePagePattern(scan.base || '.'))))
     return []
-  return globSync(normalizePagePattern(dir), {
+  return globSync(pattern, {
     ignore: rules.traversalIgnores,
     onlyDirectories: true,
     expandDirectories: false,
@@ -133,8 +137,9 @@ export function resolvePageWatchDirectories(options: ResolvedOptions): string[] 
     return []
   const rules = getPageRules(options)
   const roots = rules.patterns.flatMap((pattern) => {
-    const scan = picomatch.scan(normalizePagePattern(pattern))
-    const base = normalizePath(path.resolve(options.root, unescapePagePattern(scan.isGlob ? scan.base || '.' : pattern)))
+    const normalized = path.posix.normalize(normalizePagePattern(pattern))
+    const scan = picomatch.scan(normalized)
+    const base = normalizePath(path.resolve(options.root, unescapePagePattern(scan.isGlob ? scan.base || '.' : normalized)))
     // 整条规则被排除时不会有页面，不必再为它保留监听祖先
     if (rules.isExcluded(base))
       return []
