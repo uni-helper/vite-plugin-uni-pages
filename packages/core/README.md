@@ -554,6 +554,8 @@ export default defineConfig({
 
 `subPackages` 的字符串和对象 `dir` 都支持目录 glob。例如，`subPackages: ['src/packages/*/pages']` 会把每个匹配的 `pages` 目录作为分包目录，生成的默认 `root` 相对 `outDir` 计算。每条规则的匹配结果按路径排序，规则之间保留配置顺序。
 
+`dir` 和 `subPackages` 的值一律按 glob 模式解析，字面目录名里的 glob 元字符要转义。目录名为 `app[prod]` 时写成 `app\[prod\]/src/pages`；不转义的 `[prod]` 会被当成字符类，匹配不到任何目录。
+
 如需让分包 `root` 指向扫描目录的上级，可以使用同步回调：
 
 ```ts
