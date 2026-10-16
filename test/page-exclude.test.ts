@@ -421,14 +421,30 @@ describe('页面排除规则', () => {
     expect(resolvePageWatchDirectories(watched)).toEqual([normalizePath(workspace)])
   })
 
+  it('探测监听祖先时目录消失仍继续向上查找', () => {
+    const root = fixture()
+    page(root, 'src/pages/index.vue')
+    const options = resolveOptions({}, root)
+    const statSync = fs.statSync
+    vi.spyOn(fs, 'statSync').mockImplementationOnce((...args) => {
+      fs.rmSync(path.join(root, 'src'), { recursive: true, force: true })
+      return statSync(...args)
+    })
+
+    expect(resolvePageWatchDirectories(options)).toEqual([normalizePath(root)])
+  })
+
   it.each(['main', 'subpackage'] as const)('%s 规范化选择器后再判断扫描和监听基准是否被排除', async (kind) => {
     const root = fixture()
     const included = page(root, 'src/pages/index.vue')
+    page(root, 'src/excluded/main/index.vue')
     const pattern = 'src/excluded/*/../../pages'
     const options: UserOptions = kind === 'main' ? { dir: pattern } : { dir: 'src/excluded/main', subPackages: [pattern] }
     const ctx = await createPages({ ...options, exclude: ['src/excluded'] }, { root })
 
     expect(kind === 'main' ? ctx.pageMetaData : ctx.subPageMetaData.flatMap(pkg => pkg.pages)).toHaveLength(1)
+    if (kind === 'subpackage')
+      expect(ctx.pageMetaData).toEqual([])
     expect(isPageFileInDirectories(included, ctx.options)).toBe(true)
     expect(resolvePageWatchDirectories(ctx.options)).toContain(normalizePath(path.join(root, 'src')))
   })

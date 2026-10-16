@@ -144,7 +144,7 @@ export function resolvePageWatchDirectories(options: ResolvedOptions): string[] 
     if (rules.isExcluded(base))
       return []
     let directory = base === normalizePath(options.root) ? base : path.dirname(base)
-    while (!fs.existsSync(directory) || !fs.statSync(directory).isDirectory()) {
+    while (!fs.statSync(directory, { throwIfNoEntry: false })?.isDirectory()) {
       const parent = path.dirname(directory)
       if (parent === directory)
         break

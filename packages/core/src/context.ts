@@ -295,6 +295,23 @@ export class PageContext {
     await this.pendingUpdate
   }
 
+  /** 补充未覆盖的监听路径，注册成功后记账，失败时保留重试机会 */
+  private addWatchPaths(watcher: FSWatcher, paths: readonly string[], added: Set<string>, sharedRoot: string | undefined, description: string): void {
+    const wanted = paths.filter(file => (!sharedRoot || (file !== sharedRoot && !file.startsWith(`${sharedRoot}/`)))
+      && ![...added].some(existing => file === existing || file.startsWith(`${existing}/`)))
+    if (!wanted.length)
+      return
+    try {
+      // add() 返回 watcher，注册异步完成；这里只能捕获同步异常
+      watcher.add(wanted)
+      for (const file of wanted)
+        added.add(file)
+    }
+    catch (error) {
+      this.logger?.error(`[vite-plugin-uni-pages] Failed to watch ${description}: ${error instanceof Error ? error.message : error}`, { timestamp: true, error: error instanceof Error ? error : undefined })
+    }
+  }
+
   /** 补扫后补齐新生效的页面监听根；保留旧订阅以免影响共享 watcher */
   private refreshPageWatchers(): void {
     if (!this.watchers.size)
@@ -303,18 +320,7 @@ export class PageContext {
     for (const watcher of this.watchers.keys()) {
       const added = this.watchedPageDirectories.get(watcher)!
       const serverRoot = (this._server?.watcher as unknown) === watcher ? normalizePath(this._server!.config.root) : undefined
-      const wanted = directories.filter(dir => (!serverRoot || (dir !== serverRoot && !dir.startsWith(`${serverRoot}/`)))
-        && ![...added].some(existing => dir === existing || dir.startsWith(`${existing}/`)))
-      if (!wanted.length)
-        continue
-      try {
-        watcher.add(wanted)
-        for (const directory of wanted)
-          added.add(directory)
-      }
-      catch (error) {
-        this.logger?.error(`[vite-plugin-uni-pages] Failed to watch page directories: ${error instanceof Error ? error.message : error}`, { timestamp: true, error: error instanceof Error ? error : undefined })
-      }
+      this.addWatchPaths(watcher, directories, added, serverRoot, 'page directories')
     }
   }
 
@@ -350,20 +356,7 @@ export class PageContext {
         ? normalizeConfigPath(this._server.config.root, this.root)
         : undefined
       // sharedRoot 由 Vite 自己监听，不重复添加也不能撤销
-      const wanted = paths.filter(file => (!sharedRoot || (file !== sharedRoot && !file.startsWith(`${sharedRoot}/`)))
-        && ![...added].some(existing => file === existing || file.startsWith(`${existing}/`)))
-      if (wanted.length) {
-        try {
-          // add() 不是 Promise（chokidar 3 和 5 都返回 this），只能捕获同步抛出；
-          // 注册本身异步完成，没有可等的完成信号
-          watcher.add(wanted)
-          for (const file of wanted)
-            added.add(file)
-        }
-        catch (error) {
-          this.logger?.error(`[vite-plugin-uni-pages] Failed to watch pages config dependencies: ${error instanceof Error ? error.message : error}`, { timestamp: true, error: error instanceof Error ? error : undefined })
-        }
-      }
+      this.addWatchPaths(watcher, paths, added, sharedRoot, 'pages config dependencies')
       this.watchedConfigIndex.set(watcher, index)
     }
   }
