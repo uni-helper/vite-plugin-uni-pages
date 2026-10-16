@@ -491,6 +491,14 @@ exclude: [
 
 默认值也会命中扫描目录本身。把页面写在依赖里的来源（例如 pnpm link 或 workspace 包中的 `dir: 'node_modules/@scope/ui/pages'`，以及指向同类路径的 `subPackages`）会被默认排除，一条页面都扫不到。保留这类来源需要显式传入 `exclude`，比如关闭默认页面排除的 `exclude: []`，或只留下还需要的那部分规则（如 `exclude: ['**/__*__/**']`）。
 
+### 路径基准
+
+页面相关的路径基准在同一次调整中统一，升级前请确认以下三点：
+
+- Vite `root` 在解析阶段固定为绝对路径（相对 `process.cwd()` 传入时也会解析），之后切换 `process.cwd()` 不再影响扫描和排除结果。
+- `dts: true` 的默认输出路径相对解析后的 `root` 计算；此前相对传入的 Vite root，未传时是 `process.cwd()`。
+- `getPageFiles(directory, options)` 的 `directory` 相对 `options.root` 解析（此前相对 `process.cwd()`），返回值仍相对 `directory`。
+
 ### 完整类型定义
 
 请查看 [types.ts](./src/types.ts) 获取完整定义。
