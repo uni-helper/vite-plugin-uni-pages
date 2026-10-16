@@ -15,6 +15,9 @@ import { afterAll, describe, expect, it } from 'vitest'
 const root = path.resolve(__dirname, '..')
 const corePkg = path.join(root, 'packages/core')
 const typesPkg = path.join(root, 'packages/types')
+// 直接跑仓库装好的 tsc。走 `npx` 要多起 cmd.exe 和 npm，Windows CI 上
+// 光这条启动链就要十秒上下，测试还没跑完就撞破默认超时。
+const tsc = path.join(root, 'node_modules/typescript/lib/tsc.js')
 
 /**
  * https://github.com/uni-helper/vite-plugin-uni-pages/issues/281 的回归测试
@@ -41,6 +44,7 @@ describe('definePage global type (issue #281)', () => {
       rmSync(dir, { recursive: true, force: true })
   })
 
+  // 拉起独立进程做完整类型检查，默认的 5s 超时对 Windows CI 太紧。
   it('resolves `definePage` from the published package surface', () => {
     // 构建产物必须存在；CI 在 `test` 之前运行 `build`。
     expect(existsSync(path.join(corePkg, 'dist/index.d.mts')), 'core dist missing, run `pnpm build` first').toBe(true)
@@ -91,12 +95,10 @@ describe('definePage global type (issue #281)', () => {
     let stdout = ''
     let exitCode = 0
     try {
-      execFileSync('npx', ['tsc', '--noEmit', '-p', tmp], {
+      execFileSync(process.execPath, [tsc, '--noEmit', '-p', tmp], {
         cwd: root,
         encoding: 'utf-8',
         stdio: ['ignore', 'pipe', 'pipe'],
-        // Windows 上 `npx` 是 `npx.cmd`；启动 `.cmd` 需要 shell。
-        shell: process.platform === 'win32',
       })
     }
     catch (error: any) {
@@ -110,5 +112,5 @@ describe('definePage global type (issue #281)', () => {
     // 健全性检查：全局声明确实通过 global.d.ts 接好了。
     const globalDts = readFileSync(path.join(coreOut, 'global.d.ts'), 'utf-8')
     expect(globalDts).toMatch(/const definePage: import\(['"]\.['"]\)\.DefinePage/)
-  })
+  }, 60_000)
 })
