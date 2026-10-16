@@ -35,8 +35,6 @@ function output(root: string): any {
 
 /** 用独立哨兵确认原生订阅可达，随后每个目标文件只修改一次 */
 async function waitForSubscription(watcher: FSWatcher, directory: string): Promise<void> {
-  if (!(watcher as any)._readyEmitted)
-    await new Promise<void>(resolve => watcher.once('ready', resolve))
   const prefix = normalizePath(path.join(directory, '.exclude-watch-ready-'))
   const sentinels: string[] = []
   let observed = false
