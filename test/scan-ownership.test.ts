@@ -444,6 +444,22 @@ describe('生成路由冲突与配置覆盖', () => {
     await expect(ctx.scanAndMerge()).rejects.toThrow(/Conflicting generated route.*pages\/shared/)
   })
 
+  it.each([
+    ['shared.txt', 'shared.md'],
+    ['shared.vue', 'shared.txt'],
+    ['first', 'second'],
+  ])('文件符号链接目标 %s/%s 不能伪装同名格式变体', async (first, second) => {
+    const root = fixture()
+    fs.mkdirSync(path.join(root, 'src/pages'), { recursive: true })
+    for (const [target, filename] of [[first, 'first.vue'], [second, 'second.vue']]) {
+      page(root, `real/${target}`, 'definePage({ path: "pages/shared" })')
+      fs.symlinkSync(path.join(root, `real/${target}`), path.join(root, 'src/pages', filename), 'file')
+    }
+    const ctx = new PageContext({}, root, 'h5')
+
+    await expect(ctx.scanAndMerge()).rejects.toThrow(/Conflicting generated route.*pages\/shared/)
+  })
+
   it('格式文件族例外不允许不同归属占用同一完整路由', async () => {
     const root = fixture()
     page(root, 'src/pages/shared.vue', 'definePage({ path: "pkg/shared" })')

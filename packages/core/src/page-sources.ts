@@ -2,6 +2,7 @@ import type { Page } from './page'
 import fs from 'node:fs'
 import path from 'node:path'
 import { normalizePath } from 'vite'
+import { FILE_EXTENSIONS } from './constant'
 
 /** 一轮扫描中已通过词法路径排除的页面来源 */
 export interface PageSource {
@@ -99,9 +100,13 @@ export function selectPageSources(candidates: PageCandidate[]): PageCandidate[] 
  * 获取允许格式或平台变体覆盖的物理文件族
  *
  * @description 格式变体共享去掉扩展名的真实路径；平台后缀只在主包且当前平台适用时处理
+ * @returns 支持的真实页面格式对应的文件族，其他格式不参与覆盖例外
  */
-function fileFamily(source: PageCandidate, platform?: string): string {
+function fileFamily(source: PageCandidate, platform?: string): string | undefined {
   const extension = path.extname(source.identity)
+  // 文件别名可以指向其他格式或无扩展名文件，它们不能借别名获得格式覆盖例外
+  if (!FILE_EXTENSIONS.includes(extension.slice(1)))
+    return
   const stem = source.identity.slice(0, -extension.length)
   const filename = source.page.uri.slice(source.page.uri.lastIndexOf('/') + 1)
   // 平台资格使用词法文件 URI，宏里的 path 不能把普通文件伪装成变体
@@ -128,8 +133,10 @@ export function validateGeneratedRoutes(candidates: PageCandidate[], platform?: 
     const previous = routes.get(route)
     if (previous && previous.identity !== candidate.identity) {
       // 文件族覆盖只在同一归属内成立，不能掩盖跨分包或主分包路由冲突
+      const previousFamily = fileFamily(previous, platform)
       const sameFamily = previous.root === candidate.root
-        && fileFamily(previous, platform) === fileFamily(candidate, platform)
+        && previousFamily !== undefined
+        && previousFamily === fileFamily(candidate, platform)
       if (!sameFamily) {
         throw new Error(`[vite-plugin-uni-pages] Conflicting generated route "${route}": ${describeSource(previous)} and ${describeSource(candidate)}.`)
       }
