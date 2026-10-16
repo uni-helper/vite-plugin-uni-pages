@@ -693,6 +693,8 @@ export interface AppPlus {
        * "normal" 正常
        *
        * "bold" 粗体
+       *
+       * @default "normal"
        */
       titleWeight?: 'normal' | 'bold'
 

@@ -405,6 +405,7 @@
                       "type": "string"
                     },
                     "titleWeight": {
+                      "default": "normal",
                       "description": "返回按钮上标题的粗细\n\n\"normal\" 正常\n\n\"bold\" 粗体",
                       "enum": [
                         "normal",
@@ -1213,6 +1214,52 @@
           ],
           "type": "string"
         },
+        "androidOverscroll": {
+          "default": false,
+          "description": "Android 平台是否开启弹簧回弹效果",
+          "type": "boolean"
+        },
+        "androidRefresherColor": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "description": "Android 平台下拉刷新前景颜色，支持 HEX 颜色",
+          "format": "color"
+        },
+        "androidThreeButtonNavigationBackgroundColor": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "description": "虚拟按键区域背景色，支持 HEX 颜色",
+          "format": "color"
+        },
+        "androidThreeButtonNavigationStyle": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "description": "虚拟按键区域前景色",
+          "format": "color"
+        },
+        "androidThreeButtonNavigationTranslucent": {
+          "default": false,
+          "description": "页面内容是否可以渲染到虚拟按键区域",
+          "type": "boolean"
+        },
         "animationDuration": {
           "default": 300,
           "description": "窗口显示动画的持续时间，单位为 ms",
@@ -1299,9 +1346,19 @@
           "default": "dark",
           "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\""
         },
+        "bounces": {
+          "default": false,
+          "description": "是否开启回弹效果，优先级高于 allowsBounceVertical",
+          "type": "boolean"
+        },
         "dynamicRpx": {
           "default": false,
           "description": "是否使用动态 rpx，屏幕大小变化会重新渲染 rpx",
+          "type": "boolean"
+        },
+        "enableBackToTop": {
+          "default": false,
+          "description": "点击系统状态栏滚动条是否返回顶部",
           "type": "boolean"
         },
         "enablePullDownRefresh": {
@@ -1309,9 +1366,24 @@
           "description": "是否开启下拉刷新，详见 [页面生命周期](https://uniapp.dcloud.net.cn/tutorial/page.html#lifecycle)",
           "type": "boolean"
         },
+        "enableUcssReset": {
+          "default": true,
+          "description": "是否启用 ucss 样式覆盖",
+          "type": "boolean"
+        },
         "h5": {
           "$ref": "#/definitions/H5",
           "description": "设置编译到 H5 平台的特定样式，配置项参考 [H5](https://uniapp.dcloud.net.cn/collocation/pages#h5)\n\n相应的类型是 H5"
+        },
+        "hideBottomNavigationIndicator": {
+          "default": false,
+          "description": "是否隐藏系统底部导航栏\n\n与 hideStatusBar 同时开启可实现页面全屏",
+          "type": "boolean"
+        },
+        "hideStatusBar": {
+          "default": false,
+          "description": "是否隐藏系统顶部状态栏",
+          "type": "boolean"
         },
         "leftWindow": {
           "default": true,
@@ -1492,6 +1564,47 @@
               "description": "下拉刷新控件颜色，支持 HEX 颜色",
               "format": "color"
             },
+            "contentdown": {
+              "description": "下拉可刷新状态时下拉刷新控件显示的内容，仅 style 为 \"default\" 时有效",
+              "properties": {
+                "caption": {
+                  "description": "下拉刷新控件上显示的标题内容",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "contentover": {
+              "description": "释放可刷新状态时下拉刷新控件显示的内容，仅 style 为 \"default\" 时有效",
+              "properties": {
+                "caption": {
+                  "description": "下拉刷新控件上显示的标题内容",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "contentrefresh": {
+              "description": "正在刷新状态时下拉刷新控件显示的内容，仅 style 为 \"default\" 时有效",
+              "properties": {
+                "caption": {
+                  "description": "下拉刷新控件上显示的标题内容",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "height": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/PxSize"
+                },
+                {
+                  "$ref": "#/definitions/PercentageSize"
+                }
+              ],
+              "description": "下拉刷新控件进入刷新状态的拉拽高度，支持单位为 px 的逻辑像素值或百分比"
+            },
             "offset": {
               "anyOf": [
                 {
@@ -1503,6 +1616,29 @@
               ],
               "default": "0px",
               "description": "下拉刷新控件的起始位置，支持单位为 px 的逻辑像素值或百分比"
+            },
+            "range": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/PxSize"
+                },
+                {
+                  "$ref": "#/definitions/PercentageSize"
+                }
+              ],
+              "description": "可下拉拖拽的范围，支持单位为 px 的逻辑像素值或百分比"
+            },
+            "style": {
+              "description": "下拉刷新控件样式，h5 平台只有 \"circle\" 类型\n\nuni-app x 文档将该项写作 type，uni-h5 运行时实际读取 style，与 App 平台同名",
+              "enum": [
+                "default",
+                "circle"
+              ],
+              "type": "string"
+            },
+            "support": {
+              "description": "是否开启窗口的下拉刷新功能",
+              "type": "boolean"
             }
           },
           "type": "object"
@@ -1676,7 +1812,7 @@
           "type": "string"
         },
         "gestureBack": {
-          "default": "YES",
+          "default": "NO",
           "description": "仅支持 iOS，是否支持手势返回",
           "enum": [
             "YES",
@@ -2755,6 +2891,11 @@
           "description": "是否开启全局的下拉刷新，详见 [Page.onPullDownRefresh](https://developers.weixin.qq.com/miniprogram/dev/reference/api/Page.html#onpulldownrefresh)",
           "type": "boolean"
         },
+        "enableUcssReset": {
+          "default": true,
+          "description": "是否启用 ucss 样式覆盖",
+          "type": "boolean"
+        },
         "handleWebviewPreload": {
           "default": "static",
           "description": "控制预加载下个页面的时机，详见 [控制预加载下个页面的时机](https://developers.weixin.qq.com/miniprogram/dev/framework/performance/tips/runtime_nav.html#_2-4-%E6%8E%A7%E5%88%B6%E9%A2%84%E5%8A%A0%E8%BD%BD%E4%B8%8B%E4%B8%AA%E9%A1%B5%E9%9D%A2%E7%9A%84%E6%97%B6%E6%9C%BA)\n\n\"static\" 在当前页面 onReady 触发 200ms 后触发预加载\n\n\"auto\" 渲染线程空闲时进行预加载，由基础库根据一段时间内 requestAnimationFrame 的触发频率算法判断\n\n\"manual\" 由开发者通过调用 [wx.preloadWebview](https://developers.weixin.qq.com/miniprogram/dev/api/base/performance/wx.preloadWebview.html) 触发，开发者可以在页面主要内容的 setData 结束后手动触发",
@@ -2837,6 +2978,7 @@
           "type": "string"
         },
         "restartStrategy": {
+          "default": "homePage",
           "description": "重新启动策略配置\n\n\"homePage\" 如果从这个页面退出小程序，下次将从首页冷启动\n\n\"homePageAndLatestPage\" 如果从这个页面退出小程序，下次冷启动后立刻加载这个页面，页面的参数保持不变（不可用于 tab 页）",
           "enum": [
             "homePage",
@@ -2989,6 +3131,52 @@
           ],
           "type": "string"
         },
+        "androidOverscroll": {
+          "default": false,
+          "description": "Android 平台是否开启弹簧回弹效果",
+          "type": "boolean"
+        },
+        "androidRefresherColor": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "description": "Android 平台下拉刷新前景颜色，支持 HEX 颜色",
+          "format": "color"
+        },
+        "androidThreeButtonNavigationBackgroundColor": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "description": "虚拟按键区域背景色，支持 HEX 颜色",
+          "format": "color"
+        },
+        "androidThreeButtonNavigationStyle": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "description": "虚拟按键区域前景色",
+          "format": "color"
+        },
+        "androidThreeButtonNavigationTranslucent": {
+          "default": false,
+          "description": "页面内容是否可以渲染到虚拟按键区域",
+          "type": "boolean"
+        },
         "app-harmony": {
           "$ref": "#/definitions/AppHarmony",
           "description": "设置编译到 App（Harmony）平台的特定样式，配置项参考 [app-harmony](https://uniapp.dcloud.net.cn/collocation/pages#app-harmony)\n\n相应的类型是 AppHarmony"
@@ -3023,6 +3211,19 @@
           "description": "底部窗口的背景色（bounce 回弹区域），支持 HEX 颜色",
           "format": "color"
         },
+        "backgroundColorContent": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "default": "#ffffff",
+          "description": "页面容器背景色，支持 HEX 颜色\n\n会覆盖窗口背景色 backgroundColor，backgroundColor 仅在页面设置下拉刷新时才可能看到",
+          "format": "color"
+        },
         "backgroundColorTop": {
           "anyOf": [
             {
@@ -3053,6 +3254,11 @@
           "default": "dark",
           "description": "下拉 loading 的样式，仅支持 \"dark\" / \"light\""
         },
+        "bounces": {
+          "default": false,
+          "description": "是否开启回弹效果，优先级高于 allowsBounceVertical",
+          "type": "boolean"
+        },
         "disableScroll": {
           "default": false,
           "description": "设置为 true 则页面整体不能上下滚动（bounce 效果），只在页面配置中有效，在 globalStyle 中设置无效",
@@ -3063,14 +3269,34 @@
           "description": "是否禁用滑动返回",
           "type": "boolean"
         },
+        "enableBackToTop": {
+          "default": false,
+          "description": "点击系统状态栏滚动条是否返回顶部",
+          "type": "boolean"
+        },
         "enablePullDownRefresh": {
           "default": false,
           "description": "是否开启下拉刷新，详见 [页面生命周期](https://uniapp.dcloud.net.cn/tutorial/page.html#lifecycle)",
           "type": "boolean"
         },
+        "enableUcssReset": {
+          "default": true,
+          "description": "是否启用 ucss 样式覆盖",
+          "type": "boolean"
+        },
         "h5": {
           "$ref": "#/definitions/H5",
           "description": "设置编译到 H5 平台的特定样式，配置项参考 [H5](https://uniapp.dcloud.net.cn/collocation/pages#h5)\n\n相应的类型是 H5"
+        },
+        "hideBottomNavigationIndicator": {
+          "default": false,
+          "description": "是否隐藏系统底部导航栏\n\n与 hideStatusBar 同时开启可实现页面全屏",
+          "type": "boolean"
+        },
+        "hideStatusBar": {
+          "default": false,
+          "description": "是否隐藏系统顶部状态栏",
+          "type": "boolean"
         },
         "leftWindow": {
           "default": true,
@@ -3187,9 +3413,24 @@
           "description": "页面上拉触底事件触发时距页面底部距离，单位为 px，详见 [页面生命周期](https://uniapp.dcloud.net.cn/tutorial/page.html#lifecycle)",
           "type": "number"
         },
+        "pageOrientation": {
+          "default": "portrait",
+          "description": "页面旋转设置\n\n\"auto\" 设备自适应\n\n\"portrait\" 竖向\n\n\"landscape\" 横向",
+          "enum": [
+            "auto",
+            "portrait",
+            "landscape"
+          ],
+          "type": "string"
+        },
         "rightWindow": {
           "default": true,
           "description": "当存在 rightWindow 时，默认是否显示 rightWindow，详见 [topWindow](https://uniapp.dcloud.net.cn/collocation/pages.html#topwindow)",
+          "type": "boolean"
+        },
+        "swipeBackAsBackPress": {
+          "default": false,
+          "description": "是否将侧滑返回手势转为页面 onBackPress 事件\n\n仅在 disableSwipeBack 为 false 时生效",
           "type": "boolean"
         },
         "titleImage": {
@@ -3360,6 +3601,11 @@
     "SubPackage": {
       "description": "subPackages 数组的元素类型，即应用的子包",
       "properties": {
+        "independent": {
+          "default": false,
+          "description": "是否声明对应分包为独立分包",
+          "type": "boolean"
+        },
         "pages": {
           "$ref": "#/definitions/Pages",
           "description": "子包由哪些页面组成，参数同 pages"
@@ -3427,6 +3673,18 @@
           ],
           "type": "string"
         },
+        "borderColor": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HEXColor"
+            },
+            {
+              "$ref": "#/definitions/ThemeVar"
+            }
+          ],
+          "description": "tabBar 上边框的颜色，优先级高于 borderStyle",
+          "format": "color"
+        },
         "borderStyle": {
           "anyOf": [
             {
@@ -3468,9 +3726,30 @@
           "description": "是否启用自定义 tabBar，启用后需要在项目根目录创建 custom-tab-bar 目录，参考 https://opendocs.alipay.com/mini/03jry7",
           "type": "boolean"
         },
+        "disableGlassSafeAreaAutoFit": {
+          "default": false,
+          "description": "是否禁用玻璃效果 tabBar 自动上推页面滚动内容",
+          "type": "boolean"
+        },
         "fontSize": {
           "default": "10px",
           "description": "文字默认大小",
+          "type": "string"
+        },
+        "glassEffect": {
+          "default": false,
+          "description": "是否开启玻璃效果 tabBar\n\niOS 26 及以上使用系统液态玻璃效果，iOS 26 以下降级为系统毛玻璃效果，启用后仅支持图片图标，不支持 iconfont\n\n鸿蒙平台为开启沉浸光感效果并叠加在页面内容之上，启用后在 7.0.0(26) 之上为沉浸光感效果且为胶囊形态，在 6.1.0(23) 之上为毛玻璃效果且为胶囊形态，在更低版本为普通毛玻璃效果\n\n启用后 tabBar 以悬浮方式覆盖在页面内容上方，页面排版高度包含 tabBar 覆盖区域",
+          "type": "boolean"
+        },
+        "glassEffectMaterialLevel": {
+          "default": "adaptive",
+          "description": "鸿蒙平台沉浸光感效果的材质等级",
+          "enum": [
+            "exquisite",
+            "gentle",
+            "smooth",
+            "adaptive"
+          ],
           "type": "string"
         },
         "height": {
@@ -3685,6 +3964,10 @@
           "default": "灰色半透明",
           "description": "自定义按钮背景色，仅在标题栏 type 为 \"transparent\" 时生效，支持 HEX 和 RGBA 颜色",
           "format": "color"
+        },
+        "badgeText": {
+          "description": "自定义按钮上显示的角标文本，最多显示 3 个字符，超过则显示为 ...",
+          "type": "string"
         },
         "color": {
           "$ref": "#/definitions/HEXColor",

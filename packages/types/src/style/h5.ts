@@ -125,6 +125,11 @@ export interface H5 {
    */
   pullToRefresh?: {
     /**
+     * 是否开启窗口的下拉刷新功能
+     */
+    support?: boolean
+
+    /**
      * 下拉刷新控件颜色，支持 HEX 颜色
      *
      * @default "#2BD009"
@@ -134,11 +139,62 @@ export interface H5 {
     color?: HEXColor
 
     /**
+     * 下拉刷新控件样式，h5 平台只有 "circle" 类型
+     */
+    style?: 'default' | 'circle'
+
+    /**
+     * 下拉刷新控件进入刷新状态的拉拽高度，支持单位为 px 的逻辑像素值或百分比
+     */
+    height?: PxSize | PercentageSize
+
+    /**
+     * 可下拉拖拽的范围，支持单位为 px 的逻辑像素值或百分比
+     */
+    range?: PxSize | PercentageSize
+
+    /**
      * 下拉刷新控件的起始位置，支持单位为 px 的逻辑像素值或百分比
      *
      * @default "0px"
      */
     offset?: PxSize | PercentageSize
+
+    /**
+     * 下拉可刷新状态时下拉刷新控件显示的内容，仅 style 为 "default" 时有效
+     */
+    contentdown?: {
+      /**
+       * 下拉刷新控件上显示的标题内容
+       */
+      caption?: string
+
+      [x: string]: any
+    }
+
+    /**
+     * 释放可刷新状态时下拉刷新控件显示的内容，仅 style 为 "default" 时有效
+     */
+    contentover?: {
+      /**
+       * 下拉刷新控件上显示的标题内容
+       */
+      caption?: string
+
+      [x: string]: any
+    }
+
+    /**
+     * 正在刷新状态时下拉刷新控件显示的内容，仅 style 为 "default" 时有效
+     */
+    contentrefresh?: {
+      /**
+       * 下拉刷新控件上显示的标题内容
+       */
+      caption?: string
+
+      [x: string]: any
+    }
 
     [x: string]: any
   }

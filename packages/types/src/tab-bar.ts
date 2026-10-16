@@ -98,6 +98,8 @@ export interface TabBarMidButton {
    * 中间按钮的高度，可以大于 tabBar 高度，达到中间凸起的效果
    *
    * @default "50px"
+   *
+   * @desc uni-app x 为 "80px"
    */
   height?: string
 
@@ -170,6 +172,15 @@ export interface TabBar {
   borderStyle?: 'black' | 'white' | HEXColor | ThemeVar
 
   /**
+   * tabBar 上边框的颜色，优先级高于 borderStyle
+   *
+   * @desc uni-app x
+   *
+   * @format color
+   */
+  borderColor?: HEXColor | ThemeVar
+
+  /**
    * iOS 高斯模糊效果，参考 [使用说明](https://uniapp.dcloud.net.cn/tutorial/app-blureffect.html)
    *
    * @default "none"
@@ -177,6 +188,39 @@ export interface TabBar {
    * @desc App 2.4.0+、H5 3.0.0+（只有最新版浏览器才支持）
    */
   blurEffect?: 'dark' | 'extralight' | 'light' | 'none'
+
+  /**
+   * 是否开启玻璃效果 tabBar
+   *
+   * iOS 26 及以上使用系统液态玻璃效果，iOS 26 以下降级为系统毛玻璃效果，启用后仅支持图片图标，不支持 iconfont
+   *
+   * 鸿蒙平台为开启沉浸光感效果并叠加在页面内容之上，启用后在 7.0.0(26) 之上为沉浸光感效果且为胶囊形态，在 6.1.0(23) 之上为毛玻璃效果且为胶囊形态，在更低版本为普通毛玻璃效果
+   *
+   * 启用后 tabBar 以悬浮方式覆盖在页面内容上方，页面排版高度包含 tabBar 覆盖区域
+   *
+   * @default false
+   *
+   * @desc uni-app x
+   */
+  glassEffect?: boolean
+
+  /**
+   * 鸿蒙平台沉浸光感效果的材质等级
+   *
+   * @default "adaptive"
+   *
+   * @desc uni-app x 鸿蒙 6.1.0(23)+
+   */
+  glassEffectMaterialLevel?: 'exquisite' | 'gentle' | 'smooth' | 'adaptive'
+
+  /**
+   * 是否禁用玻璃效果 tabBar 自动上推页面滚动内容
+   *
+   * @default false
+   *
+   * @desc uni-app x
+   */
+  disableGlassSafeAreaAutoFit?: boolean
 
   /**
    * tab 列表，最少 2个，最多 5 个，app 端没有该限制

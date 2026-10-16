@@ -131,6 +131,8 @@ export interface MpWeixin {
    *
    * "homePageAndLatestPage" 如果从这个页面退出小程序，下次冷启动后立刻加载这个页面，页面的参数保持不变（不可用于 tab 页）
    *
+   * @default "homePage"
+   *
    * @desc [2.8.0](https://developers.weixin.qq.com/miniprogram/dev/framework/compatibility.html)
    */
   restartStrategy?: 'homePage' | 'homePageAndLatestPage'
@@ -165,6 +167,15 @@ export interface MpWeixin {
    * @default "static"
    */
   handleWebviewPreload?: 'static' | 'manual' | 'auto'
+
+  /**
+   * 是否启用 ucss 样式覆盖
+   *
+   * @default true
+   *
+   * @desc 小程序
+   */
+  enableUcssReset?: boolean
 
   [x: string]: any
 }

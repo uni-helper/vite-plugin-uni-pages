@@ -49,7 +49,7 @@ export interface MpAlipay {
   /**
    * 仅支持 iOS，是否支持手势返回
    *
-   * @default "YES"
+   * @default "NO"
    */
   gestureBack?: 'YES' | 'NO'
 

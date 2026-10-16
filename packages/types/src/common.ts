@@ -57,9 +57,18 @@ export interface TitleNViewButton {
   background?: HEXColor | RGBAColor
 
   /**
+   * 自定义按钮上显示的角标文本，最多显示 3 个字符，超过则显示为 ...
+   *
+   * @desc H5
+   */
+  badgeText?: string
+
+  /**
    * 自定义按钮按下状态文字颜色，支持 HEX 和 RGBA 颜色
    *
    * @default color 属性值自动调整透明度为 0.3
+   *
+   * @desc H5 暂不支持
    *
    * @format color
    */

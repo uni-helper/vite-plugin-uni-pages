@@ -162,6 +162,89 @@ interface BaseStyle {
   'allowsBounceVertical'?: 'YES' | 'NO'
 
   /**
+   * 是否隐藏系统顶部状态栏
+   *
+   * @default false
+   *
+   * @desc uni-app x App
+   */
+  'hideStatusBar'?: boolean
+
+  /**
+   * 点击系统状态栏滚动条是否返回顶部
+   *
+   * @default false
+   *
+   * @desc uni-app x App
+   */
+  'enableBackToTop'?: boolean
+
+  /**
+   * 是否开启回弹效果，优先级高于 allowsBounceVertical
+   *
+   * @default false
+   *
+   * @desc uni-app x App
+   */
+  'bounces'?: boolean
+
+  /**
+   * Android 平台是否开启弹簧回弹效果
+   *
+   * @default false
+   *
+   * @desc uni-app x App-Android
+   */
+  'androidOverscroll'?: boolean
+
+  /**
+   * Android 平台下拉刷新前景颜色，支持 HEX 颜色
+   *
+   * @desc uni-app x App-Android
+   *
+   * @format color
+   */
+  'androidRefresherColor'?: HEXColor | ThemeVar
+
+  /**
+   * 是否隐藏系统底部导航栏
+   *
+   * 与 hideStatusBar 同时开启可实现页面全屏
+   *
+   * @default false
+   *
+   * @desc uni-app x App
+   */
+  'hideBottomNavigationIndicator'?: boolean
+
+  /**
+   * 页面内容是否可以渲染到虚拟按键区域
+   *
+   * @default false
+   *
+   * @desc uni-app x App-Android 4.41+
+   */
+  'androidThreeButtonNavigationTranslucent'?: boolean
+
+  /**
+   * 虚拟按键区域背景色，支持 HEX 颜色
+   *
+   * @desc uni-app x App-Android
+   *
+   * @format color
+   */
+  'androidThreeButtonNavigationBackgroundColor'?: HEXColor | ThemeVar
+
+  /**
+   * 虚拟按键区域前景色
+   *
+   * @desc uni-app x App-Android
+   *
+   * @format color
+   */
+  'androidThreeButtonNavigationStyle'?: HEXColor | ThemeVar
+
+  /**
    * 设置编译到 App 平台的特定样式，配置项参考 [app-plus](https://uniapp.dcloud.net.cn/collocation/pages#app-plus)
    *
    * 相应的类型是 AppPlus
@@ -324,6 +407,15 @@ interface BaseStyle {
    * @desc H5（2.9.9+）
    */
   'maxWidth'?: number
+
+  /**
+   * 是否启用 ucss 样式覆盖
+   *
+   * @default true
+   *
+   * @desc 小程序
+   */
+  'enableUcssReset'?: boolean
 }
 
 /**
@@ -423,6 +515,34 @@ export interface GlobalStyle extends BaseStyle {
  */
 export interface PageStyle extends BaseStyle {
   /**
+   * 页面容器背景色，支持 HEX 颜色
+   *
+   * 会覆盖窗口背景色 backgroundColor，backgroundColor 仅在页面设置下拉刷新时才可能看到
+   *
+   * @default "#ffffff"
+   *
+   * @desc uni-app x
+   *
+   * @format color
+   */
+  backgroundColorContent?: HEXColor | ThemeVar
+
+  /**
+   * 页面旋转设置
+   *
+   * "auto" 设备自适应
+   *
+   * "portrait" 竖向
+   *
+   * "landscape" 横向
+   *
+   * @default "portrait"
+   *
+   * @desc uni-app x Android 4.13+、uni-app x iOS 4.25+，Web 由手机浏览器控制
+   */
+  pageOrientation?: 'auto' | 'portrait' | 'landscape'
+
+  /**
    * 导航栏阴影，配置参考 [导航栏阴影](https://uniapp.dcloud.net.cn/collocation/pages#navigationbarshadow)
    *
    * 微信/百度/头条小程序需要配置: "disableScroll": true
@@ -455,6 +575,17 @@ export interface PageStyle extends BaseStyle {
    * @desc App-iOS（3.4.0+）
    */
   disableSwipeBack?: boolean
+
+  /**
+   * 是否将侧滑返回手势转为页面 onBackPress 事件
+   *
+   * 仅在 disableSwipeBack 为 false 时生效
+   *
+   * @default false
+   *
+   * @desc uni-app x
+   */
+  swipeBackAsBackPress?: boolean
 
   [x: string]: any
 }
