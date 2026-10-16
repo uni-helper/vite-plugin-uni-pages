@@ -30,7 +30,7 @@
     "prepublishOnly": "pnpm build",
     "release": "bumpp",
     "test": "vitest",
-    "type-check": "tsc --noEmit"
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@antfu/eslint-config": "catalog:",
