@@ -62,6 +62,7 @@ export class PageContext {
   /** 生成物（pages.json、d.ts）的绝对路径，只在首次事件时算一次 */
   private generatedPathsCache: string[] | undefined
   private pendingUpdate: Promise<void> = Promise.resolve()
+  /** 随扫描更新的 Page 来源，用于复用检查和冲突诊断 */
   private readonly pageSources = new WeakMap<Page, PageSource>()
 
   /** 失败恢复以此为基准，避免混入前几轮失败的临时路径 */
@@ -81,9 +82,9 @@ export class PageContext {
   /** 用户配置文件的来源路径列表 */
   pagesConfigSourcePaths: string[] = []
 
-  /** 主包页面映射，键为页面文件的绝对路径 */
+  /** 主包页面映射，键为页面文件的词法绝对路径 */
   pages = new Map<string, Page>()
-  /** 子包页面映射，键为子包根目录，值为该子包下的页面映射 */
+  /** 分包页面映射，外层键为词法扫描目录，内层键为页面文件的词法绝对路径 */
   subPages = new Map<string, Map<string, Page>>()
   /** 主包页面配置数组，用于生成 pages.json 的 pages 字段 */
   pageMetaData: InternalPages = []
@@ -589,8 +590,9 @@ export class PageContext {
   }
 
   /**
-   * 扫描主包页面目录并收集所有页面文件路径
-   * 根据配置的 dirs 选项扫描对应目录
+   * 按词法目录扫描主包页面
+   *
+   * @description 各目录分别执行文件排除，物理别名保留到页面有效性与归属决议阶段
    */
   private async scanPages(): Promise<void> {
     const pages = new Map<string, Page>()
@@ -612,11 +614,16 @@ export class PageContext {
     this.pages = pages
   }
 
+  /**
+   * 登记本轮来源并复用身份与输出基准均未变化的 Page
+   *
+   * @returns 路径仍存在时返回页面实例，扫描期间已消失时为 undefined
+   */
   private trackPage(pagePath: PagePath, previous: Page | undefined, source: Omit<PageSource, 'file' | 'identity'>): Page | undefined {
     const identity = resolvePageIdentity(pagePath.absolutePath)
     if (!identity)
       return
-    // 同一词法路径可能换了符号链接目标，不能复用旧目标的宏结果
+    // 符号链接换目标或相对输出路径变化后，旧宏结果和 URI 都不能沿用
     const page = previous && this.pageSources.get(previous)?.identity === identity
       && previous.path.relativePath === pagePath.relativePath
       ? previous
@@ -652,8 +659,9 @@ export class PageContext {
   }
 
   /**
-   * 扫描子包页面目录并收集所有子包页面文件路径
-   * 根据配置的 subPackages 选项扫描对应目录
+   * 按词法来源扫描分包页面
+   *
+   * @description 同一物理目录的不同别名仍分别执行文件排除，避免某个别名被排除后漏页
    */
   private async scanSubPages(): Promise<void> {
     const paths: Record<string, PagePath[]> = {}
@@ -676,6 +684,11 @@ export class PageContext {
     this.subPages = subPages
   }
 
+  /**
+   * 为每个词法扫描目录选取声明来源
+   *
+   * @description 重复声明只扫描一次，定位信息按显式优先选择；不同词法别名仍分别保留
+   */
   private subPackageSourcesByDir(): Map<string, SubPackageDirectorySource> {
     const sources = new Map<string, SubPackageDirectorySource>()
     for (const source of getSubPackageDirectorySources(this.options)) {
@@ -686,15 +699,23 @@ export class PageContext {
     return sources
   }
 
+  /** 获取目录的最终分包 root，未登记时相对 outDir 计算默认值 */
   private subPackageRoot(dir: string): string {
     return this.options.subPackageRootMap.get(dir)
       ?? normalizePath(path.relative(this.basePath, path.resolve(this.options.root, dir)))
   }
 
+  /**
+   * 决议有效页面的归属并校验生成路由
+   *
+   * @description 先读取宏并应用既有平台规则，再选择代表；冲突校验通过后才裁剪页面映射，
+   * 配置覆盖与输出去重在此之后执行
+   */
   private async resolveScanSources(): Promise<void> {
     const candidates: PageCandidate[] = []
     const subSources = this.subPackageSourcesByDir()
     const groups: [string | undefined, Map<string, Page>][] = [[undefined, this.pages], ...this.subPages]
+    // 宏可能异步求值，保持并行读取，来源决议仍按原顺序进行
     await Promise.all(groups.flatMap(([, pages]) => [...pages.values()].map(page => page.ensureLoaded())))
     for (const [dir, pages] of groups) {
       const root = dir === undefined ? undefined : this.subPackageRoot(dir)
@@ -707,6 +728,7 @@ export class PageContext {
           : meta
         if (!effective)
           continue
+        // 扫描后的 hook 可以加入 Page，缺少扫描记录时从当前路径和目录补齐来源
         const original = this.pageSources.get(page)
         const identity = original?.identity ?? resolvePageIdentity(file)
         if (!identity)
@@ -723,6 +745,7 @@ export class PageContext {
           explicitRoot: source?.explicitRoot ?? original?.explicitRoot ?? false,
           ruleIndex: source?.ruleIndex ?? original?.ruleIndex ?? this.options.subPackages.indexOf(dir!),
           matchIndex: source?.matchIndex ?? original?.matchIndex ?? 0,
+          // 按现有分包路径换算还原完整路由，确保校验与实际输出采用同一基准
           route: root === undefined
             ? effective.path
             : path.posix.join(root, normalizePath(path.relative(root, effective.path))),
@@ -813,8 +836,9 @@ export class PageContext {
   }
 
   /**
-   * 合并主包页面配置
-   * 过滤掉属于子包的页面，再解析页面配置并与用户配置合并
+   * 决议扫描来源后合并主包页面配置
+   *
+   * @description 有效分包优先认领物理页面，生成来源冲突在用户配置覆盖前检查
    */
   private async mergePageMetaData(): Promise<void> {
     await this.resolveScanSources()
@@ -827,8 +851,9 @@ export class PageContext {
 
   /**
    * 合并子包页面配置
-   * 为每个子包解析页面配置并处理子包配置继承
-   * 保留用户配置中子包级别的属性（如 plugins）
+   *
+   * @description 静态、glob 和回调来源先按最终 root 汇集，再对整组应用一次配置覆盖，
+   * 保留手工页面和分包 plugins 配置
    */
   private async mergeSubPageMetaData(): Promise<void> {
     const packagesByRoot = new Map<string, SubPackage>()
