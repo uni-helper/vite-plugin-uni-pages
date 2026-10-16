@@ -489,6 +489,8 @@ exclude: [
 
 默认值也从 `node_modules`、`.git` 改为项目根子树中各层的目录模式，扩大了项目内的默认排除范围。目录排除现在对所有扫描形式生效，静态分包也会排除命中的目录。
 
+默认值也会命中扫描目录本身。把页面写在依赖里的来源（例如 pnpm link 或 workspace 包中的 `dir: 'node_modules/@scope/ui/pages'`，以及指向同类路径的 `subPackages`）会被默认排除，一条页面都扫不到。保留这类来源需要显式传入 `exclude`，比如关闭默认页面排除的 `exclude: []`，或只留下还需要的那部分规则（如 `exclude: ['**/__*__/**']`）。
+
 ### 完整类型定义
 
 请查看 [types.ts](./src/types.ts) 获取完整定义。
