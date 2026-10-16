@@ -338,9 +338,15 @@ interface UserOptions {
   outDir?: string
 
   /**
-   * 排除的文件/目录模式
-   * 基于 tinyglobby 的 ignore 选项
-   * @default ['node_modules', '.git', '**\/__*__/**']
+   * 页面排除的文件或目录模式
+   *
+   * @description
+   * - 相对模式基于 Vite root，绝对模式直接匹配对应路径；命中目录时排除整个子树
+   * - 主包、分包的扫描与页面事件使用相同规则
+   * - 自定义数组替换默认值，空数组禁用默认页面排除，空字符串忽略
+   * - 不接受 `!foo` 否定规则，`!(keep).vue` 等 extglob 有效
+   *
+   * @default ['**\/node_modules/**', '**\/.git/**', '**\/__*__/**']
    * @since 0.0.4
    */
   exclude?: string[]
@@ -429,7 +435,7 @@ export default defineConfig({
       dts: 'src/typings/uni-pages.d.ts', // 自定义类型声明路径
       dir: 'src/{pages,views}', // 多目录扫描
       subPackages: ['src/sub-package-a', 'src/sub-package-b'],
-      exclude: ['node_modules', '.git', '**/__*__/**', '**/components/**'],
+      exclude: ['**/node_modules/**', '**/.git/**', '**/__*__/**', '**/components/**'],
       minify: true,
       debug: true, // 或 debug: 'pages'
       onAfterScanPages(pages) {
@@ -439,6 +445,49 @@ export default defineConfig({
   ],
 })
 ```
+
+### 页面排除规则
+
+`exclude` 的相对模式统一基于 Vite `root`，绝对模式直接匹配对应路径。任一规则命中文件、目录或其祖先目录时，都会排除对应页面及整个目录子树。主包、字面分包、glob 分包以及固定或回调 `root` 的分包使用相同规则，首次扫描和后续页面事件的判断也一致。实际扫描目录、`outDir` 和分包 `root` 不改变排除基准。
+
+例如 Vite `root` 为 `/workspace/app`：
+
+| `exclude` 项 | 排除范围 |
+| --- | --- |
+| `index.vue` | `/workspace/app/index.vue` |
+| `src/pages/index.vue` | 指定的项目内页面 |
+| `**/index.vue` | 项目根子树中各层的同名页面 |
+| `src/packages/internal` | 该目录及整个子树 |
+| `../shared/pages/**/index.vue` | 根外 `shared/pages` 中各层的同名页面 |
+| `/workspace/shared/pages/internal` | 指定的绝对路径及其子树 |
+
+`**` 不跨过前导 `../`，因此 `**/index.vue` 不会排除 `../shared/pages/index.vue`。根外目录需要显式写出前缀。默认值为 `['**/node_modules/**', '**/.git/**', '**/__*__/**']`，同样只覆盖项目根子树；需要排除根外的依赖目录时，应补充 `../shared/pages/**/node_modules/**` 等规则。
+
+显式提供 `exclude` 会替换默认值。`exclude: []` 禁用默认页面排除，底层 watcher 的固有忽略仍然生效。完全为空的字符串会被忽略，路径中的空格会保留；`!foo` 这类否定规则会报错，`!(keep).vue` 这类 extglob 仍可使用。
+
+页面排除控制自动发现的页面及其变更处理。被排除目录中的合法配置入口或配置依赖仍会参与配置加载和更新。插件收到事件后的排除结果保持一致，实际能否收到文件系统事件仍受 watcher 后端及其配置限制。
+
+#### 迁移已有规则
+
+旧版本的文件扫描把 `exclude` 解释为相对每个实际扫描目录。统一到 Vite `root` 后，需要为这类旧规则补齐扫描来源的前缀。例如扫描 `src/pages`、`src/packages/*/pages` 和 `../shared/pages` 时，旧的 `exclude: ['index.vue']` 应迁移为：
+
+```ts
+exclude: [
+  'src/pages/index.vue',
+  'src/packages/*/pages/index.vue',
+  '../shared/pages/index.vue',
+]
+```
+
+这保留了仅排除各扫描目录第一层 `index.vue` 的范围。直接改为 `**/index.vue` 会额外排除嵌套的同名页面，且仍不覆盖根外来源，不能作为等价迁移。
+
+| 原写法 | 保留原文件扫描范围的迁移方式 |
+| --- | --- |
+| `internal/**` | 分别写 `src/pages/internal/**`、`src/packages/*/pages/internal/**`、`../shared/pages/internal/**` |
+| `**/components/**` | 项目内保留原写法，根外补 `../shared/pages/**/components/**` |
+| `node_modules` | 分别写 `src/pages/node_modules`、`src/packages/*/pages/node_modules`、`../shared/pages/node_modules` |
+
+默认值也从 `node_modules`、`.git` 改为项目根子树中各层的目录模式，扩大了项目内的默认排除范围。目录排除现在对所有扫描形式生效，静态分包也会排除命中的目录。
 
 ### 完整类型定义
 
@@ -659,6 +708,7 @@ context.ts        PageContext 编排核心 — 配置加载、扫描、合并、
 pipeline.ts       纯流水线入口 — createPages / generateAll，root 和 platform 从外部传入，测试直接走这里
 config-loader.ts  配置加载 — unconfig 装载、本地依赖与恢复候选收集、监听路径归一化
 directories.ts    目录发现 — glob 展开、subPackages root 映射与监听边界
+page-rules.ts     页面规则 — 基于 Vite root 编译排除模式，统一扫描与事件判定
 pages-json.ts     pages.json 读-改-写 — 多平台 #ifdef 合并、首页排前、
                   生成标记与过期子包清理、序列化格式化、文件锁与原子写入
 platform-variants.ts 平台变体表 — 跨平台合并的共享规则，数组侧与对象侧两类适配器共用tab-bar.ts        tabBar 外观属性的跨平台合并与渲染（对象侧适配器）

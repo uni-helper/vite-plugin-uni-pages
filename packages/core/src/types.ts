@@ -236,11 +236,15 @@ export interface Options {
   outDir: string
 
   /**
-   * 排除的文件/目录模式
+   * 页面排除的文件或目录模式
    *
-   * 基于 [tinyglobby 的 ignore 选项](https://superchupu.dev/tinyglobby/documentation#ignore)
+   * @description
+   * - 相对模式基于 Vite root，绝对模式直接匹配对应路径；命中目录时排除整个子树
+   * - 主包、分包的扫描与页面事件使用相同规则
+   * - 自定义数组替换默认值，空数组禁用默认页面排除，空字符串忽略
+   * - 不接受 `!foo` 否定规则，`!(keep).vue` 等 extglob 有效
    *
-   * @default ['node_modules', '.git', '**\/__*__/**']
+   * @default ['**\/node_modules/**', '**\/.git/**', '**\/__*__/**']
    * @since 0.0.4
    */
   exclude: string[]

@@ -4,20 +4,29 @@ import path from 'node:path'
 import picomatch from 'picomatch'
 import { globSync, isDynamicPattern } from 'tinyglobby'
 import { normalizePath } from 'vite'
+import { compilePageRules, getPageRules } from './page-rules'
 
-/** 根据 glob 查找目录，结果相对 root 并按路径排序 */
-export function resolvePageDirs(dir: string, root: string, exclude: string[]): string[] {
+function findPageDirs(dir: string, root: string, rules: ReturnType<typeof compilePageRules>): string[] {
+  const scan = picomatch.scan(normalizePath(dir))
+  if (rules.isExcluded(path.resolve(root, scan.base || '.')))
+    return []
   return globSync(normalizePath(dir), {
-    ignore: exclude,
+    ignore: rules.traversalIgnores,
     onlyDirectories: true,
     expandDirectories: false,
     dot: true,
     cwd: root,
-  }).map(normalizePath).sort()
+  }).map(normalizePath).filter(directory => !rules.isExcluded(path.resolve(root, directory))).sort()
+}
+
+/** 根据 glob 查找目录，结果相对 root 并按路径排序 */
+export function resolvePageDirs(dir: string, root: string, exclude: string[]): string[] {
+  return findPageDirs(dir, root, compilePageRules(root, [dir], exclude))
 }
 
 /** 展开子包规则，保留旧静态目录的自定义 root 语义 */
 export function resolveSubPackageDirs(patterns: (string | SubPackageConfig)[], root: string, outDir: string, exclude: string[]): Pick<ResolvedOptions, 'subPackages' | 'subPackageRootMap' | 'dynamicSubPackageRoots'> {
+  const rules = compilePageRules(root, [], exclude)
   const entries = new Map<string, { dir: string, root: string, customRoot?: string, dynamic: boolean }>()
   for (const pattern of patterns) {
     const dir = normalizePath(typeof pattern === 'string' ? pattern : pattern.dir)
@@ -25,9 +34,11 @@ export function resolveSubPackageDirs(patterns: (string | SubPackageConfig)[], r
       throw new Error('[vite-plugin-uni-pages] Use exclude for negative subpackage patterns.')
     const customRoot = typeof pattern === 'string' ? undefined : pattern.root
     const dynamic = isDynamicPattern(dir) || typeof customRoot === 'function'
-    const dirs = dynamic ? resolvePageDirs(dir, root, exclude) : [dir]
+    const dirs = dynamic ? findPageDirs(dir, root, rules) : [dir]
     for (const matched of dirs) {
       const absolute = normalizePath(path.resolve(root, matched))
+      if (rules.isExcluded(absolute))
+        continue
       const relative = normalizePath(path.relative(root, absolute)) || '.'
       const resolvedRoot = typeof customRoot === 'function' ? customRoot(relative) : customRoot
       if (typeof customRoot === 'function' && (typeof resolvedRoot !== 'string' || !resolvedRoot || resolvedRoot === '.' || path.posix.isAbsolute(resolvedRoot) || path.win32.isAbsolute(resolvedRoot) || resolvedRoot.replace(/\\/g, '/').split('/').includes('..'))) {
@@ -62,36 +73,8 @@ export function refreshPageDirectories(options: ResolvedOptions): void {
   Object.assign(options, subPackages)
 }
 
-function directoryPatterns(options: ResolvedOptions): string[] {
-  return [options.dir, ...options.subPackagePatterns.map(pattern => typeof pattern === 'string' ? pattern : pattern.dir)].filter(pattern => !picomatch.scan(pattern).negated)
-}
-
 function contains(directory: string, entry: string): boolean {
   return entry === directory || entry.startsWith(`${directory.replace(/\/$/, '')}/`)
-}
-
-function isExcluded(entry: string, exclude: string[]): boolean {
-  const matches = picomatch(exclude, { dot: true })
-  let current = entry
-  while (current && current !== '.' && current !== '/') {
-    if (matches(current))
-      return true
-    const parent = path.posix.dirname(current)
-    if (parent === current)
-      break
-    current = parent
-  }
-  return false
-}
-
-function matchesDirectory(absolute: string, options: ResolvedOptions): boolean {
-  const relative = normalizePath(path.relative(options.root, absolute)) || '.'
-  if (isExcluded(relative, options.exclude))
-    return false
-  return directoryPatterns(options).some((pattern) => {
-    const resolved = normalizePath(path.relative(options.root, path.resolve(options.root, pattern))) || '.'
-    return picomatch(resolved, { dot: true })(relative)
-  })
 }
 
 /** 判断目录新增或删除是否可能改变扫描目录集合 */
@@ -99,7 +82,10 @@ export function isPageDirectoryEvent(directory: string, options: ResolvedOptions
   if (!options.mergePages)
     return false
   const absolute = normalizePath(path.resolve(options.root, directory))
-  if (matchesDirectory(absolute, options))
+  const rules = getPageRules(options)
+  if (rules.isExcluded(absolute))
+    return false
+  if (rules.matchesDirectory(absolute))
     return true
   return [...options.dirs, ...options.subPackages].some(dir => contains(absolute, normalizePath(path.resolve(options.root, dir))))
 }
@@ -109,9 +95,12 @@ export function isPageFileInDirectories(file: string, options: ResolvedOptions):
   if (!options.mergePages)
     return false
   const absolute = normalizePath(path.resolve(options.root, file))
+  const rules = getPageRules(options)
+  if (rules.isExcluded(absolute))
+    return false
   let directory = normalizePath(path.dirname(absolute))
   while (true) {
-    if (matchesDirectory(directory, options) && !isExcluded(normalizePath(path.relative(directory, absolute)), options.exclude))
+    if (rules.matchesDirectory(directory))
       return true
     const parent = normalizePath(path.dirname(directory))
     if (parent === directory)
@@ -124,7 +113,7 @@ export function isPageFileInDirectories(file: string, options: ResolvedOptions):
 export function resolvePageWatchDirectories(options: ResolvedOptions): string[] {
   if (!options.mergePages)
     return []
-  const roots = directoryPatterns(options).map((pattern) => {
+  const roots = getPageRules(options).patterns.map((pattern) => {
     const scan = picomatch.scan(normalizePath(pattern))
     const base = normalizePath(path.resolve(options.root, scan.isGlob ? scan.base || '.' : pattern))
     let directory = base === normalizePath(options.root) ? base : path.dirname(base)
