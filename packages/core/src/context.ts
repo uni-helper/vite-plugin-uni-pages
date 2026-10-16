@@ -20,6 +20,22 @@ import { Page } from './page'
 import { writePagesJson } from './pages-json'
 
 /**
+ * 在 watcher 回调里查页面规则
+ *
+ * 规则会在声明变化后重新编译，编译失败属于配置错误；此时记日志并按
+ * “不是页面事件”处理，异常不能穿过 watcher 回调，否则会崩在事件循环里。
+ */
+function queryPageRules<T>(fallback: T, query: () => T): T {
+  try {
+    return query()
+  }
+  catch (error) {
+    debug.error('Failed to evaluate page rules, the event is ignored:', error)
+    return fallback
+  }
+}
+
+/**
  * 页面上下文：负责扫描页面、加载配置、合并页面信息、生成 pages.json
  *
  * 做的事情按固定顺序是：加载用户配置 → 扫描页面文件 → 合并页面
@@ -32,6 +48,7 @@ export class PageContext {
   private readonly configLoader: PagesConfigLoader
   private readonly watchers = new Map<FSWatcher, () => void>()
   private readonly watchedConfigPaths = new Map<FSWatcher, Set<string>>()
+  private readonly watchedPageDirectories = new Map<FSWatcher, Set<string>>()
   /**
    * 每次事件都要比对的绝对路径，按 watcher 缓存
    *
@@ -158,6 +175,7 @@ export class PageContext {
    */
   async scanAndMerge(): Promise<void> {
     refreshPageDirectories(this.options)
+    this.refreshPageWatchers()
     await this.scanPages()
     await this.scanSubPages()
     await this.mergePageMetaData()
@@ -225,9 +243,9 @@ export class PageContext {
         || (mightBeConfig && index.directories.some(dir => absolute.startsWith(`${dir}/`)))
       )
       const configChanged = !excluded.includes(absolute) && isConfigPath
-      // 页面规则每次事件重算：glob 匹配出的目录会在运行中增减，
-      // 缓存下来就会漏掉新出现的目录
-      const pageChanged = isTargetFile(filepath) && isPageFileInDirectories(filepath, this.options)
+      // 规则的编译结果按声明（dir/subPackages/exclude）缓存，glob 展开的
+      // 目录和 root 回调仍在每轮扫描重算，所以新出现的目录不会漏掉
+      const pageChanged = isTargetFile(filepath) && queryPageRules(false, () => isPageFileInDirectories(filepath, this.options))
       if (!configChanged && !pageChanged)
         return
 
@@ -239,7 +257,7 @@ export class PageContext {
     const onUnlink = (file: string): void => handleEvent('unlink', file)
     // glob 规则下的目录增删会改变扫描目录集合（如新增 pkg-a 命中 src/pkg-*）
     const onDirectory = (directory: string): void => {
-      if (isPageDirectoryEvent(directory, this.options))
+      if (queryPageRules(false, () => isPageDirectoryEvent(directory, this.options)))
         void this.updatePagesAndNotify()
     }
     // 初始扫描期间新增的路径可能被 ignoreInitial 吞掉，ready 后再收敛一次
@@ -260,14 +278,9 @@ export class PageContext {
     })
     this.watchedConfigPaths.set(watcher, new Set())
     this.watchedConfigIndex.set(watcher, { files: new Set(), directories: [] })
+    this.watchedPageDirectories.set(watcher, new Set())
     this.refreshConfigWatchers()
-    // 尚未命中的 glob 目录要监听它已存在的祖先目录，否则新建目录
-    // 不会产生任何事件；Vite 自己已递归监听的项目根不重复 add
-    const serverRoot = (this._server?.watcher as unknown) === watcher ? normalizePath(this._server!.config.root) : undefined
-    const directories = resolvePageWatchDirectories(this.options)
-      .filter(dir => !serverRoot || (dir !== serverRoot && !dir.startsWith(`${serverRoot}/`)))
-    if (directories.length)
-      watcher.add(directories)
+    this.refreshPageWatchers()
   }
 
   /** 解绑本插件回调；共享 watcher 的关闭仍由 Vite 负责 */
@@ -277,8 +290,38 @@ export class PageContext {
     this.watchers.clear()
     this.watchedConfigPaths.clear()
     this.watchedConfigIndex.clear()
+    this.watchedPageDirectories.clear()
     this._server = undefined
     await this.pendingUpdate
+  }
+
+  /** 补充未覆盖的监听路径，注册成功后记账，失败时保留重试机会 */
+  private addWatchPaths(watcher: FSWatcher, paths: readonly string[], added: Set<string>, sharedRoot: string | undefined, description: string): void {
+    const wanted = paths.filter(file => (!sharedRoot || (file !== sharedRoot && !file.startsWith(`${sharedRoot}/`)))
+      && ![...added].some(existing => file === existing || file.startsWith(`${existing}/`)))
+    if (!wanted.length)
+      return
+    try {
+      // add() 返回 watcher，注册异步完成；这里只能捕获同步异常
+      watcher.add(wanted)
+      for (const file of wanted)
+        added.add(file)
+    }
+    catch (error) {
+      this.logger?.error(`[vite-plugin-uni-pages] Failed to watch ${description}: ${error instanceof Error ? error.message : error}`, { timestamp: true, error: error instanceof Error ? error : undefined })
+    }
+  }
+
+  /** 补扫后补齐新生效的页面监听根；保留旧订阅以免影响共享 watcher */
+  private refreshPageWatchers(): void {
+    if (!this.watchers.size)
+      return
+    const directories = resolvePageWatchDirectories(this.options)
+    for (const watcher of this.watchers.keys()) {
+      const added = this.watchedPageDirectories.get(watcher)!
+      const serverRoot = (this._server?.watcher as unknown) === watcher ? normalizePath(this._server!.config.root) : undefined
+      this.addWatchPaths(watcher, directories, added, serverRoot, 'page directories')
+    }
   }
 
   /**
@@ -313,20 +356,7 @@ export class PageContext {
         ? normalizeConfigPath(this._server.config.root, this.root)
         : undefined
       // sharedRoot 由 Vite 自己监听，不重复添加也不能撤销
-      const wanted = paths.filter(file => (!sharedRoot || (file !== sharedRoot && !file.startsWith(`${sharedRoot}/`)))
-        && ![...added].some(existing => file === existing || file.startsWith(`${existing}/`)))
-      if (wanted.length) {
-        try {
-          // add() 不是 Promise（chokidar 3 和 5 都返回 this），只能捕获同步抛出；
-          // 注册本身异步完成，没有可等的完成信号
-          watcher.add(wanted)
-          for (const file of wanted)
-            added.add(file)
-        }
-        catch (error) {
-          this.logger?.error(`[vite-plugin-uni-pages] Failed to watch pages config dependencies: ${error instanceof Error ? error.message : error}`, { timestamp: true, error: error instanceof Error ? error : undefined })
-        }
-      }
+      this.addWatchPaths(watcher, paths, added, sharedRoot, 'pages config dependencies')
       this.watchedConfigIndex.set(watcher, index)
     }
   }
@@ -403,6 +433,7 @@ export class PageContext {
 
     if (this.options.mergePages) {
       refreshPageDirectories(this.options)
+      this.refreshPageWatchers()
       this.options.onBeforeScanPages()
       await this.scanPages()
       await this.scanSubPages()

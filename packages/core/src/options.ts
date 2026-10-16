@@ -24,7 +24,7 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
     subPackages = [],
 
     outDir = 'src',
-    exclude = ['node_modules', '.git', '**/__*__/**'],
+    exclude = ['**/node_modules/**', '**/.git/**', '**/__*__/**'],
     minify = false,
     insertFinalNewline = false,
     indent = 2,
@@ -41,14 +41,14 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
     onAfterWriteFile = () => {},
   } = userOptions
 
-  const root = viteRoot || normalizePath(process.env.VITE_ROOT_DIR || process.cwd())
+  const root = normalizePath(resolve(viteRoot || process.env.VITE_ROOT_DIR || process.cwd()))
   const resolvedDirs = resolvePageDirs(dir, root, exclude)
 
   const resolvedSubPackages = resolveSubPackageDirs(subPackages, root, outDir, exclude)
 
   const resolvedHomePage = typeof homePage === 'string' ? [homePage] : homePage
   const resolvedConfigSource = typeof configSource === 'string' ? [{ files: configSource } as LoadConfigSource<PagesConfig>] : configSource
-  const resolvedDts = !dts ? false : typeof dts === 'string' ? dts : resolve(viteRoot, 'uni-pages.d.ts')
+  const resolvedDts = !dts ? false : typeof dts === 'string' ? dts : resolve(root, 'uni-pages.d.ts')
 
   const resolvedOptions: ResolvedOptions = {
     dts: resolvedDts,

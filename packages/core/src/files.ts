@@ -2,25 +2,38 @@ import type { ResolvedOptions } from './types'
 import fs from 'node:fs'
 import path from 'node:path'
 import lockfile from 'proper-lockfile'
-import { globSync } from 'tinyglobby'
+import { escapePath, globSync } from 'tinyglobby'
+import { normalizePath } from 'vite'
 import { FILE_EXTENSIONS, OUTPUT_NAME } from './constant'
 import { debug } from './logger'
+import { getPageRules } from './page-rules'
 
 /**
- * 解析给定上下文下可作为有效页面的文件列表。
+ * 获取扫描目录中未被排除的页面文件
+ *
+ * @param directory - 绝对扫描目录，或相对项目根的目录
+ * @param options - 已解析的页面选项，排除规则以其中的项目根为基准
+ * @returns 相对扫描目录、使用 `/` 分隔的文件路径
  */
-export function getPageFiles(path: string, options: ResolvedOptions): string[] {
-  const { exclude } = options
+export function getPageFiles(directory: string, options: ResolvedOptions): string[] {
+  const absolute = path.resolve(options.root, directory)
+  const rules = getPageRules(options)
+  if (rules.isExcluded(absolute))
+    return []
 
   const ext = FILE_EXTENSIONS.length > 1 ? `{${FILE_EXTENSIONS.join(',')}}` : (FILE_EXTENSIONS[0] || '')
 
-  const files = globSync(`**/*.${ext}`, {
-    ignore: exclude,
+  const files = globSync(`${escapePath(normalizePath(absolute))}/**/*.${ext}`, {
+    ignore: rules.traversalIgnores,
+    expandDirectories: false,
     onlyFiles: true,
-    cwd: path,
+    cwd: options.root,
   })
 
   return files
+    .map(file => path.resolve(options.root, file))
+    .filter(file => !rules.isExcluded(file))
+    .map(file => normalizePath(path.relative(absolute, file)))
 }
 
 /**
