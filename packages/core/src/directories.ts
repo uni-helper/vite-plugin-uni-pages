@@ -84,10 +84,9 @@ export interface SubPackageDirectorySource {
 
 interface DirectoryCandidate extends SubPackageDirectorySource {
   defaultRoot: string
-  dynamic: boolean
 }
 
-type SubPackageDirectoryProjection = Pick<ResolvedOptions, 'subPackages' | 'subPackageRootMap' | 'dynamicSubPackageRoots'>
+type SubPackageDirectoryProjection = Pick<ResolvedOptions, 'subPackages' | 'subPackageRootMap'>
 
 // 与规则编译缓存分开；目录展开和身份必须随每轮扫描刷新
 const subPackageSources = new WeakMap<ResolvedOptions, readonly SubPackageDirectorySource[]>()
@@ -159,7 +158,6 @@ function discoverSubPackageDirectories(patterns: (string | SubPackageConfig)[], 
         matchIndex,
         rootSource: { dir: dynamic ? relative : resolved, ruleIndex, explicitRoot: resolvedRoot !== undefined },
         defaultRoot,
-        dynamic,
       }
       candidates.push(candidate)
       // 缺失目录仍可校验同一路径的声明冲突，但不能伪造物理身份
@@ -193,11 +191,10 @@ function discoverSubPackageDirectories(patterns: (string | SubPackageConfig)[], 
       roots.set(candidate.dir, candidate.root)
   }
   return {
-    sources: candidates.map(({ defaultRoot: _defaultRoot, dynamic: _dynamic, ...source }) => source),
+    sources: candidates.map(({ defaultRoot: _defaultRoot, ...source }) => source),
     projection: {
       subPackages: [...new Set(candidates.map(candidate => candidate.dir))],
       subPackageRootMap: roots,
-      dynamicSubPackageRoots: new Set(candidates.filter(candidate => candidate.dynamic).map(candidate => candidate.root)),
     },
   }
 }
@@ -212,7 +209,7 @@ function discoverSubPackageDirectories(patterns: (string | SubPackageConfig)[], 
  * @param root 相对目录和相对 exclude 的解析基准
  * @param outDir 默认分包 root 的换算基准，相对 root 解析
  * @param exclude 目录及页面排除规则
- * @returns 目录列表、最终 root 映射及动态 root 集合
+ * @returns 目录列表及最终 root 映射
  * @throws 目录规则无效、root 回调失败、显式 root 冲突或非缺失类目录访问错误
  */
 export function resolveSubPackageDirs(patterns: (string | SubPackageConfig)[], root: string, outDir: string, exclude: string[]): SubPackageDirectoryProjection {

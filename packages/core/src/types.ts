@@ -344,9 +344,6 @@ export interface ResolvedOptions extends Omit<Options, 'homePage' | 'configSourc
   /** 原始子包目录规则，用于重新发现目录 */
   subPackagePatterns: (string | SubPackageConfig)[]
 
-  /** 由 glob 或 root 回调产生的子包 root，保留用于兼容现有读取方 */
-  dynamicSubPackageRoots: Set<string>
-
   /**
    * 子包目录的 root 映射（目录 -> 最终 root）
    *
