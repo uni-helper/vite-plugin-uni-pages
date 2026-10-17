@@ -64,27 +64,19 @@ describe('扫描目录的 root 意图与页面归属', () => {
     expect(subPaths(ctx)).toEqual(['pages/index'])
   })
 
-  it('同物理目录的不同显式 root 报错并定位两个词法来源', () => {
+  it.each([
+    { kind: '两个固定值', first: 'first', second: 'second' },
+    { kind: '固定值与回调', first: 'first', second: (): string => 'second' },
+    { kind: '两个回调', first: (): string => 'first', second: (): string => 'second' },
+  ])('$kind 的显式 root 冲突会定位两个词法来源', ({ first, second }) => {
     const root = fixture()
     page(root, 'src/real/index.vue')
     alias(root, 'src/real', 'src/alias')
 
     expect(() => resolveOptions({ subPackages: [
-      { dir: 'src/alias', root: 'first' },
-      { dir: 'src/real', root: () => 'second' },
-    ] }, root)).toThrow(/Conflicting subpackage roots/)
-    try {
-      resolveOptions({ subPackages: [
-        { dir: 'src/alias', root: 'first' },
-        { dir: 'src/real', root: 'second' },
-      ] }, root)
-    }
-    catch (error) {
-      expect(String(error)).toContain('src/alias')
-      expect(String(error)).toContain('src/real')
-      expect(String(error)).toContain('first')
-      expect(String(error)).toContain('second')
-    }
+      { dir: 'src/alias', root: first },
+      { dir: 'src/real', root: second },
+    ] }, root)).toThrow(/Conflicting subpackage roots.*src\/alias.*first.*src\/real.*second/)
   })
 
   it('显式候选决定代表路径，默认别名不提前夺走页面', async () => {
@@ -249,6 +241,30 @@ describe('扫描目录的 root 意图与页面归属', () => {
     await expect(operation).rejects.toThrow(/Conflicting subpackage ownership/)
     await expect(operation).rejects.toThrow(/index\.vue/)
     await expect(operation).rejects.toThrow(/nested/)
+  })
+
+  it('同一 glob 的父子匹配冲突会解释原始规则、目录和归属', async () => {
+    const root = fixture()
+    page(root, 'src/pkg/other.vue')
+    page(root, 'src/pkg/pages/index.vue')
+    const operation = createPages({ subPackages: ['src/pkg/**'] }, { root })
+
+    await expect(operation).rejects.toThrow(/subPackages\[0\] rule "src\/pkg\/\*\*"/)
+    await expect(operation).rejects.toThrow(/directory "src\/pkg", subpackage "pkg"/)
+    await expect(operation).rejects.toThrow(/directory "src\/pkg\/pages", subpackage "pkg\/pages"/)
+    await expect(operation).rejects.toThrow(/The same directory rule matched multiple directories containing this page/)
+  })
+
+  it.each([
+    { kind: '只声明父目录', subPackages: ['src/pkg'] },
+    { kind: '递归 glob 统一 root', subPackages: [{ dir: 'src/pkg/**', root: 'pkg' }] },
+  ])('$kind 会同时保留父目录和子目录页面', async ({ subPackages }) => {
+    const root = fixture()
+    page(root, 'src/pkg/other.vue')
+    page(root, 'src/pkg/pages/index.vue')
+    const ctx = await createPages({ subPackages }, { root })
+
+    expect(subPaths(ctx)).toEqual(['other', 'pages/index'])
   })
 
   it.each([false, true])('主包与分包重叠时由有效分包优先，别名：%s', async (useAlias) => {
@@ -457,6 +473,19 @@ describe('生成路由冲突与配置覆盖', () => {
     }
     const ctx = new PageContext({}, root, 'h5')
 
+    await expect(ctx.scanAndMerge()).rejects.toThrow(/Conflicting generated route.*pages\/shared/)
+  })
+
+  it('无扩展名目标可以通过文件别名单独收录，与另一物理来源撞路由时才报错', async () => {
+    const root = fixture()
+    page(root, 'real/shared')
+    fs.mkdirSync(path.join(root, 'src/pages'), { recursive: true })
+    fs.symlinkSync(path.join(root, 'real/shared'), path.join(root, 'src/pages/shared.nvue'), 'file')
+    const ctx = await createPages({}, { root, platform: 'h5' })
+
+    expect(ctx.pageMetaData.map(page => page.path)).toEqual(['pages/shared'])
+
+    page(root, 'src/pages/shared.vue')
     await expect(ctx.scanAndMerge()).rejects.toThrow(/Conflicting generated route.*pages\/shared/)
   })
 

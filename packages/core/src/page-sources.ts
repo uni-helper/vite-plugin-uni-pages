@@ -58,14 +58,20 @@ export function comparePageSources(a: Pick<PageSource, 'explicitRoot' | 'ruleInd
     || a.matchIndex - b.matchIndex
 }
 
-function describeSource(source: PageSource): string {
+function describeSource(source: PageCandidate): string {
   const declaration = source.root === undefined ? 'dir' : `subPackages[${source.ruleIndex}]`
+  // 一条规则可能展开为多个目录，诊断中同时显示原始声明和实际匹配目录
+  const configured = source.root === undefined
+    ? source.page.ctx.options.dir
+    : source.page.ctx.options.subPackagePatterns[source.ruleIndex]
+  const pattern = typeof configured === 'string' ? configured : configured?.dir
+  const rule = pattern === undefined ? '' : ` rule ${JSON.stringify(pattern)}`
   const owner = source.root === undefined ? 'main package' : `subpackage "${source.root}"`
   const rootSource = source.rootSource
   const rootOrigin = rootSource
     ? `, root from subPackages[${rootSource.ruleIndex}] "${rootSource.dir}" (${rootSource.explicitRoot ? 'explicit' : 'default'})`
     : ''
-  return `"${source.file}" (${declaration}, directory "${source.dir}", ${owner}${rootOrigin})`
+  return `"${source.file}" (${declaration}${rule}, directory "${source.dir}", ${owner}${rootOrigin})`
 }
 
 /**
@@ -89,7 +95,10 @@ export function selectPageSources(candidates: PageCandidate[]): PageCandidate[] 
     const first = subPages[0]
     const conflict = subPages.find(source => source.root !== first?.root)
     if (first && conflict) {
-      throw new Error(`[vite-plugin-uni-pages] Conflicting subpackage ownership: ${describeSource(first)} and ${describeSource(conflict)} refer to the same page "${first.identity}".`)
+      const explanation = first.ruleIndex >= 0 && first.ruleIndex === conflict.ruleIndex && first.matchIndex !== conflict.matchIndex
+        ? ' The same directory rule matched multiple directories containing this page. For one subpackage tree, declare its parent directory once; for multiple entries in the same subpackage, use a common root.'
+        : ''
+      throw new Error(`[vite-plugin-uni-pages] Conflicting subpackage ownership: ${describeSource(first)} and ${describeSource(conflict)} refer to the same page "${first.identity}".${explanation}`)
     }
     selected.push([...(subPages.length ? subPages : group)].sort(comparePageSources)[0]!)
   }
