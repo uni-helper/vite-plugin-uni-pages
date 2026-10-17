@@ -755,6 +755,7 @@ pipeline.ts       纯流水线入口 — createPages / generateAll，root 和 pl
 config-loader.ts  配置加载 — unconfig 装载、本地依赖与恢复候选收集、监听路径归一化
 directories.ts    目录发现 — glob 展开、subPackages root 映射与监听边界
 page-rules.ts     页面规则 — 基于 Vite root 编译排除模式，统一扫描与事件判定
+page-sources.ts   扫描来源与页面归属 — 来源身份、代表选择、生成路由冲突与文件族校验
 pages-json.ts     pages.json 读-改-写 — 多平台 #ifdef 合并、首页排前、
                   生成标记与过期子包清理、序列化格式化、文件锁与原子写入
 platform-variants.ts 平台变体表 — 跨平台合并的共享规则，数组侧与对象侧两类适配器共用tab-bar.ts        tabBar 外观属性的跨平台合并与渲染（对象侧适配器）
@@ -781,6 +782,7 @@ index.ts
   │    ├─ options.ts ── directories.ts 选项解析与目录发现
   │    ├─ files.ts                     扫描与文件锁
   │    ├─ page.ts ── macro.ts ── condition.ts
+  │    ├─ page-sources.ts              来源身份、代表选择与生成路由冲突
   │    ├─ pages-json.ts                读-改-写，内含文件锁
   │    ├─ platform-variants.ts         平台变体表（两者按类型互相引用）
   │    ├─ tab-bar.ts ── jsonc-scan.ts  tabBar 属性合并与原文重复键扫描

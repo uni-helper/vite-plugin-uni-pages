@@ -1,27 +1,19 @@
 import type { Page } from './page'
+import type { ScanSourceCoordinate } from './types'
 import fs from 'node:fs'
 import path from 'node:path'
 import { normalizePath } from 'vite'
 import { FILE_EXTENSIONS } from './constant'
+import { isMissingFsError } from './files'
 
 /** 一轮扫描中已通过词法路径排除的页面来源 */
-export interface PageSource {
+export interface PageSource extends ScanSourceCoordinate {
   /** 规范化的词法绝对路径，用于定位源文件 */
   file: string
   /** 规范化的 native realpath，仅用于身份和文件族判定，不作为输出路径 */
   identity: string
-  /** 该文件来自的词法扫描目录 */
-  dir: string
   /** 最终分包 root；undefined 表示主包 */
   root?: string
-  /** 当前声明是否显式设置 root，不随同目录其他声明的 root 继承而改变 */
-  explicitRoot: boolean
-  /** 分包声明下标，从 0 开始；常规主包为 0，未关联声明的 hook 来源为 -1 */
-  ruleIndex: number
-  /** 声明内匹配目录的下标，从 0 开始，glob 按词法路径排序 */
-  matchIndex: number
-  /** 决定最终分包 root 的目录声明；主包没有此值 */
-  rootSource?: { dir: string, ruleIndex: number, explicitRoot: boolean }
 }
 
 /** 当前平台有效的页面及其完整生成路由 */
@@ -29,6 +21,12 @@ export interface PageCandidate extends PageSource {
   page: Page
   /** 适用平台规则和路径换算后的完整路由，分包路由已包含 root */
   route: string
+}
+
+/** 完成归属决议的代表页面来源 */
+export interface GeneratedPageSource extends PageCandidate {
+  /** 同一物理页面的其他有效来源，不含代表，仅用于本轮冲突诊断 */
+  relatedSources: PageSource[]
 }
 
 /**
@@ -42,7 +40,7 @@ export function resolvePageIdentity(file: string): string | undefined {
     return normalizePath(fs.realpathSync.native(file))
   }
   catch (error) {
-    if (!['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? ''))
+    if (!isMissingFsError(error))
       throw error
   }
 }
@@ -52,7 +50,7 @@ export function resolvePageIdentity(file: string): string | undefined {
  *
  * @description 显式来源优先，其余按声明和 glob 匹配顺序；相同优先级返回 0
  */
-export function comparePageSources(a: Pick<PageSource, 'explicitRoot' | 'ruleIndex' | 'matchIndex'>, b: Pick<PageSource, 'explicitRoot' | 'ruleIndex' | 'matchIndex'>): number {
+export function comparePageSources(a: Pick<ScanSourceCoordinate, 'explicitRoot' | 'ruleIndex' | 'matchIndex'>, b: Pick<ScanSourceCoordinate, 'explicitRoot' | 'ruleIndex' | 'matchIndex'>): number {
   return Number(b.explicitRoot) - Number(a.explicitRoot)
     || a.ruleIndex - b.ruleIndex
     || a.matchIndex - b.matchIndex
@@ -74,22 +72,48 @@ function describeSource(source: PageCandidate): string {
   return `"${source.file}" (${declaration}${rule}, directory "${source.dir}", ${owner}${rootOrigin})`
 }
 
+/** 关联记录仅保留来源信息，不携带其他 Page 实例 */
+function toPageSource(candidate: PageCandidate): PageSource {
+  return {
+    file: candidate.file,
+    identity: candidate.identity,
+    dir: candidate.dir,
+    root: candidate.root,
+    explicitRoot: candidate.explicitRoot,
+    ruleIndex: candidate.ruleIndex,
+    matchIndex: candidate.matchIndex,
+    rootSource: candidate.rootSource,
+  }
+}
+
+function describeRelatedSource(source: PageSource): string {
+  const owner = source.root === undefined ? 'main package' : `subpackage "${source.root}"`
+  return `"${source.file}" (directory "${source.dir}", ${owner})`
+}
+
+function describeRelatedSources(source: GeneratedPageSource): string {
+  if (source.relatedSources.length === 0)
+    return ''
+  return `; related sources: ${source.relatedSources.map(describeRelatedSource).join(', ')}`
+}
+
 /**
  * 为每个物理页面选择一个有效代表来源
  *
  * @description 候选需先通过文件排除，且未被宏结果或平台规则跳过；有效分包优先于主包，
- * 同一归属内按显式来源和声明顺序选择，返回顺序按文件身份首次出现的位置排列
+ * 同一归属内按显式来源和声明顺序选择，返回顺序按文件身份首次出现的位置排列，
+ * 同身份的其他来源仅保留在代表记录中，用于本轮冲突诊断
  * @param candidates - 本轮有效候选，数组不会被修改
  * @throws 同一物理页面被不同分包 root 认领时抛出来源冲突
  */
-export function selectPageSources(candidates: PageCandidate[]): PageCandidate[] {
+export function selectPageSources(candidates: PageCandidate[]): GeneratedPageSource[] {
   const groups = new Map<string, PageCandidate[]>()
   for (const candidate of candidates) {
     const group = groups.get(candidate.identity) ?? []
     group.push(candidate)
     groups.set(candidate.identity, group)
   }
-  const selected: PageCandidate[] = []
+  const selected: GeneratedPageSource[] = []
   for (const group of groups.values()) {
     const subPages = group.filter(source => source.root !== undefined)
     const first = subPages[0]
@@ -100,7 +124,10 @@ export function selectPageSources(candidates: PageCandidate[]): PageCandidate[] 
         : ''
       throw new Error(`[vite-plugin-uni-pages] Conflicting subpackage ownership: ${describeSource(first)} and ${describeSource(conflict)} refer to the same page "${first.identity}".${explanation}`)
     }
-    selected.push([...(subPages.length ? subPages : group)].sort(comparePageSources)[0]!)
+    const pool = subPages.length ? subPages : group
+    const representative = [...pool].sort(comparePageSources)[0]!
+    const relatedSources = group.filter(source => source !== representative).map(toPageSource)
+    selected.push({ ...representative, relatedSources })
   }
   return selected
 }
@@ -135,8 +162,8 @@ function fileFamily(source: PageCandidate, platform?: string): string | undefine
  * @param platform - 启用主包平台后缀规则时的当前平台，省略时只允许格式变体覆盖
  * @throws 不同生成来源占用同一路由且不属于同一归属的允许文件族时抛出冲突
  */
-export function validateGeneratedRoutes(candidates: PageCandidate[], platform?: string): void {
-  const routes = new Map<string, PageCandidate>()
+export function validateGeneratedRoutes(candidates: GeneratedPageSource[], platform?: string): void {
+  const routes = new Map<string, GeneratedPageSource>()
   for (const candidate of candidates) {
     const route = path.posix.normalize(candidate.route.replace(/\\/g, '/')).replace(/\/$/, '')
     const previous = routes.get(route)
@@ -147,7 +174,7 @@ export function validateGeneratedRoutes(candidates: PageCandidate[], platform?: 
         && previousFamily !== undefined
         && previousFamily === fileFamily(candidate, platform)
       if (!sameFamily) {
-        throw new Error(`[vite-plugin-uni-pages] Conflicting generated route "${route}": ${describeSource(previous)} and ${describeSource(candidate)}.`)
+        throw new Error(`[vite-plugin-uni-pages] Conflicting generated route "${route}": ${describeSource(previous)}${describeRelatedSources(previous)} and ${describeSource(candidate)}${describeRelatedSources(candidate)}.`)
       }
     }
     routes.set(route, candidate)

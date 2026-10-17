@@ -476,6 +476,22 @@ describe('生成路由冲突与配置覆盖', () => {
     await expect(ctx.scanAndMerge()).rejects.toThrow(/Conflicting generated route.*pages\/shared/)
   })
 
+  it('别名归并后与另一物理页面撞路由时，诊断仍包含关联别名', async () => {
+    const root = fixture()
+    page(root, 'src/real/index.vue', 'definePage({ path: "pkg/shared" })')
+    alias(root, 'src/real', 'src/alias')
+    const ctx = await createPages({ subPackages: [
+      { dir: 'src/real', root: 'pkg' },
+      { dir: 'src/alias', root: 'pkg' },
+      { dir: 'src/other', root: 'pkg' },
+    ] }, { root })
+
+    expect(subPaths(ctx)).toEqual(['shared'])
+
+    page(root, 'src/other/index.vue', 'definePage({ path: "pkg/shared" })')
+    await expect(ctx.scanAndMerge()).rejects.toThrow(/Conflicting generated route "pkg\/shared":.*src\/real\/index\.vue.*related sources:.*src\/alias\/index\.vue.*src\/other\/index\.vue/)
+  })
+
   it('无扩展名目标可以通过文件别名单独收录，与另一物理来源撞路由时才报错', async () => {
     const root = fixture()
     page(root, 'real/shared')

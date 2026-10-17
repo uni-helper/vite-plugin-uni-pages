@@ -383,6 +383,30 @@ export interface SubPackageConfig {
   root: string | ((dir: string) => string)
 }
 
+/** 最终分包 root 的决议来源 */
+export interface ScanSourceOrigin {
+  /** 提供 root 的词法目录，与对应分包目录来源的 dir 一致 */
+  dir: string
+  /** 提供 root 的声明在 subPackagePatterns 中的索引，从 0 开始 */
+  ruleIndex: number
+  /** 提供 root 的声明是否为显式来源 */
+  explicitRoot: boolean
+}
+
+/** 扫描来源的词法目录及声明位置 */
+export interface ScanSourceCoordinate {
+  /** 扫描目录的词法路径，保留符号链接别名；相对路径以 Vite root 为基准 */
+  dir: string
+  /** 当前声明是否显式提供 root，与是否继承其他声明的显式 root 无关 */
+  explicitRoot: boolean
+  /** 主包为 0，分包为 subPackagePatterns 中的从零索引；hook 页面未关联声明时为 -1 */
+  ruleIndex: number
+  /** 声明内从零开始的目录匹配索引；glob 按路径排序，无匹配记录时为 0 */
+  matchIndex: number
+  /** 最终分包 root 的决议来源，可能来自另一声明；主包及未关联声明的 hook 页面无此值 */
+  rootSource?: ScanSourceOrigin
+}
+
 /**
  * 页面路径信息接口
  * 包含页面文件的相对路径与绝对路径

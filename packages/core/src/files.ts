@@ -9,6 +9,17 @@ import { debug } from './logger'
 import { getPageRules } from './page-rules'
 
 /**
+ * 判断是否为路径缺失或中间路径不是目录的文件系统错误
+ *
+ * @returns 错误码为 ENOENT 或 ENOTDIR 时返回 true，其他错误及空输入返回 false
+ */
+export function isMissingFsError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('code' in error))
+    return false
+  return error.code === 'ENOENT' || error.code === 'ENOTDIR'
+}
+
+/**
  * 获取扫描目录中未被排除的页面文件
  *
  * @param directory - 绝对扫描目录，或相对项目根的目录

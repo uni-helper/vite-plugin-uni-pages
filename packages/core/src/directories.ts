@@ -1,10 +1,11 @@
-import type { ResolvedOptions, SubPackageConfig } from './types'
+import type { ResolvedOptions, ScanSourceCoordinate, ScanSourceOrigin, SubPackageConfig } from './types'
 import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import picomatch from 'picomatch'
 import { globSync, isDynamicPattern } from 'tinyglobby'
 import { normalizePath } from 'vite'
+import { isMissingFsError } from './files'
 import { compilePageRules, getPageRules } from './page-rules'
 
 /**
@@ -52,7 +53,7 @@ export function resolvePageDirs(dir: string, root: string, exclude: string[]): s
 }
 
 /** 单次分包目录发现保留的来源记录 */
-export interface SubPackageDirectorySource {
+export interface SubPackageDirectorySource extends ScanSourceCoordinate {
   /**
    * 扫描目录的词法路径，与 subPackages 的目录投影一致
    *
@@ -65,21 +66,8 @@ export interface SubPackageDirectorySource {
   identity?: string
   /** 同一物理目录完成显式／默认来源决议后的最终分包 root */
   root: string
-  /** 当前声明是否显式提供 root，与是否继承其他声明的显式 root 无关 */
-  explicitRoot: boolean
-  /** 当前声明在 subPackagePatterns 中的索引，从 0 开始 */
-  ruleIndex: number
-  /** 当前声明内的目录匹配索引，从 0 开始；glob 按路径排序 */
-  matchIndex: number
   /** 最终 root 的选择来源，可能与当前声明不同 */
-  rootSource: {
-    /** 提供最终 root 的词法目录 */
-    dir: string
-    /** 提供最终 root 的声明索引，从 0 开始 */
-    ruleIndex: number
-    /** 提供最终 root 的声明是否为显式来源 */
-    explicitRoot: boolean
-  }
+  rootSource: ScanSourceOrigin
 }
 
 interface DirectoryCandidate extends SubPackageDirectorySource {
@@ -98,7 +86,7 @@ function directoryIdentity(absolute: string): string | undefined {
   }
   catch (error) {
     // 删除或重命名中的目录按缺失处理，权限等真实错误仍交给调用方
-    if (!['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? ''))
+    if (!isMissingFsError(error))
       throw error
   }
 }
@@ -115,7 +103,7 @@ function findCallbackDirectory(dir: string, root: string, rules: ReturnType<type
       return [normalizePath(path.relative(root, absolute)) || '.']
   }
   catch (error) {
-    if (!['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? ''))
+    if (!isMissingFsError(error))
       throw error
   }
   return []
