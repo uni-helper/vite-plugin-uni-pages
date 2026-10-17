@@ -344,12 +344,10 @@ export interface ResolvedOptions extends Omit<Options, 'homePage' | 'configSourc
   /** 原始子包目录规则，用于重新发现目录 */
   subPackagePatterns: (string | SubPackageConfig)[]
 
-  /** 由 glob 或 root 回调产生的子包 root，同 root 的目录合并页面 */
-  dynamicSubPackageRoots: Set<string>
-
   /**
-   * 子包的自定义 root 映射（目录 -> root）
-   * 用于 monorepo 支持，指定 pages.json 中的自定义 root 路径
+   * 子包目录的 root 映射（目录 -> 最终 root）
+   *
+   * @description 未登记的目录继续使用相对 outDir 的默认 root
    */
   subPackageRootMap: Map<string, string>
 }
@@ -383,6 +381,30 @@ export interface SubPackageConfig {
    * 返回值须为非空相对路径，不能包含 `..`；每次重新发现目录时会再次调用
    */
   root: string | ((dir: string) => string)
+}
+
+/** 最终分包 root 的决议来源 */
+export interface ScanSourceOrigin {
+  /** 提供 root 的词法目录，与对应分包目录来源的 dir 一致 */
+  dir: string
+  /** 提供 root 的声明在 subPackagePatterns 中的索引，从 0 开始 */
+  ruleIndex: number
+  /** 提供 root 的声明是否为显式来源 */
+  explicitRoot: boolean
+}
+
+/** 扫描来源的词法目录及声明位置 */
+export interface ScanSourceCoordinate {
+  /** 扫描目录的词法路径，保留符号链接别名；相对路径以 Vite root 为基准 */
+  dir: string
+  /** 当前声明是否显式提供 root，与是否继承其他声明的显式 root 无关 */
+  explicitRoot: boolean
+  /** 主包为 0，分包为 subPackagePatterns 中的从零索引；hook 页面未关联声明时为 -1 */
+  ruleIndex: number
+  /** 声明内从零开始的目录匹配索引；glob 按路径排序，无匹配记录时为 0 */
+  matchIndex: number
+  /** 最终分包 root 的决议来源，可能来自另一声明；主包及未关联声明的 hook 页面无此值 */
+  rootSource?: ScanSourceOrigin
 }
 
 /**
