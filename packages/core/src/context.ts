@@ -628,7 +628,18 @@ export class PageContext {
       && previous.path.relativePath === pagePath.relativePath
       ? previous
       : new Page(this, pagePath)
-    this.pageSources.set(page, { ...source, file: pagePath.absolutePath, identity })
+    // 读取失败的页面允许在新一轮扫描里重试
+    page.resetReadAttempt()
+    this.pageSources.set(page, {
+      file: pagePath.absolutePath,
+      identity,
+      dir: source.dir,
+      root: source.root,
+      explicitRoot: source.explicitRoot,
+      ruleIndex: source.ruleIndex,
+      matchIndex: source.matchIndex,
+      rootSource: source.rootSource,
+    })
     return page
   }
 
@@ -685,18 +696,19 @@ export class PageContext {
   }
 
   /**
-   * 为每个词法扫描目录选取声明来源
+   * 为每个物理扫描目录选取声明来源
    *
-   * @description 重复声明只扫描一次，定位信息按显式优先选择；不同词法别名仍分别保留
+   * @description 同一路径的不同写法只扫描一次，定位信息按显式优先选择；
+   * 符号链接别名是不同的 absolute，仍分别保留各自的词法路径
    */
   private subPackageSourcesByDir(): Map<string, SubPackageDirectorySource> {
-    const sources = new Map<string, SubPackageDirectorySource>()
+    const selected = new Map<string, SubPackageDirectorySource>()
     for (const source of getSubPackageDirectorySources(this.options)) {
-      const previous = sources.get(source.dir)
+      const previous = selected.get(source.absolute)
       if (!previous || comparePageSources(source, previous) < 0)
-        sources.set(source.dir, source)
+        selected.set(source.absolute, source)
     }
-    return sources
+    return new Map([...selected.values()].map(source => [source.dir, source]))
   }
 
   /** 获取目录的最终分包 root，未登记时相对 outDir 计算默认值 */

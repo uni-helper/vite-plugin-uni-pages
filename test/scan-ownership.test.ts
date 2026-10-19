@@ -230,6 +230,16 @@ describe('扫描目录的 root 意图与页面归属', () => {
     expect(subPaths(ctx)).toEqual(['other', 'pages/index'])
   })
 
+  it('同一目录的不同写法只扫描一次', async () => {
+    const root = fixture()
+    page(root, 'src/pkg/pages/index.vue')
+    const ctx = await createPages({ subPackages: ['src/pkg', './src/pkg', 'src/pkg/'] }, { root })
+
+    expect(ctx.options.subPackages).toEqual(['src/pkg'])
+    expect([...ctx.subPages.keys()]).toEqual(['src/pkg'])
+    expect(subPaths(ctx)).toEqual(['pages/index'])
+  })
+
   it('同页面由两个分包 root 认领时明确报错并定位源文件', async () => {
     const root = fixture()
     page(root, 'src/pkg/pages/index.vue')

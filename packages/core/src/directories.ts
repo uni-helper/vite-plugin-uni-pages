@@ -7,6 +7,7 @@ import { globSync, isDynamicPattern } from 'tinyglobby'
 import { normalizePath } from 'vite'
 import { isMissingFsError } from './files'
 import { compilePageRules, getPageRules } from './page-rules'
+import { comparePageSources } from './page-sources'
 
 /**
  * 统一目录选择器的 Windows 路径分隔符
@@ -172,16 +173,26 @@ function discoverSubPackageDirectories(patterns: (string | SubPackageConfig)[], 
     }
   }
 
+  // 同一物理路径的不同写法（如 `src/pkg` 与 `src/pkg/`）只保留一个扫描入口，
+  // 否则会重复执行 glob 和身份解析；符号链接别名是不同的 absolute，仍分别保留
+  const directories = new Map<string, DirectoryCandidate>()
+  for (const candidate of candidates) {
+    const previous = directories.get(candidate.absolute)
+    if (!previous || comparePageSources(candidate, previous) < 0)
+      directories.set(candidate.absolute, candidate)
+  }
+
   // 默认别名继承其他来源的 root 后也需登记，避免读取方按该别名重算默认值
   const roots = new Map<string, string>()
-  for (const candidate of candidates) {
+  for (const candidate of directories.values()) {
     if (candidate.explicitRoot || candidate.root !== candidate.defaultRoot)
       roots.set(candidate.dir, candidate.root)
   }
   return {
+    // 声明记录逐条保留，root 决议与诊断仍需知道每条声明的位置
     sources: candidates.map(({ defaultRoot: _defaultRoot, ...source }) => source),
     projection: {
-      subPackages: [...new Set(candidates.map(candidate => candidate.dir))],
+      subPackages: [...directories.values()].map(candidate => candidate.dir),
       subPackageRootMap: roots,
     },
   }

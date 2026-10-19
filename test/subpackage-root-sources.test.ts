@@ -154,6 +154,29 @@ describe('分包目录 root 来源', () => {
     ])
   })
 
+  it('同一物理路径的不同写法只保留一个扫描入口', () => {
+    const root = fixture()
+    const options = resolveOptions({ subPackages: ['src/real', './src/real', 'src/real/'] }, root)
+    refreshPageDirectories(options)
+
+    expect(options.subPackages).toEqual(['src/real'])
+    // 声明记录仍逐条保留，root 决议和诊断需要原始位置
+    expect(getSubPackageDirectorySources(options).map(source => source.dir)).toEqual([
+      'src/real',
+      './src/real',
+      'src/real/',
+    ])
+    expect(new Set(getSubPackageDirectorySources(options).map(source => source.absolute)).size).toBe(1)
+  })
+
+  it('同路径的显式声明决定保留的扫描写法和 root', () => {
+    const root = fixture()
+    const options = resolveOptions({ subPackages: ['./src/real', { dir: 'src/real/', root: 'pkg' }] }, root)
+
+    expect(options.subPackages).toEqual(['src/real/'])
+    expect(options.subPackageRootMap.get('src/real/')).toBe('pkg')
+  })
+
   it('缺失目录不伪造 identity，目录出现及别名换目标后每轮重新解析', () => {
     const root = fixture()
     const options = resolveOptions({ subPackages: ['src/missing'] }, root)

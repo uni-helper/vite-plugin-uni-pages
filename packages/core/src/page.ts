@@ -34,8 +34,10 @@ export class Page {
    */
   skipped: boolean = false
 
-  /** 页面文件是否至少被读取过一次 */
+  /** 页面文件是否至少被成功读取过一次 */
   private loaded: boolean = false
+  /** 当前扫描轮次是否已经尝试读取过；失败后不重复读取，直到下一轮扫描 */
+  private readAttempted: boolean = false
 
   /** 页面配置的原始 JSON 字符串，用于变更检测 */
   private raw: string = ''
@@ -65,7 +67,7 @@ export class Page {
    * @returns 页面配置对象
    */
   public async getPageMeta(forceUpdate = false): Promise<InternalPageItem> {
-    if (forceUpdate || !this.loaded)
+    if (forceUpdate || (!this.loaded && !this.readAttempted))
       await this.read()
 
     const { path, tabBar: _, ...others } = this.meta || {}
@@ -84,7 +86,7 @@ export class Page {
    * @returns tabBar 配置对象，页面未定义 tabBar 时返回 undefined
    */
   public async getTabBar(forceUpdate = false): Promise<TabBarItem & { index: number } | undefined> {
-    if (forceUpdate || !this.loaded) {
+    if (forceUpdate || (!this.loaded && !this.readAttempted)) {
       await this.read()
     }
 
@@ -110,8 +112,18 @@ export class Page {
    * 当前文件内容
    */
   public async ensureLoaded(): Promise<void> {
-    if (!this.loaded)
+    if (!this.loaded && !this.readAttempted)
       await this.read()
+  }
+
+  /**
+   * 允许下一轮扫描重新尝试读取
+   *
+   * @description 成功读取后仍沿用缓存；只有读取失败的页面需要在
+   * 新扫描开始时清掉尝试标记
+   */
+  public resetReadAttempt(): void {
+    this.readAttempted = false
   }
 
   /**
@@ -127,6 +139,7 @@ export class Page {
    * 从 Vue SFC 中提取 definePage 宏定义的配置
    */
   public async read(): Promise<void> {
+    this.readAttempted = true
     let meta: UserPageItem | undefined
     let skipped = false
     try {
