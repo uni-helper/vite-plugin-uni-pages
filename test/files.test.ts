@@ -3,10 +3,23 @@ import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, vi } from 'vitest'
-import { checkPagesJsonFileSync, getPageFiles, resolveOptions } from '../packages/core/src'
+import { checkPagesJsonFileSync, getPageFiles, isMissingFsError, resolveOptions } from '../packages/core/src'
 
 const options = resolveOptions({}, process.cwd())
 const pages = 'playground/src/pages'
+
+describe('isMissingFsError', () => {
+  it('识别路径缺失和中间路径不是目录的错误', () => {
+    for (const code of ['ENOENT', 'ENOTDIR'])
+      expect(isMissingFsError(Object.assign(new Error('missing path'), { code }))).toBe(true)
+  })
+
+  it('其他错误和非错误输入返回 false', () => {
+    const inputs = [Object.assign(new Error('permission denied'), { code: 'EACCES' }), new Error('failure'), null, undefined, 'ENOENT', 42, false, {}, { code: 1 }]
+    for (const input of inputs)
+      expect(isMissingFsError(input)).toBe(false)
+  })
+})
 
 describe('get files', () => {
   it('pages', async () => {
