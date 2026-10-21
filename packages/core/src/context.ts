@@ -316,7 +316,9 @@ export class PageContext {
     this.watchedConfigIndex.set(watcher, { files: new Set(), directories: [] })
     this.refreshConfigWatchers()
     this.refreshPageWatchers()
-    this.pageWatcher.start()
+    const watchDisabled = (this._server?.watcher as unknown) === watcher && this._server?.config.server.watch === null
+    if (!watchDisabled)
+      this.pageWatcher.start(watcher.options, (this._server?.watcher as unknown) === watcher ? this._server?.watcher.options.ignored : undefined)
   }
 
   /** 解绑本插件回调；共享 watcher 的关闭仍由 Vite 负责 */

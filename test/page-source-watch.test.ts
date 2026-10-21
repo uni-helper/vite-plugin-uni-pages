@@ -16,7 +16,8 @@ const { default: chokidar } = await import(require.resolve('chokidar'))
 const roots: string[] = []
 const watchers: PageSourceWatch[] = []
 
-function fixture() {
+function fixture(polling = 'false') {
+  vi.stubEnv('CHOKIDAR_USEPOLLING', polling)
   const workspace = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-source-watch-')))
   roots.push(workspace)
   const root = path.join(workspace, 'app')
@@ -34,6 +35,17 @@ function fixture() {
     entrances.set(normalizePath(file), watcher as unknown as ReturnType<typeof fs.watch>)
     return watcher
   }) as unknown as typeof fs.watch)
+  const pollingEntrances = new Map<string, EventEmitter>()
+  const watchFile = vi.spyOn(fs, 'watchFile').mockImplementation(((file: string, _options: unknown, listener: (...args: any[]) => void) => {
+    const watcher = pollingEntrances.get(normalizePath(file)) ?? new EventEmitter()
+    watcher.on('change', listener)
+    pollingEntrances.set(normalizePath(file), watcher)
+    return watcher
+  }) as unknown as typeof fs.watchFile)
+  const unwatchFile = vi.spyOn(fs, 'unwatchFile').mockImplementation((file, listener) => {
+    if (listener)
+      pollingEntrances.get(normalizePath(String(file)))?.off('change', listener)
+  })
   const options = resolveOptions({ dir: 'src/alias', dts: false }, root)
   const onStructure = vi.fn()
   const sourceWatch = new PageSourceWatch(options, vi.fn(), onStructure, (error) => {
@@ -46,13 +58,14 @@ function fixture() {
   }
   refresh()
   sourceWatch.start()
-  return { workspace, root, target, alias, content, entrances, watch, options, onStructure, sourceWatch, refresh }
+  return { workspace, root, target, alias, content, entrances, watch, watchFile, unwatchFile, pollingEntrances, options, onStructure, sourceWatch, refresh }
 }
 
 afterEach(async () => {
   for (const watcher of watchers.splice(0))
     await watcher.close()
   vi.restoreAllMocks()
+  vi.unstubAllEnvs()
   for (const root of roots.splice(0))
     fs.rmSync(root, { recursive: true, force: true })
 })
@@ -143,6 +156,45 @@ describe('当前页面来源的监听范围', () => {
 
     expect(onStructure).toHaveBeenCalledOnce()
     expect(content.add).toHaveBeenCalledWith([normalizePath(available)])
+  })
+
+  it.each(['true', '1'])('polling=%s 时使用目录状态观察并只撤销自身订阅', async (polling) => {
+    vi.stubEnv('CHOKIDAR_INTERVAL', '37')
+    const { workspace, target, watch, watchFile, unwatchFile, pollingEntrances, onStructure, sourceWatch } = fixture(polling)
+    expect(watch).not.toHaveBeenCalled()
+    expect(watchFile).toHaveBeenCalled()
+    expect(watchFile.mock.calls.every(call => (call as unknown as [string, { interval: number }])[1].interval === 37)).toBe(true)
+    const parent = normalizePath(path.dirname(target))
+    const observer = pollingEntrances.get(parent)!
+    const ownListener = observer.listeners('change')[0]
+    const otherListener = vi.fn()
+    observer.on('change', otherListener)
+
+    fs.rmSync(path.dirname(target), { recursive: true })
+    observer.emit('change', fs.statSync(workspace), fs.statSync(workspace))
+    expect(onStructure).toHaveBeenCalledOnce()
+    expect(unwatchFile).toHaveBeenCalledWith(parent, ownListener)
+    expect(observer.listeners('change')).toEqual([otherListener])
+    expect(pollingEntrances.has(normalizePath(workspace))).toBe(true)
+
+    fs.mkdirSync(target, { recursive: true })
+    pollingEntrances.get(normalizePath(workspace))!.emit('change', fs.statSync(workspace), fs.statSync(workspace))
+    expect(onStructure).toHaveBeenCalledTimes(2)
+    expect(watch).not.toHaveBeenCalled()
+
+    await sourceWatch.close()
+    expect(unwatchFile.mock.calls.every(([, listener]) => typeof listener === 'function')).toBe(true)
+    expect(observer.listeners('change')).toEqual([otherListener])
+    const before = otherListener.mock.calls.length
+    observer.emit('change', fs.statSync(workspace), fs.statSync(workspace))
+    expect(otherListener).toHaveBeenCalledTimes(before + 1)
+    expect(onStructure).toHaveBeenCalledTimes(2)
+  })
+
+  it('polling 未配置间隔时每 100ms 观察目录状态', () => {
+    vi.stubEnv('CHOKIDAR_INTERVAL', undefined)
+    const { watchFile } = fixture('true')
+    expect(watchFile.mock.calls.every(call => (call as unknown as [string, { interval: number }])[1].interval === 100)).toBe(true)
   })
 
   it('关闭后刷新来源也不会重新建立订阅', async () => {

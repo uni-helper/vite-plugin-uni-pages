@@ -1,5 +1,7 @@
-import type { FSWatcher } from 'chokidar'
-import type { FSWatcher as NodeWatcher } from 'node:fs'
+import type { ChokidarOptions, FSWatcher } from 'chokidar'
+import type { EventEmitter } from 'node:events'
+import type { Stats } from 'node:fs'
+import type { WatchOptions } from 'vite'
 import type { PageSource } from './page-sources'
 import type { ResolvedOptions } from './types'
 import fs from 'node:fs'
@@ -12,6 +14,7 @@ import { normalizePath } from 'vite'
 import { isPageDirectoryEvent, isPageFileInDirectories, resolvePageDirs } from './directories'
 import { isMissingFsError, isTargetFile } from './files'
 import { getPageRules } from './page-rules'
+import { createPageWatchFilter } from './page-watch-filter'
 
 interface SourceTarget {
   target: string
@@ -21,7 +24,8 @@ interface SourceTarget {
 }
 
 interface EntranceWatch {
-  watcher: NodeWatcher
+  watcher: EventEmitter
+  close: () => void
   entries: Set<string> | undefined
   identity: string
 }
@@ -85,6 +89,9 @@ export class PageSourceWatch {
   private readonly recoveryWatchers = new Map<string, EntranceWatch>()
   private readonly closing = new Set<Promise<void>>()
   private started = false
+  private usePolling = false
+  private interval = 100
+  private ignored: ((file: string, stats?: Stats) => boolean) | undefined
   watcher?: FSWatcher
 
   constructor(
@@ -96,18 +103,53 @@ export class PageSourceWatch {
     this.rules = getPageRules(options)
   }
 
-  start(): void {
+  start(options: Pick<ChokidarOptions, 'usePolling' | 'interval' | 'cwd'> = {}, ignored?: WatchOptions['ignored']): void {
     if (this.started)
       return
+    const polling = process.env.CHOKIDAR_USEPOLLING?.toLowerCase()
+    this.usePolling = polling === undefined ? !!options.usePolling : !!polling && polling !== 'false' && polling !== '0'
+    const interval = process.env.CHOKIDAR_INTERVAL
+      ? Number.parseInt(process.env.CHOKIDAR_INTERVAL, 10)
+      : options.interval ?? 100
+    this.interval = Number.isFinite(interval) && interval > 0 ? interval : 100
+    this.ignored = ignored === undefined || (Array.isArray(ignored) && ignored.length === 0)
+      ? undefined
+      : createPageWatchFilter(ignored, this.options.root, options.cwd)
     this.started = true
-    this.reconcile()
+    this.refresh()
+  }
+
+  private ignoresSource(source: string, stats?: Stats): boolean {
+    if (!this.ignored)
+      return false
+    let current = source
+    while (true) {
+      let entry = current === source ? stats : undefined
+      if (!entry) {
+        try {
+          entry = fs.statSync(current, { throwIfNoEntry: false })
+        }
+        catch (error) {
+          if (!isMissingFsError(error))
+            throw error
+        }
+      }
+      if (this.ignored(current, entry))
+        return true
+      const parent = normalizePath(path.dirname(current))
+      if (parent === current)
+        return false
+      current = parent
+    }
   }
 
   private createContentWatcher(): FSWatcher {
     const watcher = chokidar.watch([], {
       ignoreInitial: true,
       followSymlinks: false,
-      ignored: (file) => {
+      usePolling: this.usePolling,
+      interval: this.interval,
+      ignored: (file, stats) => {
         const absolute = normalizePath(path.resolve(file))
         if (absolute.split('/').some(part => part === 'node_modules' || part === '.git'))
           return true
@@ -119,11 +161,11 @@ export class PageSourceWatch {
             return false
           if (contains(target, absolute)) {
             const lexical = normalizePath(path.join(source, path.relative(target, absolute)))
-            if (!this.rules.isExcluded(lexical))
+            if (!this.rules.isExcluded(lexical) && !this.ignoresSource(lexical, stats))
               return false
           }
         }
-        return ![...this.files.values()].some(({ target }) => contains(absolute, target))
+        return ![...this.files].some(([source, { target }]) => contains(absolute, target) && !this.ignoresSource(source, absolute === target ? stats : undefined))
       },
     })
     for (const event of ['add', 'change', 'unlink'] as const) {
@@ -163,13 +205,13 @@ export class PageSourceWatch {
     }
     const directories = new Map<string, SourceTarget>()
     for (const source of currentDirectories) {
-      if (this.options.mergePages && rules.matchesDirectory(source))
+      if (this.options.mergePages && rules.matchesDirectory(source) && !this.ignoresSource(source))
         directories.set(source, resolveTarget(source))
     }
     const currentFiles = new Set([...this.files.keys(), ...candidates.map(source => source.file)])
     const files = new Map<string, SourceTarget>()
     for (const source of currentFiles) {
-      if (!isPageFileInDirectories(source, this.options))
+      if (!isPageFileInDirectories(source, this.options) || this.ignoresSource(source))
         continue
       const resolved = resolveTarget(source)
       const covered = [...directories].some(([directory, { target }]) => contains(directory, source)
@@ -186,36 +228,39 @@ export class PageSourceWatch {
 
   fileForEvent(file: string, identity: string): string | undefined {
     const absolute = normalizePath(path.resolve(this.options.root, file))
-    if (isTargetFile(absolute) && isPageFileInDirectories(absolute, this.options))
+    if (isTargetFile(absolute) && isPageFileInDirectories(absolute, this.options) && !this.ignoresSource(absolute))
       return absolute
     for (const [source, { target }] of this.files) {
-      if (target === identity && isPageFileInDirectories(source, this.options) && resolveTarget(source).target === target)
+      if (target === identity && isPageFileInDirectories(source, this.options) && !this.ignoresSource(source) && resolveTarget(source).target === target)
         return source
     }
     for (const [source, { target }] of this.directories) {
       if (!contains(target, identity) || resolveTarget(source).target !== target)
         continue
       const lexical = normalizePath(path.join(source, path.relative(target, identity)))
-      if (isTargetFile(lexical) && isPageFileInDirectories(lexical, this.options))
+      if (isTargetFile(lexical) && isPageFileInDirectories(lexical, this.options) && !this.ignoresSource(lexical))
         return lexical
     }
   }
 
   directoryForEvent(directory: string): boolean {
-    if (isPageDirectoryEvent(directory, this.options))
-      return true
+    if (!this.options.mergePages)
+      return false
     const absolute = normalizePath(path.resolve(this.options.root, directory))
+    if (!this.ignoresSource(absolute) && (getPageRules(this.options).matchesDirectory(absolute) || [...this.directories.keys()].some(source => contains(absolute, source))))
+      return true
     return this.options.mergePages && [...this.directories, ...this.files].some(([source, { target }]) =>
       contains(absolute, target)
       && (isPageDirectoryEvent(source, this.options) || isPageFileInDirectories(source, this.options))
+      && !this.ignoresSource(source)
       && resolveTarget(source).target === target,
     )
   }
 
   async close(): Promise<void> {
     this.started = false
-    for (const { watcher } of this.recoveryWatchers.values())
-      watcher.close()
+    for (const { close } of this.recoveryWatchers.values())
+      close()
     this.recoveryWatchers.clear()
     this.contentKey = ''
     this.contentRules = undefined
@@ -310,7 +355,7 @@ export class PageSourceWatch {
         if (!scan.isGlob)
           continue
         const base = normalizePath(path.resolve(this.options.root, (scan.base || '.').replace(/\\(?=[[\](){}!*+?@|])/g, '')))
-        if (rules.isExcluded(base))
+        if (rules.isExcluded(base) || this.ignoresSource(base))
           continue
         entrance(base)
         if (isDirectory(base))
@@ -323,7 +368,7 @@ export class PageSourceWatch {
           const directories = globSync(prefix, { cwd: this.options.root, onlyDirectories: true, expandDirectories: false, dot: true, ignore: rules.traversalIgnores })
           for (const directory of directories) {
             const absolute = normalizePath(path.resolve(this.options.root, directory))
-            if (!rules.isExcluded(absolute)) {
+            if (!rules.isExcluded(absolute) && !this.ignoresSource(absolute)) {
               entrance(absolute)
               observe(absolute)
             }
@@ -333,7 +378,7 @@ export class PageSourceWatch {
     }
     for (const [directory, entry] of this.recoveryWatchers) {
       if (!wanted.has(directory)) {
-        entry.watcher.close()
+        entry.close()
         this.recoveryWatchers.delete(directory)
       }
     }
@@ -346,26 +391,51 @@ export class PageSourceWatch {
           existing.entries = entries
           continue
         }
-        existing?.watcher.close()
-        const watcher = fs.watch(directory, { recursive: false, persistent: false }, (event, filename) => {
-          const observed = this.recoveryWatchers.get(directory)
-          if (observed?.watcher !== watcher || event !== 'rename')
+        existing?.close()
+        let entry: EntranceWatch
+        let watcher: EventEmitter
+        let stop: () => void
+        if (this.usePolling) {
+          const onChange = (): void => {
+            if (this.recoveryWatchers.get(directory) === entry)
+              this.refreshFromEntrance()
+          }
+          watcher = fs.watchFile(directory, { persistent: false, interval: this.interval }, onChange)
+          stop = () => fs.unwatchFile(directory, onChange)
+        }
+        else {
+          const nativeWatcher = fs.watch(directory, { recursive: false, persistent: false }, (event, filename) => {
+            const observed = this.recoveryWatchers.get(directory)
+            if (observed !== entry || event !== 'rename')
+              return
+            const name = filename?.toString()
+            if (!name || !observed.entries || observed.entries.has(name) || name === path.basename(directory))
+              this.refreshFromEntrance()
+          })
+          watcher = nativeWatcher
+          stop = () => nativeWatcher.close()
+        }
+        const onError = (error: unknown): void => {
+          if (this.recoveryWatchers.get(directory) !== entry)
             return
-          const name = filename?.toString()
-          if (!name || !observed.entries || observed.entries.has(name) || name === path.basename(directory))
-            this.refreshFromEntrance()
-        })
-        watcher.on('error', (error) => {
-          if (this.recoveryWatchers.get(directory)?.watcher !== watcher)
-            return
-          watcher.close()
+          entry.close()
           this.recoveryWatchers.delete(directory)
           if (!isMissingFsError(error))
             this.onError(error)
           if (this.started)
             this.refreshFromEntrance()
-        })
-        this.recoveryWatchers.set(directory, { watcher, entries, identity })
+        }
+        watcher.on('error', onError)
+        entry = {
+          watcher,
+          entries,
+          identity,
+          close: () => {
+            watcher.off('error', onError)
+            stop()
+          },
+        }
+        this.recoveryWatchers.set(directory, entry)
       }
       catch (error) {
         if (!isMissingFsError(error))

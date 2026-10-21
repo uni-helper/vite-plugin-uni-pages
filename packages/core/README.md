@@ -592,7 +592,7 @@ UniPages({
 
 H5 开发服务器和 `vite build --watch` 都会重新发现主包 `dir` 与分包目录，支持启动时目录尚不存在，以及运行中的新增、删除、重命名和重建。空目录会被发现，在包含页面之前不生成空分包。目录可以位于 Vite 项目根目录之外，路径仍相对 Vite `root` 解析，不受命令执行目录影响。`mergePages: false` 时不扫描或监听页面目录；H5 的监听范围仍受 Vite `server.watch` 配置约束。
 
-Windows 下，当前 Chokidar 原生监听会持有子目录句柄，重命名其父目录可能报 `EPERM`，详见 [Chokidar #1380](https://github.com/paulmillr/chokidar/issues/1380)。需要在运行期间重命名这类目录时，可在启动命令前设置环境变量 `CHOKIDAR_USEPOLLING=true`，为 H5 和 `build --watch` 启用 [Chokidar 轮询后端](https://github.com/paulmillr/chokidar/blob/5.0.0/README.md#performance)。轮询会增加 CPU 和文件系统访问开销，插件不会默认启用。
+Windows 下，原生监听会持有子目录句柄，重命名其父目录可能报 `EPERM`，详见 [Chokidar #1380](https://github.com/paulmillr/chokidar/issues/1380)。需要在运行期间重命名这类目录时，可在启动命令前设置环境变量 `CHOKIDAR_USEPOLLING=true`，为 H5 和 `build --watch` 启用 [Chokidar 轮询后端](https://github.com/paulmillr/chokidar/blob/5.0.0/README.md#performance)。页面内容与恢复入口使用相同的轮询设置，`CHOKIDAR_INTERVAL` 可指定轮询间隔（毫秒）；H5 也支持 Vite 的 `server.watch.usePolling` 和 `server.watch.interval`。轮询会增加 CPU 和文件系统访问开销，插件不会默认启用。
 
 动态发现会更新 `pages.json`。如果下游插件只在创建时缓存分包信息，它仍需要重启才能使用新增分包；自动重新发现不会改变其他插件的缓存策略。
 

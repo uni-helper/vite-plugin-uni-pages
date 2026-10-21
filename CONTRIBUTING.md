@@ -66,6 +66,8 @@ test/
 ├── page-update-coalescing.test.ts       连续 watcher 事件的合并与读取上界
 ├── page-symlink-*.test.ts               符号链接事件映射、目标恢复与真实 watcher
 ├── page-source-watch.test.ts            当前来源、内容订阅与非递归恢复入口的生命周期
+├── page-watch-options.test.ts           Vite 监听开关、轮询后端与忽略规则
+├── page-watch-filter.test.ts            Vite 忽略规则的词法路径匹配
 ├── subpackage-user-pages-path.test.ts   配置里的分包 pages 按 root 写相对 path
 ├── concurrent-pages-json.test.ts        多终端并发读写 pages.json
 ├── files*.test.ts                       文件工具与文件锁

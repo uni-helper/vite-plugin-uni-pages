@@ -1,4 +1,5 @@
 import type { Buffer } from 'node:buffer'
+import type { EventEmitter } from 'node:events'
 import type { FSWatcher } from 'vite'
 import type { UserOptions } from '../packages/core/src'
 import fs from 'node:fs'
@@ -37,7 +38,7 @@ interface WatchContext {
   pendingPageUpdate: unknown
   pageWatcher: {
     watcher?: FSWatcher
-    recoveryWatchers: Map<string, { watcher: fs.FSWatcher }>
+    recoveryWatchers: Map<string, { watcher: EventEmitter }>
   }
 }
 
@@ -46,18 +47,23 @@ async function waitForWatchDirectories(context: WatchContext): Promise<void> {
   for (const [directory, { watcher }] of context.pageWatcher.recoveryWatchers) {
     const prefix = `.watch-ready-${Math.random().toString(36).slice(2)}-`
     let subscribed = false
-    const onChange = (_event: string, filename: string | Buffer | null): void => {
-      if (filename?.toString().startsWith(prefix))
-        subscribed = true
+    const sentinels: string[] = []
+    const onChange = (event: string | fs.Stats, previous: string | Buffer | fs.Stats | null): void => {
+      if (typeof event === 'string') {
+        if (previous?.toString().startsWith(prefix))
+          subscribed = true
+      }
+      else if (sentinels.length && previous && typeof previous === 'object' && 'mtimeMs' in previous) {
+        subscribed ||= event.mtimeMs !== previous.mtimeMs
+      }
     }
     watcher.on('change', onChange)
-    const sentinels: string[] = []
     try {
       await vi.waitFor(() => {
         const sentinel = path.join(directory, `${prefix}${sentinels.length}`)
         sentinels.push(sentinel)
         fs.writeFileSync(sentinel, '')
-        expect(subscribed, `原生入口尚未监听 ${directory}`).toBe(true)
+        expect(subscribed, `目录入口监听尚未就绪 ${directory}`).toBe(true)
       }, { timeout: 10000, interval: 100 })
     }
     finally {
@@ -65,6 +71,31 @@ async function waitForWatchDirectories(context: WatchContext): Promise<void> {
       for (const sentinel of sentinels)
         fs.rmSync(sentinel, { force: true })
     }
+  }
+}
+
+/** 哨兵只验证当前内容订阅，不改写待测页面 */
+async function waitForContentSubscription(watcher: FSWatcher, directory: string): Promise<void> {
+  const prefix = `.content-ready-${Math.random().toString(36).slice(2)}-`
+  const sentinels: string[] = []
+  let subscribed = false
+  const onAll = (_event: string, file: string): void => {
+    if (normalizePath(file).startsWith(normalizePath(path.join(directory, prefix))))
+      subscribed = true
+  }
+  watcher.on('all', onAll)
+  try {
+    await vi.waitFor(() => {
+      const sentinel = path.join(directory, `${prefix}${sentinels.length}`)
+      sentinels.push(sentinel)
+      fs.writeFileSync(sentinel, '')
+      expect(subscribed, `页面内容监听尚未就绪 ${directory}`).toBe(true)
+    }, { timeout: 10000, interval: 100 })
+  }
+  finally {
+    watcher.off('all', onAll)
+    for (const sentinel of sentinels)
+      fs.rmSync(sentinel, { force: true })
   }
 }
 async function waitForPackages(root: string, expected: string[]): Promise<void> {
@@ -95,17 +126,28 @@ async function start(root: string, mode: 'serve' | 'build', overrides: UserOptio
   let observedWatcher: FSWatcher | undefined
   let context: WatchContext
   const events: string[] = []
+  const contentWatchers = new Set<FSWatcher>()
+  const contentWatcher = (): FSWatcher | undefined => {
+    const watcher = context.pageWatcher.watcher
+    if (watcher && !contentWatchers.has(watcher)) {
+      contentWatchers.add(watcher)
+      watcher.on('all', (event, file) => events.push(`${event}:${normalizePath(path.relative(root, file))}`))
+    }
+    return watcher
+  }
   const setup = PageContext.prototype.setupWatcher
   const setupSpy = vi.spyOn(PageContext.prototype, 'setupWatcher').mockImplementation(function (this: PageContext, watcher) {
     observedWatcher = watcher as unknown as FSWatcher
     context = this as unknown as WatchContext
-    observedWatcher.on('all', (event, file) => events.push(`${event}:${normalizePath(path.relative(root, file))}`))
-    return setup.call(this, watcher)
+    const pending = setup.call(this, watcher)
+    contentWatcher()
+    return pending
   })
   const settle = async (): Promise<void> => {
     let snapshot = ''
     let quietSince = Date.now()
     await vi.waitFor(async () => {
+      contentWatcher()
       while (true) {
         const update = context.pendingUpdate
         await context.pendingPageFlush
@@ -113,6 +155,7 @@ async function start(root: string, mode: 'serve' | 'build', overrides: UserOptio
         if (!context.pendingPageFlush && !context.pendingPageUpdate && update === context.pendingUpdate)
           break
       }
+      contentWatcher()
       const current = `${events.length}:${updates.mock.calls.length}`
       if (snapshot !== current) {
         snapshot = current
@@ -121,7 +164,18 @@ async function start(root: string, mode: 'serve' | 'build', overrides: UserOptio
       expect(Date.now() - quietSince).toBeGreaterThanOrEqual(250)
     }, { timeout: 10000, interval: 50 })
   }
-  const contentWatcher = () => context.pageWatcher.watcher
+  const readyContent = async (directory: string): Promise<FSWatcher> => {
+    await vi.waitFor(() => expect(contentWatcher()).toBeDefined(), { timeout: 10000 })
+    const watcher = contentWatcher()!
+    await waitForContentSubscription(watcher, directory)
+    await settle()
+    expect(contentWatcher()).toBe(watcher)
+    return watcher
+  }
+  const readyEntrances = async (): Promise<void> => {
+    await waitForWatchDirectories(context)
+    await settle()
+  }
   const plugin = UniPages({
     ...options,
     ...overrides,
@@ -139,7 +193,7 @@ async function start(root: string, mode: 'serve' | 'build', overrides: UserOptio
     await waitForWatchDirectories(context!)
     await settle()
     setupSpy.mockRestore()
-    return { close, watcher: observedWatcher!, contentWatcher, events, settle }
+    return { close, watcher: observedWatcher!, contentWatcher, readyContent, readyEntrances, events, settle }
   }
   fs.writeFileSync(path.join(root, 'entry.js'), 'export const example = 1')
   const watcher = await build({
@@ -159,14 +213,14 @@ async function start(root: string, mode: 'serve' | 'build', overrides: UserOptio
   await waitForWatchDirectories(context!)
   await settle()
   setupSpy.mockRestore()
-  return { close, watcher: observedWatcher!, contentWatcher, events, settle }
+  return { close, watcher: observedWatcher!, contentWatcher, readyContent, readyEntrances, events, settle }
 }
 
 describe.each(['serve', 'build'] as const)('%s 真实目录监听', (mode) => {
   it('发现多级缺失目录，并处理新增、删除、重建和页面元数据修改', async () => {
     const root = fixture()
     let foundEmptyDirectory = false
-    const { events, settle } = await start(root, mode, {
+    const { contentWatcher, readyContent, readyEntrances, events, settle } = await start(root, mode, {
       onAfterScanPages: (_, subPages) => {
         foundEmptyDirectory ||= subPages.has('nested/deep/packages/account/pages')
       },
@@ -175,27 +229,34 @@ describe.each(['serve', 'build'] as const)('%s 真实目录监听', (mode) => {
     fs.mkdirSync(path.join(root, 'nested/deep/packages/account/pages'), { recursive: true })
     await vi.waitFor(() => expect(foundEmptyDirectory).toBe(true), { timeout: 10000, interval: 25 })
     await waitForPackages(root, [])
+    const directory = path.join(root, 'nested/deep/packages/account/pages')
+    const initialWatcher = await readyContent(directory)
+    events.length = 0
     page(root, 'nested/deep/packages/account/pages/profile.vue', '初始')
     await waitForPackages(root, ['nested/deep/packages/account'])
     expect(read(root).subPackages[0].pages[0].path).toBe('pages/profile')
     await vi.waitFor(() => expect(events).toContain('add:nested/deep/packages/account/pages/profile.vue'), { timeout: 10000 })
     await fs.promises.rm(path.join(root, 'nested'), { recursive: true, maxRetries: 10, retryDelay: 50 })
     await waitForPackages(root, [])
-    // pages.json 可先由目录事件更新，等待文件删除事件后再开始重建阶段
-    await vi.waitFor(() => expect(events).toContain('unlink:nested/deep/packages/account/pages/profile.vue'), { timeout: 10000 })
     await settle()
+    expect(initialWatcher.getWatched()).toEqual({})
+    expect(contentWatcher()).toBeUndefined()
+    await readyEntrances()
     events.length = 0
     page(root, 'nested/deep/packages/account/pages/profile.vue', '重建')
     page(root, 'nested/deep/packages/account/pages/detail.vue', '详情')
     await waitForPackages(root, ['nested/deep/packages/account'])
     await vi.waitFor(() => expect(read(root).subPackages[0].pages).toHaveLength(2), { timeout: 10000 })
-    await vi.waitFor(() => {
-      expect(events).toContain('add:nested/deep/packages/account/pages/profile.vue')
-      expect(events).toContain('add:nested/deep/packages/account/pages/detail.vue')
-    }, { timeout: 10000 })
+    const restoredWatcher = await readyContent(directory)
+    expect(watchedFiles(restoredWatcher, directory)).toEqual(expect.arrayContaining(['profile.vue', 'detail.vue']))
+    events.length = 0
     page(root, 'nested/deep/packages/account/pages/profile.vue', '修改一')
     page(root, 'nested/deep/packages/account/pages/detail.vue', '修改二')
     await vi.waitFor(() => expect(read(root).subPackages[0].pages.map((page: any) => page.style.navigationBarTitleText).sort()).toEqual(['修改一', '修改二']), { timeout: 10000 })
+    await vi.waitFor(() => {
+      expect(events).toContain('change:nested/deep/packages/account/pages/profile.vue')
+      expect(events).toContain('change:nested/deep/packages/account/pages/detail.vue')
+    }, { timeout: 10000 })
     page(root, 'main/account/pages/index.vue')
     await vi.waitFor(() => expect(read(root).pages.some((page: any) => page.path === 'main/account/pages/index')).toBe(true), { timeout: 10000 })
   }, 30000)
@@ -205,16 +266,20 @@ describe.each(['serve', 'build'] as const)('%s 真实目录监听', (mode) => {
     if (process.platform === 'win32')
       vi.stubEnv('CHOKIDAR_USEPOLLING', 'true')
     const root = fixture()
-    const { events } = await start(root, mode)
     page(root, 'nested/deep/packages/account/pages/profile.vue', '改名前')
+    const { readyContent, events, settle } = await start(root, mode)
     await waitForPackages(root, ['nested/deep/packages/account'])
-    await vi.waitFor(() => expect(events).toContain('add:nested/deep/packages/account/pages/profile.vue'), { timeout: 10000 })
+    const initialWatcher = await readyContent(path.join(root, 'nested/deep/packages/account/pages'))
     await fs.promises.rename(path.join(root, 'nested/deep/packages/account'), path.join(root, 'nested/deep/packages/profile'))
     await waitForPackages(root, ['nested/deep/packages/profile'])
     expect(read(root).subPackages[0].pages[0].path).toBe('pages/profile')
-    await vi.waitFor(() => expect(events).toContain('add:nested/deep/packages/profile/pages/profile.vue'), { timeout: 10000 })
+    await settle()
+    expect(initialWatcher.getWatched()).toEqual({})
+    await readyContent(path.join(root, 'nested/deep/packages/profile/pages'))
+    events.length = 0
     page(root, 'nested/deep/packages/profile/pages/profile.vue', '改名后修改')
     await vi.waitFor(() => expect(read(root).subPackages[0].pages[0].style.navigationBarTitleText).toBe('改名后修改'), { timeout: 10000 })
+    await vi.waitFor(() => expect(events).toContain('change:nested/deep/packages/profile/pages/profile.vue'), { timeout: 10000 })
   }, 30000)
 
   it('关闭后不再更新 pages.json', async () => {
