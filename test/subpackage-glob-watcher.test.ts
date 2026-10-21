@@ -32,6 +32,17 @@ function read(root: string): any {
 function watchedFiles(watcher: FSWatcher, directory: string): string[] | undefined {
   return Object.entries(watcher.getWatched()).find(([dir]) => normalizePath(dir) === normalizePath(directory))?.[1]
 }
+
+/** 关闭后的异步清理可能留下空目录记录，以句柄和文件条目确认释放 */
+async function expectClosedContentWatcher(watcher: FSWatcher): Promise<void> {
+  const state = watcher as unknown as { closed: boolean, _closePromise?: Promise<void>, _closers: Map<string, unknown> }
+  expect(state.closed).toBe(true)
+  expect(state._closePromise).toBeDefined()
+  await state._closePromise
+  expect(state._closers.size).toBe(0)
+  expect(Object.values(watcher.getWatched()).flat()).toEqual([])
+}
+
 interface WatchContext {
   pendingPageFlush: Promise<void> | undefined
   pendingUpdate: Promise<void>
@@ -239,7 +250,7 @@ describe.each(['serve', 'build'] as const)('%s 真实目录监听', (mode) => {
     await fs.promises.rm(path.join(root, 'nested'), { recursive: true, maxRetries: 10, retryDelay: 50 })
     await waitForPackages(root, [])
     await settle()
-    expect(initialWatcher.getWatched()).toEqual({})
+    await expectClosedContentWatcher(initialWatcher)
     expect(contentWatcher()).toBeUndefined()
     await readyEntrances()
     events.length = 0
@@ -274,7 +285,7 @@ describe.each(['serve', 'build'] as const)('%s 真实目录监听', (mode) => {
     await waitForPackages(root, ['nested/deep/packages/profile'])
     expect(read(root).subPackages[0].pages[0].path).toBe('pages/profile')
     await settle()
-    expect(initialWatcher.getWatched()).toEqual({})
+    await expectClosedContentWatcher(initialWatcher)
     await readyContent(path.join(root, 'nested/deep/packages/profile/pages'))
     events.length = 0
     page(root, 'nested/deep/packages/profile/pages/profile.vue', '改名后修改')
