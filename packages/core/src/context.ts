@@ -4,6 +4,7 @@ import type { Logger, ModuleNode, ViteDevServer } from 'vite'
 import type { SubPackageDirectorySource } from './directories'
 import type { PageCandidate, PageSource } from './page-sources'
 import type { InternalPages, PagePath, ResolvedOptions, UserOptions } from './types'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { platform as uniEnvPlatform } from '@uni-helper/uni-env'
@@ -40,6 +41,18 @@ function queryPageRules<T>(fallback: T, query: () => T): T {
 
 function containsPath(directory: string, file: string): boolean {
   return file === directory || file.startsWith(`${directory.replace(/\/$/, '')}/`)
+}
+
+/**
+ * 符号链接目标的监听路径
+ *
+ * @description 目标存在时只监听目标本身，避免把目标的兄弟目录一起递归订阅；
+ * 目标缺失时补上现存祖先，chokidar 无法为父目录也缺失的路径重新建立监听
+ */
+function pageTargetWatchPaths(target: string): string[] {
+  if (existsSync(target))
+    return [target]
+  return [target, configWatchDirectory(target)]
 }
 
 /**
@@ -409,7 +422,7 @@ export class PageContext {
       return
     const directories = [
       ...resolvePageWatchDirectories(this.options),
-      ...new Set([...this.pageDirectoryTargets.values(), ...this.pageFileTargets.values()].map(configWatchDirectory)),
+      ...new Set([...this.pageDirectoryTargets.values(), ...this.pageFileTargets.values()].flatMap(pageTargetWatchPaths)),
     ]
     for (const watcher of this.watchers.keys()) {
       const added = this.watchedPageDirectories.get(watcher)!

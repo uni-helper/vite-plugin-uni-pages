@@ -58,6 +58,16 @@ afterEach(async () => {
 })
 
 describe('符号链接目标恢复', () => {
+  it('已存在的目标只监听目标本身，不递归订阅其父目录', async () => {
+    const { root, target } = fixture()
+    page(path.join(target, 'index.vue'), '初始')
+    const { watcher } = await start(root)
+
+    const added = watcher.add.mock.calls.flat(2).map(file => normalizePath(file))
+    expect(added).toContain(normalizePath(target))
+    expect(added).not.toContain(normalizePath(path.dirname(target)))
+  })
+
   it('扫描规则收窄时仍刷新既有目录关联，忽略已脱离的旧目标', async () => {
     const { workspace, root, target } = fixture()
     const oldFile = path.join(target, 'nested/index.vue')
