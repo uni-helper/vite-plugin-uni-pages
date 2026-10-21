@@ -6,6 +6,7 @@ import path from 'node:path'
 import { parse } from 'comment-json'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PageContext } from '../packages/core/src/context'
+import { PageSourceWatch } from '../packages/core/src/page-watch'
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>()
@@ -58,6 +59,7 @@ async function dispatch(event: 'add' | 'change' | 'unlink', file: string): Promi
 }
 
 beforeEach(() => {
+  vi.spyOn(PageSourceWatch.prototype, 'start').mockImplementation(() => {})
   root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-watch-fast-path-')))
   fs.mkdirSync(path.join(root, 'src/pages'), { recursive: true })
   write('package.json', '{"type":"module"}')

@@ -292,32 +292,3 @@ export function isPageFileInDirectories(file: string, options: ResolvedOptions):
     directory = parent
   }
 }
-
-/**
- * 查找覆盖页面来源的稳定监听目录
- *
- * @description 每次调用重新探测已有祖先，返回去除重复覆盖后的绝对路径
- * 被完整排除的来源不贡献监听目录，尚不存在的多级目录由已有祖先覆盖；关闭 mergePages 时返回空数组
- */
-export function resolvePageWatchDirectories(options: ResolvedOptions): string[] {
-  if (!options.mergePages)
-    return []
-  const rules = getPageRules(options)
-  const roots = rules.patterns.flatMap((pattern) => {
-    const normalized = path.posix.normalize(normalizePagePattern(pattern))
-    const scan = picomatch.scan(normalized)
-    const base = normalizePath(path.resolve(options.root, unescapePagePattern(scan.isGlob ? scan.base || '.' : normalized)))
-    // 整条规则被排除时不会有页面，不必再为它保留监听祖先
-    if (rules.isExcluded(base))
-      return []
-    let directory = base === normalizePath(options.root) ? base : path.dirname(base)
-    while (!fs.statSync(directory, { throwIfNoEntry: false })?.isDirectory()) {
-      const parent = path.dirname(directory)
-      if (parent === directory)
-        break
-      directory = parent
-    }
-    return [normalizePath(directory)]
-  })
-  return [...new Set(roots)].filter(root => !roots.some(parent => parent !== root && contains(parent, root)))
-}

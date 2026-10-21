@@ -5,11 +5,16 @@ import os from 'node:os'
 import path from 'node:path'
 import { parse } from 'comment-json'
 import { normalizePath } from 'vite'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PageContext } from '../packages/core/src'
+import { PageSourceWatch } from '../packages/core/src/page-watch'
 
 const roots: string[] = []
 const contexts: PageContext[] = []
+
+beforeEach(() => {
+  vi.spyOn(PageSourceWatch.prototype, 'start').mockImplementation(() => {})
+})
 
 function fixture(): string {
   const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-symlink-events-')))
@@ -231,6 +236,25 @@ describe('符号链接页面的增量读取', () => {
     expect(output(root).subPackages[0].pages).toContainEqual(expect.objectContaining({
       path: 'index',
       style: { navigationBarTitleText: '恢复' },
+    }))
+    expect(readFile.mock.calls.filter(call => normalizePath(String(call[0])).endsWith('/other.vue'))).toHaveLength(0)
+  })
+
+  it('重叠来源中无关页面的非代表候选不会重复读取', async () => {
+    const root = fixture()
+    const target = path.join(root, 'src/real/index.vue')
+    page(target, '初始')
+    page(path.join(root, 'src/real/other.vue'), '其他页面')
+    const { ctx, watcher } = await start(root, [], { dir: 'src/real' })
+    const readFile = vi.spyOn(fs.promises, 'readFile')
+    page(target, '内容更新')
+
+    await dispatch(ctx, watcher, 'change', target)
+
+    expect(ctx.pageMetaData).toEqual([])
+    expect(output(root).subPackages[0].pages).toContainEqual(expect.objectContaining({
+      path: 'index',
+      style: { navigationBarTitleText: '内容更新' },
     }))
     expect(readFile.mock.calls.filter(call => normalizePath(String(call[0])).endsWith('/other.vue'))).toHaveLength(0)
   })

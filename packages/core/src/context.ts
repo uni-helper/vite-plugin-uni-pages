@@ -4,7 +4,6 @@ import type { Logger, ModuleNode, ViteDevServer } from 'vite'
 import type { SubPackageDirectorySource } from './directories'
 import type { PageCandidate, PageSource } from './page-sources'
 import type { InternalPages, PagePath, ResolvedOptions, UserOptions } from './types'
-import { existsSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { platform as uniEnvPlatform } from '@uni-helper/uni-env'
@@ -15,12 +14,13 @@ import { normalizePath } from 'vite'
 import { configFileExtensions, configWatchDirectory, isConfigLoaderArtifact, normalizeConfigPath, PagesConfigLoader } from './config-loader'
 import { RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import { writeDeclaration } from './declaration'
-import { getSubPackageDirectorySources, isPageDirectoryEvent, isPageFileInDirectories, refreshPageDirectories, resolvePageWatchDirectories } from './directories'
+import { getSubPackageDirectorySources, refreshPageDirectories } from './directories'
 import { checkPagesJsonFileSync, getPageFiles, isTargetFile, resolvePagesJsonPath } from './files'
 import { debug } from './logger'
 import { resolveOptions } from './options'
 import { Page } from './page'
 import { comparePageSources, resolvePageIdentity, selectPageSources, validateGeneratedRoutes } from './page-sources'
+import { PageSourceWatch } from './page-watch'
 import { writePagesJson } from './pages-json'
 
 /**
@@ -39,10 +39,6 @@ function queryPageRules<T>(fallback: T, query: () => T): T {
   }
 }
 
-function containsPath(directory: string, file: string): boolean {
-  return file === directory || file.startsWith(`${directory.replace(/\/$/, '')}/`)
-}
-
 /**
  * 页面上下文：负责扫描页面、加载配置、合并页面信息、生成 pages.json
  *
@@ -56,7 +52,6 @@ export class PageContext {
   private readonly configLoader: PagesConfigLoader
   private readonly watchers = new Map<FSWatcher, () => void>()
   private readonly watchedConfigPaths = new Map<FSWatcher, Set<string>>()
-  private readonly watchedPageDirectories = new Map<FSWatcher, Set<string>>()
   /**
    * 每次事件都要比对的绝对路径，按 watcher 缓存
    *
@@ -69,10 +64,10 @@ export class PageContext {
   private pendingUpdate: Promise<void> = Promise.resolve()
   /** 随扫描更新的 Page 来源，用于复用检查和冲突诊断 */
   private readonly pageSources = new WeakMap<Page, PageSource>()
-  /** 扫描目录的词法路径与最近一次已发现的目标，缺失时保留以等待重建 */
-  private readonly pageDirectoryTargets = new Map<string, string>()
-  /** 页面词法路径与真实目标的关联，保留文件别名和被归并的候选 */
-  private readonly pageFileTargets = new Map<string, string>()
+  /** 扫描候选独立于归属裁剪后的输出映射，保留非代表来源的内容缓存 */
+  private mainPageCandidates = new Map<string, Page>()
+  private subPageCandidates = new Map<string, Map<string, Page>>()
+  private readonly pageWatcher: PageSourceWatch
   /** 待处理的页面更新：生成期间到达的事件合并到下一轮 */
   private pendingPageUpdate: { full: boolean, files: Set<string> } | undefined
   /** 当前事件更新循环；dispose 时等待它排空 */
@@ -141,6 +136,16 @@ export class PageContext {
     this.platform = platform
     debug.options('root', this.root)
     this.options = resolveOptions(userOptions, this.root)
+    this.pageWatcher = new PageSourceWatch(
+      this.options,
+      (event, file) => {
+        const pageFile = queryPageRules(undefined, () => this.pageFileForEvent(file, normalizeConfigPath(file, this.root)))
+        if (pageFile)
+          this.queuePageUpdate(event === 'change' ? pageFile : undefined)
+      },
+      () => this.queuePageUpdate(),
+      error => this.logUpdateFailure(error),
+    )
     // 调试日志逻辑
     const debugOption = this.options.debug
     if (debugOption) {
@@ -231,42 +236,11 @@ export class PageContext {
 
   /** 按当前词法规则识别页面事件，真实路径只用于关联已收录来源 */
   private pageFileForEvent(file: string, identity: string): string | undefined {
-    if (isTargetFile(file) && isPageFileInDirectories(file, this.options))
-      return normalizePath(path.resolve(this.root, file))
-    for (const pages of [this.pages, ...this.subPages.values()]) {
-      for (const page of pages.values()) {
-        const source = this.pageSources.get(page)
-        if (source?.identity === identity && isPageFileInDirectories(source.file, this.options))
-          return source.file
-      }
-    }
-    for (const [source, target] of this.pageFileTargets) {
-      if (target === identity && isPageFileInDirectories(source, this.options))
-        return source
-    }
-    for (const [source, target] of this.pageDirectoryTargets) {
-      if (containsPath(target, identity)) {
-        const lexical = normalizePath(path.join(source, path.relative(target, identity)))
-        if (isTargetFile(lexical) && isPageFileInDirectories(lexical, this.options))
-          return lexical
-      }
-    }
+    return this.pageWatcher.fileForEvent(file, identity)
   }
 
-  /** 目标或其祖先恢复时，仍按关联的词法来源判断是否需要补扫 */
   private pageDirectoryForEvent(directory: string): boolean {
-    if (isPageDirectoryEvent(directory, this.options))
-      return true
-    const absolute = normalizeConfigPath(directory, this.root)
-    for (const [source, target] of this.pageDirectoryTargets) {
-      if (containsPath(absolute, target) && isPageDirectoryEvent(source, this.options))
-        return true
-    }
-    for (const [source, target] of this.pageFileTargets) {
-      if (containsPath(absolute, target) && isPageFileInDirectories(source, this.options))
-        return true
-    }
-    return false
+    return this.pageWatcher.directoryForEvent(directory)
   }
 
   /**
@@ -340,9 +314,9 @@ export class PageContext {
     })
     this.watchedConfigPaths.set(watcher, new Set())
     this.watchedConfigIndex.set(watcher, { files: new Set(), directories: [] })
-    this.watchedPageDirectories.set(watcher, new Set())
     this.refreshConfigWatchers()
     this.refreshPageWatchers()
+    this.pageWatcher.start()
   }
 
   /** 解绑本插件回调；共享 watcher 的关闭仍由 Vite 负责 */
@@ -352,17 +326,17 @@ export class PageContext {
     this.watchers.clear()
     this.watchedConfigPaths.clear()
     this.watchedConfigIndex.clear()
-    this.watchedPageDirectories.clear()
     this._server = undefined
+    await this.pageWatcher.close()
     await this.pendingPageFlush
     await this.pendingUpdate
   }
 
   /** 补充未覆盖的监听路径，注册成功后记账，失败时保留重试机会 */
-  private addWatchPaths(watcher: FSWatcher, paths: readonly string[], added: Set<string>, sharedRoot: string | undefined, description: string, allowCovered = false): void {
+  private addWatchPaths(watcher: FSWatcher, paths: readonly string[], added: Set<string>, sharedRoot: string | undefined, description: string): void {
     const wanted = paths.filter(file => (!sharedRoot || (file !== sharedRoot && !file.startsWith(`${sharedRoot}/`)))
       && !added.has(file)
-      && (allowCovered || ![...added].some(existing => file.startsWith(`${existing}/`))))
+      && ![...added].some(existing => file.startsWith(`${existing}/`)))
     if (!wanted.length)
       return
     try {
@@ -376,77 +350,12 @@ export class PageContext {
     }
   }
 
-  /** 补扫后补齐新生效的页面监听根；保留旧订阅以免影响共享 watcher */
+  /** 在归属裁剪前登记全部扫描候选，刷新当前来源及其监听 */
   private refreshPageWatchers(): void {
-    // 关闭页面合并时事件匹配始终为 false，目标关联和额外订阅都没有意义
-    if (!this.options.mergePages) {
-      this.pageDirectoryTargets.clear()
-      this.pageFileTargets.clear()
-      return
-    }
-    // 先登记全部扫描候选，避免归属决议裁剪别名后丢失事件关联
-    for (const [source] of this.pageDirectoryTargets) {
-      if (!isPageDirectoryEvent(source, this.options))
-        this.pageDirectoryTargets.delete(source)
-    }
-    for (const [source] of this.pageFileTargets) {
-      if (!isPageFileInDirectories(source, this.options))
-        this.pageFileTargets.delete(source)
-    }
-    const sources = new Set([
-      ...this.pageDirectoryTargets.keys(),
-      ...[...this.options.dirs, ...this.options.subPackages].map(dir => normalizePath(path.resolve(this.root, dir))),
-    ])
-    for (const source of sources) {
-      const target = resolvePageIdentity(source)
-      const previous = this.pageDirectoryTargets.get(source)
-      if (target && previous && target !== previous) {
-        // 目录换目标后，旧目录派生的文件关联不再有效
-        for (const file of this.pageFileTargets.keys()) {
-          if (containsPath(source, file))
-            this.pageFileTargets.delete(file)
-        }
-      }
-      if (target && target !== source)
-        this.pageDirectoryTargets.set(source, target)
-      else if (target)
-        this.pageDirectoryTargets.delete(source)
-    }
-    for (const pages of [this.pages, ...this.subPages.values()]) {
-      for (const page of pages.values()) {
-        const source = this.pageSources.get(page)
-        if (source && source.identity !== source.file)
-          this.pageFileTargets.set(source.file, source.identity)
-        else if (source)
-          this.pageFileTargets.delete(source.file)
-      }
-    }
-    const targets = [...new Set([...this.pageDirectoryTargets.values(), ...this.pageFileTargets.values()])]
-    // 目录目标已经递归覆盖其下的文件目标，不再逐文件订阅
-    const existingDirectories = [...new Set(this.pageDirectoryTargets.values())].filter(target => existsSync(target))
-    const uncoveredTargets = targets.filter(target => !existingDirectories.some(directory => directory !== target && containsPath(directory, target)))
-    const existingTargets = uncoveredTargets.filter(target => existsSync(target))
-    const existing = new Set(existingTargets)
-    if (!this.watchers.size)
-      return
-    // 目标缺失后 chokidar 会丢掉目标自身的订阅；清掉记账，重建后重新订阅
-    for (const target of uncoveredTargets) {
-      if (existing.has(target))
-        continue
-      for (const added of this.watchedPageDirectories.values())
-        added.delete(target)
-    }
-    const directories = [
-      ...resolvePageWatchDirectories(this.options),
-      ...new Set(uncoveredTargets.map(target => existing.has(target) ? target : configWatchDirectory(target))),
-    ]
-    for (const watcher of this.watchers.keys()) {
-      const added = this.watchedPageDirectories.get(watcher)!
-      const serverRoot = (this._server?.watcher as unknown) === watcher ? normalizePath(this._server!.config.root) : undefined
-      this.addWatchPaths(watcher, directories, added, serverRoot, 'page directories')
-      // 祖先目录已在监听集合时，仍补上目标自身的订阅，确保重建后的目标继续收到内容事件
-      this.addWatchPaths(watcher, existingTargets, added, serverRoot, 'page targets', true)
-    }
+    const sources = [...this.pages.values(), ...[...this.subPages.values()].flatMap(pages => [...pages.values()])]
+      .map(page => this.pageSources.get(page))
+      .filter((source): source is PageSource => !!source)
+    this.pageWatcher.refresh(sources)
   }
 
   /**
@@ -771,7 +680,7 @@ export class PageContext {
       for (const pagePath of getPagePaths(dir, this.options)) {
         if (pages.has(pagePath.absolutePath))
           continue
-        const page = this.trackPage(pagePath, this.pages.get(pagePath.absolutePath), {
+        const page = this.trackPage(pagePath, this.pages.get(pagePath.absolutePath) ?? this.mainPageCandidates.get(pagePath.absolutePath), {
           dir,
           explicitRoot: false,
           ruleIndex: 0,
@@ -782,7 +691,8 @@ export class PageContext {
       }
     }
     debug.pages([...pages.keys()])
-    this.pages = pages
+    this.mainPageCandidates = pages
+    this.pages = new Map(pages)
   }
 
   /**
@@ -822,7 +732,7 @@ export class PageContext {
    */
   private findPages(filepath: string): Page[] {
     const absolute = normalizePath(path.resolve(this.root, filepath))
-    const groups = [this.pages, ...this.subPages.values()]
+    const groups = [this.mainPageCandidates, ...this.subPageCandidates.values(), this.pages, ...this.subPages.values()]
     const identity = resolvePageIdentity(absolute)
     if (!identity)
       return []
@@ -850,7 +760,7 @@ export class PageContext {
 
       const pages = new Map<string, Page>()
       for (const pagePath of pagePaths) {
-        const page = this.trackPage(pagePath, this.subPages.get(dir)?.get(pagePath.absolutePath), source, refreshContent)
+        const page = this.trackPage(pagePath, this.subPages.get(dir)?.get(pagePath.absolutePath) ?? this.subPageCandidates.get(dir)?.get(pagePath.absolutePath), source, refreshContent)
         if (page)
           pages.set(pagePath.absolutePath, page)
       }
@@ -858,7 +768,8 @@ export class PageContext {
     }
     debug.subPages(JSON.stringify(paths, null, 2))
 
-    this.subPages = subPages
+    this.subPageCandidates = subPages
+    this.subPages = new Map([...subPages].map(([dir, pages]) => [dir, new Map(pages)]))
   }
 
   /**

@@ -6,7 +6,7 @@ import path from 'node:path'
 import process from 'node:process'
 import { normalizePath } from 'vite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createPages, getPageFiles, isPageDirectoryEvent, isPageFileInDirectories, resolveOptions, resolvePageWatchDirectories } from '../packages/core/src'
+import { createPages, getPageFiles, isPageDirectoryEvent, isPageFileInDirectories, resolveOptions } from '../packages/core/src'
 
 const roots: string[] = []
 
@@ -409,32 +409,7 @@ describe('页面排除规则', () => {
     expect(isPageFileInDirectories(path.join(root, 'included/index.vue'), ctx.options)).toBe(true)
   })
 
-  it('整条规则被排除后不再为它保留监听祖先目录', () => {
-    const workspace = fixture()
-    const root = path.join(workspace, 'app')
-    page(root, 'src/pages/index.vue')
-    const kept = resolveOptions({ subPackages: ['../shared/pages'], exclude: ['../shared/pages'] }, root)
-    const watched = resolveOptions({ subPackages: ['../shared/pages'], exclude: [] }, root)
-
-    expect(resolvePageWatchDirectories(kept)).toEqual([normalizePath(path.join(root, 'src'))])
-    // 未排除时规则仍需要监听，根外来源的祖先目录是项目根的上级
-    expect(resolvePageWatchDirectories(watched)).toEqual([normalizePath(workspace)])
-  })
-
-  it('探测监听祖先时目录消失仍继续向上查找', () => {
-    const root = fixture()
-    page(root, 'src/pages/index.vue')
-    const options = resolveOptions({}, root)
-    const statSync = fs.statSync
-    vi.spyOn(fs, 'statSync').mockImplementationOnce((...args) => {
-      fs.rmSync(path.join(root, 'src'), { recursive: true, force: true })
-      return statSync(...args)
-    })
-
-    expect(resolvePageWatchDirectories(options)).toEqual([normalizePath(root)])
-  })
-
-  it.each(['main', 'subpackage'] as const)('%s 规范化选择器后再判断扫描和监听基准是否被排除', async (kind) => {
+  it.each(['main', 'subpackage'] as const)('%s 规范化选择器后再判断扫描和事件路径是否被排除', async (kind) => {
     const root = fixture()
     const included = page(root, 'src/pages/index.vue')
     page(root, 'src/excluded/main/index.vue')
@@ -446,7 +421,6 @@ describe('页面排除规则', () => {
     if (kind === 'subpackage')
       expect(ctx.pageMetaData).toEqual([])
     expect(isPageFileInDirectories(included, ctx.options)).toBe(true)
-    expect(resolvePageWatchDirectories(ctx.options)).toContain(normalizePath(path.join(root, 'src')))
   })
 
   it('绝对排除模式可以在项目根所在的路径段使用 glob', async () => {

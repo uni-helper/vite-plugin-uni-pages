@@ -11,6 +11,7 @@ import { PageContext } from '../packages/core/src'
 
 const roots: string[] = []
 const contexts: PageContext[] = []
+const contextsByWatcher = new WeakMap<EventEmitter, PageContext>()
 
 function fixture() {
   const workspace = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-symlink-targets-')))
@@ -39,6 +40,8 @@ async function start(root: string) {
   await ctx.updatePagesJSON()
   const updates = vi.spyOn(ctx, 'updatePagesJSON')
   const watcher = Object.assign(new EventEmitter(), { add: vi.fn() })
+  vi.spyOn((ctx as any).pageWatcher, 'start').mockImplementation(() => {})
+  contextsByWatcher.set(watcher, ctx)
   await ctx.setupWatcher(watcher as unknown as Parameters<PageContext['setupWatcher']>[0])
   return { ctx, updates, watcher }
 }
@@ -46,7 +49,10 @@ async function start(root: string) {
 async function dispatch(watcher: EventEmitter, updates: MockInstance<PageContext['updatePagesJSON']>, event: string, file: string): Promise<void> {
   updates.mockClear()
   watcher.emit(event, file)
-  await Promise.all(updates.mock.results.map(result => result.value))
+  const ctx = contextsByWatcher.get(watcher) as any
+  while (ctx.pendingPageFlush)
+    await ctx.pendingPageFlush
+  await ctx.pendingUpdate
 }
 
 afterEach(async () => {
@@ -58,13 +64,13 @@ afterEach(async () => {
 })
 
 describe('符号链接目标恢复', () => {
-  it('已存在的目标只监听目标本身，不递归订阅其父目录', async () => {
+  it('页面目标及其祖先不加入共享 watcher 的订阅', async () => {
     const { root, target } = fixture()
     page(path.join(target, 'index.vue'), '初始')
     const { watcher } = await start(root)
 
     const added = watcher.add.mock.calls.flat(2).map(file => normalizePath(file))
-    expect(added).toContain(normalizePath(target))
+    expect(added).not.toContain(normalizePath(target))
     expect(added).not.toContain(normalizePath(path.dirname(target)))
   })
 
@@ -161,7 +167,7 @@ describe('符号链接目标恢复', () => {
     ])
   })
 
-  it('目标父目录删除后补订阅尚存祖先，并由目录恢复事件补扫', async () => {
+  it('目标父目录删除重建时补扫，共享 watcher 不扩大订阅范围', async () => {
     const { workspace, root, target } = fixture()
     const file = path.join(target, 'profile.vue')
     page(file, '初始')
@@ -174,12 +180,12 @@ describe('符号链接目标恢复', () => {
 
     expect(updates).toHaveBeenCalledOnce()
     expect(output(root).subPackages ?? []).toEqual([])
-    expect(watcher.add.mock.calls.flat(2).map(file => normalizePath(file))).toContain(normalizePath(path.join(workspace, 'external')))
+    expect(watcher.add.mock.calls.flat(2).map(file => normalizePath(file))).not.toContain(normalizePath(path.join(workspace, 'external')))
 
     watcher.add.mockClear()
     page(file, '目录恢复')
     await dispatch(watcher, updates, 'addDir', parent)
-    expect(watcher.add.mock.calls.flat(2).map(file => normalizePath(file))).toContain(normalizePath(target))
+    expect(watcher.add.mock.calls.flat(2).map(file => normalizePath(file))).not.toContain(normalizePath(target))
     expect(updates).toHaveBeenCalledOnce()
     expect(output(root).subPackages).toMatchObject([{ root: 'src/alias', pages: [{ path: 'profile', style: { navigationBarTitleText: '目录恢复' } }] }])
 

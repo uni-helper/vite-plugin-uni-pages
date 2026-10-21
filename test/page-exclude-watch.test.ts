@@ -1,5 +1,6 @@
 import type { FSWatcher } from 'vite'
 import type { UserOptions } from '../packages/core/src'
+import type { PageSourceWatch } from '../packages/core/src/page-watch'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -67,10 +68,12 @@ async function start(root: string, mode: 'serve' | 'build', options: UserOptions
   const updates = vi.spyOn(PageContext.prototype, 'updatePagesJSON')
   const events: string[] = []
   let watcher: FSWatcher | undefined
+  let context: { pageWatcher: PageSourceWatch, pendingPageFlush?: Promise<void>, pendingUpdate: Promise<void> }
   let updatePages: (() => Promise<boolean>) | undefined
   let scans = 0
   const setup = PageContext.prototype.setupWatcher
   vi.spyOn(PageContext.prototype, 'setupWatcher').mockImplementation(function (this: PageContext, observed) {
+    context = this as unknown as typeof context
     updatePages = this.updatePagesJSON.bind(this)
     watcher = observed as unknown as FSWatcher
     watcher.on('all', (event, file) => events.push(`${event}:${normalizePath(path.relative(root, file))}`))
@@ -110,10 +113,16 @@ async function start(root: string, mode: 'serve' | 'build', options: UserOptions
   await vi.waitFor(() => expect(scans).toBeGreaterThanOrEqual(2), { timeout: 10000 })
   await waitForSubscription(watcher!, root)
   const settleUpdates = async (): Promise<void> => {
-    await Promise.allSettled(updates.mock.results.map(result => result.value))
+    let pending: Promise<void>
+    do {
+      await context.pendingPageFlush
+      pending = context.pendingUpdate
+      await pending
+    } while (context.pendingPageFlush || pending !== context.pendingUpdate)
   }
   await settleUpdates()
-  return { watcher: watcher!, updatePages: updatePages!, events, settleUpdates, scheduledUpdates: () => updates.mock.calls.length }
+  const contentWatcher = () => context.pageWatcher.watcher as unknown as FSWatcher
+  return { watcher: watcher!, contentWatcher, updatePages: updatePages!, events, settleUpdates, scheduledUpdates: () => updates.mock.calls.length }
 }
 
 afterEach(async () => {
@@ -214,7 +223,7 @@ describe.each(['serve', 'build'] as const)('%s 页面排除规则', (mode) => {
     page(root, 'src/pages/index.vue')
     page(workspace, 'external/account/pages/existing.vue')
     const exclude = ['../external']
-    const { watcher, updatePages, settleUpdates } = await start(root, mode, {
+    const { watcher, contentWatcher, updatePages, settleUpdates } = await start(root, mode, {
       subPackages: ['../external/*/pages'],
       exclude,
     })
@@ -230,12 +239,11 @@ describe.each(['serve', 'build'] as const)('%s 页面排除规则', (mode) => {
       pages: [{ path: 'existing' }],
     }])
 
-    // 哨兵只检测订阅，不承担页面更新；失败时仍只创建一次目标页面以验证遗漏
-    const subscribed = await waitForSubscription(watcher, externalPages).then(() => true, () => false)
+    await waitForSubscription(contentWatcher(), externalPages)
     page(workspace, 'external/account/pages/added.vue')
     await vi.waitFor(() => {
       const pages = output(root).subPackages[0].pages.map((page: any) => page.path).sort()
-      expect(pages, subscribed ? '外部页面新增后应自动发现' : '补扫后仍未注册外部目录的原生监听').toEqual(['added', 'existing'])
+      expect(pages, '外部页面新增后应自动发现').toEqual(['added', 'existing'])
     }, { timeout: 10000 })
   }, 30000)
 })

@@ -2,11 +2,16 @@ import { EventEmitter } from 'node:events'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PageContext } from '../packages/core/src'
+import { PageSourceWatch } from '../packages/core/src/page-watch'
 
 const roots: string[] = []
 const contexts: PageContext[] = []
+
+beforeEach(() => {
+  vi.spyOn(PageSourceWatch.prototype, 'start').mockImplementation(() => {})
+})
 
 async function fixture() {
   const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-watch-failure-')))

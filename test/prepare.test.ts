@@ -8,6 +8,7 @@ import { parse } from 'comment-json'
 import { createServer, resolveConfig } from 'vite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import UniPages from '../packages/core/src'
+import { PageSourceWatch } from '../packages/core/src/page-watch'
 
 const coreRequire = createRequire(new URL('../packages/core/package.json', import.meta.url))
 const lockfile = coreRequire('proper-lockfile')
@@ -37,6 +38,8 @@ afterEach(() => {
 
 describe('pages.prepare()', () => {
   it('首次启动时在下游插件工厂执行前生成完整配置和声明，并由真实 Vite 复用', async () => {
+    // 单独验证初始化复用，页面监听的就绪补扫由监听测试覆盖
+    vi.spyOn(PageSourceWatch.prototype, 'start').mockImplementation(() => {})
     const root = fixture()
     fs.mkdirSync(path.join(root, 'src/account'), { recursive: true })
     fs.writeFileSync(path.join(root, 'src/account/profile.vue'), '<template><view>账户</view></template>')

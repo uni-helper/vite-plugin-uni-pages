@@ -3,11 +3,16 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { normalizePath } from 'vite'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { PageContext } from '../packages/core/src'
+import { PageSourceWatch } from '../packages/core/src/page-watch'
 
 const roots: string[] = []
 const contexts: PageContext[] = []
+
+beforeEach(() => {
+  vi.spyOn(PageSourceWatch.prototype, 'start').mockImplementation(() => {})
+})
 
 function page(file: string, title: string): void {
   fs.mkdirSync(path.dirname(file), { recursive: true })

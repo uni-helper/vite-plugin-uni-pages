@@ -1,5 +1,6 @@
+import type { Buffer } from 'node:buffer'
 import type { FSWatcher } from 'vite'
-import type { ResolvedOptions, UserOptions } from '../packages/core/src'
+import type { UserOptions } from '../packages/core/src'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -8,7 +9,7 @@ import { parse } from 'comment-json'
 import { build, createServer, normalizePath } from 'vite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import UniPages, { PageContext } from '../packages/core/src'
-import { isPageDirectoryEvent, isPageFileInDirectories, resolvePageWatchDirectories } from '../packages/core/src/directories'
+import { isPageDirectoryEvent, isPageFileInDirectories } from '../packages/core/src/directories'
 
 vi.hoisted(() => vi.stubEnv('UNI_PLATFORM', 'h5'))
 
@@ -30,49 +31,37 @@ function read(root: string): any {
 function watchedFiles(watcher: FSWatcher, directory: string): string[] | undefined {
   return Object.entries(watcher.getWatched()).find(([dir]) => normalizePath(dir) === normalizePath(directory))?.[1]
 }
-/**
- * 等待 setupWatcher 内 watcher.add() 的扫描完成。
- *
- * 只等 root 下的 pages.config.json 不够：glob 基准目录落在 root 之外时
- * （如 `../external/deep` 下的 glob），要监听的是外部祖先目录。
- *
- * 目录键出现不代表注册完成：chokidar 写 _watched 图是同步的，但 OS 层订阅
- * （FSEvents / inotify / kqueue）可能在 ready 之后还有一小段窗口才生效。
- * 落在窗口里的写入既进不了 chokidar 的首次 readdir 快照，也没有订阅去接住，
- * 事件就永久丢了。哨兵只写一次时，撞上窗口就必然超时（CI 上 macos + node 24
- * 高负载下复现过）。这里改成反复写新哨兵：订阅一旦生效，下一次写入就能被看到。
- *
- * 先等 ready 是因为 chokidar 5 在 ready 之前会把 ignoreInitial 事件丢掉；
- * _readyEmitted 是私有字段，只能 as any 读。
- */
-async function waitForWatchDirectories(watcher: FSWatcher, options: ResolvedOptions): Promise<void> {
-  const directories = resolvePageWatchDirectories(options)
-  if (directories.length === 0)
-    return
-  // shortcut: 读 chokidar 5 的私有字段 _readyEmitted，等它暴露公开 api 后换掉
-  if (!(watcher as any)._readyEmitted)
-    await new Promise<void>(resolve => watcher.once('ready', resolve))
-  for (const directory of directories) {
-    const prefix = `${directory}/.watch-ready-`
+interface WatchContext {
+  pendingPageFlush: Promise<void> | undefined
+  pendingUpdate: Promise<void>
+  pendingPageUpdate: unknown
+  pageWatcher: {
+    watcher?: FSWatcher
+    recoveryWatchers: Map<string, { watcher: fs.FSWatcher }>
+  }
+}
+
+/** 用独立哨兵确认非递归目录入口已就绪 */
+async function waitForWatchDirectories(context: WatchContext): Promise<void> {
+  for (const [directory, { watcher }] of context.pageWatcher.recoveryWatchers) {
+    const prefix = `.watch-ready-${Math.random().toString(36).slice(2)}-`
     let subscribed = false
-    const onAll = (_event: string, filepath: string): void => {
-      if (normalizePath(filepath).startsWith(prefix))
+    const onChange = (_event: string, filename: string | Buffer | null): void => {
+      if (filename?.toString().startsWith(prefix))
         subscribed = true
     }
-    watcher.on('all', onAll)
+    watcher.on('change', onChange)
     const sentinels: string[] = []
     try {
-      // 单次写入可能落在订阅生效前的窗口里，此后永远不会重试。
-      // 每个轮次写一个新哨兵，任意一个被看到就说明订阅已生效。
       await vi.waitFor(() => {
-        const sentinel = normalizePath(path.join(directory, `.watch-ready-${Math.random().toString(36).slice(2)}`))
+        const sentinel = path.join(directory, `${prefix}${sentinels.length}`)
         sentinels.push(sentinel)
         fs.writeFileSync(sentinel, '')
-        expect(subscribed, `OS watcher inactive for ${directory}`).toBe(true)
+        expect(subscribed, `原生入口尚未监听 ${directory}`).toBe(true)
       }, { timeout: 10000, interval: 100 })
     }
     finally {
-      watcher.off('all', onAll)
+      watcher.off('change', onChange)
       for (const sentinel of sentinels)
         fs.rmSync(sentinel, { force: true })
     }
@@ -87,7 +76,7 @@ afterEach(async () => {
   vi.restoreAllMocks()
   vi.unstubAllEnvs()
   for (const root of roots.splice(0))
-    fs.rmSync(root, { recursive: true, force: true })
+    fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
 })
 
 const options: UserOptions = {
@@ -97,22 +86,42 @@ const options: UserOptions = {
   subPackages: [{ dir: 'nested/deep/packages/*/pages', root: dir => path.posix.dirname(dir) }],
 }
 
-async function start(root: string, mode: 'serve' | 'build', overrides: UserOptions = {}): Promise<{ close: () => Promise<unknown>, watcher: FSWatcher, events: string[] }> {
+async function start(root: string, mode: 'serve' | 'build', overrides: UserOptions = {}) {
   vi.stubEnv('VITE_ROOT_DIR', root)
   vi.stubEnv('UNI_PLATFORM', 'h5')
   fs.writeFileSync(path.join(root, 'pages.config.json'), JSON.stringify({ pages: [{ path: 'home', type: 'home' }] }))
   let scans = 0
   const updates = vi.spyOn(PageContext.prototype, 'updatePagesJSON')
   let observedWatcher: FSWatcher | undefined
-  let observedOptions: ResolvedOptions | undefined
+  let context: WatchContext
   const events: string[] = []
   const setup = PageContext.prototype.setupWatcher
   const setupSpy = vi.spyOn(PageContext.prototype, 'setupWatcher').mockImplementation(function (this: PageContext, watcher) {
     observedWatcher = watcher as unknown as FSWatcher
-    observedOptions = this.options
+    context = this as unknown as WatchContext
     observedWatcher.on('all', (event, file) => events.push(`${event}:${normalizePath(path.relative(root, file))}`))
     return setup.call(this, watcher)
   })
+  const settle = async (): Promise<void> => {
+    let snapshot = ''
+    let quietSince = Date.now()
+    await vi.waitFor(async () => {
+      while (true) {
+        const update = context.pendingUpdate
+        await context.pendingPageFlush
+        await update
+        if (!context.pendingPageFlush && !context.pendingPageUpdate && update === context.pendingUpdate)
+          break
+      }
+      const current = `${events.length}:${updates.mock.calls.length}`
+      if (snapshot !== current) {
+        snapshot = current
+        quietSince = Date.now()
+      }
+      expect(Date.now() - quietSince).toBeGreaterThanOrEqual(250)
+    }, { timeout: 10000, interval: 50 })
+  }
+  const contentWatcher = () => context.pageWatcher.watcher
   const plugin = UniPages({
     ...options,
     ...overrides,
@@ -127,11 +136,10 @@ async function start(root: string, mode: 'serve' | 'build', overrides: UserOptio
     closers.push(close)
     await vi.waitFor(() => expect(scans).toBeGreaterThanOrEqual(2), { timeout: 10000 })
     await vi.waitFor(() => expect(watchedFiles(observedWatcher!, root)).toContain('pages.config.json'), { timeout: 10000 })
-    await waitForWatchDirectories(observedWatcher!, observedOptions!)
-    await Promise.allSettled(updates.mock.results.map(result => result.value))
-    updates.mockRestore()
+    await waitForWatchDirectories(context!)
+    await settle()
     setupSpy.mockRestore()
-    return { close, watcher: observedWatcher!, events }
+    return { close, watcher: observedWatcher!, contentWatcher, events, settle }
   }
   fs.writeFileSync(path.join(root, 'entry.js'), 'export const example = 1')
   const watcher = await build({
@@ -148,18 +156,17 @@ async function start(root: string, mode: 'serve' | 'build', overrides: UserOptio
   await vi.waitFor(() => expect(fs.existsSync(path.join(root, 'dist/entry.mjs'))).toBe(true), { timeout: 10000 })
   await vi.waitFor(() => expect(scans).toBeGreaterThanOrEqual(2), { timeout: 10000 })
   await vi.waitFor(() => expect(watchedFiles(observedWatcher!, root)).toContain('pages.config.json'), { timeout: 10000 })
-  await waitForWatchDirectories(observedWatcher!, observedOptions!)
-  await Promise.allSettled(updates.mock.results.map(result => result.value))
-  updates.mockRestore()
+  await waitForWatchDirectories(context!)
+  await settle()
   setupSpy.mockRestore()
-  return { close, watcher: observedWatcher!, events }
+  return { close, watcher: observedWatcher!, contentWatcher, events, settle }
 }
 
 describe.each(['serve', 'build'] as const)('%s 真实目录监听', (mode) => {
   it('发现多级缺失目录，并处理新增、删除、重建和页面元数据修改', async () => {
     const root = fixture()
     let foundEmptyDirectory = false
-    const { events } = await start(root, mode, {
+    const { events, settle } = await start(root, mode, {
       onAfterScanPages: (_, subPages) => {
         foundEmptyDirectory ||= subPages.has('nested/deep/packages/account/pages')
       },
@@ -176,6 +183,7 @@ describe.each(['serve', 'build'] as const)('%s 真实目录监听', (mode) => {
     await waitForPackages(root, [])
     // pages.json 可先由目录事件更新，等待文件删除事件后再开始重建阶段
     await vi.waitFor(() => expect(events).toContain('unlink:nested/deep/packages/account/pages/profile.vue'), { timeout: 10000 })
+    await settle()
     events.length = 0
     page(root, 'nested/deep/packages/account/pages/profile.vue', '重建')
     page(root, 'nested/deep/packages/account/pages/detail.vue', '详情')
@@ -227,10 +235,19 @@ describe.each(['serve', 'build'] as const)('%s 真实目录监听', (mode) => {
     const workspace = fixture()
     const root = path.join(workspace, 'app')
     fs.mkdirSync(root)
-    await start(root, mode, { subPackages: ['../external/deep/*/pages'] })
+    const unrelated = path.join(workspace, 'other-project')
+    page(unrelated, 'src/index.vue')
+    const { watcher, contentWatcher, settle } = await start(root, mode, { subPackages: ['../external/deep/*/pages'] })
+    const expectScope = (): void => {
+      for (const observed of [watcher, contentWatcher()].filter((value): value is FSWatcher => !!value))
+        expect(Object.keys(observed.getWatched()).map(normalizePath).filter(directory => directory === normalizePath(unrelated) || directory.startsWith(`${normalizePath(unrelated)}/`)), '多级入口发现不应递归监听无关项目').toEqual([])
+    }
+    expectScope()
     page(workspace, 'external/deep/account/pages/profile.vue')
     await waitForPackages(root, ['../external/deep/account/pages'])
+    await settle()
     expect(read(root).subPackages[0].pages[0].path).toBe('profile')
+    expectScope()
   }, 30000)
 })
 
@@ -244,15 +261,13 @@ describe('目录监听边界', () => {
     expect(isPageFileInDirectories(path.join(root, 'src/packages/account/pages/__private__/a.vue'), ctx.options)).toBe(false)
     expect(isPageDirectoryEvent(path.join(root, 'src/packages/hidden/pages'), ctx.options)).toBe(false)
     expect(isPageDirectoryEvent(path.join(root, 'src/components'), ctx.options)).toBe(false)
-    expect(resolvePageWatchDirectories(ctx.options)).toEqual([normalizePath(root)])
   })
 
-  it('项目根外的缺失目录使用外部已有祖先', () => {
+  it('项目根外的缺失目录仍按当前规则识别页面路径', () => {
     const root = fixture()
     const app = path.join(root, 'app')
     fs.mkdirSync(app)
     const ctx = new PageContext({ dir: 'pages', subPackages: ['../external/deep/*/pages'] }, app)
-    expect(resolvePageWatchDirectories(ctx.options)).toEqual([normalizePath(root)])
     expect(isPageFileInDirectories(path.join(root, 'external/deep/account/pages/a.vue'), ctx.options)).toBe(true)
   })
 
