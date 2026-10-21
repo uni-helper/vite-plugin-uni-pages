@@ -1,8 +1,10 @@
+import type { PagesConfig } from '@uni-helper/uni-pages-types'
 import type { UserOptions } from '../packages/core/src'
 import { EventEmitter } from 'node:events'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { parse } from 'comment-json'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PageContext } from '../packages/core/src'
 
@@ -23,12 +25,12 @@ function write(file: string, definition: string): void {
   fs.writeFileSync(file, `<script setup>${definition}</script><template><view /></template>`)
 }
 
-async function fixture(scope: typeof scopes[number], definition = macro('初始')): Promise<{ ctx: PageContext, file: string }> {
+async function fixture(scope: { options: UserOptions, file: string }, definition = macro('初始'), dts = false): Promise<{ ctx: PageContext, file: string }> {
   const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-content-refresh-')))
   roots.push(root)
   const file = path.join(root, scope.file)
   write(file, definition)
-  const ctx = new PageContext({ ...scope.options, dts: false }, root, 'h5')
+  const ctx = new PageContext({ ...scope.options, dts }, root, 'h5')
   contexts.push(ctx)
   await ctx.updatePagesJSON()
   return { ctx, file }
@@ -49,6 +51,24 @@ afterEach(async () => {
   vi.restoreAllMocks()
   for (const root of roots.splice(0))
     fs.rmSync(root, { recursive: true, force: true })
+})
+
+it('重叠主分包的 skipped 候选在增量更新时共同刷新，保持分包优先', async () => {
+  const { ctx, file } = await fixture({
+    ...scopes[0],
+    options: { dir: 'src/pages', subPackages: [{ dir: 'src/pages', root: 'pages' }] },
+  }, 'definePage(null)')
+  expect(ctx.pageMetaData).toEqual([])
+  expect(ctx.subPageMetaData).toEqual([])
+
+  write(file, macro('重新启用'))
+  await ctx.updatePagesJSON(file)
+
+  expect(ctx.pageMetaData).toEqual([])
+  expect(ctx.subPageMetaData).toMatchObject([{
+    root: 'pages',
+    pages: [{ path: 'index', style: { navigationBarTitleText: '重新启用' } }],
+  }])
 })
 
 describe.each(scopes)('$name 页面内容刷新', (scope) => {
@@ -99,6 +119,35 @@ describe.each(scopes)('$name 页面内容刷新', (scope) => {
     await update.mock.results[0].value
 
     expect(pages(ctx, scope.sub)).toMatchObject([{ path: scope.route, style: { navigationBarTitleText: '就绪前修改' } }])
+  })
+
+  it('ready 补扫同步更新 pages.json、虚拟模块与导航声明的页面路径', async () => {
+    const prefix = scope.sub ? 'pkg' : 'pages'
+    const previous = `${prefix}/previous`
+    const current = `${prefix}/current`
+    const { ctx, file } = await fixture(scope, `definePage({ path: ${JSON.stringify(previous)} })`, true)
+    const declarationPath = path.join(ctx.root, 'uni-pages.d.ts')
+    expect(fs.readFileSync(declarationPath, 'utf8')).toContain(`"/${previous}"`)
+    const watcher = Object.assign(new EventEmitter(), { add: vi.fn() })
+    await ctx.setupWatcher(watcher as any)
+    const update = vi.spyOn(ctx, 'updatePagesJSON')
+
+    write(file, `definePage({ path: ${JSON.stringify(current)} })`)
+    watcher.emit('ready')
+    expect(update).toHaveBeenCalledOnce()
+    await update.mock.results[0].value
+
+    const output = parse(fs.readFileSync(ctx.resolvedPagesJSONPath, 'utf8')) as unknown as PagesConfig
+    const virtual = await import(`data:text/javascript,${encodeURIComponent(ctx.virtualModule())}`) as PagesConfig
+    for (const source of [output, virtual]) {
+      const routes = [
+        ...source.pages?.map(page => page.path) ?? [],
+        ...source.subPackages?.flatMap(pkg => pkg.pages.map(page => path.posix.join(pkg.root, page.path))) ?? [],
+      ]
+      expect(routes).toEqual([current])
+    }
+    const declared = [...fs.readFileSync(declarationPath, 'utf8').matchAll(/"\/([^"\n]+)"/g)].map(match => match[1])
+    expect(declared).toEqual([current])
   })
 
   it('scanAndMerge 重读已有页面内容', async () => {

@@ -38,6 +38,10 @@ function queryPageRules<T>(fallback: T, query: () => T): T {
   }
 }
 
+function containsPath(directory: string, file: string): boolean {
+  return file === directory || file.startsWith(`${directory.replace(/\/$/, '')}/`)
+}
+
 /**
  * 页面上下文：负责扫描页面、加载配置、合并页面信息、生成 pages.json
  *
@@ -64,6 +68,10 @@ export class PageContext {
   private pendingUpdate: Promise<void> = Promise.resolve()
   /** 随扫描更新的 Page 来源，用于复用检查和冲突诊断 */
   private readonly pageSources = new WeakMap<Page, PageSource>()
+  /** 扫描目录的词法路径与最近一次已发现的目标，缺失时保留以等待重建 */
+  private readonly pageDirectoryTargets = new Map<string, string>()
+  /** 页面词法路径与真实目标的关联，保留文件别名和被归并的候选 */
+  private readonly pageFileTargets = new Map<string, string>()
 
   /** 失败恢复以此为基准，避免混入前几轮失败的临时路径 */
   private lastSuccessfulConfigDependencyPaths: string[] = []
@@ -180,9 +188,9 @@ export class PageContext {
    */
   async scanAndMerge(): Promise<void> {
     refreshPageDirectories(this.options)
-    this.refreshPageWatchers()
     await this.scanPages()
     await this.scanSubPages()
+    this.refreshPageWatchers()
     await this.mergePageMetaData()
     await this.mergeSubPageMetaData()
   }
@@ -227,6 +235,33 @@ export class PageContext {
           return source.file
       }
     }
+    for (const [source, target] of this.pageFileTargets) {
+      if (target === identity && isPageFileInDirectories(source, this.options))
+        return source
+    }
+    for (const [source, target] of this.pageDirectoryTargets) {
+      if (containsPath(target, identity)) {
+        const lexical = normalizePath(path.join(source, path.relative(target, identity)))
+        if (isTargetFile(lexical) && isPageFileInDirectories(lexical, this.options))
+          return lexical
+      }
+    }
+  }
+
+  /** 目标或其祖先恢复时，仍按关联的词法来源判断是否需要补扫 */
+  private pageDirectoryForEvent(directory: string): boolean {
+    if (isPageDirectoryEvent(directory, this.options))
+      return true
+    const absolute = normalizeConfigPath(directory, this.root)
+    for (const [source, target] of this.pageDirectoryTargets) {
+      if (containsPath(absolute, target) && isPageDirectoryEvent(source, this.options))
+        return true
+    }
+    for (const [source, target] of this.pageFileTargets) {
+      if (containsPath(absolute, target) && isPageFileInDirectories(source, this.options))
+        return true
+    }
+    return false
   }
 
   /**
@@ -276,7 +311,7 @@ export class PageContext {
     const onUnlink = (file: string): void => handleEvent('unlink', file)
     // glob 规则下的目录增删会改变扫描目录集合（如新增 pkg-a 命中 src/pkg-*）
     const onDirectory = (directory: string): void => {
-      if (queryPageRules(false, () => isPageDirectoryEvent(directory, this.options)))
+      if (queryPageRules(false, () => this.pageDirectoryForEvent(directory)))
         void this.updatePagesAndNotify()
     }
     // 初始扫描期间新增的路径可能被 ignoreInitial 吞掉，ready 后再收敛一次
@@ -333,9 +368,49 @@ export class PageContext {
 
   /** 补扫后补齐新生效的页面监听根；保留旧订阅以免影响共享 watcher */
   private refreshPageWatchers(): void {
+    // 先登记全部扫描候选，避免归属决议裁剪别名后丢失事件关联
+    for (const [source] of this.pageDirectoryTargets) {
+      if (!isPageDirectoryEvent(source, this.options))
+        this.pageDirectoryTargets.delete(source)
+    }
+    for (const [source] of this.pageFileTargets) {
+      if (!isPageFileInDirectories(source, this.options))
+        this.pageFileTargets.delete(source)
+    }
+    const sources = new Set([
+      ...this.pageDirectoryTargets.keys(),
+      ...[...this.options.dirs, ...this.options.subPackages].map(dir => normalizePath(path.resolve(this.root, dir))),
+    ])
+    for (const source of sources) {
+      const target = resolvePageIdentity(source)
+      const previous = this.pageDirectoryTargets.get(source)
+      if (target && previous && target !== previous) {
+        // 目录换目标后，旧目录派生的文件关联不再有效
+        for (const file of this.pageFileTargets.keys()) {
+          if (containsPath(source, file))
+            this.pageFileTargets.delete(file)
+        }
+      }
+      if (target && target !== source)
+        this.pageDirectoryTargets.set(source, target)
+      else if (target)
+        this.pageDirectoryTargets.delete(source)
+    }
+    for (const pages of [this.pages, ...this.subPages.values()]) {
+      for (const page of pages.values()) {
+        const source = this.pageSources.get(page)
+        if (source && source.identity !== source.file)
+          this.pageFileTargets.set(source.file, source.identity)
+        else if (source)
+          this.pageFileTargets.delete(source.file)
+      }
+    }
     if (!this.watchers.size)
       return
-    const directories = resolvePageWatchDirectories(this.options)
+    const directories = [
+      ...resolvePageWatchDirectories(this.options),
+      ...new Set([...this.pageDirectoryTargets.values(), ...this.pageFileTargets.values()].map(configWatchDirectory)),
+    ]
     for (const watcher of this.watchers.keys()) {
       const added = this.watchedPageDirectories.get(watcher)!
       const serverRoot = (this._server?.watcher as unknown) === watcher ? normalizePath(this._server!.config.root) : undefined
@@ -435,10 +510,10 @@ export class PageContext {
 
   private async generatePagesJSON(filepath?: string): Promise<boolean> {
     if (filepath) {
-      const page = this.findPage(filepath)
-      if (page) {
-        await page.read()
-        if (!page.hasChanged()) {
+      const pages = this.findPages(filepath)
+      if (pages.length) {
+        await Promise.all(pages.map(page => page.read()))
+        if (!pages.some(page => page.hasChanged())) {
           debug.cache(`The page meta on page ${filepath} did not send any changes, skipping`)
           return false
         }
@@ -452,11 +527,11 @@ export class PageContext {
 
     if (this.options.mergePages) {
       refreshPageDirectories(this.options)
-      this.refreshPageWatchers()
       this.options.onBeforeScanPages()
       await this.scanPages(!filepath)
       await this.scanSubPages(!filepath)
       this.options.onAfterScanPages(this.pages, this.subPages)
+      this.refreshPageWatchers()
     }
 
     this.options.onBeforeMergePageMetaData(this.pages, this.pagesGlobConfig)
@@ -659,29 +734,20 @@ export class PageContext {
   }
 
   /**
-   * 按页面文件绝对路径查找被跟踪的页面（主包或任一子包）
+   * 按词法路径或物理身份查找全部缓存候选
    * @param filepath - 页面文件的绝对路径
-   * @returns 被跟踪的页面，文件未被跟踪时为 undefined
+   * @returns 主包和分包中属于同一文件的页面实例，每个实例只返回一次
    */
-  private findPage(filepath: string): Page | undefined {
-    const mainPage = this.pages.get(filepath)
-    if (mainPage)
-      return mainPage
-
-    for (const pages of this.subPages.values()) {
-      const subPage = pages.get(filepath)
-      if (subPage)
-        return subPage
-    }
-
-    const normalized = normalizeConfigPath(filepath, this.root)
-    for (const pages of [this.pages, ...this.subPages.values()]) {
-      for (const [file, page] of pages) {
-        if (normalizeConfigPath(file, this.root) === normalized)
-          return page
-      }
-    }
-    return undefined
+  private findPages(filepath: string): Page[] {
+    const absolute = normalizePath(path.resolve(this.root, filepath))
+    const groups = [this.pages, ...this.subPages.values()]
+    const direct = groups.map(pages => pages.get(absolute)).find(page => page !== undefined)
+    const identity = (direct && this.pageSources.get(direct)?.identity) || normalizeConfigPath(filepath, this.root)
+    const matched = groups.flatMap(pages => [...pages.entries()].flatMap(([file, page]) => {
+      const source = this.pageSources.get(page)
+      return file === absolute || (source?.identity ?? normalizeConfigPath(file, this.root)) === identity ? [page] : []
+    }))
+    return [...new Set(matched)]
   }
 
   /**
