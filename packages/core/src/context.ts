@@ -216,6 +216,19 @@ export class PageContext {
     return this.generatedPathsCache
   }
 
+  /** 按当前词法规则识别页面事件，真实路径只用于关联已收录来源 */
+  private pageFileForEvent(file: string, identity: string): string | undefined {
+    if (isTargetFile(file) && isPageFileInDirectories(file, this.options))
+      return normalizePath(path.resolve(this.root, file))
+    for (const pages of [this.pages, ...this.subPages.values()]) {
+      for (const page of pages.values()) {
+        const source = this.pageSources.get(page)
+        if (source?.identity === identity && isPageFileInDirectories(source.file, this.options))
+          return source.file
+      }
+    }
+  }
+
   /**
    * 设置文件监听器，监听页面文件与配置文件变更
    * 页面文件或配置文件变化时自动更新 pages.json
@@ -250,12 +263,13 @@ export class PageContext {
       const configChanged = !excluded.includes(absolute) && isConfigPath
       // 规则的编译结果按声明（dir/subPackages/exclude）缓存，glob 展开的
       // 目录和 root 回调仍在每轮扫描重算，所以新出现的目录不会漏掉
-      const pageChanged = isTargetFile(filepath) && queryPageRules(false, () => isPageFileInDirectories(filepath, this.options))
-      if (!configChanged && !pageChanged)
+      const pageFile = configChanged ? undefined : queryPageRules(undefined, () => this.pageFileForEvent(filepath, absolute))
+      if (!configChanged && !pageFile)
         return
 
       debug.pages(configChanged ? `Config changed: ${absolute}` : `File changed: ${absolute}`)
-      void this.updatePagesAndNotify(!configChanged && event === 'change' ? filepath : undefined)
+      // 真实路径事件可能影响多个词法候选，整轮刷新后重新选择代表
+      void this.updatePagesAndNotify(!configChanged && event === 'change' && pageFile === eventPath ? pageFile : undefined)
     }
     const onAdd = (file: string): void => handleEvent('add', file)
     const onChange = (file: string): void => handleEvent('change', file)
