@@ -5,6 +5,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { parse } from 'comment-json'
+import { normalizePath } from 'vite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PageContext } from '../packages/core/src'
 
@@ -28,7 +29,7 @@ function write(file: string, definition: string): void {
 async function fixture(scope: { options: UserOptions, file: string }, definition = macro('初始'), dts = false): Promise<{ ctx: PageContext, file: string }> {
   const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-content-refresh-')))
   roots.push(root)
-  const file = path.join(root, scope.file)
+  const file = normalizePath(path.join(root, scope.file))
   write(file, definition)
   const ctx = new PageContext({ ...scope.options, dts }, root, 'h5')
   contexts.push(ctx)
@@ -161,7 +162,7 @@ describe.each(scopes)('$name 页面内容刷新', (scope) => {
 
   it('普通 change 更新配置，无配置变化时跳过完整生成', async () => {
     const { ctx, file } = await fixture(scope)
-    const otherFile = path.join(path.dirname(file), 'other.vue')
+    const otherFile = normalizePath(path.join(path.dirname(file), 'other.vue'))
     write(otherFile, macro('其他页面'))
     await ctx.updatePagesJSON()
     const readFile = vi.spyOn(fs.promises, 'readFile')
