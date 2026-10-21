@@ -176,8 +176,10 @@ describe('符号链接目标恢复', () => {
     expect(output(root).subPackages ?? []).toEqual([])
     expect(watcher.add.mock.calls.flat(2).map(file => normalizePath(file))).toContain(normalizePath(path.join(workspace, 'external')))
 
+    watcher.add.mockClear()
     page(file, '目录恢复')
     await dispatch(watcher, updates, 'addDir', parent)
+    expect(watcher.add.mock.calls.flat(2).map(file => normalizePath(file))).toContain(normalizePath(target))
     expect(updates).toHaveBeenCalledOnce()
     expect(output(root).subPackages).toMatchObject([{ root: 'src/alias', pages: [{ path: 'profile', style: { navigationBarTitleText: '目录恢复' } }] }])
 

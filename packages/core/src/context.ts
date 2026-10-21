@@ -44,18 +44,6 @@ function containsPath(directory: string, file: string): boolean {
 }
 
 /**
- * 符号链接目标的监听路径
- *
- * @description 目标存在时只监听目标本身，避免把目标的兄弟目录一起递归订阅；
- * 目标缺失时补上现存祖先，chokidar 无法为父目录也缺失的路径重新建立监听
- */
-function pageTargetWatchPaths(target: string): string[] {
-  if (existsSync(target))
-    return [target]
-  return [target, configWatchDirectory(target)]
-}
-
-/**
  * 页面上下文：负责扫描页面、加载配置、合并页面信息、生成 pages.json
  *
  * 做的事情按固定顺序是：加载用户配置 → 扫描页面文件 → 合并页面
@@ -320,8 +308,11 @@ export class PageContext {
         return
 
       debug.pages(configChanged ? `Config changed: ${absolute}` : `File changed: ${absolute}`)
-      // 真实路径事件可能影响多个词法候选，整轮刷新后重新选择代表
-      this.queuePageUpdate(!configChanged && event === 'change' && pageFile === eventPath ? pageFile : undefined)
+      // 配置变化立即排队；页面事件才进入合并队列。真实路径事件可能影响多个词法候选，整轮刷新后重新选择代表
+      if (configChanged)
+        void this.updatePagesAndNotify()
+      else
+        this.queuePageUpdate(event === 'change' && pageFile === eventPath ? pageFile : undefined)
     }
     const onAdd = (file: string): void => handleEvent('add', file)
     const onChange = (file: string): void => handleEvent('change', file)
@@ -368,9 +359,10 @@ export class PageContext {
   }
 
   /** 补充未覆盖的监听路径，注册成功后记账，失败时保留重试机会 */
-  private addWatchPaths(watcher: FSWatcher, paths: readonly string[], added: Set<string>, sharedRoot: string | undefined, description: string): void {
+  private addWatchPaths(watcher: FSWatcher, paths: readonly string[], added: Set<string>, sharedRoot: string | undefined, description: string, allowCovered = false): void {
     const wanted = paths.filter(file => (!sharedRoot || (file !== sharedRoot && !file.startsWith(`${sharedRoot}/`)))
-      && ![...added].some(existing => file === existing || file.startsWith(`${existing}/`)))
+      && !added.has(file)
+      && (allowCovered || ![...added].some(existing => file.startsWith(`${existing}/`))))
     if (!wanted.length)
       return
     try {
@@ -429,16 +421,31 @@ export class PageContext {
           this.pageFileTargets.delete(source.file)
       }
     }
+    const targets = [...new Set([...this.pageDirectoryTargets.values(), ...this.pageFileTargets.values()])]
+    // 目录目标已经递归覆盖其下的文件目标，不再逐文件订阅
+    const existingDirectories = [...new Set(this.pageDirectoryTargets.values())].filter(target => existsSync(target))
+    const uncoveredTargets = targets.filter(target => !existingDirectories.some(directory => directory !== target && containsPath(directory, target)))
+    const existingTargets = uncoveredTargets.filter(target => existsSync(target))
+    const existing = new Set(existingTargets)
     if (!this.watchers.size)
       return
+    // 目标缺失后 chokidar 会丢掉目标自身的订阅；清掉记账，重建后重新订阅
+    for (const target of uncoveredTargets) {
+      if (existing.has(target))
+        continue
+      for (const added of this.watchedPageDirectories.values())
+        added.delete(target)
+    }
     const directories = [
       ...resolvePageWatchDirectories(this.options),
-      ...new Set([...this.pageDirectoryTargets.values(), ...this.pageFileTargets.values()].flatMap(pageTargetWatchPaths)),
+      ...new Set(uncoveredTargets.map(target => existing.has(target) ? target : configWatchDirectory(target))),
     ]
     for (const watcher of this.watchers.keys()) {
       const added = this.watchedPageDirectories.get(watcher)!
       const serverRoot = (this._server?.watcher as unknown) === watcher ? normalizePath(this._server!.config.root) : undefined
       this.addWatchPaths(watcher, directories, added, serverRoot, 'page directories')
+      // 祖先目录已在监听集合时，仍补上目标自身的订阅，确保重建后的目标继续收到内容事件
+      this.addWatchPaths(watcher, existingTargets, added, serverRoot, 'page targets', true)
     }
   }
 
@@ -479,8 +486,24 @@ export class PageContext {
     }
   }
 
+  /** 配置变化的完整更新：失败只记录，不让 Promise 拒绝 */
+  private async updatePagesAndNotify(): Promise<void> {
+    try {
+      if (await this.updatePagesJSON())
+        this.onUpdate()
+    }
+    catch (error) {
+      this.logUpdateFailure(error)
+    }
+  }
+
+  /** 记录 watcher 更新失败，避免未处理的拒绝终止进程 */
+  private logUpdateFailure(error: unknown): void {
+    this.logger?.error(`[vite-plugin-uni-pages] Failed to update pages.json after a file change: ${error instanceof Error ? error.message : error}`, { timestamp: true, error: error instanceof Error ? error : undefined })
+  }
+
   /**
-   * 登记 watcher 触发的更新：生成期间到达的事件合并到下一轮
+   * 登记页面事件触发的更新：生成期间到达的事件合并到下一轮
    *
    * @description 连续删除、重建会一次性派发大量事件，逐个生成会反复
    * 重读全部页面；同一批内只有一个页面变更时保留增量读取，多个变更
@@ -499,9 +522,9 @@ export class PageContext {
   }
 
   /**
-   * 排空更新队列；失败只记录，不让 Promise 拒绝
+   * 排空页面事件队列；失败只记录，不让 Promise 拒绝
    *
-   * watcher 的回调走这里而不是直接调 {@link updatePagesJSON}：一旦
+   * 页面事件的回调走这里而不是直接调 {@link updatePagesJSON}：一旦
    * 它拒绝（拿不到文件锁、声明文件写不进去），就成了未处理的拒绝，
    * Node 默认直接终止进程——开发时正在编辑文件，一次偶发的锁冲突
    * 不该把 dev server 打死。用户改一次文件就会再触发一次事件，
@@ -520,7 +543,7 @@ export class PageContext {
             this.onUpdate()
         }
         catch (error) {
-          this.logger?.error(`[vite-plugin-uni-pages] Failed to update pages.json after a file change: ${error instanceof Error ? error.message : error}`, { timestamp: true, error: error instanceof Error ? error : undefined })
+          this.logUpdateFailure(error)
         }
       }
     }
