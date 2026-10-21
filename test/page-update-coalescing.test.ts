@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { normalizePath } from 'vite'
 import { afterEach, expect, it, vi } from 'vitest'
 import { PageContext } from '../packages/core/src'
 
@@ -22,6 +23,10 @@ function fixture(count: number): { ctx: PageContext, root: string } {
   const ctx = new PageContext({ dir: 'src/pages', dts: false }, root, 'h5')
   contexts.push(ctx)
   return { ctx, root }
+}
+
+async function flush(ctx: PageContext): Promise<void> {
+  await (ctx as unknown as { pendingPageFlush?: Promise<void> }).pendingPageFlush
 }
 
 async function setup(ctx: PageContext): Promise<EventEmitter> {
@@ -50,7 +55,7 @@ it('连续删除事件合并为有限次生成，读取次数不超过两轮扫�
     fs.unlinkSync(file)
     watcher.emit('unlink', file)
   }
-  await ctx.disposeWatchers()
+  await flush(ctx)
 
   expect(updates.mock.calls.length).toBeLessThanOrEqual(2)
   expect(ctx.pageMetaData).toHaveLength(20)
@@ -59,18 +64,41 @@ it('连续删除事件合并为有限次生成，读取次数不超过两轮扫�
   expect(pageReads).toBeLessThanOrEqual(40)
 })
 
-it('一批内多个页面变更合并为一次全量生成', async () => {
+it('一批内多个页面变更仅重读相关页面', async () => {
   const { ctx, root } = fixture(4)
   await ctx.updatePagesJSON()
   const watcher = await setup(ctx)
-  const updates = vi.spyOn(ctx, 'updatePagesJSON')
+  const onBeforeLoadUserConfig = vi.fn()
+  ctx.options.onBeforeLoadUserConfig = onBeforeLoadUserConfig
+  const readFile = vi.spyOn(fs.promises, 'readFile')
 
   for (const index of [0, 1, 2]) {
     page(path.join(root, `src/pages/p${index}.vue`), `更新${index}`)
     watcher.emit('change', path.join(root, `src/pages/p${index}.vue`))
   }
-  await ctx.disposeWatchers()
+  await flush(ctx)
 
-  expect(updates.mock.calls.length).toBeLessThanOrEqual(2)
+  expect(onBeforeLoadUserConfig.mock.calls.length).toBeLessThanOrEqual(2)
+  expect(readFile.mock.calls.filter(call => call[0] === normalizePath(path.join(root, 'src/pages/p3.vue')))).toHaveLength(0)
   expect(ctx.pageMetaData.map(item => item.style?.navigationBarTitleText).sort()).toEqual(['P3', '更新0', '更新1', '更新2'])
+})
+
+it('生成期间到达的内容变更由同一次 flush 继续处理', async () => {
+  const { ctx, root } = fixture(3)
+  await ctx.updatePagesJSON()
+  const watcher = await setup(ctx)
+  const readFile = vi.spyOn(fs.promises, 'readFile')
+  const onBeforeWriteFile = vi.fn().mockImplementationOnce(() => {
+    page(path.join(root, 'src/pages/p1.vue'), '后续更新')
+    watcher.emit('change', path.join(root, 'src/pages/p1.vue'))
+  })
+  ctx.options.onBeforeWriteFile = onBeforeWriteFile
+  page(path.join(root, 'src/pages/p0.vue'), '首轮更新')
+
+  watcher.emit('change', path.join(root, 'src/pages/p0.vue'))
+  await flush(ctx)
+
+  expect(onBeforeWriteFile).toHaveBeenCalledTimes(2)
+  expect(ctx.pageMetaData.map(item => item.style?.navigationBarTitleText).sort()).toEqual(['P2', '后续更新', '首轮更新'])
+  expect(readFile.mock.calls.filter(call => call[0] === normalizePath(path.join(root, 'src/pages/p2.vue')))).toHaveLength(0)
 })

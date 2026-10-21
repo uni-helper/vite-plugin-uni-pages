@@ -308,11 +308,11 @@ export class PageContext {
         return
 
       debug.pages(configChanged ? `Config changed: ${absolute}` : `File changed: ${absolute}`)
-      // 配置变化立即排队；页面事件才进入合并队列。真实路径事件可能影响多个词法候选，整轮刷新后重新选择代表
+      // 配置变化立即排队；页面内容事件按物理身份刷新关联候选
       if (configChanged)
         void this.updatePagesAndNotify()
       else
-        this.queuePageUpdate(event === 'change' && pageFile === eventPath ? pageFile : undefined)
+        this.queuePageUpdate(event === 'change' ? pageFile : undefined)
     }
     const onAdd = (file: string): void => handleEvent('add', file)
     const onChange = (file: string): void => handleEvent('change', file)
@@ -506,8 +506,7 @@ export class PageContext {
    * 登记页面事件触发的更新：生成期间到达的事件合并到下一轮
    *
    * @description 连续删除、重建会一次性派发大量事件，逐个生成会反复
-   * 重读全部页面；同一批内只有一个页面变更时保留增量读取，多个变更
-   * 或任意完整变更合并为一次全量生成
+   * 重读全部页面；内容变更合并待刷新文件，结构变更执行完整刷新
    * @param filepath - 只读取该页面；省略时执行完整扫描
    */
   private queuePageUpdate(filepath?: string): void {
@@ -536,9 +535,11 @@ export class PageContext {
         const { full, files } = this.pendingPageUpdate
         this.pendingPageUpdate = undefined
         try {
-          const updated = full || files.size > 1
+          const updated = full
             ? await this.updatePagesJSON()
-            : await this.updatePagesJSON([...files][0])
+            : files.size === 1
+              ? await this.updatePagesJSON([...files][0])
+              : await this.enqueuePagesUpdate([...files])
           if (updated)
             this.onUpdate()
         }
@@ -579,20 +580,25 @@ export class PageContext {
    * @returns pages.json 是否成功更新
    */
   async updatePagesJSON(filepath?: string): Promise<boolean> {
-    const update = this.pendingUpdate.then(() => this.generatePagesJSON(filepath))
+    return this.enqueuePagesUpdate(filepath ? [filepath] : undefined)
+  }
+
+  private enqueuePagesUpdate(files?: readonly string[]): Promise<boolean> {
+    const update = this.pendingUpdate.then(() => this.generatePagesJSON(files))
     this.pendingUpdate = update.then(() => {}, () => {})
     return update
   }
 
-  private async generatePagesJSON(filepath?: string): Promise<boolean> {
-    if (filepath) {
-      const pages = this.findPages(filepath)
-      if (pages.length) {
-        await Promise.all(pages.map(page => page.read()))
-        if (!pages.some(page => page.hasChanged())) {
-          debug.cache(`The page meta on page ${filepath} did not send any changes, skipping`)
-          return false
-        }
+  private async generatePagesJSON(files?: readonly string[]): Promise<boolean> {
+    const candidates = files?.map(file => this.findPages(file))
+    // 未收录文件或身份变化需要完整刷新，不能沿用旧来源的内容缓存
+    const incremental = !!candidates?.length && candidates.every(pages => pages.length > 0)
+    if (incremental) {
+      const pages = [...new Set(candidates.flat())]
+      await Promise.all(pages.map(page => page.read()))
+      if (!pages.some(page => page.hasChanged())) {
+        debug.cache('Page metadata is unchanged, skipping generation')
+        return false
       }
     }
 
@@ -604,8 +610,8 @@ export class PageContext {
     if (this.options.mergePages) {
       refreshPageDirectories(this.options)
       this.options.onBeforeScanPages()
-      await this.scanPages(!filepath)
-      await this.scanSubPages(!filepath)
+      await this.scanPages(!incremental)
+      await this.scanSubPages(!incremental)
       this.options.onAfterScanPages(this.pages, this.subPages)
       this.refreshPageWatchers()
     }
@@ -817,12 +823,15 @@ export class PageContext {
   private findPages(filepath: string): Page[] {
     const absolute = normalizePath(path.resolve(this.root, filepath))
     const groups = [this.pages, ...this.subPages.values()]
-    const direct = groups.map(pages => pages.get(absolute)).find(page => page !== undefined)
-    const identity = (direct && this.pageSources.get(direct)?.identity) || normalizeConfigPath(filepath, this.root)
+    const identity = resolvePageIdentity(absolute)
+    if (!identity)
+      return []
     const matched = groups.flatMap(pages => [...pages.entries()].flatMap(([file, page]) => {
       const source = this.pageSources.get(page)
-      return file === absolute || (source?.identity ?? normalizeConfigPath(file, this.root)) === identity ? [page] : []
+      return file === absolute || source?.identity === identity ? [page] : []
     }))
+    if (matched.some(page => this.pageSources.get(page)?.identity !== identity || resolvePageIdentity(page.path.absolutePath) !== identity))
+      return []
     return [...new Set(matched)]
   }
 
