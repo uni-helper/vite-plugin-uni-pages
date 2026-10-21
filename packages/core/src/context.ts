@@ -381,6 +381,12 @@ export class PageContext {
 
   /** 补扫后补齐新生效的页面监听根；保留旧订阅以免影响共享 watcher */
   private refreshPageWatchers(): void {
+    // 关闭页面合并时事件匹配始终为 false，目标关联和额外订阅都没有意义
+    if (!this.options.mergePages) {
+      this.pageDirectoryTargets.clear()
+      this.pageFileTargets.clear()
+      return
+    }
     // 先登记全部扫描候选，避免归属决议裁剪别名后丢失事件关联
     for (const [source] of this.pageDirectoryTargets) {
       if (!isPageDirectoryEvent(source, this.options))

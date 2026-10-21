@@ -68,6 +68,20 @@ describe('符号链接目标恢复', () => {
     expect(added).not.toContain(normalizePath(path.dirname(target)))
   })
 
+  it('关闭页面合并时不注册页面目标监听', async () => {
+    const { root, target } = fixture()
+    page(path.join(target, 'index.vue'), '初始')
+    const ctx = new PageContext({ subPackages: ['src/alias'], outDir: '.', mergePages: false, dts: false }, root, 'h5')
+    contexts.push(ctx)
+    await ctx.updatePagesJSON()
+    const watcher = Object.assign(new EventEmitter(), { add: vi.fn() })
+    await ctx.setupWatcher(watcher as unknown as Parameters<PageContext['setupWatcher']>[0])
+
+    const added = watcher.add.mock.calls.flat(2).map(file => normalizePath(file))
+    expect(added.filter(file => file.includes('/external'))).toEqual([])
+    await ctx.disposeWatchers()
+  })
+
   it('扫描规则收窄时仍刷新既有目录关联，忽略已脱离的旧目标', async () => {
     const { workspace, root, target } = fixture()
     const oldFile = path.join(target, 'nested/index.vue')
