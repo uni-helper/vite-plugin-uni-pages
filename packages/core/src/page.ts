@@ -115,11 +115,6 @@ export class Page {
       await this.read()
   }
 
-  /** 允许下次访问重新尝试读取失败的页面，保留成功读取的缓存 */
-  public resetReadAttempt(): void {
-    this.readAttempted = false
-  }
-
   /**
    * 使页面读取缓存失效
    *
@@ -127,7 +122,7 @@ export class Page {
    */
   public invalidate(): void {
     this.loaded = false
-    this.resetReadAttempt()
+    this.readAttempted = false
   }
 
   /**
