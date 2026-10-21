@@ -34,9 +34,9 @@ export class Page {
    */
   skipped: boolean = false
 
-  /** 页面文件是否至少被成功读取过一次 */
+  /** 当前读取缓存是否有效 */
   private loaded: boolean = false
-  /** 当前扫描轮次是否已经尝试读取过；失败后不重复读取，直到下一轮扫描 */
+  /** 当前缓存是否已尝试读取；失败后等下次失效再重试 */
   private readAttempted: boolean = false
 
   /** 页面配置的原始 JSON 字符串，用于变更检测 */
@@ -108,22 +108,26 @@ export class Page {
   }
 
   /**
-   * 确保页面文件至少被读取过一次，使 `skipped` 与缓存的配置反映
-   * 当前文件内容
+   * 加载尚未读取的页面配置，缓存失效前不重复尝试失败的读取
    */
   public async ensureLoaded(): Promise<void> {
     if (!this.loaded && !this.readAttempted)
       await this.read()
   }
 
-  /**
-   * 允许下一轮扫描重新尝试读取
-   *
-   * @description 成功读取后仍沿用缓存；只有读取失败的页面需要在
-   * 新扫描开始时清掉尝试标记
-   */
+  /** 允许下次访问重新尝试读取失败的页面，保留成功读取的缓存 */
   public resetReadAttempt(): void {
     this.readAttempted = false
+  }
+
+  /**
+   * 使页面读取缓存失效
+   *
+   * @description 下次访问时重新读取，保留上次成功配置作为读取失败时的回退
+   */
+  public invalidate(): void {
+    this.loaded = false
+    this.resetReadAttempt()
   }
 
   /**

@@ -440,8 +440,8 @@ export class PageContext {
       refreshPageDirectories(this.options)
       this.refreshPageWatchers()
       this.options.onBeforeScanPages()
-      await this.scanPages()
-      await this.scanSubPages()
+      await this.scanPages(!filepath)
+      await this.scanSubPages(!filepath)
       this.options.onAfterScanPages(this.pages, this.subPages)
     }
 
@@ -594,7 +594,7 @@ export class PageContext {
    *
    * @description 各目录分别执行文件排除，物理别名保留到页面有效性与归属决议阶段
    */
-  private async scanPages(): Promise<void> {
+  private async scanPages(refreshContent = true): Promise<void> {
     const pages = new Map<string, Page>()
     for (const [matchIndex, dir] of this.options.dirs.entries()) {
       for (const pagePath of getPagePaths(dir, this.options)) {
@@ -605,7 +605,7 @@ export class PageContext {
           explicitRoot: false,
           ruleIndex: 0,
           matchIndex,
-        })
+        }, refreshContent)
         if (page)
           pages.set(pagePath.absolutePath, page)
       }
@@ -617,9 +617,10 @@ export class PageContext {
   /**
    * 登记本轮来源并复用身份与输出基准均未变化的 Page
    *
+   * @description 整轮更新使读取缓存失效，增量更新复用目标页的预读结果与其他页面缓存
    * @returns 路径仍存在时返回页面实例，扫描期间已消失时为 undefined
    */
-  private trackPage(pagePath: PagePath, previous: Page | undefined, source: Omit<PageSource, 'file' | 'identity'>): Page | undefined {
+  private trackPage(pagePath: PagePath, previous: Page | undefined, source: Omit<PageSource, 'file' | 'identity'>, refreshContent: boolean): Page | undefined {
     const identity = resolvePageIdentity(pagePath.absolutePath)
     if (!identity)
       return
@@ -628,8 +629,8 @@ export class PageContext {
       && previous.path.relativePath === pagePath.relativePath
       ? previous
       : new Page(this, pagePath)
-    // 读取失败的页面允许在新一轮扫描里重试
-    page.resetReadAttempt()
+    if (refreshContent)
+      page.invalidate()
     this.pageSources.set(page, {
       file: pagePath.absolutePath,
       identity,
@@ -674,7 +675,7 @@ export class PageContext {
    *
    * @description 同一物理目录的不同别名仍分别执行文件排除，避免某个别名被排除后漏页
    */
-  private async scanSubPages(): Promise<void> {
+  private async scanSubPages(refreshContent = true): Promise<void> {
     const paths: Record<string, PagePath[]> = {}
     const subPages = new Map<string, Map<string, Page>>()
     const sources = this.subPackageSourcesByDir()
@@ -684,7 +685,7 @@ export class PageContext {
 
       const pages = new Map<string, Page>()
       for (const pagePath of pagePaths) {
-        const page = this.trackPage(pagePath, this.subPages.get(dir)?.get(pagePath.absolutePath), source)
+        const page = this.trackPage(pagePath, this.subPages.get(dir)?.get(pagePath.absolutePath), source, refreshContent)
         if (page)
           pages.set(pagePath.absolutePath, page)
       }
