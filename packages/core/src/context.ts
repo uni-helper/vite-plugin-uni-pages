@@ -85,6 +85,10 @@ export class PageContext {
   private readonly pageDirectoryTargets = new Map<string, string>()
   /** 页面词法路径与真实目标的关联，保留文件别名和被归并的候选 */
   private readonly pageFileTargets = new Map<string, string>()
+  /** 待处理的页面更新：生成期间到达的事件合并到下一轮 */
+  private pendingPageUpdate: { full: boolean, files: Set<string> } | undefined
+  /** 当前事件更新循环；dispose 时等待它排空 */
+  private pendingPageFlush: Promise<void> | undefined
 
   /** 失败恢复以此为基准，避免混入前几轮失败的临时路径 */
   private lastSuccessfulConfigDependencyPaths: string[] = []
@@ -317,7 +321,7 @@ export class PageContext {
 
       debug.pages(configChanged ? `Config changed: ${absolute}` : `File changed: ${absolute}`)
       // 真实路径事件可能影响多个词法候选，整轮刷新后重新选择代表
-      void this.updatePagesAndNotify(!configChanged && event === 'change' && pageFile === eventPath ? pageFile : undefined)
+      this.queuePageUpdate(!configChanged && event === 'change' && pageFile === eventPath ? pageFile : undefined)
     }
     const onAdd = (file: string): void => handleEvent('add', file)
     const onChange = (file: string): void => handleEvent('change', file)
@@ -325,10 +329,10 @@ export class PageContext {
     // glob 规则下的目录增删会改变扫描目录集合（如新增 pkg-a 命中 src/pkg-*）
     const onDirectory = (directory: string): void => {
       if (queryPageRules(false, () => this.pageDirectoryForEvent(directory)))
-        void this.updatePagesAndNotify()
+        this.queuePageUpdate()
     }
     // 初始扫描期间新增的路径可能被 ignoreInitial 吞掉，ready 后再收敛一次
-    const onReady = (): void => void this.updatePagesAndNotify()
+    const onReady = (): void => this.queuePageUpdate()
     watcher.on('add', onAdd)
     watcher.on('change', onChange)
     watcher.on('unlink', onUnlink)
@@ -359,6 +363,7 @@ export class PageContext {
     this.watchedConfigIndex.clear()
     this.watchedPageDirectories.clear()
     this._server = undefined
+    await this.pendingPageFlush
     await this.pendingUpdate
   }
 
@@ -475,23 +480,52 @@ export class PageContext {
   }
 
   /**
-   * 监听事件里的“更新并通知”：失败只记录，不让 Promise 拒绝。
+   * 登记 watcher 触发的更新：生成期间到达的事件合并到下一轮
+   *
+   * @description 连续删除、重建会一次性派发大量事件，逐个生成会反复
+   * 重读全部页面；同一批内只有一个页面变更时保留增量读取，多个变更
+   * 或任意完整变更合并为一次全量生成
+   * @param filepath - 只读取该页面；省略时执行完整扫描
+   */
+  private queuePageUpdate(filepath?: string): void {
+    if (!this.pendingPageUpdate)
+      this.pendingPageUpdate = { full: false, files: new Set() }
+    if (filepath)
+      this.pendingPageUpdate.files.add(filepath)
+    else
+      this.pendingPageUpdate.full = true
+    if (!this.pendingPageFlush)
+      this.pendingPageFlush = this.flushPageUpdates()
+  }
+
+  /**
+   * 排空更新队列；失败只记录，不让 Promise 拒绝
    *
    * watcher 的回调走这里而不是直接调 {@link updatePagesJSON}：一旦
    * 它拒绝（拿不到文件锁、声明文件写不进去），就成了未处理的拒绝，
    * Node 默认直接终止进程——开发时正在编辑文件，一次偶发的锁冲突
    * 不该把 dev server 打死。用户改一次文件就会再触发一次事件，
    * 所以这里报错即可。
-   *
-   * @param filepath - 发生变更的文件路径，透传给 {@link updatePagesJSON}
    */
-  private async updatePagesAndNotify(filepath?: string): Promise<void> {
+  private async flushPageUpdates(): Promise<void> {
     try {
-      if (await this.updatePagesJSON(filepath))
-        this.onUpdate()
+      while (this.pendingPageUpdate) {
+        const { full, files } = this.pendingPageUpdate
+        this.pendingPageUpdate = undefined
+        try {
+          const updated = full || files.size > 1
+            ? await this.updatePagesJSON()
+            : await this.updatePagesJSON([...files][0])
+          if (updated)
+            this.onUpdate()
+        }
+        catch (error) {
+          this.logger?.error(`[vite-plugin-uni-pages] Failed to update pages.json after a file change: ${error instanceof Error ? error.message : error}`, { timestamp: true, error: error instanceof Error ? error : undefined })
+        }
+      }
     }
-    catch (error) {
-      this.logger?.error(`[vite-plugin-uni-pages] Failed to update pages.json after a file change: ${error instanceof Error ? error.message : error}`, { timestamp: true, error: error instanceof Error ? error : undefined })
+    finally {
+      this.pendingPageFlush = undefined
     }
   }
 

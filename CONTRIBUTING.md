@@ -63,6 +63,7 @@ test/
 ├── page-exclude.test.ts                 页面排除基准、模式语义与目录发现一致性
 ├── page-exclude-watch.test.ts           页面排除与配置依赖在真实 watcher 下的隔离
 ├── page-content-refresh.test.ts         页面删建、ready 补扫与增量读取缓存
+├── page-update-coalescing.test.ts       连续 watcher 事件的合并与读取上界
 ├── page-symlink-*.test.ts               符号链接事件映射、目标恢复与真实 watcher
 ├── subpackage-user-pages-path.test.ts   配置里的分包 pages 按 root 写相对 path
 ├── concurrent-pages-json.test.ts        多终端并发读写 pages.json
