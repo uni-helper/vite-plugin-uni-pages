@@ -93,6 +93,7 @@ async function start(root: string, mode: 'serve' | 'build', watchOptions?: Serve
     return observed
   }) as typeof fs.watch)
   let scans = 0
+  let writes = 0
   const setup = PageContext.prototype.setupWatcher
   vi.spyOn(PageContext.prototype, 'setupWatcher').mockImplementation(async function (this: PageContext, observed) {
     queue = this as unknown as ContextQueue
@@ -107,6 +108,7 @@ async function start(root: string, mode: 'serve' | 'build', watchOptions?: Serve
     outDir: '.',
     dts: false,
     onAfterScanPages: () => scans++,
+    onAfterWriteFile: () => writes++,
   })
   if (mode === 'serve') {
     const server = await createServer({
@@ -140,26 +142,49 @@ async function start(root: string, mode: 'serve' | 'build', watchOptions?: Serve
     return trackWatcher(watcher!)
   }
 
+  let settleId = 0
   const settle = async (): Promise<void> => {
+    const id = ++settleId
+    const before = { events: events.length, updates: updates.mock.calls.length, scans, writes }
     let snapshot = ''
     let quietSince = Date.now()
-    await vi.waitFor(async () => {
-      contentWatcher()
-      while (true) {
-        const update = queue.pendingUpdate
-        await queue.pendingPageFlush
-        await update
-        if (!queue.pendingPageFlush && !queue.pendingPageUpdate && update === queue.pendingUpdate)
-          break
-      }
-      contentWatcher()
-      const current = `${events.length}:${updates.mock.calls.length}`
-      if (snapshot !== current) {
-        snapshot = current
-        quietSince = Date.now()
-      }
-      expect(Date.now() - quietSince, '原生事件与更新队列应先收敛').toBeGreaterThanOrEqual(250)
-    }, { timeout: 10000, interval: 50 })
+    try {
+      await vi.waitFor(async () => {
+        contentWatcher()
+        while (true) {
+          const update = queue.pendingUpdate
+          await queue.pendingPageFlush
+          await update
+          if (!queue.pendingPageFlush && !queue.pendingPageUpdate && update === queue.pendingUpdate)
+            break
+        }
+        contentWatcher()
+        const current = `${events.length}:${updates.mock.calls.length}`
+        if (snapshot !== current) {
+          snapshot = current
+          quietSince = Date.now()
+        }
+        expect(Date.now() - quietSince, '原生事件与更新队列应先收敛').toBeGreaterThanOrEqual(250)
+      }, { timeout: 10000, interval: 50 })
+    }
+    catch (error) {
+      const received = events.slice(before.events)
+      const eventCounts = received.reduce<Record<string, number>>((counts, { event }) => {
+        counts[event] = (counts[event] ?? 0) + 1
+        return counts
+      }, {})
+      throw new Error(`Watcher did not settle: ${JSON.stringify({
+        mode,
+        settleId: id,
+        eventCounts,
+        updates: updates.mock.calls.length - before.updates,
+        scans: scans - before.scans,
+        writes: writes - before.writes,
+        recentEvents: received.slice(-20),
+        recentUpdates: updates.mock.calls.slice(before.updates).slice(-5),
+        pending: !!queue.pendingPageFlush || !!queue.pendingPageUpdate,
+      })}`, { cause: error })
+    }
   }
   await settle()
   const expectBoundedScope = (unrelated: string): void => {
