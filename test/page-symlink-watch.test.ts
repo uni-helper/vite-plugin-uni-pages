@@ -1,4 +1,4 @@
-import type { FSWatcher } from 'vite'
+import type { FSWatcher, ServerOptions } from 'vite'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -66,7 +66,7 @@ async function waitForSubscription(watchers: readonly FSWatcher[], directory: st
   }
 }
 
-async function start(root: string, mode: 'serve' | 'build') {
+async function start(root: string, mode: 'serve' | 'build', watchOptions?: ServerOptions['watch']) {
   vi.stubEnv('VITE_ROOT_DIR', root)
   vi.stubEnv('UNI_PLATFORM', 'h5')
   write(path.join(root, 'pages.config.json'), '{}')
@@ -115,7 +115,7 @@ async function start(root: string, mode: 'serve' | 'build') {
       appType: 'custom',
       logLevel: 'silent',
       plugins: [plugin],
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, watch: watchOptions },
     })
     close = () => server.close()
   }
@@ -434,7 +434,8 @@ describe.each(['serve', 'build'] as const)('%s 符号链接页面监听', (mode)
     ]) {
       fs.symlinkSync(target!, source!, process.platform === 'win32' ? 'junction' : 'dir')
     }
-    const { settle, contentWatcher } = await start(root, mode)
+    // Vite 共享 watcher 不展开循环，页面目标仍由插件独立发现和订阅
+    const { settle, contentWatcher } = await start(root, mode, { followSymlinks: false, useFsEvents: false })
     const watched = Object.keys(contentWatcher().getWatched()).map(normalizePath)
     expect(watched).toContain(normalizePath(first))
     expect(watched).toContain(normalizePath(second))
