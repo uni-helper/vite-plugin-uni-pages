@@ -8,7 +8,7 @@ import { parse } from 'comment-json'
 import { normalizePath } from 'vite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PageContext } from '../packages/core/src'
-import { currentPageWatcher, flushPageUpdates, mockPageWatchers } from './helpers/page-watcher'
+import { currentPageWatcher, flushPageUpdates, mockPageWatchers, pageWatchState } from './helpers/page-watcher'
 
 const roots: string[] = []
 const contexts: PageContext[] = []
@@ -180,7 +180,7 @@ describe('符号链接目标恢复', () => {
     page(file, '初始')
     page(home, '首页')
     const { ctx, updates, watcher, shared } = await start(root)
-    const sourceWatch = (ctx as unknown as { pageWatcher: { recoveryWatchers: Map<string, unknown> } }).pageWatcher
+    const sourceWatch = pageWatchState(ctx)
     shared.add.mockClear()
     const parent = path.dirname(target)
     fs.rmSync(parent, { recursive: true })

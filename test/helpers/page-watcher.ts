@@ -14,6 +14,11 @@ interface MockPageWatcher extends EventEmitter {
   close: Mock<() => Promise<void>>
 }
 
+interface PageWatchState {
+  watcher?: MockPageWatcher
+  recoveryWatchers: ReadonlyMap<string, unknown>
+}
+
 function watcher(): MockPageWatcher {
   const emitter = new EventEmitter()
   return Object.assign(emitter, {
@@ -47,9 +52,14 @@ export function mockPageWatchers(): { entrances: Map<string, EventEmitter> } {
   return { entrances }
 }
 
+/** 读取当前内容监听与恢复入口的状态 */
+export function pageWatchState(ctx: PageContext): PageWatchState {
+  return (ctx as unknown as { pageWatcher: PageWatchState }).pageWatcher
+}
+
 /** 当前实例可能随目标变化而替换，派发事件前重新取得 */
 export function currentPageWatcher(ctx: PageContext): MockPageWatcher | undefined {
-  return (ctx as unknown as { pageWatcher: { watcher?: MockPageWatcher } }).pageWatcher.watcher
+  return pageWatchState(ctx).watcher
 }
 
 export async function flushPageUpdates(ctx: PageContext): Promise<void> {
