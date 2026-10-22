@@ -10,15 +10,31 @@ import { compilePageRules, getPageRules } from './page-rules'
 import { comparePageSources } from './page-sources'
 
 /**
- * 统一目录选择器的 Windows 路径分隔符
+ * 规范化页面目录选择器中的路径分隔符
  *
- * @description 保留 `\[` 等 glob 转义，避免 normalizePath 将转义字符一起替换
+ * @description 在 Windows 上将反斜杠路径分隔符转换为 `/`，保留 `\[`、`\(` 等 glob 转义
+ *
+ * @param pattern 页面目录路径或 glob 表达式
+ * @returns Windows 返回规范化后的选择器，其他平台返回原字符串
+ *
+ * @example
+ * normalizePagePattern('src\\pages') // Windows: 'src/pages'
  */
 export function normalizePagePattern(pattern: string): string {
   return process.platform === 'win32' ? pattern.replace(/\\(?![()[\]{}!+@])/g, '/') : pattern
 }
 
-/** 把选择器里的转义还原，用作真实路径前的处理 */
+/**
+ * 将目录选择器中的 glob 转义还原为字面字符
+ *
+ * @description 用于已经确定的固定路径部分，还原后的字符串可传给 `path.resolve` 等路径 API
+ *
+ * @param pattern 以 `/` 分隔、可包含 glob 转义的固定目录路径
+ * @returns 去除 glob 特殊字符前转义反斜杠的路径字符串
+ *
+ * @example
+ * unescapePagePattern('src/\\[demo\\]') // 'src/[demo]'
+ */
 export function unescapePagePattern(pattern: string): string {
   return pattern.replace(/\\(?=[[\](){}!*+?@|])/g, '')
 }

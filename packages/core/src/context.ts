@@ -470,15 +470,13 @@ export class PageContext {
   }
 
   /**
-   * 更新 pages.json 文件
-   * 这是负责协调整个页面配置生成流程的核心方法：
-   * 1. 检查文件变更（指定 filepath 时）
-   * 2. 加载用户配置
-   * 3. 扫描页面文件
-   * 4. 合并页面配置
-   * 5. 生成并写入 pages.json
-   * @param filepath - 发生变更的文件路径，用于增量更新判断
-   * @returns pages.json 是否成功更新
+   * 刷新页面配置并更新 pages.json
+   *
+   * @description 同一实例的调用按顺序执行；指定页面时尝试增量读取，页面尚未收录或物理身份变化时执行完整刷新
+   *
+   * @param filepath 变更页面的绝对路径或相对 root 的路径；省略时执行完整刷新
+   * @returns pages.json 写入新内容时为 `true`，内容未变或跳过生成时为 `false`
+   * @throws 生成、写入或声明输出失败时拒绝；声明输出失败前 pages.json 可能已更新
    */
   async updatePagesJSON(filepath?: string): Promise<boolean> {
     return this.enqueuePagesUpdate(filepath ? [filepath] : undefined)
