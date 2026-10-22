@@ -177,3 +177,19 @@ it('root 外词法入口改指 root 内目标后恢复页面及后续内容更�
   page(path.join(target, 'index.vue'), '再次保存')
   await vi.waitFor(() => expect(output(root).subPackages[0].pages[0].style.navigationBarTitleText).toBe('再次保存'), { timeout: 10000 })
 }, 20000)
+
+it('exclude: [] 的页面来源链接进 node_modules 时仍监听内容', async () => {
+  const { root } = fixture()
+  const target = path.join(root, 'node_modules/@scope/ui/pages')
+  const alias = path.join(root, 'src/alias')
+  page(path.join(target, 'index.vue'), '初始')
+  fs.mkdirSync(path.dirname(alias), { recursive: true })
+  link(target, alias)
+  const { updates, settle } = await start(root, { subPackages: ['src/alias'], exclude: [] })
+  expect(output(root).subPackages[0].pages[0].style.navigationBarTitleText).toBe('初始')
+
+  page(path.join(target, 'index.vue'), '更新')
+  await vi.waitFor(() => expect(output(root).subPackages[0].pages[0].style.navigationBarTitleText).toBe('更新'), { timeout: 10000 })
+  await settle()
+  expect(updates).toHaveBeenCalledWith(normalizePath(path.join(alias, 'index.vue')))
+}, 20000)

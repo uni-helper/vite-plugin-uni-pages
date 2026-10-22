@@ -160,8 +160,8 @@ export class PageSourceWatch {
       ...(this.atomic !== undefined && { atomic: this.atomic }),
       ignored: (file, stats) => {
         const absolute = normalizePath(path.resolve(file))
-        if (absolute.split('/').some(part => part === 'node_modules' || part === '.git'))
-          return true
+        // node_modules/.git 不在这里硬编码：合法来源可能通过 exclude: [] 链接进依赖，
+        // 是否忽略应由 exclude 与 Vite ignored 按词法来源决定
         const lock = normalizePath(path.resolve(this.options.root, this.options.outDir, 'pages.json.lock'))
         if (contains(lock, absolute))
           return true
