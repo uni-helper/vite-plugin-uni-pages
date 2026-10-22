@@ -169,7 +169,7 @@ async function start(root: string, mode: 'serve' | 'build') {
     for (const watcher of watchers)
       expect(Object.keys(watcher.getWatched()).map(normalizePath).filter(belongsToUnrelated), '监听清单不应覆盖无关项目').toEqual([])
   }
-  return { watchers, events, settle, subscriptions, expectBoundedScope, contentWatcher }
+  return { watchers, events, settle, subscriptions, expectBoundedScope, contentWatcher, updates }
 }
 
 afterEach(async () => {
@@ -318,4 +318,131 @@ describe.each(['serve', 'build'] as const)('%s 符号链接页面监听', (mode)
     await vi.waitFor(() => expect(paths()).toContain('src/pages/later/d'), { timeout: 10000 })
     await settle()
   }, 30000)
+
+  it('嵌套链接初始目标缺失时，单次创建后恢复页面及后续修改', async () => {
+    const workspace = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-nested-missing-')))
+    roots.push(workspace)
+    const root = path.join(workspace, 'app')
+    const target = path.join(workspace, 'external/pages')
+    const file = path.join(target, 'profile.vue')
+    page(path.join(root, 'src/pages/index.vue'), '首页')
+    fs.symlinkSync(target, path.join(root, 'src/pages/feature'), process.platform === 'win32' ? 'junction' : 'dir')
+    const { settle } = await start(root, mode)
+    const title = () => output(root).pages.find((entry: any) => entry.path === 'src/pages/feature/profile')?.style.navigationBarTitleText
+
+    page(file, '创建')
+    await vi.waitFor(() => expect(title()).toBe('创建'), { timeout: 10000 })
+    await settle()
+
+    page(file, '修改')
+    await vi.waitFor(() => expect(title()).toBe('修改'), { timeout: 10000 })
+    await settle()
+  }, 30000)
+
+  it('交叉嵌套来源改指后新旧目标分别有效，最后一个旧入口删除后释放订阅', async () => {
+    const workspace = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-nested-cross-')))
+    roots.push(workspace)
+    const root = path.join(workspace, 'app')
+    const previous = path.join(workspace, 'previous')
+    const target = path.join(workspace, 'replacement')
+    const alias = path.join(root, 'src/pages/feature')
+    const second = path.join(root, 'src/pages/second')
+    page(path.join(root, 'src/pages/index.vue'), '首页')
+    page(path.join(previous, 'profile.vue'), '旧目标')
+    page(path.join(target, 'profile.vue'), '新目标')
+    for (const source of [alias, second])
+      fs.symlinkSync(previous, source, process.platform === 'win32' ? 'junction' : 'dir')
+    const { settle, updates, contentWatcher } = await start(root, mode)
+    const title = (name: string) => output(root).pages.find((entry: any) => entry.path === `src/pages/${name}/profile`)?.style.navigationBarTitleText
+
+    fs.unlinkSync(alias)
+    fs.symlinkSync(target, alias, process.platform === 'win32' ? 'junction' : 'dir')
+    await vi.waitFor(() => {
+      expect(title('feature')).toBe('新目标')
+      expect(title('second')).toBe('旧目标')
+    }, { timeout: 10000 })
+    await settle()
+
+    page(path.join(target, 'profile.vue'), '新目标修改')
+    page(path.join(previous, 'profile.vue'), '旧目标修改')
+    await vi.waitFor(() => {
+      expect(title('feature')).toBe('新目标修改')
+      expect(title('second')).toBe('旧目标修改')
+    }, { timeout: 10000 })
+    await settle()
+
+    fs.unlinkSync(second)
+    await vi.waitFor(() => expect(title('second')).toBeUndefined(), { timeout: 10000 })
+    await settle()
+    const events = vi.fn()
+    contentWatcher().on('all', events)
+    updates.mockClear()
+    page(path.join(previous, 'profile.vue'), '失效来源')
+    page(path.join(previous, 'added.vue'), '失效新增')
+    await new Promise(resolve => setTimeout(resolve, 300))
+    await settle()
+    expect(events).not.toHaveBeenCalled()
+    expect(updates).not.toHaveBeenCalled()
+  }, 30000)
+
+  it('运行中新建多层悬空链接，目标恢复及中间层改指后持续更新', async () => {
+    const workspace = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-nested-chain-')))
+    roots.push(workspace)
+    const root = path.join(workspace, 'app')
+    const container = path.join(workspace, 'container')
+    const target = path.join(workspace, 'target/pages')
+    const replacement = path.join(workspace, 'replacement/pages')
+    page(path.join(root, 'src/pages/index.vue'), '首页')
+    fs.mkdirSync(container)
+    fs.symlinkSync(container, path.join(root, 'src/pages/feature'), process.platform === 'win32' ? 'junction' : 'dir')
+    const { settle, contentWatcher } = await start(root, mode)
+    const title = () => output(root).pages.find((entry: any) => entry.path === 'src/pages/feature/nested/profile')?.style.navigationBarTitleText
+    const nested = path.join(container, 'nested')
+    fs.symlinkSync(target, nested, process.platform === 'win32' ? 'junction' : 'dir')
+    await settle()
+
+    page(path.join(target, 'profile.vue'), '创建')
+    await vi.waitFor(() => expect(title()).toBe('创建'), { timeout: 10000 })
+    await settle()
+
+    fs.unlinkSync(nested)
+    fs.symlinkSync(replacement, nested, process.platform === 'win32' ? 'junction' : 'dir')
+    await vi.waitFor(() => expect(title()).toBeUndefined(), { timeout: 10000 })
+    await settle()
+    page(path.join(replacement, 'profile.vue'), '改指恢复')
+    await vi.waitFor(() => expect(title()).toBe('改指恢复'), { timeout: 10000 })
+    await waitForSubscription([contentWatcher()], replacement)
+    await settle()
+    page(path.join(replacement, 'profile.vue'), '继续修改')
+    await vi.waitFor(() => expect(title()).toBe('继续修改'), { timeout: 10000 })
+    await settle()
+  }, 40000)
+
+  it('多层链接形成循环时订阅保持有界且正常页面继续更新', async () => {
+    const workspace = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-nested-cycle-')))
+    roots.push(workspace)
+    const root = path.join(workspace, 'app')
+    const first = path.join(workspace, 'first')
+    const second = path.join(workspace, 'second')
+    page(path.join(root, 'src/pages/index.vue'), '首页')
+    page(path.join(first, 'a.vue'), 'A')
+    page(path.join(second, 'b.vue'), 'B')
+    for (const [target, source] of [
+      [first, path.join(root, 'src/pages/feature')],
+      [second, path.join(first, 'nested')],
+      [first, path.join(second, 'back')],
+    ]) {
+      fs.symlinkSync(target!, source!, process.platform === 'win32' ? 'junction' : 'dir')
+    }
+    const { settle, contentWatcher } = await start(root, mode)
+    const watched = Object.keys(contentWatcher().getWatched()).map(normalizePath)
+    expect(watched).toContain(normalizePath(first))
+    expect(watched).toContain(normalizePath(second))
+    expect(watched.filter(directory => directory.includes('/back') || directory.includes('/nested'))).toEqual([])
+    expect(output(root).pages).toHaveLength(3)
+
+    page(path.join(second, 'b.vue'), 'B 修改')
+    await vi.waitFor(() => expect(output(root).pages.find((entry: any) => entry.path === 'src/pages/feature/nested/b')?.style.navigationBarTitleText).toBe('B 修改'), { timeout: 10000 })
+    await settle()
+  }, 20000)
 })
