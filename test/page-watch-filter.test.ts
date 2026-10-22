@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import process from 'node:process'
 import { normalizePath } from 'vite'
 import { describe, expect, it, vi } from 'vitest'
 import { createPageWatchFilter } from '../packages/core/src/page-watch-filter'
@@ -64,11 +65,30 @@ describe('页面监听的 Vite 过滤规则', () => {
     expect(ignored(lexical('src/pages/public/index.vue'))).toBe(false)
   })
 
-  it('相对字符串仅按 watcher 指定的 cwd 展开', () => {
+  it('相对字符串默认按 process.cwd 展开，显式 cwd 优先', () => {
     const file = lexical('src/pages/index.vue')
+    const cwd = vi.spyOn(process, 'cwd').mockReturnValue(root)
+    try {
+      expect(createPageWatchFilter('src/pages/**', root)(file)).toBe(true)
+    }
+    finally {
+      cwd.mockRestore()
+    }
     expect(createPageWatchFilter('src/pages/**', root)(file)).toBe(false)
     expect(createPageWatchFilter('src/pages/**', root, root)(file)).toBe(true)
     expect(createPageWatchFilter('src/pages', root, root)(file)).toBe(true)
+  })
+
+  it('相对否定规则解析后仍保留否定语义', () => {
+    const cwd = vi.spyOn(process, 'cwd').mockReturnValue(root)
+    try {
+      const ignored = createPageWatchFilter(['src/pages/**', '!src/pages/public/**'], root)
+      expect(ignored(lexical('src/pages/private/index.vue'))).toBe(true)
+      expect(ignored(lexical('src/pages/public/index.vue'))).toBe(false)
+    }
+    finally {
+      cwd.mockRestore()
+    }
   })
 
   it('候选相对路径以项目 root 解析，匹配过程不依赖真实目标', () => {

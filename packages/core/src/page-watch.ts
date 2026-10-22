@@ -91,6 +91,8 @@ export class PageSourceWatch {
   private started = false
   private usePolling = false
   private interval = 100
+  private awaitWriteFinish: ChokidarOptions['awaitWriteFinish']
+  private atomic: ChokidarOptions['atomic']
   private ignored: ((file: string, stats?: Stats) => boolean) | undefined
   watcher?: FSWatcher
 
@@ -103,7 +105,7 @@ export class PageSourceWatch {
     this.rules = getPageRules(options)
   }
 
-  start(options: Pick<ChokidarOptions, 'usePolling' | 'interval' | 'cwd'> = {}, ignored?: WatchOptions['ignored']): void {
+  start(options: Pick<ChokidarOptions, 'usePolling' | 'interval' | 'cwd' | 'awaitWriteFinish' | 'atomic'> = {}, ignored?: WatchOptions['ignored']): void {
     if (this.started)
       return
     const polling = process.env.CHOKIDAR_USEPOLLING?.toLowerCase()
@@ -112,9 +114,12 @@ export class PageSourceWatch {
       ? Number.parseInt(process.env.CHOKIDAR_INTERVAL, 10)
       : options.interval ?? 100
     this.interval = Number.isFinite(interval) && interval > 0 ? interval : 100
+    this.awaitWriteFinish = options.awaitWriteFinish
+    this.atomic = options.atomic
+    // 与 chokidar 一致：没有 watcher cwd 时，相对 ignored 规则按 process.cwd() 解析
     this.ignored = ignored === undefined || (Array.isArray(ignored) && ignored.length === 0)
       ? undefined
-      : createPageWatchFilter(ignored, this.options.root, options.cwd)
+      : createPageWatchFilter(ignored, this.options.root, options.cwd ?? process.cwd())
     this.started = true
     this.refresh()
   }
@@ -151,6 +156,8 @@ export class PageSourceWatch {
       followSymlinks: true,
       usePolling: this.usePolling,
       interval: this.interval,
+      ...(this.awaitWriteFinish !== undefined && { awaitWriteFinish: this.awaitWriteFinish }),
+      ...(this.atomic !== undefined && { atomic: this.atomic }),
       ignored: (file, stats) => {
         const absolute = normalizePath(path.resolve(file))
         if (absolute.split('/').some(part => part === 'node_modules' || part === '.git'))

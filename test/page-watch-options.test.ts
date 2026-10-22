@@ -79,6 +79,12 @@ afterEach(async () => {
     fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
 })
 
+it('转发 Vite 的写稳定性选项', async () => {
+  const awaitWriteFinish = { stabilityThreshold: 120, pollInterval: 20 }
+  const { state } = await start({ awaitWriteFinish, atomic: false })
+  expect(state.pageWatcher.watcher?.options).toMatchObject({ awaitWriteFinish, atomic: false })
+})
+
 it('vite polling 后端及间隔同时用于页面内容和恢复入口', async () => {
   vi.stubEnv('CHOKIDAR_USEPOLLING', undefined)
   vi.stubEnv('CHOKIDAR_INTERVAL', undefined)

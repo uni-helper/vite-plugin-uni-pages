@@ -594,6 +594,8 @@ H5 开发服务器和 `vite build --watch` 都会重新发现主包 `dir` 与分
 
 Windows 下，原生监听会持有子目录句柄，重命名其父目录可能报 `EPERM`，详见 [Chokidar #1380](https://github.com/paulmillr/chokidar/issues/1380)。需要在运行期间重命名这类目录时，可在启动命令前设置环境变量 `CHOKIDAR_USEPOLLING=true`，为 H5 和 `build --watch` 启用 [Chokidar 轮询后端](https://github.com/paulmillr/chokidar/blob/5.0.0/README.md#performance)。页面内容与恢复入口使用相同的轮询设置，`CHOKIDAR_INTERVAL` 可指定轮询间隔（毫秒）；H5 也支持 Vite 的 `server.watch.usePolling` 和 `server.watch.interval`。轮询会增加 CPU 和文件系统访问开销，插件不会默认启用。
 
+Vite 的 `server.watch.ignored` 同样约束 H5 的页面监听。相对字符串规则按 watcher 的 `cwd` 解析；未设置 `cwd` 时与 Chokidar 一致按 `process.cwd()` 展开，`**/` 开头的规则仍匹配任意绝对路径，`!` 否定规则在解析后保留否定语义。`server.watch.awaitWriteFinish` 和 `server.watch.atomic` 会转发给页面内容 watcher，与 Vite 自身的监听行为保持一致。
+
 动态发现会更新 `pages.json`。如果下游插件只在创建时缓存分包信息，它仍需要重启才能使用新增分包；自动重新发现不会改变其他插件的缓存策略。
 
 ### 扫描目录与页面归属
