@@ -13,6 +13,7 @@ import {
   GENERATION_MARKER_PREFIX,
   hasGenerationMarker,
   isGenerationMarker,
+  orderVariantLists,
   platformsExcluding,
   resolvePlatformUnion,
   sortVariants,
@@ -187,7 +188,7 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
 
   // pages
   const oldPagesArray = oldPages as unknown as CommentArray<CommentObject> | undefined
-  pageJson.pages = mergePlatformItems(oldPagesArray, currentPlatform, data.pages, 'path').items as unknown as Pages
+  pageJson.pages = mergePlatformItems(oldPagesArray, currentPlatform, data.pages, 'path', false).items as unknown as Pages
 
   // mergePlatformItems 内部用 Map 保存条目，顺序可能和首页在前的
   // 要求不一致，所以合并后要把首页挪到最前面
@@ -210,7 +211,7 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
       // 律带新的生成标记，看合并后的数组永远为真。手写子包（没有
       // 标记）的 plugins 不碰
       const wasGenerated = hasGenerationMarker(existing.pages as unknown as CommentArray<CommentObject> | undefined)
-      existing.pages = mergePlatformItems(existing.pages as unknown as CommentArray<CommentObject>, currentPlatform, sub.pages, 'path').items as unknown as Pages
+      existing.pages = mergePlatformItems(existing.pages as unknown as CommentArray<CommentObject>, currentPlatform, sub.pages, 'path', false).items as unknown as Pages
       if (sub.plugins) {
         existing.plugins = sub.plugins
       }
@@ -250,7 +251,7 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
   for (const [_, newSub] of newSubPackages) {
     const subPackage: SubPackage = {
       root: newSub.root,
-      pages: mergePlatformItems(undefined, currentPlatform, newSub.pages, 'path').items as unknown as Pages,
+      pages: mergePlatformItems(undefined, currentPlatform, newSub.pages, 'path', false).items as unknown as Pages,
     }
     // 配置了 plugins 属性时一并带上
     if (newSub.plugins) {
@@ -270,7 +271,9 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
   // 的条目从 list 中退出，其他平台的条目在自己的 #ifdef 块后面继续
   // 存活。pages.json 是各平台共享的，当前平台没有 tabBar，不代表可以
   // 删掉其他平台已经生成的整个区块
-  const tabBarMerge = mergePlatformItems(oldTabBarObj?.list, currentPlatform, list || [], 'pagePath')
+  // tabBar list 启用配置序重排：tab 顺序用户直接可见，且没有首页前置
+  // 子系统的约束（见 platform-variants 规则 6）
+  const tabBarMerge = mergePlatformItems(oldTabBarObj?.list, currentPlatform, list || [], 'pagePath', true)
   let tabBarBodyLines: string[] | undefined
 
   if (tabBarMerge.items.length === 0) {
@@ -546,9 +549,14 @@ interface MergedPlatformItems {
  * @param currentPlatform - 当前平台标识（如 H5、MP-WEIXIN）
  * @param items - 新配置条目数组
  * @param uniqueKeyName - 用于识别条目唯一性的字段名（如 'path' 或 'pagePath'）
+ * @param followConfigOrder - 是否在配置覆盖全部既有条目时按配置顺序
+ * 输出（规则见 platform-variants 的 orderVariantLists）。只有 tabBar
+ * list 启用：tab 顺序用户直接可见；pages 数组由首页前置子系统接管
+ * （各平台可声明不同首页，配置序重排会翻转首页变体的相对顺序）。
+ * 两个平台的配置都覆盖全部条目但顺序不同时，文件跟随最后写入者
  * @returns 带 #ifdef 块的合并条目，以及平台全集与拥有平台
  */
-function mergePlatformItems<T extends object = Record<string, unknown>>(source: CommentArray<CommentObject> | undefined, currentPlatform: string, items: T[], uniqueKeyName: keyof ExcludeIndexSignature<T>): MergedPlatformItems {
+function mergePlatformItems<T extends object = Record<string, unknown>>(source: CommentArray<CommentObject> | undefined, currentPlatform: string, items: T[], uniqueKeyName: keyof ExcludeIndexSignature<T>, followConfigOrder: boolean): MergedPlatformItems {
   const src = source || new CommentArray<CommentObject>()
   currentPlatform = currentPlatform.toUpperCase()
 
@@ -664,8 +672,14 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
   // 把生成标记写进 result 的 Symbol.for(`before:0`)
   result[Symbol.for('before:0') as CommentSymbol] = [lineComment(` ${GENERATION_MARKER_PREFIX} ${platformUnionStr}`)]
 
-  // 按插入顺序处理元素
-  for (const [_, list] of mergedMap) {
+  // 计算输出顺序：仅 tabBar list 启用配置序重排（followConfigOrder
+  // 由调用方决定）；配置没覆盖全部既有条目时保持磁盘序
+  const declaredKeys = followConfigOrder
+    ? [...new Set(items.map(item => item[uniqueKeyName]).filter(Boolean))] as string[]
+    : null
+
+  // 按输出顺序处理元素
+  for (const list of orderVariantLists(mergedMap, declaredKeys)) {
     for (const { payload: item, platformStr, passthrough } of list) {
       result.push(item as unknown as CommentObject)
 

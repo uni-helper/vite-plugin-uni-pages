@@ -1,6 +1,6 @@
 import type { PlatformVariant } from '../packages/core/src/platform-variants'
 import { describe, expect, it } from 'vitest'
-import { platformsExcluding, sortVariants, upsertCurrentVariant } from '../packages/core/src/platform-variants'
+import { orderVariantLists, platformsExcluding, sortVariants, upsertCurrentVariant } from '../packages/core/src/platform-variants'
 
 /**
  * 平台变体表核心规则的单测：这些规则此前只能通过 mergePagesJson 的
@@ -81,5 +81,54 @@ describe('platformsExcluding', () => {
     expect(platformsExcluding('H5 ||', 'MP-WEIXIN')).toEqual(['H5'])
     // 空串混进列表同样丢掉，且不算"还有别的平台"
     expect(platformsExcluding('H5 || || MP-WEIXIN', 'MP-ALIPAY')).toEqual(['H5', 'MP-WEIXIN'])
+  })
+})
+
+describe('orderVariantLists', () => {
+  it('orders variant lists by the config order when the config declares every existing key', () => {
+    const mergedMap = new Map<string, PlatformVariant<{ v: string }>[]>([
+      ['a', [variant(['H5'], 'a', { v: 'a' })]],
+      ['b', [variant(['H5'], 'b', { v: 'b' })]],
+    ])
+
+    // 配置把 b 声明在 a 前面：输出跟随配置顺序，而不是磁盘序
+    expect(orderVariantLists(mergedMap, ['b', 'a']).map(list => list[0].payload)).toEqual([{ v: 'b' }, { v: 'a' }])
+  })
+
+  it('inserts a config-added key at its declared position', () => {
+    const mergedMap = new Map<string, PlatformVariant<{ v: string }>[]>([
+      ['a', [variant(['H5'], 'a', { v: 'a' })]],
+      // b 是本次配置新增的条目：upsert 后它已带着自己的变体注册进 mergedMap
+      ['b', [variant(['APP-PLUS'], 'b', { v: 'b' })]],
+      ['c', [variant(['H5'], 'c', { v: 'c' })]],
+    ])
+
+    // 落在 a、c 之间，而不是追加到末尾
+    expect(orderVariantLists(mergedMap, ['a', 'b', 'c']).map(list => list[0].payload)).toEqual([{ v: 'a' }, { v: 'b' }, { v: 'c' }])
+  })
+
+  it('keeps the map (disk) order when the config does not cover all existing keys', () => {
+    const mergedMap = new Map<string, PlatformVariant<{ v: string }>[]>([
+      ['a', [variant(['H5'], 'a', { v: 'a' })]],
+      ['b', [variant(['MP-WEIXIN'], 'b', { v: 'b' })]],
+      ['c', [variant(['H5'], 'c', { v: 'c' })]],
+    ])
+
+    // 配置只有 a、c（b 属于其它平台）：保持磁盘序，避免两端构建来回翻转
+    expect(orderVariantLists(mergedMap, ['a', 'c']).map(list => list[0].payload)).toEqual([{ v: 'a' }, { v: 'b' }, { v: 'c' }])
+  })
+
+  it('returns an empty array for an empty map', () => {
+    expect(orderVariantLists(new Map(), ['a'])).toEqual([])
+  })
+
+  it('keeps the disk order when reordering is disabled with null', () => {
+    const mergedMap = new Map<string, PlatformVariant<{ v: string }>[]>([
+      ['a', [variant(['H5'], 'a', { v: 'a' })]],
+      ['b', [variant(['H5'], 'b', { v: 'b' })]],
+    ])
+
+    // pages 数组的调用方传 null：永不重排
+    expect(orderVariantLists(mergedMap, null).map(list => list[0].payload)).toEqual([{ v: 'a' }, { v: 'b' }])
   })
 })

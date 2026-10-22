@@ -20,6 +20,13 @@ import type { CommentArray, CommentLineToken, CommentObject, CommentSymbol } fro
  * 5. 覆盖平台并集才裸输出：没被包裹的条目所有平台都看得见，覆盖面
  *    小的变体必须包进 #ifdef，免得漏进其他平台的构建产物（比较
  *    platformStr 与并集串，在两侧的渲染处执行）
+ * 6. 配置覆盖全部既有条目时按配置顺序输出：声明顺序是权威顺序，每
+ *    次运行把文件归位、不依赖构建历史；没覆盖时保持磁盘序，避免两
+ *    端构建来回翻转（{@link orderVariantLists}）。是否启用由调用方
+ *    决定：目前只有 tabBar list 启用——tab 顺序是用户直接可见的顺
+ *    序；pages 数组另有「首页变体提到最前」的子系统（各平台可以声
+ *    明不同首页，首页变体的相对顺序按首次出现序保持字节级稳定），
+ *    配置序重排会翻转它，故暂不参与
  *
  * 两类适配器往里喂数据：数组侧（pages / subPackages / tabBar.list）
  * 从 comment-json 的注释符号里读 #ifdef（pages-json.ts 的
@@ -108,6 +115,55 @@ export function upsertCurrentVariant<P>(
  */
 export function sortVariants<P>(variants: PlatformVariant<P>[]): void {
   variants.sort((a, b) => (a.platformStr < b.platformStr ? -1 : a.platformStr > b.platformStr ? 1 : 0))
+}
+
+/**
+ * 决定变体列表的输出顺序（规则 6）
+ *
+ * 此前条目一律按磁盘上的旧顺序输出、配置里新增的条目追加到末尾：
+ * 「哪个平台先构建」决定了文件长什么样，配置里的声明顺序会被丢掉
+ * （比如某平台把一个新条目声明在 tabBar 第二位，生成的文件里却垫
+ * 着底，该平台编译剥掉注释后实际顺序就是错的）。
+ *
+ * 只有本次配置声明了全部既有键时才按配置顺序重排：这时配置就是全量
+ * 超集，它声明的顺序是唯一已知的权威顺序，每次运行都会把文件归位。
+ * 注意：两个平台的配置都声明了全部键但顺序不同时，文件跟随最后写入
+ * 者的顺序——每次构建产物各自正确（各自平台剥掉注释后的顺序就是它
+ * 自己配置的顺序），共享文件则与平台收敛行为一样由最后写入者定稿。
+ * 配置没覆盖全部键时（某平台没有另一些平台的条目，谁也不知道完整顺
+ * 序）保持磁盘序——强行重排会让两端构建来回翻转。
+ *
+ * @param mergedMap - 键 → 变体列表的合并结果
+ * @param declaredKeys - 本次配置声明的键，按配置顺序，可含新增键；
+ * 传 null 表示不启用配置序重排，保持磁盘序
+ * @returns 按输出顺序排列的变体列表（mergedMap 中列表的原引用）
+ */
+export function orderVariantLists<P, V extends PlatformVariant<P> = PlatformVariant<P>>(mergedMap: Map<string, V[]>, declaredKeys: string[] | null): V[][] {
+  if (mergedMap.size === 0)
+    return []
+
+  if (declaredKeys === null)
+    return [...mergedMap.values()]
+
+  // 配置没有声明全部既有键：保持磁盘序
+  const declared = new Set(declaredKeys)
+  if (![...mergedMap.keys()].every(key => declared.has(key)))
+    return [...mergedMap.values()]
+
+  // 按配置顺序取变体列表；配置新增的键自然落在它声明的位置上。
+  // 去重与 if (list) 是防御：唯一调用点已用 Set 去重、upsert 也保证
+  // 声明过的键都注册进了 map，正常流程走不到这两个分支
+  const lists: V[][] = []
+  const seen = new Set<string>()
+  for (const key of declaredKeys) {
+    if (seen.has(key))
+      continue
+    seen.add(key)
+    const list = mergedMap.get(key)
+    if (list)
+      lists.push(list)
+  }
+  return lists
 }
 
 /**
