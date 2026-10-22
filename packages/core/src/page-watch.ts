@@ -174,7 +174,7 @@ export class PageSourceWatch {
               return false
           }
         }
-        return ![...this.files].some(([source, { target }]) => contains(absolute, target) && !this.ignoresSource(source, absolute === target ? stats : undefined))
+        return true
       },
     })
     for (const event of ['add', 'change', 'unlink'] as const) {
@@ -279,11 +279,16 @@ export class PageSourceWatch {
   }
 
   private reconcile(): void {
-    const resolved = [...this.directories.values(), ...this.files.values()].filter(source => source.exists)
-    const directories = [...this.directories.values()].filter(source => source.exists).map(source => source.target)
-    const wanted = new Map(resolved.filter(({ target }) => !directories.some(directory => directory !== target && contains(directory, target)))
-      .map(({ target, identity }) => [target, identity]))
-    const key = JSON.stringify([...wanted].sort(([a], [b]) => a.localeCompare(b)))
+    const directories = [...this.directories.values()].filter(source => source.exists)
+    const covered = (target: string): boolean => directories.some(directory => directory.target !== target && contains(directory.target, target))
+    const wanted = new Map<string, string | undefined>()
+    // 内容 watcher 跟随目录目标中的符号链接，文件别名的内容事件由目录
+    // 订阅覆盖；files 保留用于事件映射与目标恢复，不再单独订阅
+    for (const target of directories) {
+      if (!covered(target.target))
+        wanted.set(target.target, target.identity)
+    }
+    const key = JSON.stringify([...wanted].map(([target, identity]) => [target, identity ?? null]).sort(([a], [b]) => String(a).localeCompare(String(b))))
     if (key !== this.contentKey || this.contentRules !== this.rules) {
       if (this.watcher) {
         // chokidar.unwatch 不会释放目录后代的全部句柄；重建自有订阅才能收回旧目标
@@ -309,9 +314,11 @@ export class PageSourceWatch {
   }
 
   private refreshFromEntrance(): void {
-    const signature = (): string => JSON.stringify([...this.directories, ...this.files]
-      .map(([source, { target, exists, identity }]) => [source, target, exists, identity])
-      .sort(([a], [b]) => String(a).localeCompare(String(b))))
+    const signature = (): string => JSON.stringify([
+      ...[...this.directories].map(([source, { target, exists, identity }]) => [source, target, exists, identity]),
+      // 文件被原子替换时只改变内容，页面来源结构没变，不触发全量刷新
+      ...[...this.files].map(([source, { target, exists }]) => [source, target, exists, null]),
+    ].sort(([a], [b]) => String(a).localeCompare(String(b))))
     try {
       const previous = signature()
       this.refresh()

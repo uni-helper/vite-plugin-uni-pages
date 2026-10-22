@@ -193,3 +193,24 @@ it('exclude: [] 的页面来源链接进 node_modules 时仍监听内容', async
   await settle()
   expect(updates).toHaveBeenCalledWith(normalizePath(path.join(alias, 'index.vue')))
 }, 20000)
+
+it('符号链接页面文件原子替换只触发一次增量读取', async () => {
+  const { workspace, root } = fixture()
+  const target = path.join(workspace, 'external/real.vue')
+  const temporary = path.join(workspace, 'external/.real.tmp')
+  const alias = path.join(root, 'pages/index.vue')
+  page(target, '初始')
+  fs.mkdirSync(path.dirname(alias), { recursive: true })
+  fs.symlinkSync(target, alias, 'file')
+  const { context, updates, settle } = await start(root)
+  const loads = vi.fn()
+  context.options.onBeforeLoadUserConfig = loads
+  page(temporary, '更新')
+  fs.renameSync(temporary, target)
+
+  await vi.waitFor(() => expect(output(root).pages.find((entry: any) => entry.path === 'pages/index').style.navigationBarTitleText).toBe('更新'), { timeout: 10000 })
+  await settle()
+  expect(updates).toHaveBeenCalledOnce()
+  expect(updates).toHaveBeenCalledWith(normalizePath(alias))
+  expect(loads).toHaveBeenCalledOnce()
+}, 20000)
