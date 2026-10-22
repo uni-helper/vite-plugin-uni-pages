@@ -646,7 +646,7 @@ Vite 的 `server.watch.ignored` 同样约束 H5 的页面监听。相对字符�
 
 普通非循环页面链接无需额外配置。UniPages 自行发现链接、解析真实目标并建立页面监听；Vite 的共享监听负责模块更新与 HMR，两条更新路径需要分别判断。
 
-以下两项均为 Vite 配置，UniPages 不自动改写。页面监听仍按契约使用 Vite 的忽略规则、轮询设置和监听开关。
+以下两项均为 Vite 配置，分别控制文件监听和模块解析，按项目需要设置：
 
 | 配置 | 默认值 | 职责 |
 | --- | --- | --- |
@@ -668,7 +668,7 @@ export default defineConfig({
 
 `followSymlinks` 作用于整个共享 watcher，可能影响链接模块的 HMR 和依赖它的其他插件。实际影响取决于模块解析路径及真实目标是否另行受到监听，调整后应验证项目中的模块热更新。
 
-如果项目已配置 `preserveSymlinks: true`，需要特别验证这一组合；无需为使用 UniPages 额外开启它。页面配置恢复成功不能证明模块热更新正常。
+项目采用 `preserveSymlinks: true` 保留链接路径时，关闭 `followSymlinks` 后应特别验证链接模块的 HMR。页面配置恢复成功不能证明模块热更新正常。
 
 <details>
 <summary>HMR 实测结果与验证范围</summary>
