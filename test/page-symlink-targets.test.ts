@@ -173,11 +173,14 @@ describe('符号链接目标恢复', () => {
     ])
   })
 
-  it('目标父目录删除重建时补扫，共享 watcher 不扩大订阅范围', async () => {
+  it('目标父目录重建时，同一受控批次的入口、ready 与目录通知最多补扫两轮', async () => {
     const { workspace, root, target } = fixture()
     const file = path.join(target, 'profile.vue')
+    const home = path.join(root, 'src/pages/index.vue')
     page(file, '初始')
+    page(home, '首页')
     const { ctx, updates, watcher, shared } = await start(root)
+    const sourceWatch = (ctx as unknown as { pageWatcher: { recoveryWatchers: Map<string, unknown> } }).pageWatcher
     shared.add.mockClear()
     const parent = path.dirname(target)
     fs.rmSync(parent, { recursive: true })
@@ -188,19 +191,49 @@ describe('符号链接目标恢复', () => {
 
     expect(updates).toHaveBeenCalledOnce()
     expect(output(root).subPackages ?? []).toEqual([])
+    expect(watcher.close).toHaveBeenCalledOnce()
+    const remainingWatcher = currentPageWatcher(ctx)!
+    expect(remainingWatcher.add.mock.calls.flat(2)).toEqual([normalizePath(path.dirname(home))])
+    remainingWatcher.emit('ready')
+    await flushPageUpdates(ctx)
+    const ancestorPath = normalizePath(path.dirname(parent))
+    const ancestor = entrances.get(ancestorPath)!
+    expect(sourceWatch.recoveryWatchers.has(ancestorPath)).toBe(true)
     expect(shared.add.mock.calls.flat(2).map(file => normalizePath(file))).not.toContain(normalizePath(path.join(workspace, 'external')))
 
     shared.add.mockClear()
-    page(file, '目录恢复')
     updates.mockClear()
-    entrances.get(normalizePath(path.dirname(parent)))!.emit('change', 'rename', path.basename(parent))
+    const scans = vi.fn()
+    ctx.options.onBeforeScanPages = scans
+    page(file, '目录恢复')
+    ancestor.emit('change', 'rename', path.basename(parent))
+    const restoredWatcher = currentPageWatcher(ctx)!
+    restoredWatcher.emit('ready')
+    shared.emit('addDir', path.join(root, 'src/alias'))
     await flushPageUpdates(ctx)
+
+    expect(updates.mock.calls.every(([file]) => file === undefined)).toBe(true)
+    expect(updates.mock.calls.length).toBeLessThanOrEqual(2)
+    expect(scans.mock.calls.length).toBeGreaterThan(0)
+    expect(scans.mock.calls.length).toBeLessThanOrEqual(2)
+    expect(currentPageWatcher(ctx)).toBe(restoredWatcher)
+    expect(restoredWatcher).not.toBe(remainingWatcher)
+    expect(remainingWatcher.close).toHaveBeenCalledOnce()
+    expect(restoredWatcher.add.mock.calls.flat(2).sort()).toEqual([normalizePath(path.dirname(home)), normalizePath(target)].sort())
+    expect(sourceWatch.recoveryWatchers.has(ancestorPath)).toBe(false)
+    expect(ancestor.listenerCount('change')).toBe(0)
     expect(shared.add.mock.calls.flat(2).map(file => normalizePath(file))).not.toContain(normalizePath(target))
-    expect(updates).toHaveBeenCalledOnce()
     expect(output(root).subPackages).toMatchObject([{ root: 'src/alias', pages: [{ path: 'profile', style: { navigationBarTitleText: '目录恢复' } }] }])
 
+    const readFile = vi.spyOn(fs.promises, 'readFile')
     page(file, '恢复后修改')
     await dispatch(watcher, updates, 'change', file)
+
+    const lexicalFile = normalizePath(path.join(root, 'src/alias/profile.vue'))
+    expect(updates).toHaveBeenCalledOnce()
+    expect(updates).toHaveBeenCalledWith(lexicalFile)
+    expect(readFile.mock.calls.filter(call => call[0] === lexicalFile)).toHaveLength(1)
+    expect(readFile.mock.calls.filter(call => call[0] === normalizePath(home))).toHaveLength(0)
     expect(output(root).subPackages[0].pages[0].style.navigationBarTitleText).toBe('恢复后修改')
   })
 })
