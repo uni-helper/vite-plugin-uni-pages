@@ -17,6 +17,8 @@ interface PageRules {
   /** 可交给 tinyglobby 提前剪枝的保守模式子集，相对项目根 */
   traversalIgnores: readonly string[]
   isExcluded: (absoluteRulePath: string) => boolean
+  /** 创建一次遍历内复用祖先判断的排除查询 */
+  createExcludeFilter: () => (absoluteRulePath: string) => boolean
   matchesDirectory: (absoluteRulePath: string) => boolean
 }
 
@@ -63,16 +65,31 @@ export function compilePageRules(root: string, patterns: readonly string[], excl
   const directoryPatterns = patterns.filter(pattern => pattern !== '' && !picomatch.scan(pattern).negated)
   // 与 tinyglobby 的 POSIX 字符类语义一致，例如 [!a]
   const directories = directoryPatterns.map(compilePattern)
-  const isExcluded = (absoluteRulePath: string): boolean => {
+  const isExcluded = (absoluteRulePath: string, cache?: Map<string, boolean>): boolean => {
     let current = path.resolve(absoluteRulePath)
+    const visited: string[] | undefined = cache ? [] : undefined
+    let excluded = false
     while (true) {
-      if (exclusions.some(rule => rule.matches(current)))
-        return true
+      const cached = cache?.get(current)
+      if (cached !== undefined) {
+        excluded = cached
+        break
+      }
+      visited?.push(current)
+      if (exclusions.some(rule => rule.matches(current))) {
+        excluded = true
+        break
+      }
       const parent = path.dirname(current)
       if (parent === current)
-        return false
+        break
       current = parent
     }
+    if (cache && visited) {
+      for (const directory of visited)
+        cache.set(directory, excluded)
+    }
+    return excluded
   }
 
   return {
@@ -80,6 +97,10 @@ export function compilePageRules(root: string, patterns: readonly string[], excl
     // 复杂表达式只由统一 matcher 判定，避免第二套规范化提前删掉有效页面
     traversalIgnores: exclusions.filter(rule => !rule.absolute && !/[!()[\]{}\\+@|]/.test(rule.pattern)).map(rule => rule.pattern),
     isExcluded,
+    createExcludeFilter: () => {
+      const cache = new Map<string, boolean>()
+      return absolute => isExcluded(absolute, cache)
+    },
     matchesDirectory: absolute => !isExcluded(absolute) && directories.some(rule => rule.matches(absolute)),
   }
 }

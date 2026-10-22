@@ -209,7 +209,8 @@ export class PageSourceWatch {
       }
     }
     this.roots = new Set([...currentDirectories].filter(source => this.options.mergePages && rules.matchesDirectory(source)))
-    const sources = collectPageWatchSources(this.roots, source => rules.isExcluded(source) || this.ignoresSource(source))
+    const isExcluded = rules.createExcludeFilter()
+    const sources = collectPageWatchSources(this.roots, source => isExcluded(source) || this.ignoresSource(source))
     this.rules = rules
     this.directories = sources.directories
     this.files = sources.files
