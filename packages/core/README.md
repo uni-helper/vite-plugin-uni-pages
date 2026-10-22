@@ -642,7 +642,20 @@ Vite 的 `server.watch.ignored` 同样约束 H5 的页面监听。相对字符�
 
 例如 `src/pages/feature` 指向外部 `shared/pages`：启动时目标不存在，稍后创建 `shared/pages/profile.vue` 会自动加入页面；运行中将 `feature` 改指另一目录后，新目录的后续页面修改也会更新产物。两个有效入口共用同一目标时，移除其中一个入口仍保留另一入口所需的订阅；最后一个有效入口退出后才释放目标。多层链接按各自的词法路径应用排除规则，同一遍历链路遇到已访问的物理目录时停止展开循环，其他独立别名继续参与发现。
 
-普通非循环链接无需额外配置。循环链接导致 Vite 共享 watcher 递归遍历并报 `ELOOP` 时，可在 H5 开发中选择关闭链接递归：
+#### Vite 配置与模块热更新
+
+普通非循环页面链接无需额外配置。UniPages 自行发现链接、解析真实目标并建立页面监听；Vite 的共享监听负责模块更新与 HMR，两条更新路径需要分别判断。
+
+以下两项均为 Vite 配置，UniPages 不自动改写。页面监听仍按契约使用 Vite 的忽略规则、轮询设置和监听开关。
+
+| 配置 | 默认值 | 职责 |
+| --- | --- | --- |
+| `server.watch.followSymlinks` | `true` | 控制监听器是否沿符号链接覆盖目标 |
+| `resolve.preserveSymlinks` | `false` | 控制模块身份是否保留链接路径；默认使用解析后的真实路径 |
+
+#### 循环链接的可选处理
+
+仅当循环链接导致 Vite 共享 watcher 报 `ELOOP` 时，才考虑在 H5 开发中关闭链接递归。该问题已在未启用 UniPages 的对照中复现，下面是 Vite 监听层的可选规避措施：
 
 ```ts
 export default defineConfig({
@@ -653,11 +666,27 @@ export default defineConfig({
 })
 ```
 
-此选项作用于整个 Vite 共享 watcher，可能影响链接模块的 HMR，以及依赖共享 watcher 的其他插件。实际影响取决于模块解析后的路径、真实目标是否另行受到监听，需要按项目验证。页面链接目标仍由 UniPages 独立发现和监听；插件不会自动修改 Vite 的共享监听策略。
+`followSymlinks` 作用于整个共享 watcher，可能影响链接模块的 HMR 和依赖它的其他插件。实际影响取决于模块解析路径及真实目标是否另行受到监听，调整后应验证项目中的模块热更新。
 
-同时设置 `server.watch.followSymlinks: false` 和 `resolve.preserveSymlinks: true` 时，应特别检查链接模块的热更新。在 Vite 5.4.21、macOS 的项目外链接 Vue/JS 场景中，Node watcher 和 FSEvents 均已复现：修改 Vue 模板或独立 JS 模块后没有 HMR 更新消息，再次请求模块转换代码仍得到旧内容，但 `pages.json` 元数据继续更新。同一场景保持默认 `preserveSymlinks: false` 时，HMR 消息与转换代码更新正常。
+如果项目已配置 `preserveSymlinks: true`，需要特别验证这一组合；无需为使用 UniPages 额外开启它。页面配置恢复成功不能证明模块热更新正常。
 
-上述 HMR 验证覆盖服务端消息和转换代码，未覆盖浏览器渲染、样式 HMR、Windows、Linux、polling、其他 Vite 版本或其他插件行为。页面监听回归（含循环链接场景）覆盖页面发现、配置生成、监听订阅与恢复；页面配置恢复不代表模块热更新正常。独立页面 watcher 收到变化不代表所有事件都已转发给 Vite；普通 `change` 下元数据未变时，生成逻辑会提前返回。
+<details>
+<summary>HMR 实测结果与验证范围</summary>
+
+验证环境为 Vite 5.4.21、macOS，使用 Vue 插件加载项目外链接的 Vue 页面和独立 JS 模块。Node watcher 与 FSEvents 两种后端得到相同结果：
+
+| `followSymlinks` | `preserveSymlinks` | Vue 模板与 JS 模块更新 | `pages.json` 元数据 |
+| --- | --- | --- | --- |
+| `false` | `true` | 无 HMR 更新消息，再次请求模块转换代码仍是旧内容 | 正常更新 |
+| `false` | `false`（默认值） | HMR 更新消息与转换代码正常更新 | 正常更新 |
+
+这些结果只描述该验证场景，不构成其他配置组合或默认配置的 HMR 保证。核验范围为服务端消息和转换代码，未覆盖浏览器渲染、样式 HMR、Windows、Linux、polling、其他 Vite 版本或其他插件行为。
+
+页面监听回归（含循环链接场景）验证页面发现、配置生成、监听订阅与恢复。私有页面 watcher 未向 Vite 转发全部页面事件；普通 `change` 下元数据未变时，生成逻辑会提前返回。
+
+</details>
+
+#### 来源恢复与订阅
 
 当前配置中的词法来源决定页面范围，符号链接的当前指向决定内容目标。来源暂时不可用时，插件观察恢复所需的目录入口；仍指向已删除目标的链接可以在目标重建后恢复。确认链接改指另一个目标时，旧目标会退出该来源的关联与订阅，新目标尚不存在时也按新指向等待恢复。链接自身删除后，恢复时重新解析其当前指向。
 
