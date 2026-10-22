@@ -98,6 +98,8 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
           const lockDirectory = normalizeConfigPath(`${ctx.resolvedPagesJSONPath}.lock`, config.root)
           buildWatcher = chokidar.watch([], {
             ignoreInitial: true,
+            // 配置依赖按解析后的路径注册，目录恢复观察不递归跟随页面链接
+            followSymlinks: false,
             ignored: (file) => {
               const absolute = normalizeConfigPath(file, config.root)
               return absolute.split('/').some(part => part === 'node_modules' || part === '.git')

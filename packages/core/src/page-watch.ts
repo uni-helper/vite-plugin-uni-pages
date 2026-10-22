@@ -2,7 +2,7 @@ import type { ChokidarOptions, FSWatcher } from 'chokidar'
 import type { EventEmitter } from 'node:events'
 import type { Stats } from 'node:fs'
 import type { WatchOptions } from 'vite'
-import type { PageSource } from './page-sources'
+import type { SourceTarget } from './page-watch-sources'
 import type { ResolvedOptions } from './types'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -15,13 +15,7 @@ import { isPageDirectoryEvent, isPageFileInDirectories, normalizePagePattern, re
 import { isMissingFsError, isTargetFile } from './files'
 import { getPageRules } from './page-rules'
 import { createPageWatchFilter } from './page-watch-filter'
-
-interface SourceTarget {
-  target: string
-  exists: boolean
-  links: string[]
-  identity?: string
-}
+import { collectPageWatchSources, resolveWatchTarget } from './page-watch-sources'
 
 interface EntranceWatch {
   watcher: EventEmitter
@@ -34,46 +28,12 @@ function contains(directory: string, file: string): boolean {
   return file === directory || file.startsWith(`${directory.replace(/\/$/, '')}/`)
 }
 
-/** 逐段解析链接，保留可确认的悬空目标 */
-function resolveTarget(source: string): SourceTarget {
-  let remaining = path.resolve(source)
-  const links: string[] = []
-  for (let redirects = 0; redirects < 40; redirects++) {
-    const root = path.parse(remaining).root
-    const parts = remaining.slice(root.length).split(path.sep).filter(Boolean)
-    let current = root
-    let redirected = false
-    let identity: string | undefined
-    for (const [index, part] of parts.entries()) {
-      current = path.join(current, part)
-      try {
-        const stat = fs.lstatSync(current)
-        identity = `${stat.dev}:${stat.ino}`
-        if (stat.isSymbolicLink()) {
-          links.push(normalizePath(current))
-          remaining = path.resolve(path.dirname(current), fs.readlinkSync(current), ...parts.slice(index + 1))
-          redirected = true
-          break
-        }
-      }
-      catch (error) {
-        if (!isMissingFsError(error))
-          throw error
-        return { target: normalizePath(path.join(current, ...parts.slice(index + 1))), exists: false, links }
-      }
-    }
-    if (!redirected)
-      return { target: normalizePath(current), exists: true, links, identity }
-  }
-  return { target: normalizePath(remaining), exists: false, links }
-}
-
 function isDirectory(file: string): boolean {
   try {
     return fs.statSync(file, { throwIfNoEntry: false })?.isDirectory() ?? false
   }
   catch (error) {
-    if (!isMissingFsError(error))
+    if (!isMissingFsError(error) && (error as NodeJS.ErrnoException).code !== 'ELOOP')
       throw error
     return false
   }
@@ -82,12 +42,15 @@ function isDirectory(file: string): boolean {
 /** 当前词法页面来源、物理内容订阅及非递归入口观察 */
 export class PageSourceWatch {
   private rules: ReturnType<typeof getPageRules>
+  private roots = new Set<string>()
+  private links = new Set<string>()
   private directories = new Map<string, SourceTarget>()
   private files = new Map<string, SourceTarget>()
   private contentKey = ''
   private contentRules: ReturnType<typeof getPageRules> | undefined
   private readonly recoveryWatchers = new Map<string, EntranceWatch>()
   private readonly closing = new Set<Promise<void>>()
+  private sourceRefreshQueued = false
   private started = false
   private usePolling = false
   private interval = 100
@@ -135,7 +98,7 @@ export class PageSourceWatch {
           entry = fs.statSync(current, { throwIfNoEntry: false })
         }
         catch (error) {
-          if (!isMissingFsError(error))
+          if (!isMissingFsError(error) && (error as NodeJS.ErrnoException).code !== 'ELOOP')
             throw error
         }
       }
@@ -151,9 +114,8 @@ export class PageSourceWatch {
   private createContentWatcher(): FSWatcher {
     const watcher = chokidar.watch([], {
       ignoreInitial: true,
-      // 页面来源内部的链接目录按 tinyglobby 的扫描语义跟随；顶层来源的链接
-      // 仍由 refresh 解析到目标后订阅，恢复入口保持非递归
-      followSymlinks: true,
+      // 链接统一解析成物理目标后订阅，避免改指时复用仍绑定旧目标的词法路径句柄
+      followSymlinks: false,
       usePolling: this.usePolling,
       interval: this.interval,
       ...(this.awaitWriteFinish !== undefined && { awaitWriteFinish: this.awaitWriteFinish }),
@@ -165,6 +127,10 @@ export class PageSourceWatch {
         const lock = normalizePath(path.resolve(this.options.root, this.options.outDir, 'pages.json.lock'))
         if (contains(lock, absolute))
           return true
+        for (const [source, { target }] of this.files) {
+          if (contains(absolute, target) && !this.rules.isExcluded(source) && !this.ignoresSource(source))
+            return false
+        }
         for (const [source, { target }] of this.directories) {
           if (contains(absolute, target))
             return false
@@ -179,10 +145,38 @@ export class PageSourceWatch {
     })
     for (const event of ['add', 'change', 'unlink'] as const) {
       watcher.on(event, (file) => {
-        if (this.started && this.watcher === watcher)
+        if (!this.started || this.watcher !== watcher)
+          return
+        if (this.links.has(normalizePath(path.resolve(file))))
+          this.queueSourceRefresh()
+        else
           this.onFile(event, file)
       })
     }
+    // 悬空链接不会产生 chokidar 的 add；原生目录通知用于补充链接发现
+    watcher.on('raw', (event, file, raw) => {
+      if (!this.started || this.watcher !== watcher)
+        return
+      const details = (raw ?? {}) as { watchedPath?: string, curr?: Stats }
+      if (details.curr?.isDirectory()) {
+        this.queueSourceRefresh()
+      }
+      else if (event === 'rename' && details.watchedPath) {
+        if (!file) {
+          this.queueSourceRefresh()
+          return
+        }
+        const entry = normalizePath(path.resolve(details.watchedPath, file))
+        try {
+          if (this.links.has(entry) || fs.lstatSync(entry, { throwIfNoEntry: false })?.isSymbolicLink())
+            this.queueSourceRefresh()
+        }
+        catch (error) {
+          if (!isMissingFsError(error))
+            this.onError(error)
+        }
+      }
+    })
     const onStructure = (): void => {
       if (this.started && this.watcher === watcher)
         this.onStructure()
@@ -195,10 +189,12 @@ export class PageSourceWatch {
   }
 
   /** 来源声明或扫描结果变化后重新解析当前目标 */
-  refresh(candidates: readonly PageSource[] = []): void {
+  refresh(): void {
+    if (!this.started)
+      return
     const rules = getPageRules(this.options)
     const currentDirectories = new Set([
-      ...this.directories.keys(),
+      ...this.roots,
       ...this.options.dirs.map(dir => normalizePath(path.resolve(this.options.root, dir))),
       ...this.options.subPackages.map(dir => normalizePath(path.resolve(this.options.root, dir))),
     ])
@@ -212,27 +208,13 @@ export class PageSourceWatch {
           currentDirectories.add(normalizePath(path.resolve(this.options.root, directory)))
       }
     }
-    const directories = new Map<string, SourceTarget>()
-    for (const source of currentDirectories) {
-      if (this.options.mergePages && rules.matchesDirectory(source) && !this.ignoresSource(source))
-        directories.set(source, resolveTarget(source))
-    }
-    const currentFiles = new Set([...this.files.keys(), ...candidates.map(source => source.file)])
-    const files = new Map<string, SourceTarget>()
-    for (const source of currentFiles) {
-      if (!isPageFileInDirectories(source, this.options) || this.ignoresSource(source))
-        continue
-      const resolved = resolveTarget(source)
-      const covered = [...directories].some(([directory, { target }]) => contains(directory, source)
-        && normalizePath(path.join(target, path.relative(directory, source))) === resolved.target)
-      if (resolved.target !== source && !covered)
-        files.set(source, resolved)
-    }
+    this.roots = new Set([...currentDirectories].filter(source => this.options.mergePages && rules.matchesDirectory(source)))
+    const sources = collectPageWatchSources(this.roots, source => rules.isExcluded(source) || this.ignoresSource(source))
     this.rules = rules
-    this.directories = directories
-    this.files = files
-    if (this.started)
-      this.reconcile()
+    this.directories = sources.directories
+    this.files = sources.files
+    this.links = sources.links
+    this.reconcile()
   }
 
   fileForEvent(file: string, identity: string): string | undefined {
@@ -240,14 +222,14 @@ export class PageSourceWatch {
     if (isTargetFile(absolute) && isPageFileInDirectories(absolute, this.options) && !this.ignoresSource(absolute))
       return absolute
     for (const [source, { target }] of this.files) {
-      if (target === identity && isPageFileInDirectories(source, this.options) && !this.ignoresSource(source) && resolveTarget(source).target === target)
+      if (target === identity && isPageFileInDirectories(source, this.options) && !this.ignoresSource(source) && resolveWatchTarget(source).target === target)
         return source
     }
     for (const [source, { target }] of this.directories) {
-      if (!contains(target, identity) || resolveTarget(source).target !== target)
+      if (!contains(target, identity) || resolveWatchTarget(source).target !== target)
         continue
       const lexical = normalizePath(path.join(source, path.relative(target, identity)))
-      if (isTargetFile(lexical) && isPageFileInDirectories(lexical, this.options) && !this.ignoresSource(lexical))
+      if (isTargetFile(lexical) && isPageFileInDirectories(lexical, this.options) && !this.ignoresSource(lexical) && resolveWatchTarget(lexical).target === identity)
         return lexical
     }
   }
@@ -262,7 +244,7 @@ export class PageSourceWatch {
       contains(absolute, target)
       && (isPageDirectoryEvent(source, this.options) || isPageFileInDirectories(source, this.options))
       && !this.ignoresSource(source)
-      && resolveTarget(source).target === target,
+      && resolveWatchTarget(source).target === target,
     )
   }
 
@@ -281,14 +263,14 @@ export class PageSourceWatch {
   private reconcile(): void {
     const directories = [...this.directories.values()].filter(source => source.exists)
     const covered = (target: string): boolean => directories.some(directory => directory.target !== target && contains(directory.target, target))
-    const wanted = new Map<string, string | undefined>()
-    // 内容 watcher 跟随目录目标中的符号链接，文件别名的内容事件由目录
-    // 订阅覆盖；files 保留用于事件映射与目标恢复，不再单独订阅
-    for (const target of directories) {
+    const wanted = new Set<string>()
+    // 所有来源共同决定物理订阅；目录覆盖的文件目标不再重复注册
+    for (const target of [...directories, ...this.files.values()].filter(source => source.exists)) {
       if (!covered(target.target))
-        wanted.set(target.target, target.identity)
+        wanted.add(target.target)
     }
-    const key = JSON.stringify([...wanted].map(([target, identity]) => [target, identity ?? null]).sort(([a], [b]) => String(a).localeCompare(String(b))))
+    // 别名集合变化也可能改变词法过滤结果，目标相同仍需重新应用过滤
+    const key = this.sourceSignature()
     if (key !== this.contentKey || this.contentRules !== this.rules) {
       if (this.watcher) {
         // chokidar.unwatch 不会释放目录后代的全部句柄；重建自有订阅才能收回旧目标
@@ -305,7 +287,7 @@ export class PageSourceWatch {
       }
       if (wanted.size) {
         this.watcher = this.createContentWatcher()
-        this.watcher.add([...wanted.keys()])
+        this.watcher.add([...wanted])
       }
       this.contentKey = key
       this.contentRules = this.rules
@@ -314,20 +296,34 @@ export class PageSourceWatch {
   }
 
   private refreshFromEntrance(): void {
-    const signature = (): string => JSON.stringify([
-      ...[...this.directories].map(([source, { target, exists, identity }]) => [source, target, exists, identity]),
-      // 文件被原子替换时只改变内容，页面来源结构没变，不触发全量刷新
-      ...[...this.files].map(([source, { target, exists }]) => [source, target, exists, null]),
-    ].sort(([a], [b]) => String(a).localeCompare(String(b))))
     try {
-      const previous = signature()
+      const previous = this.sourceSignature()
       this.refresh()
-      if (signature() !== previous)
+      if (this.sourceSignature() !== previous)
         this.onStructure()
     }
     catch (error) {
       this.onError(error)
     }
+  }
+
+  private queueSourceRefresh(): void {
+    if (this.sourceRefreshQueued)
+      return
+    this.sourceRefreshQueued = true
+    // raw 回调结束后 chokidar 还要派发内容事件，不能在其遍历监听器时关闭实例
+    queueMicrotask(() => {
+      this.sourceRefreshQueued = false
+      if (this.started)
+        this.refreshFromEntrance()
+    })
+  }
+
+  private sourceSignature(): string {
+    // 文件原子替换只改变内容；目录身份变化则需要重新建立子树订阅
+    return JSON.stringify([...this.directories, ...this.files]
+      .map(([source, { target, exists, kind, identity }]) => [source, target, exists, kind, kind === 'directory' ? identity : null])
+      .sort(([a], [b]) => String(a).localeCompare(String(b))))
   }
 
   private refreshEntrances(): void {
@@ -414,7 +410,7 @@ export class PageSourceWatch {
         if (this.usePolling) {
           const onChange = (): void => {
             if (this.recoveryWatchers.get(directory) === entry)
-              this.refreshFromEntrance()
+              this.queueSourceRefresh()
           }
           watcher = fs.watchFile(directory, { persistent: false, interval: this.interval }, onChange)
           stop = () => fs.unwatchFile(directory, onChange)

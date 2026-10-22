@@ -202,7 +202,7 @@ export class PageContext {
     refreshPageDirectories(this.options)
     await this.scanPages()
     await this.scanSubPages()
-    this.refreshPageWatchers()
+    this.pageWatcher.refresh()
     await this.mergePageMetaData()
     await this.mergeSubPageMetaData()
   }
@@ -305,7 +305,7 @@ export class PageContext {
     this.watchedConfigPaths.set(watcher, new Set())
     this.watchedConfigIndex.set(watcher, { files: new Set(), directories: [] })
     this.refreshConfigWatchers()
-    this.refreshPageWatchers()
+    this.pageWatcher.refresh()
     const watchDisabled = (this._server?.watcher as unknown) === watcher && this._server?.config.server.watch === null
     if (!watchDisabled)
       this.pageWatcher.start(watcher.options, (this._server?.watcher as unknown) === watcher ? this._server?.watcher.options.ignored : undefined)
@@ -340,14 +340,6 @@ export class PageContext {
     catch (error) {
       this.logger?.error(`[vite-plugin-uni-pages] Failed to watch ${description}: ${error instanceof Error ? error.message : error}`, { timestamp: true, error: error instanceof Error ? error : undefined })
     }
-  }
-
-  /** 在归属裁剪前登记全部扫描候选，刷新当前来源及其监听 */
-  private refreshPageWatchers(): void {
-    const sources = [...this.pages.values(), ...[...this.subPages.values()].flatMap(pages => [...pages.values()])]
-      .map(page => this.pageSources.get(page))
-      .filter((source): source is PageSource => !!source)
-    this.pageWatcher.refresh(sources)
   }
 
   /**
@@ -512,7 +504,7 @@ export class PageContext {
       await this.scanPages(!incremental)
       await this.scanSubPages(!incremental)
       this.options.onAfterScanPages(this.pages, this.subPages)
-      this.refreshPageWatchers()
+      this.pageWatcher.refresh()
     }
 
     this.options.onBeforeMergePageMetaData(this.pages, this.pagesGlobConfig)
