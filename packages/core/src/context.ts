@@ -4,7 +4,6 @@ import type { Logger, ModuleNode, ViteDevServer } from 'vite'
 import type { SubPackageDirectorySource } from './directories'
 import type { PageCandidate, PageSource } from './page-sources'
 import type { InternalPages, PagePath, ResolvedOptions, UserOptions } from './types'
-import { existsSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { platform as uniEnvPlatform } from '@uni-helper/uni-env'
@@ -15,12 +14,13 @@ import { normalizePath } from 'vite'
 import { configFileExtensions, configWatchDirectory, isConfigLoaderArtifact, normalizeConfigPath, PagesConfigLoader } from './config-loader'
 import { RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import { writeDeclaration } from './declaration'
-import { getSubPackageDirectorySources, isPageDirectoryEvent, isPageFileInDirectories, refreshPageDirectories, resolvePageWatchDirectories } from './directories'
-import { checkPagesJsonFileSync, getPageFiles, isTargetFile, resolvePagesJsonPath } from './files'
+import { getSubPackageDirectorySources, refreshPageDirectories } from './directories'
+import { checkPagesJsonFileSync, getPageFiles, resolvePagesJsonPath } from './files'
 import { debug } from './logger'
 import { resolveOptions } from './options'
 import { Page } from './page'
 import { comparePageSources, resolvePageIdentity, selectPageSources, validateGeneratedRoutes } from './page-sources'
+import { PageSourceWatch } from './page-watch'
 import { writePagesJson } from './pages-json'
 
 /**
@@ -39,10 +39,6 @@ function queryPageRules<T>(fallback: T, query: () => T): T {
   }
 }
 
-function containsPath(directory: string, file: string): boolean {
-  return file === directory || file.startsWith(`${directory.replace(/\/$/, '')}/`)
-}
-
 /**
  * 页面上下文：负责扫描页面、加载配置、合并页面信息、生成 pages.json
  *
@@ -56,7 +52,6 @@ export class PageContext {
   private readonly configLoader: PagesConfigLoader
   private readonly watchers = new Map<FSWatcher, () => void>()
   private readonly watchedConfigPaths = new Map<FSWatcher, Set<string>>()
-  private readonly watchedPageDirectories = new Map<FSWatcher, Set<string>>()
   /**
    * 每次事件都要比对的绝对路径，按 watcher 缓存
    *
@@ -69,10 +64,10 @@ export class PageContext {
   private pendingUpdate: Promise<void> = Promise.resolve()
   /** 随扫描更新的 Page 来源，用于复用检查和冲突诊断 */
   private readonly pageSources = new WeakMap<Page, PageSource>()
-  /** 扫描目录的词法路径与最近一次已发现的目标，缺失时保留以等待重建 */
-  private readonly pageDirectoryTargets = new Map<string, string>()
-  /** 页面词法路径与真实目标的关联，保留文件别名和被归并的候选 */
-  private readonly pageFileTargets = new Map<string, string>()
+  /** 扫描候选独立于归属裁剪后的输出映射，保留非代表来源的内容缓存 */
+  private mainPageCandidates = new Map<string, Page>()
+  private subPageCandidates = new Map<string, Map<string, Page>>()
+  private readonly pageWatcher: PageSourceWatch
   /** 待处理的页面更新：生成期间到达的事件合并到下一轮 */
   private pendingPageUpdate: { full: boolean, files: Set<string> } | undefined
   /** 当前事件更新循环；dispose 时等待它排空 */
@@ -141,6 +136,18 @@ export class PageContext {
     this.platform = platform
     debug.options('root', this.root)
     this.options = resolveOptions(userOptions, this.root)
+    this.pageWatcher = new PageSourceWatch(
+      this.options,
+      (event, file) => {
+        const pageFile = queryPageRules(undefined, () => this.pageFileForEvent(file, normalizeConfigPath(file, this.root)))
+        if (pageFile) {
+          debug.pages(`File changed: ${pageFile}`)
+          this.queuePageUpdate(event === 'change' ? pageFile : undefined)
+        }
+      },
+      () => this.queuePageUpdate(),
+      error => this.logUpdateFailure(error),
+    )
     // 调试日志逻辑
     const debugOption = this.options.debug
     if (debugOption) {
@@ -231,54 +238,23 @@ export class PageContext {
 
   /** 按当前词法规则识别页面事件，真实路径只用于关联已收录来源 */
   private pageFileForEvent(file: string, identity: string): string | undefined {
-    if (isTargetFile(file) && isPageFileInDirectories(file, this.options))
-      return normalizePath(path.resolve(this.root, file))
-    for (const pages of [this.pages, ...this.subPages.values()]) {
-      for (const page of pages.values()) {
-        const source = this.pageSources.get(page)
-        if (source?.identity === identity && isPageFileInDirectories(source.file, this.options))
-          return source.file
-      }
-    }
-    for (const [source, target] of this.pageFileTargets) {
-      if (target === identity && isPageFileInDirectories(source, this.options))
-        return source
-    }
-    for (const [source, target] of this.pageDirectoryTargets) {
-      if (containsPath(target, identity)) {
-        const lexical = normalizePath(path.join(source, path.relative(target, identity)))
-        if (isTargetFile(lexical) && isPageFileInDirectories(lexical, this.options))
-          return lexical
-      }
-    }
+    return this.pageWatcher.fileForEvent(file, identity)
   }
 
-  /** 目标或其祖先恢复时，仍按关联的词法来源判断是否需要补扫 */
   private pageDirectoryForEvent(directory: string): boolean {
-    if (isPageDirectoryEvent(directory, this.options))
-      return true
-    const absolute = normalizeConfigPath(directory, this.root)
-    for (const [source, target] of this.pageDirectoryTargets) {
-      if (containsPath(absolute, target) && isPageDirectoryEvent(source, this.options))
-        return true
-    }
-    for (const [source, target] of this.pageFileTargets) {
-      if (containsPath(absolute, target) && isPageFileInDirectories(source, this.options))
-        return true
-    }
-    return false
+    return this.pageWatcher.directoryForEvent(directory)
   }
 
   /**
-   * 设置文件监听器，监听页面文件与配置文件变更
-   * 页面文件或配置文件变化时自动更新 pages.json
-   * @param watcher - chokidar 文件监听器实例
+   * 注册配置文件与页面目录结构监听，并启动页面内容监听
+   *
+   * @param watcher - 配置文件及目录结构事件使用的 chokidar 监听器
    */
   async setupWatcher(watcher: FSWatcher): Promise<void> {
     if (this.watchers.has(watcher))
       return
 
-    const handleEvent = (event: 'add' | 'change' | 'unlink', filepath: string): void => {
+    const onConfigFile = (filepath: string): void => {
       const index = this.watchedConfigIndex.get(watcher)
       const basename = path.basename(filepath)
       const mightBeConfig = configFileExtensions.test(basename)
@@ -288,7 +264,7 @@ export class PageContext {
       const excluded = this.generatedFilePaths()
       // 自己写的生成物不参与任何匹配，先走这步，免得为每个
       // pages.json 事件白做一次路径解析
-      if (!isTargetFile(filepath) && excluded.includes(eventPath))
+      if (excluded.includes(eventPath))
         return
 
       // 未直接命中的路径仍需解析，以识别符号链接别名；直接命中就不查文件系统
@@ -300,49 +276,39 @@ export class PageContext {
         index.files.has(absolute)
         || (mightBeConfig && index.directories.some(dir => absolute.startsWith(`${dir}/`)))
       )
-      const configChanged = !excluded.includes(absolute) && isConfigPath
-      // 规则的编译结果按声明（dir/subPackages/exclude）缓存，glob 展开的
-      // 目录和 root 回调仍在每轮扫描重算，所以新出现的目录不会漏掉
-      const pageFile = configChanged ? undefined : queryPageRules(undefined, () => this.pageFileForEvent(filepath, absolute))
-      if (!configChanged && !pageFile)
+      if (excluded.includes(absolute) || !isConfigPath)
         return
 
-      debug.pages(configChanged ? `Config changed: ${absolute}` : `File changed: ${absolute}`)
-      // 配置变化立即排队；页面事件才进入合并队列。真实路径事件可能影响多个词法候选，整轮刷新后重新选择代表
-      if (configChanged)
-        void this.updatePagesAndNotify()
-      else
-        this.queuePageUpdate(event === 'change' && pageFile === eventPath ? pageFile : undefined)
+      debug.pages(`Config changed: ${absolute}`)
+      void this.updatePagesAndNotify()
     }
-    const onAdd = (file: string): void => handleEvent('add', file)
-    const onChange = (file: string): void => handleEvent('change', file)
-    const onUnlink = (file: string): void => handleEvent('unlink', file)
-    // glob 规则下的目录增删会改变扫描目录集合（如新增 pkg-a 命中 src/pkg-*）
     const onDirectory = (directory: string): void => {
       if (queryPageRules(false, () => this.pageDirectoryForEvent(directory)))
         this.queuePageUpdate()
     }
-    // 初始扫描期间新增的路径可能被 ignoreInitial 吞掉，ready 后再收敛一次
+    // 配置首次加载与订阅就绪之间的变化可能被 ignoreInitial 吞掉
     const onReady = (): void => this.queuePageUpdate()
-    watcher.on('add', onAdd)
-    watcher.on('change', onChange)
-    watcher.on('unlink', onUnlink)
+    watcher.on('add', onConfigFile)
+    watcher.on('change', onConfigFile)
+    watcher.on('unlink', onConfigFile)
     watcher.on('addDir', onDirectory)
     watcher.on('unlinkDir', onDirectory)
     watcher.on('ready', onReady)
     this.watchers.set(watcher, () => {
-      watcher.off('add', onAdd)
-      watcher.off('change', onChange)
-      watcher.off('unlink', onUnlink)
+      watcher.off('add', onConfigFile)
+      watcher.off('change', onConfigFile)
+      watcher.off('unlink', onConfigFile)
       watcher.off('addDir', onDirectory)
       watcher.off('unlinkDir', onDirectory)
       watcher.off('ready', onReady)
     })
     this.watchedConfigPaths.set(watcher, new Set())
     this.watchedConfigIndex.set(watcher, { files: new Set(), directories: [] })
-    this.watchedPageDirectories.set(watcher, new Set())
     this.refreshConfigWatchers()
     this.refreshPageWatchers()
+    const watchDisabled = (this._server?.watcher as unknown) === watcher && this._server?.config.server.watch === null
+    if (!watchDisabled)
+      this.pageWatcher.start(watcher.options, (this._server?.watcher as unknown) === watcher ? this._server?.watcher.options.ignored : undefined)
   }
 
   /** 解绑本插件回调；共享 watcher 的关闭仍由 Vite 负责 */
@@ -352,17 +318,17 @@ export class PageContext {
     this.watchers.clear()
     this.watchedConfigPaths.clear()
     this.watchedConfigIndex.clear()
-    this.watchedPageDirectories.clear()
     this._server = undefined
+    await this.pageWatcher.close()
     await this.pendingPageFlush
     await this.pendingUpdate
   }
 
   /** 补充未覆盖的监听路径，注册成功后记账，失败时保留重试机会 */
-  private addWatchPaths(watcher: FSWatcher, paths: readonly string[], added: Set<string>, sharedRoot: string | undefined, description: string, allowCovered = false): void {
+  private addWatchPaths(watcher: FSWatcher, paths: readonly string[], added: Set<string>, sharedRoot: string | undefined, description: string): void {
     const wanted = paths.filter(file => (!sharedRoot || (file !== sharedRoot && !file.startsWith(`${sharedRoot}/`)))
       && !added.has(file)
-      && (allowCovered || ![...added].some(existing => file.startsWith(`${existing}/`))))
+      && ![...added].some(existing => file.startsWith(`${existing}/`)))
     if (!wanted.length)
       return
     try {
@@ -376,77 +342,12 @@ export class PageContext {
     }
   }
 
-  /** 补扫后补齐新生效的页面监听根；保留旧订阅以免影响共享 watcher */
+  /** 在归属裁剪前登记全部扫描候选，刷新当前来源及其监听 */
   private refreshPageWatchers(): void {
-    // 关闭页面合并时事件匹配始终为 false，目标关联和额外订阅都没有意义
-    if (!this.options.mergePages) {
-      this.pageDirectoryTargets.clear()
-      this.pageFileTargets.clear()
-      return
-    }
-    // 先登记全部扫描候选，避免归属决议裁剪别名后丢失事件关联
-    for (const [source] of this.pageDirectoryTargets) {
-      if (!isPageDirectoryEvent(source, this.options))
-        this.pageDirectoryTargets.delete(source)
-    }
-    for (const [source] of this.pageFileTargets) {
-      if (!isPageFileInDirectories(source, this.options))
-        this.pageFileTargets.delete(source)
-    }
-    const sources = new Set([
-      ...this.pageDirectoryTargets.keys(),
-      ...[...this.options.dirs, ...this.options.subPackages].map(dir => normalizePath(path.resolve(this.root, dir))),
-    ])
-    for (const source of sources) {
-      const target = resolvePageIdentity(source)
-      const previous = this.pageDirectoryTargets.get(source)
-      if (target && previous && target !== previous) {
-        // 目录换目标后，旧目录派生的文件关联不再有效
-        for (const file of this.pageFileTargets.keys()) {
-          if (containsPath(source, file))
-            this.pageFileTargets.delete(file)
-        }
-      }
-      if (target && target !== source)
-        this.pageDirectoryTargets.set(source, target)
-      else if (target)
-        this.pageDirectoryTargets.delete(source)
-    }
-    for (const pages of [this.pages, ...this.subPages.values()]) {
-      for (const page of pages.values()) {
-        const source = this.pageSources.get(page)
-        if (source && source.identity !== source.file)
-          this.pageFileTargets.set(source.file, source.identity)
-        else if (source)
-          this.pageFileTargets.delete(source.file)
-      }
-    }
-    const targets = [...new Set([...this.pageDirectoryTargets.values(), ...this.pageFileTargets.values()])]
-    // 目录目标已经递归覆盖其下的文件目标，不再逐文件订阅
-    const existingDirectories = [...new Set(this.pageDirectoryTargets.values())].filter(target => existsSync(target))
-    const uncoveredTargets = targets.filter(target => !existingDirectories.some(directory => directory !== target && containsPath(directory, target)))
-    const existingTargets = uncoveredTargets.filter(target => existsSync(target))
-    const existing = new Set(existingTargets)
-    if (!this.watchers.size)
-      return
-    // 目标缺失后 chokidar 会丢掉目标自身的订阅；清掉记账，重建后重新订阅
-    for (const target of uncoveredTargets) {
-      if (existing.has(target))
-        continue
-      for (const added of this.watchedPageDirectories.values())
-        added.delete(target)
-    }
-    const directories = [
-      ...resolvePageWatchDirectories(this.options),
-      ...new Set(uncoveredTargets.map(target => existing.has(target) ? target : configWatchDirectory(target))),
-    ]
-    for (const watcher of this.watchers.keys()) {
-      const added = this.watchedPageDirectories.get(watcher)!
-      const serverRoot = (this._server?.watcher as unknown) === watcher ? normalizePath(this._server!.config.root) : undefined
-      this.addWatchPaths(watcher, directories, added, serverRoot, 'page directories')
-      // 祖先目录已在监听集合时，仍补上目标自身的订阅，确保重建后的目标继续收到内容事件
-      this.addWatchPaths(watcher, existingTargets, added, serverRoot, 'page targets', true)
-    }
+    const sources = [...this.pages.values(), ...[...this.subPages.values()].flatMap(pages => [...pages.values()])]
+      .map(page => this.pageSources.get(page))
+      .filter((source): source is PageSource => !!source)
+    this.pageWatcher.refresh(sources)
   }
 
   /**
@@ -506,8 +407,7 @@ export class PageContext {
    * 登记页面事件触发的更新：生成期间到达的事件合并到下一轮
    *
    * @description 连续删除、重建会一次性派发大量事件，逐个生成会反复
-   * 重读全部页面；同一批内只有一个页面变更时保留增量读取，多个变更
-   * 或任意完整变更合并为一次全量生成
+   * 重读全部页面；内容变更合并待刷新文件，结构变更执行完整刷新
    * @param filepath - 只读取该页面；省略时执行完整扫描
    */
   private queuePageUpdate(filepath?: string): void {
@@ -536,9 +436,11 @@ export class PageContext {
         const { full, files } = this.pendingPageUpdate
         this.pendingPageUpdate = undefined
         try {
-          const updated = full || files.size > 1
+          const updated = full
             ? await this.updatePagesJSON()
-            : await this.updatePagesJSON([...files][0])
+            : files.size === 1
+              ? await this.updatePagesJSON([...files][0])
+              : await this.enqueuePagesUpdate([...files])
           if (updated)
             this.onUpdate()
         }
@@ -568,31 +470,34 @@ export class PageContext {
   }
 
   /**
-   * 更新 pages.json 文件
-   * 这是负责协调整个页面配置生成流程的核心方法：
-   * 1. 检查文件变更（指定 filepath 时）
-   * 2. 加载用户配置
-   * 3. 扫描页面文件
-   * 4. 合并页面配置
-   * 5. 生成并写入 pages.json
-   * @param filepath - 发生变更的文件路径，用于增量更新判断
-   * @returns pages.json 是否成功更新
+   * 刷新页面配置并更新 pages.json
+   *
+   * @description 同一实例的调用按顺序执行；指定页面时尝试增量读取，页面尚未收录或物理身份变化时执行完整刷新
+   *
+   * @param filepath 变更页面的绝对路径或相对 root 的路径；省略时执行完整刷新
+   * @returns pages.json 写入新内容时为 `true`，内容未变或跳过生成时为 `false`
+   * @throws 生成、写入或声明输出失败时拒绝；声明输出失败前 pages.json 可能已更新
    */
   async updatePagesJSON(filepath?: string): Promise<boolean> {
-    const update = this.pendingUpdate.then(() => this.generatePagesJSON(filepath))
+    return this.enqueuePagesUpdate(filepath ? [filepath] : undefined)
+  }
+
+  private enqueuePagesUpdate(files?: readonly string[]): Promise<boolean> {
+    const update = this.pendingUpdate.then(() => this.generatePagesJSON(files))
     this.pendingUpdate = update.then(() => {}, () => {})
     return update
   }
 
-  private async generatePagesJSON(filepath?: string): Promise<boolean> {
-    if (filepath) {
-      const pages = this.findPages(filepath)
-      if (pages.length) {
-        await Promise.all(pages.map(page => page.read()))
-        if (!pages.some(page => page.hasChanged())) {
-          debug.cache(`The page meta on page ${filepath} did not send any changes, skipping`)
-          return false
-        }
+  private async generatePagesJSON(files?: readonly string[]): Promise<boolean> {
+    const candidates = files?.map(file => this.findPages(file))
+    // 未收录文件或身份变化需要完整刷新，不能沿用旧来源的内容缓存
+    const incremental = !!candidates?.length && candidates.every(pages => pages.length > 0)
+    if (incremental) {
+      const pages = [...new Set(candidates.flat())]
+      await Promise.all(pages.map(page => page.read()))
+      if (!pages.some(page => page.hasChanged())) {
+        debug.cache('Page metadata is unchanged, skipping generation')
+        return false
       }
     }
 
@@ -604,8 +509,8 @@ export class PageContext {
     if (this.options.mergePages) {
       refreshPageDirectories(this.options)
       this.options.onBeforeScanPages()
-      await this.scanPages(!filepath)
-      await this.scanSubPages(!filepath)
+      await this.scanPages(!incremental)
+      await this.scanSubPages(!incremental)
       this.options.onAfterScanPages(this.pages, this.subPages)
       this.refreshPageWatchers()
     }
@@ -765,7 +670,7 @@ export class PageContext {
       for (const pagePath of getPagePaths(dir, this.options)) {
         if (pages.has(pagePath.absolutePath))
           continue
-        const page = this.trackPage(pagePath, this.pages.get(pagePath.absolutePath), {
+        const page = this.trackPage(pagePath, this.pages.get(pagePath.absolutePath) ?? this.mainPageCandidates.get(pagePath.absolutePath), {
           dir,
           explicitRoot: false,
           ruleIndex: 0,
@@ -776,7 +681,8 @@ export class PageContext {
       }
     }
     debug.pages([...pages.keys()])
-    this.pages = pages
+    this.mainPageCandidates = pages
+    this.pages = new Map(pages)
   }
 
   /**
@@ -816,13 +722,16 @@ export class PageContext {
    */
   private findPages(filepath: string): Page[] {
     const absolute = normalizePath(path.resolve(this.root, filepath))
-    const groups = [this.pages, ...this.subPages.values()]
-    const direct = groups.map(pages => pages.get(absolute)).find(page => page !== undefined)
-    const identity = (direct && this.pageSources.get(direct)?.identity) || normalizeConfigPath(filepath, this.root)
+    const groups = [this.mainPageCandidates, ...this.subPageCandidates.values(), this.pages, ...this.subPages.values()]
+    const identity = resolvePageIdentity(absolute)
+    if (!identity)
+      return []
     const matched = groups.flatMap(pages => [...pages.entries()].flatMap(([file, page]) => {
       const source = this.pageSources.get(page)
-      return file === absolute || (source?.identity ?? normalizeConfigPath(file, this.root)) === identity ? [page] : []
+      return file === absolute || source?.identity === identity ? [page] : []
     }))
+    if (matched.some(page => this.pageSources.get(page)?.identity !== identity || resolvePageIdentity(page.path.absolutePath) !== identity))
+      return []
     return [...new Set(matched)]
   }
 
@@ -841,7 +750,7 @@ export class PageContext {
 
       const pages = new Map<string, Page>()
       for (const pagePath of pagePaths) {
-        const page = this.trackPage(pagePath, this.subPages.get(dir)?.get(pagePath.absolutePath), source, refreshContent)
+        const page = this.trackPage(pagePath, this.subPages.get(dir)?.get(pagePath.absolutePath) ?? this.subPageCandidates.get(dir)?.get(pagePath.absolutePath), source, refreshContent)
         if (page)
           pages.set(pagePath.absolutePath, page)
       }
@@ -849,7 +758,8 @@ export class PageContext {
     }
     debug.subPages(JSON.stringify(paths, null, 2))
 
-    this.subPages = subPages
+    this.subPageCandidates = subPages
+    this.subPages = new Map([...subPages].map(([dir, pages]) => [dir, new Map(pages)]))
   }
 
   /**

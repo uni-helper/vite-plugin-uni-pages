@@ -6,6 +6,7 @@ import path from 'node:path'
 import { parse } from 'comment-json'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PageContext } from '../packages/core/src/context'
+import { PageSourceWatch } from '../packages/core/src/page-watch'
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>()
@@ -58,6 +59,7 @@ async function dispatch(event: 'add' | 'change' | 'unlink', file: string): Promi
 }
 
 beforeEach(() => {
+  vi.spyOn(PageSourceWatch.prototype, 'start').mockImplementation(() => {})
   root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-watch-fast-path-')))
   fs.mkdirSync(path.join(root, 'src/pages'), { recursive: true })
   write('package.json', '{"type":"module"}')
@@ -73,6 +75,21 @@ afterEach(async () => {
 })
 
 describe('配置 watcher 路径匹配开销', () => {
+  it('关闭页面合并时，配置监听就绪仍补读首次加载后的变化', async () => {
+    write('pages.config.json', config('pages.config.json', 'initial'))
+    ctx = new PageContext({ mergePages: false, dts: false }, root, 'h5')
+    await ctx.updatePagesJSON()
+    await ctx.setupWatcher(watcher as unknown as Parameters<PageContext['setupWatcher']>[0])
+    updates = vi.spyOn(ctx, 'updatePagesJSON')
+    write('pages.config.json', config('pages.config.json', 'updated'))
+
+    watcher.emit('ready')
+    await Promise.allSettled(updates.mock.results.map(result => result.value))
+
+    expect(updates).toHaveBeenCalledOnce()
+    expect(output().globalStyle?.navigationBarTitleText).toBe('updated')
+  })
+
   it.each(['pages.config', 'pages.custom', 'pages.config.ts', 'pages.config.json'])('已知入口 %s 的事件匹配不查询文件系统', async (filename) => {
     await start(filename)
     write(filename, config(filename, 'updated'))

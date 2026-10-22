@@ -592,7 +592,9 @@ UniPages({
 
 H5 开发服务器和 `vite build --watch` 都会重新发现主包 `dir` 与分包目录，支持启动时目录尚不存在，以及运行中的新增、删除、重命名和重建。空目录会被发现，在包含页面之前不生成空分包。目录可以位于 Vite 项目根目录之外，路径仍相对 Vite `root` 解析，不受命令执行目录影响。`mergePages: false` 时不扫描或监听页面目录；H5 的监听范围仍受 Vite `server.watch` 配置约束。
 
-Windows 下，当前 Chokidar 原生监听会持有子目录句柄，重命名其父目录可能报 `EPERM`，详见 [Chokidar #1380](https://github.com/paulmillr/chokidar/issues/1380)。需要在运行期间重命名这类目录时，可在启动命令前设置环境变量 `CHOKIDAR_USEPOLLING=true`，为 H5 和 `build --watch` 启用 [Chokidar 轮询后端](https://github.com/paulmillr/chokidar/blob/5.0.0/README.md#performance)。轮询会增加 CPU 和文件系统访问开销，插件不会默认启用。
+Windows 下，原生监听会持有子目录句柄，重命名其父目录可能报 `EPERM`，详见 [Chokidar #1380](https://github.com/paulmillr/chokidar/issues/1380)。需要在运行期间重命名这类目录时，可在启动命令前设置环境变量 `CHOKIDAR_USEPOLLING=true`，为 H5 和 `build --watch` 启用 [Chokidar 轮询后端](https://github.com/paulmillr/chokidar/blob/5.0.0/README.md#performance)。页面内容与恢复入口使用相同的轮询设置，`CHOKIDAR_INTERVAL` 可指定轮询间隔（毫秒）；H5 也支持 Vite 的 `server.watch.usePolling` 和 `server.watch.interval`。轮询会增加 CPU 和文件系统访问开销，插件不会默认启用。
+
+Vite 的 `server.watch.ignored` 同样约束 H5 的页面监听。相对字符串规则按 watcher 的 `cwd` 解析；未设置 `cwd` 时与 Chokidar 一致按 `process.cwd()` 展开，`**/` 开头的规则仍匹配任意绝对路径，`!` 否定规则在解析后保留否定语义。`server.watch.awaitWriteFinish` 和 `server.watch.atomic` 会转发给页面内容 watcher，与 Vite 自身的监听行为保持一致。
 
 动态发现会更新 `pages.json`。如果下游插件只在创建时缓存分包信息，它仍需要重启才能使用新增分包；自动重新发现不会改变其他插件的缓存策略。
 
@@ -632,13 +634,21 @@ Windows 下，当前 Chokidar 原生监听会持有子目录句柄，重命名�
 
 ### 页面内容与符号链接监听
 
-页面文件、目录的新增和删除，以及 watcher 首次 `ready` 后的补扫，都会重新读取当前页面内容。同路径快速删除重建也会刷新标题、路由和 `definePage(null)` 状态。普通 `change` 先读取变更页面；元数据未变时跳过完整生成，其他页面继续复用读取缓存。读取失败时保留上次成功配置，后续变更或整轮补扫可以重试。
+页面文件、目录的新增和删除，以及页面内容 watcher 首次 `ready` 后的补扫，都会重新读取当前页面内容。同路径快速删除重建也会刷新标题、路由和 `definePage(null)` 状态。普通 `change` 只重读该物理文件关联的缓存候选，其他页面继续复用内容缓存，包括归属决议中未被选为代表的来源。仅模板变化、页面元数据未变时，跳过配置加载与产物生成；元数据变化时仍扫描页面清单、校验归属与路由冲突，再合并产物。读取失败时保留上次成功配置，后续变更或整轮补扫可以重试。
 
 已收录的符号链接页面可以通过词法路径或真实目标路径的事件更新。事件按当前有效的词法来源检查 `exclude` 和扫描规则，再重新计算页面归属；物理目标的位置不改变排除或输出路径的基准。
 
-插件会保留本次会话中已发现的符号链接目标关联。目标存在时直接监听目标本身；目标缺失时再补上现存祖先，等待同路径重建，并在重建后恢复目标自身的订阅。外部目标删除后，H5 开发服务器和 `build --watch` 会重新发现页面并继续监听内容变化。新增订阅与现有监听共存，开发服务器的共享 watcher 仍由 Vite 管理。
+页面来源目录内部的嵌套符号链接会按扫描语义被跟随，因此链接目录中新增、删除或修改页面都会更新产物；顶层来源链接仍解析到目标后订阅，恢复观察保持非递归。
 
-页面事件在生成期间到达时合并到下一轮；同一批内只有一个页面变更时仍按增量读取，多个变更或任一完整变更只补跑一次全量生成，避免连续删除、重建时逐个重读全部页面。
+当前配置中的词法来源决定页面范围，符号链接的当前指向决定内容目标。来源暂时不可用时，插件观察恢复所需的目录入口；仍指向已删除目标的链接可以在目标重建后恢复。确认链接改指另一个目标时，旧目标会退出该来源的关联与订阅，新目标尚不存在时也按新指向等待恢复。链接自身删除后，恢复时重新解析其当前指向。
+
+页面来源可以直接位于 `node_modules` 内，也可以链接到其中。这类路径是否参与监听由 `exclude` 和 Vite 忽略规则按词法来源决定，插件不会额外按 `node_modules`、`.git` 路径片段跳过。默认 `exclude` 仍会排除依赖目录，保留这类来源时需要显式放开，例如 `exclude: []`。
+
+页面文件事件统一由插件独立持有的页面监听器处理，内容订阅只覆盖当前有效目录目标；文件别名由所在目录的订阅覆盖，仍参与事件映射与目标恢复。恢复观察采用非递归的目录入口监听，不会将公共祖先下的兄弟项目加入递归监听；恢复或切换目标后会收回不再需要的订阅。H5 开发服务器和 `build --watch` 使用相同的页面监听机制。共享 watcher 提供配置文件事件和有效页面目录的结构通知；Vite 的共享 watcher 保持由 Vite 管理。恢复以能够从来源路径解析出的链接指向为依据。
+
+页面事件在生成期间到达时合并到下一轮。同一待处理批次中的多个普通内容变更只重读各自关联的缓存候选；批次中包含新增、删除、目标切换或恢复等结构变化时，执行完整刷新。
+
+编辑器通过临时文件重命名覆盖页面时，页面来源结构没有变化，插件只按内容变更重读关联页面，不会触发全量刷新；目录订阅会跟随链接文件到替换后的目标，无需重新订阅。
 
 ### 支持 monorepo 吗？
 
@@ -760,15 +770,18 @@ export default defineConfig({
 
 ```
 index.ts          Vite 插件入口 — configResolved / transform / configureServer / resolveId / load
-context.ts        PageContext 编排核心 — 配置加载、扫描、合并、监听、虚拟模块与 HMR
+context.ts        PageContext 编排核心 — 配置加载、扫描、合并、串行生成、监听编排、虚拟模块与 HMR
 pipeline.ts       纯流水线入口 — createPages / generateAll，root 和 platform 从外部传入，测试直接走这里
 config-loader.ts  配置加载 — unconfig 装载、本地依赖与恢复候选收集、监听路径归一化
-directories.ts    目录发现 — glob 展开、subPackages root 映射与监听边界
+directories.ts    目录发现 — glob 展开、subPackages root 映射与扫描目录投影
 page-rules.ts     页面规则 — 基于 Vite root 编译排除模式，统一扫描与事件判定
 page-sources.ts   扫描来源与页面归属 — 来源身份、代表选择、生成路由冲突与文件族校验
+page-watch.ts     页面监听 — 当前词法来源、内容目标订阅与非递归恢复入口
+page-watch-filter.ts 监听过滤 — 将 Vite ignored 规则应用于词法来源路径
 pages-json.ts     pages.json 读-改-写 — 多平台 #ifdef 合并、首页排前、
                   生成标记与过期子包清理、序列化格式化、文件锁与原子写入
-platform-variants.ts 平台变体表 — 跨平台合并的共享规则，数组侧与对象侧两类适配器共用tab-bar.ts        tabBar 外观属性的跨平台合并与渲染（对象侧适配器）
+platform-variants.ts 平台变体表 — 跨平台合并的共享规则，数组侧与对象侧两类适配器共用
+tab-bar.ts        tabBar 外观属性的跨平台合并与渲染（对象侧适配器）
 jsonc-scan.ts     从 pages.json 原始文本里捞回 comment-json 解析时丢掉的重复键
 files.ts          文件工具 — 页面扫描、路径解析、文件锁（withFileLock）、pages.json 合法性检查
 macro.ts          definePage 宏解析 — SFC 解析、单个 script 块失败不影响别的块、
@@ -793,6 +806,9 @@ index.ts
   │    ├─ files.ts                     扫描与文件锁
   │    ├─ page.ts ── macro.ts ── condition.ts
   │    ├─ page-sources.ts              来源身份、代表选择与生成路由冲突
+  │    ├─ page-watch.ts                页面内容订阅与恢复入口
+  │    │    ├─ directories.ts / page-rules.ts 目录发现与词法范围
+  │    │    └─ page-watch-filter.ts    Vite ignored 规则匹配
   │    ├─ pages-json.ts                读-改-写，内含文件锁
   │    ├─ platform-variants.ts         平台变体表（两者按类型互相引用）
   │    ├─ tab-bar.ts ── jsonc-scan.ts  tabBar 属性合并与原文重复键扫描
@@ -807,19 +823,20 @@ pipeline.ts ── context.ts              测试与外部调用的流水线入�
 插件通过 Vite 的生命周期钩子驱动，顺序如下：
 
 1. **插件工厂调用**（同步）— 预检 `pages.json` 是否存在且合法（此时 `config.root` 未知，回退到 `VITE_ROOT_DIR` / `process.cwd()` 解析路径）
-2. **`configResolved`**（异步）— 创建 `PageContext`，检测是否与 `vite-plugin-uni-platform` 协同，执行首次 `updatePagesJSON()` 生成 pages.json；`build --watch` 模式下另建 chokidar 监听页面目录
-3. **`configureServer`**（dev）— 复用 Vite 的 `server.watcher`，把配置文件源（`pages.config.ts` 等）加入监听；变更时重跑完整流水线，失效虚拟模块并通知浏览器 full-reload
+2. **`configResolved`**（异步）— 初始化或复用 `PageContext`，检测是否与 `vite-plugin-uni-platform` 协同，完成首次 pages.json 生成；`build --watch` 模式下另建 watcher，接收配置文件事件与页面目录结构通知，同时启动自有页面监听器
+3. **`configureServer`**（dev）— 从 Vite 的 `server.watcher` 接收配置文件及其依赖的事件和页面目录结构通知，并按 Vite 的监听开关、忽略规则和轮询设置启动自有页面监听器；产物更新后失效虚拟模块并通知浏览器 full-reload
 4. **`transform`** — 从 vue / nvue / uvue 文件中移除 `definePage` 宏调用，避免运行时报错
 5. **`resolveId` / `load`** — 提供 `virtual:uni-pages` 虚拟模块，暴露所有页面元数据
+6. **`closeWatcher` / `closeBundle`** — 按运行模式释放本插件持有的监听资源，并解绑共享 watcher 的回调；Vite 负责关闭共享 watcher
 
 ### 关键设计决策
 
-- **统一入口**：`PageContext.updatePagesJSON()` 是唯一的完整流水线入口，阶段顺序封装其内，调用方（Vite 钩子、watcher 回调、测试）无需知道内部阶段。
+- **串行生成**：公开方法 `PageContext.updatePagesJSON(filepath?)` 与内部页面事件批次共用串行生成队列，配置加载、扫描、合并和写入的阶段顺序集中维护。传入文件路径时尝试增量读取，省略时执行完整刷新。
 - **read-modify-write + 生成标记**：平台状态保存在 `pages.json` 自身（`// GENERATED BY UNI-PAGES, PLATFORM: ...` 标记），无需外部缓存文件；无标记的条目视为用户手写，插件永不修改。过期生成物基于该标记自动清理。
 - **文件锁 + 原子写入**：整个「读 → 合并 → 写」在同一个 `withFileLock` 内执行，写入走 tmp + rename，多终端并发（如同时跑 mp-weixin 和 mp-alipay）不会互相覆盖或读到写了一半的内容。
 - **内容不变就不写**：写入前先和磁盘上的内容比一遍，没变化就跳过，避免触发下游不必要的重编译。
-- **统一监听**：配置文件与页面文件共用同一个 chokidar（dev 下直接复用 Vite 的 watcher，不额外创建）；配置变更不做增量，直接重跑完整流水线，配合「内容不变就不写」避免多余的磁盘写入。
-- **增量页面更新**：页面文件变更时先经 `hasChanged()` 检测页面配置是否真的变化，无变化则跳过整轮流水线。
+- **监听职责**：配置事件来自 Vite 的共享 watcher 或 `build --watch` 中创建的 watcher，触发完整生成；其中有效页面目录的结构通知也会触发补扫。`PageSourceWatch` 统一处理页面文件事件，独立管理当前内容目标与非递归恢复入口，并收回失效订阅。
+- **增量页面更新**：普通内容变更只重读相关物理文件的缓存候选，元数据未变时跳过配置加载与产物生成。页面事件按待处理批次合并；批次内含新增、删除、目标切换或恢复等结构变化时执行完整刷新，生成期间到达的事件留给下一轮。
 - **宏解析失败隔离**：每个 `<script>` 块独立解析，单块语法错误（如 Babel 8 已移除的 `assert` import attributes）只影响该块，不会阻断其它块的宏移除。
 - **无导入时副作用**：所有文件系统操作都在插件生命周期内执行，而非模块导入时，模块可独立测试。
 - **可从外部传入的入口**：`pipeline.ts` 的 `root` / `platform` 从外部传入，测试不绑定进程环境变量，平台相关快照结果确定。

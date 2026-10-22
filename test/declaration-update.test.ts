@@ -6,6 +6,7 @@ import { parse } from 'comment-json'
 import { createServer } from 'vite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import UniPages, { PageContext } from '../packages/core/src'
+import { PageSourceWatch } from '../packages/core/src/page-watch'
 
 vi.hoisted(() => vi.stubEnv('UNI_PLATFORM', 'h5'))
 
@@ -22,6 +23,7 @@ afterEach(async () => {
 })
 
 async function fixture() {
+  vi.spyOn(PageSourceWatch.prototype, 'start').mockImplementation(() => {})
   root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-declaration-update-')))
   fs.mkdirSync(path.join(root, 'src/pages'), { recursive: true })
   fs.writeFileSync(path.join(root, 'src/pages/index.vue'), '<template><view/></template>')

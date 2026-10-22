@@ -95,10 +95,8 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
 
       if (config.command === 'build') {
         if (config.build.watch) {
-          // 必须相对真实的 Vite root 解析：否则 chokidar 会按 process.cwd()
-          // 解释相对目录，在 root 与 cwd 不一致时监听到错误的目录
           const lockDirectory = normalizeConfigPath(`${ctx.resolvedPagesJSONPath}.lock`, config.root)
-          buildWatcher = chokidar.watch([...ctx.options.dirs, ...ctx.options.subPackages].map(v => normalizePath(path.resolve(config.root, v))), {
+          buildWatcher = chokidar.watch([], {
             ignoreInitial: true,
             ignored: (file) => {
               const absolute = normalizeConfigPath(file, config.root)
