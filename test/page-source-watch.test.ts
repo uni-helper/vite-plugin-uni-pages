@@ -74,6 +74,7 @@ describe('当前页面来源的监听范围', () => {
   it('目标存在时只递归监听目标，目录入口采用非递归观察', () => {
     const { workspace, target, content, watch } = fixture()
     expect(content.add.mock.calls.flat(2)).toEqual([normalizePath(target)])
+    expect(vi.mocked(chokidar.watch).mock.calls[0]?.[1]).toMatchObject({ followSymlinks: true })
     expect(watch.mock.calls.every(call => (call as unknown as [string, { recursive: boolean }])[1].recursive === false)).toBe(true)
     expect(content.add.mock.calls.flat(2)).not.toContain(normalizePath(workspace))
   })

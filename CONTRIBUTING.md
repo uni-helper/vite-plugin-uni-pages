@@ -64,7 +64,7 @@ test/
 ├── page-exclude-watch.test.ts           页面排除与配置依赖在真实 watcher 下的隔离
 ├── page-content-refresh.test.ts         页面删建、ready 补扫与增量读取缓存
 ├── page-update-coalescing.test.ts       连续 watcher 事件的合并与读取上界
-├── page-symlink-*.test.ts               符号链接事件映射、目标恢复与真实 watcher
+├── page-symlink-*.test.ts               符号链接事件映射、嵌套/外部目标恢复与真实 watcher
 ├── page-source-watch.test.ts            当前来源、内容订阅与非递归恢复入口的生命周期
 ├── page-watch-options.test.ts           Vite 监听开关、轮询后端与忽略规则
 ├── page-watch-ownership.test.ts         页面文件事件单一处理与外部别名的监听覆盖

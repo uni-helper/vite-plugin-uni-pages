@@ -291,4 +291,31 @@ describe.each(['serve', 'build'] as const)('%s 符号链接页面监听', (mode)
       expect(output(root).subPackages[0].pages[0].style.navigationBarTitleText).toBe('C')
     }, { timeout: 10000 })
   }, 30000)
+
+  it('页面目录内的嵌套符号链接持续发现页面', async () => {
+    const workspace = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-symlink-nested-')))
+    roots.push(workspace)
+    const root = path.join(workspace, 'app')
+    const external = path.join(workspace, 'external-feature')
+    const later = path.join(workspace, 'external-later')
+    page(path.join(root, 'src/pages/index.vue'), '首页')
+    page(path.join(external, 'a.vue'), 'A')
+    page(path.join(later, 'c.vue'), 'C')
+    fs.symlinkSync(external, path.join(root, 'src/pages/feature'), process.platform === 'win32' ? 'junction' : 'dir')
+    const { settle } = await start(root, mode)
+    const paths = (): string[] => output(root).pages.map((entry: any) => entry.path)
+
+    await vi.waitFor(() => expect(paths()).toContain('src/pages/feature/a'), { timeout: 10000 })
+    await settle()
+
+    page(path.join(external, 'b.vue'), 'B')
+    await vi.waitFor(() => expect(paths()).toContain('src/pages/feature/b'), { timeout: 10000 })
+
+    fs.symlinkSync(later, path.join(root, 'src/pages/later'), process.platform === 'win32' ? 'junction' : 'dir')
+    await vi.waitFor(() => expect(paths()).toContain('src/pages/later/c'), { timeout: 10000 })
+
+    page(path.join(later, 'd.vue'), 'D')
+    await vi.waitFor(() => expect(paths()).toContain('src/pages/later/d'), { timeout: 10000 })
+    await settle()
+  }, 30000)
 })

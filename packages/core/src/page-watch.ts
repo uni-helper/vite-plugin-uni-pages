@@ -146,7 +146,9 @@ export class PageSourceWatch {
   private createContentWatcher(): FSWatcher {
     const watcher = chokidar.watch([], {
       ignoreInitial: true,
-      followSymlinks: false,
+      // 页面来源内部的链接目录按 tinyglobby 的扫描语义跟随；顶层来源的链接
+      // 仍由 refresh 解析到目标后订阅，恢复入口保持非递归
+      followSymlinks: true,
       usePolling: this.usePolling,
       interval: this.interval,
       ignored: (file, stats) => {
