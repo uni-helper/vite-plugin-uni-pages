@@ -4,13 +4,13 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PageContext } from '../packages/core/src'
-import { PageSourceWatch } from '../packages/core/src/page-watch'
+import { currentPageWatcher, flushPageUpdates, mockPageWatchers } from './helpers/page-watcher'
 
 const roots: string[] = []
 const contexts: PageContext[] = []
 
 beforeEach(() => {
-  vi.spyOn(PageSourceWatch.prototype, 'start').mockImplementation(() => {})
+  mockPageWatchers()
 })
 
 async function fixture() {
@@ -25,11 +25,7 @@ async function fixture() {
   const watcher = Object.assign(new EventEmitter(), { add: vi.fn() })
   await ctx.setupWatcher(watcher as unknown as Parameters<PageContext['setupWatcher']>[0])
   const onUpdate = vi.spyOn(ctx, 'onUpdate')
-  return { ctx, error, onUpdate, root, watcher }
-}
-
-async function flush(ctx: PageContext): Promise<void> {
-  await (ctx as unknown as { pendingPageFlush?: Promise<void> }).pendingPageFlush
+  return { ctx, error, onUpdate, root, watcher: currentPageWatcher(ctx)! }
 }
 
 afterEach(async () => {
@@ -47,7 +43,7 @@ describe('页面更新队列的失败恢复', () => {
     const update = vi.spyOn(ctx, 'updatePagesJSON').mockRejectedValueOnce(failure).mockResolvedValue(true)
 
     watcher.emit('add', path.join(root, 'src/pages/new.vue'))
-    await flush(ctx)
+    await flushPageUpdates(ctx)
 
     expect(error).toHaveBeenCalledWith(
       expect.stringContaining('Failed to update pages.json after a file change'),
@@ -56,7 +52,7 @@ describe('页面更新队列的失败恢复', () => {
     expect(onUpdate).not.toHaveBeenCalled()
 
     watcher.emit('change', path.join(root, 'src/pages/new.vue'))
-    await flush(ctx)
+    await flushPageUpdates(ctx)
 
     expect(update).toHaveBeenCalledTimes(2)
     expect(error).toHaveBeenCalledOnce()
@@ -75,7 +71,7 @@ describe('页面更新队列的失败恢复', () => {
     watcher.emit('add', path.join(root, 'src/pages/first.vue'))
     watcher.emit('add', path.join(root, 'src/pages/second.vue'))
     rejectUpdate(failure)
-    await flush(ctx)
+    await flushPageUpdates(ctx)
 
     expect(update).toHaveBeenCalledTimes(2)
     expect(error).toHaveBeenCalledOnce()
@@ -87,7 +83,7 @@ describe('页面更新队列的失败恢复', () => {
     vi.spyOn(ctx, 'updatePagesJSON').mockResolvedValue(false)
 
     watcher.emit('change', path.join(root, 'src/pages/index.vue'))
-    await flush(ctx)
+    await flushPageUpdates(ctx)
 
     expect(error).not.toHaveBeenCalled()
     expect(onUpdate).not.toHaveBeenCalled()

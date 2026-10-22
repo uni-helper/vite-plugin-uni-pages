@@ -6,11 +6,16 @@ import os from 'node:os'
 import path from 'node:path'
 import { parse } from 'comment-json'
 import { normalizePath } from 'vite'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PageContext } from '../packages/core/src'
+import { currentPageWatcher, flushPageUpdates, mockPageWatchers } from './helpers/page-watcher'
 
 const roots: string[] = []
 const contexts: PageContext[] = []
+
+beforeEach(() => {
+  mockPageWatchers()
+})
 
 const scopes = [
   { name: '主包', options: { dir: 'src/pages' }, file: 'src/pages/index.vue', route: 'pages/index', sub: false },
@@ -115,9 +120,9 @@ describe.each(scopes)('$name 页面内容刷新', (scope) => {
     const update = vi.spyOn(ctx, 'updatePagesJSON')
 
     write(file, macro('就绪前修改'))
-    watcher.emit('ready')
+    currentPageWatcher(ctx)!.emit('ready')
     expect(update).toHaveBeenCalledOnce()
-    await update.mock.results[0].value
+    await flushPageUpdates(ctx)
 
     expect(pages(ctx, scope.sub)).toMatchObject([{ path: scope.route, style: { navigationBarTitleText: '就绪前修改' } }])
   })
@@ -134,9 +139,9 @@ describe.each(scopes)('$name 页面内容刷新', (scope) => {
     const update = vi.spyOn(ctx, 'updatePagesJSON')
 
     write(file, `definePage({ path: ${JSON.stringify(current)} })`)
-    watcher.emit('ready')
+    currentPageWatcher(ctx)!.emit('ready')
     expect(update).toHaveBeenCalledOnce()
-    await update.mock.results[0].value
+    await flushPageUpdates(ctx)
 
     const output = parse(fs.readFileSync(ctx.resolvedPagesJSONPath, 'utf8')) as unknown as PagesConfig
     const virtual = await import(`data:text/javascript,${encodeURIComponent(ctx.virtualModule())}`) as PagesConfig

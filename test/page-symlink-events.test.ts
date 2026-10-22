@@ -7,13 +7,13 @@ import { parse } from 'comment-json'
 import { normalizePath } from 'vite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PageContext } from '../packages/core/src'
-import { PageSourceWatch } from '../packages/core/src/page-watch'
+import { currentPageWatcher, flushPageUpdates, mockPageWatchers } from './helpers/page-watcher'
 
 const roots: string[] = []
 const contexts: PageContext[] = []
 
 beforeEach(() => {
-  vi.spyOn(PageSourceWatch.prototype, 'start').mockImplementation(() => {})
+  mockPageWatchers()
 })
 
 function fixture(): string {
@@ -41,13 +41,13 @@ async function start(root: string, exclude: string[] = [], options: UserOptions 
   const updates = vi.spyOn(ctx, 'updatePagesJSON')
   const watcher = Object.assign(new EventEmitter(), { add: vi.fn() })
   await ctx.setupWatcher(watcher as unknown as Parameters<PageContext['setupWatcher']>[0])
-  return { ctx, updates, watcher }
+  return { ctx, updates, watcher: currentPageWatcher(ctx)! }
 }
 
 async function dispatch(ctx: PageContext, watcher: EventEmitter, event: string, file: string): Promise<void> {
   vi.mocked(ctx.updatePagesJSON).mockClear()
   watcher.emit(event, file)
-  await (ctx as unknown as { pendingPageFlush?: Promise<void> }).pendingPageFlush
+  await flushPageUpdates(ctx)
 }
 
 afterEach(async () => {

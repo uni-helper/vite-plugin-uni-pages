@@ -15,7 +15,7 @@ import { configFileExtensions, configWatchDirectory, isConfigLoaderArtifact, nor
 import { RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import { writeDeclaration } from './declaration'
 import { getSubPackageDirectorySources, refreshPageDirectories } from './directories'
-import { checkPagesJsonFileSync, getPageFiles, isTargetFile, resolvePagesJsonPath } from './files'
+import { checkPagesJsonFileSync, getPageFiles, resolvePagesJsonPath } from './files'
 import { debug } from './logger'
 import { resolveOptions } from './options'
 import { Page } from './page'
@@ -140,8 +140,10 @@ export class PageContext {
       this.options,
       (event, file) => {
         const pageFile = queryPageRules(undefined, () => this.pageFileForEvent(file, normalizeConfigPath(file, this.root)))
-        if (pageFile)
+        if (pageFile) {
+          debug.pages(`File changed: ${pageFile}`)
           this.queuePageUpdate(event === 'change' ? pageFile : undefined)
+        }
       },
       () => this.queuePageUpdate(),
       error => this.logUpdateFailure(error),
@@ -244,15 +246,15 @@ export class PageContext {
   }
 
   /**
-   * 设置文件监听器，监听页面文件与配置文件变更
-   * 页面文件或配置文件变化时自动更新 pages.json
-   * @param watcher - chokidar 文件监听器实例
+   * 注册配置文件与页面目录结构监听，并启动页面内容监听
+   *
+   * @param watcher - 配置文件及目录结构事件使用的 chokidar 监听器
    */
   async setupWatcher(watcher: FSWatcher): Promise<void> {
     if (this.watchers.has(watcher))
       return
 
-    const handleEvent = (event: 'add' | 'change' | 'unlink', filepath: string): void => {
+    const onConfigFile = (filepath: string): void => {
       const index = this.watchedConfigIndex.get(watcher)
       const basename = path.basename(filepath)
       const mightBeConfig = configFileExtensions.test(basename)
@@ -262,7 +264,7 @@ export class PageContext {
       const excluded = this.generatedFilePaths()
       // 自己写的生成物不参与任何匹配，先走这步，免得为每个
       // pages.json 事件白做一次路径解析
-      if (!isTargetFile(filepath) && excluded.includes(eventPath))
+      if (excluded.includes(eventPath))
         return
 
       // 未直接命中的路径仍需解析，以识别符号链接别名；直接命中就不查文件系统
@@ -274,40 +276,28 @@ export class PageContext {
         index.files.has(absolute)
         || (mightBeConfig && index.directories.some(dir => absolute.startsWith(`${dir}/`)))
       )
-      const configChanged = !excluded.includes(absolute) && isConfigPath
-      // 规则的编译结果按声明（dir/subPackages/exclude）缓存，glob 展开的
-      // 目录和 root 回调仍在每轮扫描重算，所以新出现的目录不会漏掉
-      const pageFile = configChanged ? undefined : queryPageRules(undefined, () => this.pageFileForEvent(filepath, absolute))
-      if (!configChanged && !pageFile)
+      if (excluded.includes(absolute) || !isConfigPath)
         return
 
-      debug.pages(configChanged ? `Config changed: ${absolute}` : `File changed: ${absolute}`)
-      // 配置变化立即排队；页面内容事件按物理身份刷新关联候选
-      if (configChanged)
-        void this.updatePagesAndNotify()
-      else
-        this.queuePageUpdate(event === 'change' ? pageFile : undefined)
+      debug.pages(`Config changed: ${absolute}`)
+      void this.updatePagesAndNotify()
     }
-    const onAdd = (file: string): void => handleEvent('add', file)
-    const onChange = (file: string): void => handleEvent('change', file)
-    const onUnlink = (file: string): void => handleEvent('unlink', file)
-    // glob 规则下的目录增删会改变扫描目录集合（如新增 pkg-a 命中 src/pkg-*）
     const onDirectory = (directory: string): void => {
       if (queryPageRules(false, () => this.pageDirectoryForEvent(directory)))
         this.queuePageUpdate()
     }
-    // 初始扫描期间新增的路径可能被 ignoreInitial 吞掉，ready 后再收敛一次
+    // 配置首次加载与订阅就绪之间的变化可能被 ignoreInitial 吞掉
     const onReady = (): void => this.queuePageUpdate()
-    watcher.on('add', onAdd)
-    watcher.on('change', onChange)
-    watcher.on('unlink', onUnlink)
+    watcher.on('add', onConfigFile)
+    watcher.on('change', onConfigFile)
+    watcher.on('unlink', onConfigFile)
     watcher.on('addDir', onDirectory)
     watcher.on('unlinkDir', onDirectory)
     watcher.on('ready', onReady)
     this.watchers.set(watcher, () => {
-      watcher.off('add', onAdd)
-      watcher.off('change', onChange)
-      watcher.off('unlink', onUnlink)
+      watcher.off('add', onConfigFile)
+      watcher.off('change', onConfigFile)
+      watcher.off('unlink', onConfigFile)
       watcher.off('addDir', onDirectory)
       watcher.off('unlinkDir', onDirectory)
       watcher.off('ready', onReady)

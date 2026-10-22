@@ -5,13 +5,13 @@ import path from 'node:path'
 import { normalizePath } from 'vite'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { PageContext } from '../packages/core/src'
-import { PageSourceWatch } from '../packages/core/src/page-watch'
+import { currentPageWatcher, flushPageUpdates, mockPageWatchers } from './helpers/page-watcher'
 
 const roots: string[] = []
 const contexts: PageContext[] = []
 
 beforeEach(() => {
-  vi.spyOn(PageSourceWatch.prototype, 'start').mockImplementation(() => {})
+  mockPageWatchers()
 })
 
 function page(file: string, title: string): void {
@@ -30,14 +30,10 @@ function fixture(count: number): { ctx: PageContext, root: string } {
   return { ctx, root }
 }
 
-async function flush(ctx: PageContext): Promise<void> {
-  await (ctx as unknown as { pendingPageFlush?: Promise<void> }).pendingPageFlush
-}
-
-async function setup(ctx: PageContext): Promise<EventEmitter> {
-  const watcher = Object.assign(new EventEmitter(), { add: vi.fn() })
-  await ctx.setupWatcher(watcher as unknown as Parameters<PageContext['setupWatcher']>[0])
-  return watcher
+async function setup(ctx: PageContext) {
+  const shared = Object.assign(new EventEmitter(), { add: vi.fn() })
+  await ctx.setupWatcher(shared as unknown as Parameters<PageContext['setupWatcher']>[0])
+  return { shared, watcher: currentPageWatcher(ctx)! }
 }
 
 afterEach(async () => {
@@ -51,7 +47,7 @@ afterEach(async () => {
 it('连续删除事件合并为有限次生成，读取次数不超过两轮扫描', async () => {
   const { ctx, root } = fixture(30)
   await ctx.updatePagesJSON()
-  const watcher = await setup(ctx)
+  const { watcher } = await setup(ctx)
   const updates = vi.spyOn(ctx, 'updatePagesJSON')
   const readFile = vi.spyOn(fs.promises, 'readFile')
 
@@ -60,7 +56,7 @@ it('连续删除事件合并为有限次生成，读取次数不超过两轮扫�
     fs.unlinkSync(file)
     watcher.emit('unlink', file)
   }
-  await flush(ctx)
+  await flushPageUpdates(ctx)
 
   expect(updates.mock.calls.length).toBeLessThanOrEqual(2)
   expect(ctx.pageMetaData).toHaveLength(20)
@@ -72,7 +68,7 @@ it('连续删除事件合并为有限次生成，读取次数不超过两轮扫�
 it('一批内多个页面变更仅重读相关页面', async () => {
   const { ctx, root } = fixture(4)
   await ctx.updatePagesJSON()
-  const watcher = await setup(ctx)
+  const { watcher } = await setup(ctx)
   const onBeforeLoadUserConfig = vi.fn()
   ctx.options.onBeforeLoadUserConfig = onBeforeLoadUserConfig
   const readFile = vi.spyOn(fs.promises, 'readFile')
@@ -81,7 +77,7 @@ it('一批内多个页面变更仅重读相关页面', async () => {
     page(path.join(root, `src/pages/p${index}.vue`), `更新${index}`)
     watcher.emit('change', path.join(root, `src/pages/p${index}.vue`))
   }
-  await flush(ctx)
+  await flushPageUpdates(ctx)
 
   expect(onBeforeLoadUserConfig.mock.calls.length).toBeLessThanOrEqual(2)
   expect(readFile.mock.calls.filter(call => call[0] === normalizePath(path.join(root, 'src/pages/p3.vue')))).toHaveLength(0)
@@ -91,7 +87,7 @@ it('一批内多个页面变更仅重读相关页面', async () => {
 it('生成期间到达的内容变更由同一次 flush 继续处理', async () => {
   const { ctx, root } = fixture(3)
   await ctx.updatePagesJSON()
-  const watcher = await setup(ctx)
+  const { watcher } = await setup(ctx)
   const readFile = vi.spyOn(fs.promises, 'readFile')
   const onBeforeWriteFile = vi.fn().mockImplementationOnce(() => {
     page(path.join(root, 'src/pages/p1.vue'), '后续更新')
@@ -101,9 +97,31 @@ it('生成期间到达的内容变更由同一次 flush 继续处理', async () 
   page(path.join(root, 'src/pages/p0.vue'), '首轮更新')
 
   watcher.emit('change', path.join(root, 'src/pages/p0.vue'))
-  await flush(ctx)
+  await flushPageUpdates(ctx)
 
   expect(onBeforeWriteFile).toHaveBeenCalledTimes(2)
   expect(ctx.pageMetaData.map(item => item.style?.navigationBarTitleText).sort()).toEqual(['P2', '后续更新', '首轮更新'])
   expect(readFile.mock.calls.filter(call => call[0] === normalizePath(path.join(root, 'src/pages/p2.vue')))).toHaveLength(0)
+})
+
+it('页面更新完成后共享 watcher 的重复页面文件事件不再读取或生成', async () => {
+  const { ctx, root } = fixture(1)
+  await ctx.updatePagesJSON()
+  const { shared, watcher } = await setup(ctx)
+  const updates = vi.spyOn(ctx, 'updatePagesJSON')
+  const readFile = vi.spyOn(fs.promises, 'readFile')
+  const file = normalizePath(path.join(root, 'src/pages/p0.vue'))
+  page(file, '更新')
+
+  watcher.emit('change', file)
+  await flushPageUpdates(ctx)
+  expect(ctx.pageMetaData[0].style?.navigationBarTitleText).toBe('更新')
+  expect(readFile.mock.calls.filter(call => call[0] === file)).toHaveLength(1)
+
+  for (const event of ['change', 'add', 'unlink'])
+    shared.emit(event, file)
+  await flushPageUpdates(ctx)
+
+  expect(updates).toHaveBeenCalledOnce()
+  expect(readFile.mock.calls.filter(call => call[0] === file)).toHaveLength(1)
 })

@@ -6,12 +6,18 @@ import path from 'node:path'
 import process from 'node:process'
 import { parse } from 'comment-json'
 import { normalizePath } from 'vite'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PageContext } from '../packages/core/src'
+import { currentPageWatcher, flushPageUpdates, mockPageWatchers } from './helpers/page-watcher'
 
 const roots: string[] = []
 const contexts: PageContext[] = []
 const contextsByWatcher = new WeakMap<EventEmitter, PageContext>()
+let entrances: Map<string, EventEmitter>
+
+beforeEach(() => {
+  entrances = mockPageWatchers().entrances
+})
 
 function fixture() {
   const workspace = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-symlink-targets-')))
@@ -39,20 +45,19 @@ async function start(root: string) {
   contexts.push(ctx)
   await ctx.updatePagesJSON()
   const updates = vi.spyOn(ctx, 'updatePagesJSON')
-  const watcher = Object.assign(new EventEmitter(), { add: vi.fn() })
-  vi.spyOn((ctx as any).pageWatcher, 'start').mockImplementation(() => {})
+  const shared = Object.assign(new EventEmitter(), { add: vi.fn() })
+  await ctx.setupWatcher(shared as unknown as Parameters<PageContext['setupWatcher']>[0])
+  const watcher = currentPageWatcher(ctx)!
   contextsByWatcher.set(watcher, ctx)
-  await ctx.setupWatcher(watcher as unknown as Parameters<PageContext['setupWatcher']>[0])
-  return { ctx, updates, watcher }
+  return { ctx, updates, watcher, shared }
 }
 
 async function dispatch(watcher: EventEmitter, updates: MockInstance<PageContext['updatePagesJSON']>, event: string, file: string): Promise<void> {
   updates.mockClear()
-  watcher.emit(event, file)
-  const ctx = contextsByWatcher.get(watcher) as any
-  while (ctx.pendingPageFlush)
-    await ctx.pendingPageFlush
-  await ctx.pendingUpdate
+  const ctx = contextsByWatcher.get(watcher)!
+  const current = currentPageWatcher(ctx) ?? watcher
+  current.emit(event, file)
+  await flushPageUpdates(ctx)
 }
 
 afterEach(async () => {
@@ -67,7 +72,7 @@ describe('符号链接目标恢复', () => {
   it('页面目标及其祖先不加入共享 watcher 的订阅', async () => {
     const { root, target } = fixture()
     page(path.join(target, 'index.vue'), '初始')
-    const { watcher } = await start(root)
+    const { shared: watcher } = await start(root)
 
     const added = watcher.add.mock.calls.flat(2).map(file => normalizePath(file))
     expect(added).not.toContain(normalizePath(target))
@@ -85,6 +90,7 @@ describe('符号链接目标恢复', () => {
 
     const added = watcher.add.mock.calls.flat(2).map(file => normalizePath(file))
     expect(added.filter(file => file.includes('/external'))).toEqual([])
+    expect(currentPageWatcher(ctx)).toBeUndefined()
     await ctx.disposeWatchers()
   })
 
@@ -171,21 +177,25 @@ describe('符号链接目标恢复', () => {
     const { workspace, root, target } = fixture()
     const file = path.join(target, 'profile.vue')
     page(file, '初始')
-    const { updates, watcher } = await start(root)
-    watcher.add.mockClear()
+    const { ctx, updates, watcher, shared } = await start(root)
+    shared.add.mockClear()
     const parent = path.dirname(target)
     fs.rmSync(parent, { recursive: true })
 
-    await dispatch(watcher, updates, 'unlinkDir', parent)
+    updates.mockClear()
+    entrances.get(normalizePath(parent))!.emit('change', 'rename', path.basename(parent))
+    await flushPageUpdates(ctx)
 
     expect(updates).toHaveBeenCalledOnce()
     expect(output(root).subPackages ?? []).toEqual([])
-    expect(watcher.add.mock.calls.flat(2).map(file => normalizePath(file))).not.toContain(normalizePath(path.join(workspace, 'external')))
+    expect(shared.add.mock.calls.flat(2).map(file => normalizePath(file))).not.toContain(normalizePath(path.join(workspace, 'external')))
 
-    watcher.add.mockClear()
+    shared.add.mockClear()
     page(file, '目录恢复')
-    await dispatch(watcher, updates, 'addDir', parent)
-    expect(watcher.add.mock.calls.flat(2).map(file => normalizePath(file))).not.toContain(normalizePath(target))
+    updates.mockClear()
+    entrances.get(normalizePath(path.dirname(parent)))!.emit('change', 'rename', path.basename(parent))
+    await flushPageUpdates(ctx)
+    expect(shared.add.mock.calls.flat(2).map(file => normalizePath(file))).not.toContain(normalizePath(target))
     expect(updates).toHaveBeenCalledOnce()
     expect(output(root).subPackages).toMatchObject([{ root: 'src/alias', pages: [{ path: 'profile', style: { navigationBarTitleText: '目录恢复' } }] }])
 

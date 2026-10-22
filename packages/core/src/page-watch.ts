@@ -249,7 +249,7 @@ export class PageSourceWatch {
     const absolute = normalizePath(path.resolve(this.options.root, directory))
     if (!this.ignoresSource(absolute) && (getPageRules(this.options).matchesDirectory(absolute) || [...this.directories.keys()].some(source => contains(absolute, source))))
       return true
-    return this.options.mergePages && [...this.directories, ...this.files].some(([source, { target }]) =>
+    return [...this.directories, ...this.files].some(([source, { target }]) =>
       contains(absolute, target)
       && (isPageDirectoryEvent(source, this.options) || isPageFileInDirectories(source, this.options))
       && !this.ignoresSource(source)
