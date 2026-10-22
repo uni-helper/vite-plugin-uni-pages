@@ -396,7 +396,7 @@ export class PageSourceWatch {
     }
     for (const [directory, entries] of wanted) {
       try {
-        const stat = fs.statSync(directory)
+        const stat = fs.statSync(directory, { bigint: true })
         const identity = `${stat.dev}:${stat.ino}`
         const existing = this.recoveryWatchers.get(directory)
         if (existing?.identity === identity) {

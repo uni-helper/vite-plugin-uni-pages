@@ -28,11 +28,11 @@ export function resolveWatchTarget(source: string): SourceTarget {
     const parts = remaining.slice(root.length).split(path.sep).filter(Boolean)
     let current = root
     let redirected = false
-    let stat: fs.Stats | undefined
+    let stat: fs.BigIntStats | undefined
     for (const [index, part] of parts.entries()) {
       current = path.join(current, part)
       try {
-        stat = fs.lstatSync(current)
+        stat = fs.lstatSync(current, { bigint: true })
         if (stat.isSymbolicLink()) {
           links.add(normalizePath(current))
           remaining = path.resolve(path.dirname(current), fs.readlinkSync(current), ...parts.slice(index + 1))
@@ -47,7 +47,7 @@ export function resolveWatchTarget(source: string): SourceTarget {
       }
     }
     if (!redirected) {
-      stat ??= fs.lstatSync(root)
+      stat ??= fs.lstatSync(root, { bigint: true })
       return {
         target: normalizePath(current),
         exists: true,
@@ -85,7 +85,8 @@ export function collectPageWatchSources(roots: Iterable<string>, excluded: (sour
         children = fs.readdirSync(target, { withFileTypes: true })
       }
       catch (error) {
-        if (!isMissingFsError(error))
+        const code = (error as NodeJS.ErrnoException).code
+        if (!isMissingFsError(error) && code !== 'EACCES' && code !== 'EPERM')
           throw error
         return
       }

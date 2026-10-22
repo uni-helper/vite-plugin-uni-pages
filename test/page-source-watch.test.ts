@@ -79,6 +79,71 @@ describe('当前页面来源的监听范围', () => {
     expect(content.add.mock.calls.flat(2)).not.toContain(normalizePath(workspace))
   })
 
+  it('超出安全整数范围的目录身份变化仍重建内容订阅和恢复入口', () => {
+    const { target, content, entrances, refresh } = fixture()
+    const parent = normalizePath(path.dirname(target))
+    const previous = 9007199254740992n
+    let inode = previous
+    const lstat = fs.lstatSync
+    const stat = fs.statSync
+    vi.spyOn(fs, 'lstatSync').mockImplementation(((file: fs.PathLike, options?: { bigint?: boolean }) => {
+      const result = Reflect.apply(lstat, fs, [file, options]) as fs.Stats | fs.BigIntStats
+      if (normalizePath(String(file)) === normalizePath(target))
+        result.ino = options?.bigint ? inode : Number(inode)
+      return result
+    }) as typeof fs.lstatSync)
+    vi.spyOn(fs, 'statSync').mockImplementation(((file: fs.PathLike, options?: { bigint?: boolean }) => {
+      const result = Reflect.apply(stat, fs, [file, options]) as fs.Stats | fs.BigIntStats
+      if (normalizePath(String(file)) === parent)
+        result.ino = options?.bigint ? inode : Number(inode)
+      return result
+    }) as typeof fs.statSync)
+    refresh()
+    const entrance = entrances.get(parent)!
+    content.close.mockClear()
+    content.add.mockClear()
+
+    inode = previous + 1n
+    expect(Number(inode)).toBe(Number(previous))
+    entrance.emit('change', 'rename', path.basename(target))
+
+    expect(content.close).toHaveBeenCalledOnce()
+    expect(content.add).toHaveBeenCalledExactlyOnceWith([normalizePath(target)])
+    expect(entrance.close).toHaveBeenCalledOnce()
+    expect(entrances.get(parent)).not.toBe(entrance)
+  })
+
+  it.each(['EACCES', 'EPERM'])('嵌套目录读取遇到 %s 时继续发现其他有效来源', (code) => {
+    const { root, target, alias, options, content, sourceWatch, refresh } = fixture()
+    options.dir = 'src'
+    const denied = path.join(root, 'src/denied')
+    fs.mkdirSync(denied)
+    const read = fs.readdirSync
+    vi.spyOn(fs, 'readdirSync').mockImplementation(((file: fs.PathLike, options: unknown) => {
+      if (normalizePath(String(file)) === normalizePath(denied))
+        throw Object.assign(new Error('Permission denied'), { code })
+      return Reflect.apply(read, fs, [file, options])
+    }) as typeof fs.readdirSync)
+
+    expect(refresh).not.toThrow()
+    expect(content.add).toHaveBeenLastCalledWith([normalizePath(path.join(root, 'src')), normalizePath(target)])
+    const file = normalizePath(path.join(target, 'index.vue'))
+    expect(sourceWatch.fileForEvent(file, file)).toBe(normalizePath(path.join(alias, 'index.vue')))
+  })
+
+  it('嵌套目录读取遇到未知文件系统错误时仍抛出', () => {
+    const { target, sourceWatch } = fixture()
+    const read = fs.readdirSync
+    const error = Object.assign(new Error('I/O error'), { code: 'EIO' })
+    vi.spyOn(fs, 'readdirSync').mockImplementation(((file: fs.PathLike, options: unknown) => {
+      if (normalizePath(String(file)) === normalizePath(target))
+        throw error
+      return Reflect.apply(read, fs, [file, options])
+    }) as typeof fs.readdirSync)
+
+    expect(() => sourceWatch.refresh()).toThrow(error)
+  })
+
   it('缺失目标保留来源关联，恢复后关闭临时祖先观察', () => {
     const { workspace, target, alias, content, entrances, sourceWatch, refresh } = fixture()
     fs.rmSync(path.dirname(target), { recursive: true })
