@@ -18,7 +18,9 @@ import { comparePageSources } from './page-sources'
  * @returns Windows 返回规范化后的选择器，其他平台返回原字符串
  *
  * @example
+ * ```ts
  * normalizePagePattern('src\\pages') // Windows: 'src/pages'
+ * ```
  */
 export function normalizePagePattern(pattern: string): string {
   return process.platform === 'win32' ? pattern.replace(/\\(?![()[\]{}!+@])/g, '/') : pattern
@@ -33,7 +35,9 @@ export function normalizePagePattern(pattern: string): string {
  * @returns 去除 glob 特殊字符前转义反斜杠的路径字符串
  *
  * @example
+ * ```ts
  * unescapePagePattern('src/\\[demo\\]') // 'src/[demo]'
+ * ```
  */
 export function unescapePagePattern(pattern: string): string {
   return pattern.replace(/\\(?=[[\](){}!*+?@|])/g, '')
