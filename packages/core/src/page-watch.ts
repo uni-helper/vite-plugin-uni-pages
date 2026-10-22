@@ -11,7 +11,7 @@ import chokidar from 'chokidar'
 import picomatch from 'picomatch'
 import { globSync } from 'tinyglobby'
 import { normalizePath } from 'vite'
-import { isPageDirectoryEvent, isPageFileInDirectories, resolvePageDirs } from './directories'
+import { isPageDirectoryEvent, isPageFileInDirectories, normalizePagePattern, resolvePageDirs, unescapePagePattern } from './directories'
 import { isMissingFsError, isTargetFile } from './files'
 import { getPageRules } from './page-rules'
 import { createPageWatchFilter } from './page-watch-filter'
@@ -194,9 +194,9 @@ export class PageSourceWatch {
       ...this.options.subPackages.map(dir => normalizePath(path.resolve(this.options.root, dir))),
     ])
     for (const pattern of rules.patterns) {
-      const portable = process.platform === 'win32' ? pattern.replace(/\\(?![()[\]{}!+@])/g, '/') : pattern
+      const portable = normalizePagePattern(pattern)
       if (!picomatch.scan(portable).isGlob) {
-        currentDirectories.add(normalizePath(path.resolve(this.options.root, portable.replace(/\\(?=[[\](){}!*+?@|])/g, ''))))
+        currentDirectories.add(normalizePath(path.resolve(this.options.root, unescapePagePattern(portable))))
       }
       else if (this.options.mergePages) {
         for (const directory of resolvePageDirs(pattern, this.options.root, this.options.exclude))
@@ -349,12 +349,12 @@ export class PageSourceWatch {
     if (this.options.mergePages) {
       const rules = getPageRules(this.options)
       for (const pattern of rules.patterns) {
-        const portable = process.platform === 'win32' ? pattern.replace(/\\(?![()[\]{}!+@])/g, '/') : pattern
+        const portable = normalizePagePattern(pattern)
         const normalized = path.posix.normalize(portable)
         const scan = picomatch.scan(normalized, { parts: true })
         if (!scan.isGlob)
           continue
-        const base = normalizePath(path.resolve(this.options.root, (scan.base || '.').replace(/\\(?=[[\](){}!*+?@|])/g, '')))
+        const base = normalizePath(path.resolve(this.options.root, unescapePagePattern(scan.base || '.')))
         if (rules.isExcluded(base) || this.ignoresSource(base))
           continue
         entrance(base)

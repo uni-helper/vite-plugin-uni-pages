@@ -14,12 +14,12 @@ import { comparePageSources } from './page-sources'
  *
  * @description 保留 `\[` 等 glob 转义，避免 normalizePath 将转义字符一起替换
  */
-function normalizePagePattern(pattern: string): string {
+export function normalizePagePattern(pattern: string): string {
   return process.platform === 'win32' ? pattern.replace(/\\(?![()[\]{}!+@])/g, '/') : pattern
 }
 
 /** 把选择器里的转义还原，用作真实路径前的处理 */
-function unescapePagePattern(pattern: string): string {
+export function unescapePagePattern(pattern: string): string {
   return pattern.replace(/\\(?=[[\](){}!*+?@|])/g, '')
 }
 
