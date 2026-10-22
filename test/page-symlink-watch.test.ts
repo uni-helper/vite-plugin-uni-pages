@@ -83,12 +83,21 @@ async function start(root: string, mode: 'serve' | 'build', watchOptions?: Serve
   }
   let queue: ContextQueue
   const subscriptions: { file: string, recursive: boolean, closed: boolean }[] = []
+  const lockDirectory = normalizePath(path.join(root, 'pages.json.lock'))
+  const isLockPath = (file: string): boolean => file === lockDirectory || file.startsWith(`${lockDirectory}/`)
   const watch = fs.watch
   vi.spyOn(fs, 'watch').mockImplementation(((file: fs.PathLike, ...args: any[]) => {
     const subscription = { file: normalizePath(String(file)), recursive: !!args[0]?.recursive, closed: false }
     subscriptions.push(subscription)
     const observed = (watch as any)(file, ...args) as fs.FSWatcher
-    observed.on('change', (event, filename) => events.push({ event: `native:${event}`, file: normalizePath(path.join(String(file), String(filename ?? ''))) }))
+    observed.on('change', (event, filename) => {
+      // 临时锁目录的底层通知不属于页面或恢复入口事件
+      if (isLockPath(subscription.file))
+        return
+      const changed = normalizePath(path.join(String(file), String(filename ?? '')))
+      if (!isLockPath(changed))
+        events.push({ event: `native:${event}`, file: changed })
+    })
     observed.once('close', () => subscription.closed = true)
     return observed
   }) as typeof fs.watch)
