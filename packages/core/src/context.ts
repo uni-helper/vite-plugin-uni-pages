@@ -377,7 +377,7 @@ export class PageContext {
    * 故意留的兜底）。
    */
   private refreshConfigWatchers(): void {
-    // 只按专用目录排除产物，不从真实输入的文件名推断身份
+    // 排除临时产物目录，避免加载器写入和清理文件时再次触发配置重载
     const files = [...this.pagesConfigSourcePaths, ...this.pagesConfigDependencyPaths, ...this.configRecoveryCandidates]
       .filter(file => !isConfigLoaderArtifact(normalizeConfigPath(file, this.root), this.configLoader.artifactDirectory))
     // 监听现存父目录可发现新建文件；事件仍按当前依赖集合过滤

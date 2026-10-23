@@ -64,7 +64,7 @@ export function configWatchDirectory(filepath: string): string {
   return normalizePath(directory)
 }
 
-/** 判断路径是否位于加载器专用产物目录，真实输入的文件名不受限制 */
+/** 判断路径是否位于加载器专用产物目录 */
 export function isConfigLoaderArtifact(filepath: string, directory: string): boolean {
   const relative = path.relative(directory, filepath)
   return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
@@ -78,9 +78,9 @@ interface LoadedPagesConfig {
 }
 
 /**
- * 保留 unconfig 的发现与回调契约，以打包后的新模块重新求值本地依赖
+ * 页面配置加载器
  *
- * @description 自定义 parser 仍由调用方负责加载；失败路径只用于恢复监听，不替换上次成功配置
+ * @description 按配置源顺序发现并加载首个有效配置，返回配置对象及依赖路径；加载失败时记录恢复路径并抛出错误
  */
 export class PagesConfigLoader {
   /** 装载失败时仍需监听重建的入口与已尝试路径 */
@@ -90,13 +90,20 @@ export class PagesConfigLoader {
   /** 目录导入的恢复范围，覆盖 package.json 和自定义入口 */
   readonly recoveryDirectories = new Set<string>()
   private readonly knownSources = new Set<string>()
-  /** 产物目录的物理路径，供输入索引和事件过滤使用 */
+  /** 临时工作目录的物理路径，每轮加载创建独占子目录，输入索引与事件过滤排除此目录 */
   readonly artifactDirectory: string
 
   constructor(private readonly root: string) {
     this.artifactDirectory = normalizeConfigPath(path.join(root, 'node_modules/.cache/uni-pages'), root)
   }
 
+  /**
+   * 按来源顺序加载首个有效配置
+   *
+   * @description 内置 parser 使用转换后的文本；自定义 parser 接收原入口路径并自行读取
+   * @returns 配置对象、已加载入口及参与监听的依赖路径；没有有效配置时配置对象为空
+   * @throws 配置读取、转换、解析或执行失败时抛出错误
+   */
   async load(sources: LoadConfigSource<PagesConfig>[]): Promise<LoadedPagesConfig> {
     this.recoveryCandidates.clear()
     this.recoveryDirectories.clear()
@@ -105,7 +112,7 @@ export class PagesConfigLoader {
     const normalize = (filepath: string): string => normalizeConfigPath(filepath, this.root)
     const adapted = sources.map((source): LoadConfigSource<PagesConfig> => ({
       ...source,
-      // transform 在 parser 内执行，避免 unconfig 写入入口旁的同名文件
+      // 在 parser 内传递转换文本，使入口路径保持不变且无需写入源码目录
       transform: undefined,
       parser: async (filepath) => {
         attemptedPaths.add(normalize(filepath))
@@ -157,20 +164,30 @@ export class PagesConfigLoader {
     }
   }
 
+  /**
+   * 打包并执行脚本配置，返回其导出的配置对象
+   *
+   * @param source 原配置入口路径，作为入口导入和运行时相对路径的解析基准
+   * @param code 经过可选 transform 处理的入口文本，依赖模块按各自路径读取
+   * @param dependencies 接收成功打包涉及的本地依赖路径
+   * @param attempted 接收本轮尝试读取的本地源路径，供执行失败后恢复监听
+   */
   private async loadScript(source: string, code: string, dependencies: Set<string>, attempted: Set<string>): Promise<PagesConfig> {
     const sourcePath = normalizeConfigPath(source, this.root)
     const importDirectories = new Set<string>()
     const recoveryCandidates = new Set<string>()
     const root = this.root
-    // 每次加载独占目录；转换文本只在内存中流转，源码目录不产生中间文件
+    // 每轮打包使用独占目录，隔离并发加载的辅助模块和执行产物
     const cacheDirectory = this.artifactDirectory
     mkdirSync(cacheDirectory, { recursive: true })
     const bundleDirectory = await mkdtemp(path.join(cacheDirectory, 'load-'))
     const runtime = normalizePath(path.join(bundleDirectory, 'runtime.mjs'))
-    // bundle-require 校验入口扩展名；无扩展名和自定义扩展名仍按原路径读取
+    // 合成入口只用于通过 bundle-require 的扩展名校验，onResolve 会映射回原文件，无需落盘
     const entry = scriptExtensions.test(source) ? source : path.join(bundleDirectory, 'entry.ts')
     try {
+      // runtime.mjs 提供公共解析助手，原文件位置由每个源模块注入的调用参数提供
       await writeFile(runtime, configRuntimeSource())
+      // bundle-require 将配置和辅助代码打包到 config.mjs，再交给 Node 执行
       const { mod, dependencies: inputs } = await bundleRequire<Record<string, unknown>>({
         filepath: entry,
         cwd: this.root,

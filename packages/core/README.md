@@ -113,7 +113,7 @@ await pages.prepare({ platformSuffix: false })
 
 ### 配置依赖热更新
 
-`pages.config.ts` 可以拆分为本地模块。开发服务器和 `vite build --watch` 会监听配置入口及其直接、间接依赖；修改依赖后自动重新生成 `pages.json` 和类型声明。
+默认的 `pages.config.ts` 或通过 `configSource` 指定的配置入口可以导入本地模块。使用内置 parser 时，开发服务器和 `vite build --watch` 会监听入口及打包器收集到的直接、间接依赖；修改这些文件后自动重新生成 `pages.json` 和已启用的类型声明。
 
 ```ts
 // pages.config.ts
@@ -132,47 +132,69 @@ export const globalStyle = {
 
 支持本地 TypeScript、JavaScript 和 JSON，以及静态 `import`、`export ... from`、字面量 `import()` / `require()` 形成的依赖链。新增导入后会更新监听集合，移除导入后该文件不再触发配置生成。纯类型导入不参与运行时依赖监听。
 
-通过包名导入 workspace 包时，真实路径位于 `node_modules` 之外的源码也会参与加载、监听和重新求值，包括 Vite 根目录外的文件。已安装包的 TypeScript／JSON 入口及其相对依赖可以加载，但真实路径位于 `node_modules` 内的文件不参与自动监听；普通 JavaScript 包保持原有的 `import`／`require` 条件解析。
+通过包名导入 workspace 包时，真实路径位于 `node_modules` 之外的源码也会参与加载、监听和重新求值，包括 Vite 根目录外的文件。已安装包的 TypeScript／JSON 入口及其相对依赖可以加载，但真实路径位于 `node_modules` 内的文件不参与自动监听；普通 JavaScript 包按 `import`／`require` 的条件导出解析。
 
 配置或依赖暂时出现语法错误、缺失文件时，watch 模式保留上次成功的产物并报告错误；修复后继续更新。已加载的配置入口删除后会使用空配置，重建入口后恢复加载。首次加载失败会终止初始化。
 
-配置入口和依赖按实际路径识别，文件名可以包含 `.bundled_` 或以 `__unconfig_` 开头。例如 `settings.bundled_config.ts`、`config/__unconfig_constants.ts` 都能正常加载和更新。
-
 #### 源位置与运行时加载
 
-入口及打包进配置的嵌套模块分别使用自己的源位置。`__dirname`、`__filename`、`import.meta.url`、`import.meta.dirname`、`import.meta.filename` 指向对应源文件；计算式 `require(name)`、`require.resolve(name)`、`import(name)` 和 `import.meta.resolve(name)` 也从该模块解析。
+配置辅助模块可以在运行时加载其他文件。例如，配置入口导入 `config/global-style.ts`，该模块再通过变量加载同目录的标题文件：
 
 ```text
 app/
-├── pages.config.ts
-├── runtime.cjs             # 导出 entry
+├── pages.config.ts         # 插件读取的配置入口
 └── config/
-    ├── module.ts
-    └── runtime.cjs         # 导出 nested
+    ├── global-style.ts     # 入口导入的辅助模块
+    └── title.mjs           # 辅助模块在运行时加载的文件
 ```
-
-例如两个模块都执行以下代码时，`pages.config.ts` 读取 `app/runtime.cjs`，`config/module.ts` 读取 `app/config/runtime.cjs`：
 
 ```ts
-const target = './runtime.cjs'
-const value = require(target)
-const resolved = import.meta.resolve(target)
+// pages.config.ts
+import { defineUniPages } from '@uni-helper/vite-plugin-uni-pages'
+import { globalStyle } from './config/global-style'
+
+export default defineUniPages({ globalStyle })
 ```
 
-静态依赖会随配置重新打包、求值。运行时才确定目标的 `require(name)` / `import(name)` 由 Node 加载并沿用 Node 缓存：仅修改目标不会自动触发配置更新，重新加载入口也可能继续读到缓存值。运行时加载失败后，仅补建或修复动态目标也不保证触发恢复；需要自动更新时，优先使用上面的静态导入。`import.meta.resolve()` 只返回解析后的 URL，不代表目标已经加载。
+```ts
+// config/global-style.ts
+const target = './title.mjs'
+const { title } = await import(target)
 
-运行时解析区分包的 `import` / `require` 条件导出，支持模块所属包的 `#imports`。ESM 解析使用 `import-meta-resolve`，不接管 Node 自定义 loader、`--conditions` 等额外命令行解析选项。`fs.readFile()` 等自行读取、`node_modules` 变更和应用的 `resolve.alias` 仍不在自动依赖监听范围内。
+export const globalStyle = { navigationBarTitleText: title }
+```
+
+```js
+// config/title.mjs
+export const title = '首页'
+```
+
+加载关系是 `pages.config.ts → config/global-style.ts → config/title.mjs`。其中入口到辅助模块是静态导入，最后一步的 `import(target)` 在运行时解析。相对路径以发起调用的 `config/global-style.ts` 为基准，所以读取的是 `app/config/title.mjs`。入口或其他嵌套模块执行同样的调用时，分别使用各自的源文件位置。
+
+导入的写法决定依赖如何加载和更新：
+
+| 写法 | 加载与更新行为 |
+| --- | --- |
+| `import { title } from './title.mjs'`、`import('./title.mjs')`、`require('./title.cjs')` | 路径明确，由打包器收集；符合上述本地依赖范围的文件会被监听，并随配置重新打包、求值 |
+| esbuild 可枚举的相对路径表达式，例如 ``import(`./titles/${locale}.mjs`)`` | 由打包器展开候选文件，收集到的本地文件参与监听 |
+| 未被打包器展开的 `import(target)`、`require(target)` | 以调用模块的源位置交给 Node 加载，沿用 Node 缓存；动态目标不自动加入监听集合 |
+
+上例中的 `title.mjs` 属于最后一种情况：仅修改它不会自动触发配置更新，重新加载入口也可能继续读到缓存值；仅补建或修复缺失的动态目标也不保证触发恢复。若标题文件需要随编辑自动更新，可以把 `global-style.ts` 中的加载改为 `import { title } from './title.mjs'`。
+
+对配置入口及打包进配置的脚本模块，`__dirname`、`__filename`、`import.meta.url`、`import.meta.dirname`、`import.meta.filename` 同样对应各自源文件。`require.resolve()` 和 `import.meta.resolve()` 从调用模块的位置解析目标，只返回路径或 URL，不加载目标模块。运行时由 Node 加载的目标不经过这层转换，遵循目标模块自身的 ESM 或 CommonJS 语义。
+
+运行时解析区分包的 `import` / `require` 条件导出，支持模块所属包的 `#imports`。Node 自定义 loader、`--conditions` 等额外命令行解析选项不在此解析约定内。`fs.readFile()` 等自行读取、`node_modules` 变更和应用的 `resolve.alias` 不在自动依赖监听范围内。
 
 #### transform 与自定义 parser
 
-`configSource` 对实际加载的入口按 `transform → parser → rewrite` 的顺序执行已提供的回调，成功加载时各调用一次；前一步失败会终止后续回调。回调接收原配置入口路径。
+需要在解析前转换入口文本时，可以设置 `configSource.transform`；需要自行读取和解析入口时，可以提供自定义 `parser`。对实际加载的入口，已提供的回调按 `transform → parser → rewrite` 的顺序执行，成功加载时各调用一次；前一步失败会终止后续回调。回调接收原配置入口路径。
 
 | parser | 读取内容 | 依赖跟踪 |
 | --- | --- | --- |
 | 内置 `auto`、`json`、`import` | 使用内存中的 transform 结果；未返回有效字符串时使用原内容 | 脚本打包收集到的本地输入参与监听 |
-| 自定义函数 | 收到原入口，读取该文件时得到原内容 | parser 自行读取的其他文件不自动加入依赖集合 |
+| 自定义函数 | 收到原入口，读取该文件时得到原内容；transform 会执行，但其返回文本不传给自定义 parser | parser 自行读取的其他文件不自动加入依赖集合 |
 
-transform 不再生成入口旁的 `__unconfig_*` 文件，已有同名真实文件不会被覆写或删除。加载器只在 `node_modules/.cache/uni-pages/` 内创建每次加载独占的产物目录，并在加载成功或失败后清理。该目录专供加载器使用，不作为配置输入监听；多个独立 loader 的产物互不覆盖。
+transform 的文本转换在内存中完成，加载器不会把转换结果写回配置源文件或其相邻文件。脚本执行所需的临时文件统一存放在 `node_modules/.cache/uni-pages/` 的独占子目录中，每次加载结束后清理；该目录专供加载器使用，不应放置项目配置。内部文件的来源、用途及清理过程见[脚本配置的加载流程](#脚本配置的加载流程)。
 
 ### 页面级配置 definePage
 
@@ -323,7 +345,8 @@ interface UserOptions {
 
   /**
    * 页面配置文件的加载源
-   * 基于 unconfig，支持多配置源合并
+   *
+   * @description 基于 unconfig，按来源顺序加载首个有效配置
    * @default 'pages.config'
    * @since 0.2.7
    */
@@ -915,6 +938,45 @@ index.ts
   └─ files.ts                          pages.json 预检与路径解析
 pipeline.ts ── context.ts              测试与外部调用的流水线入口
 ```
+
+### 脚本配置的加载流程
+
+`PageContext` 通过 `PagesConfigLoader.load()` 取得配置对象及依赖路径，再扫描页面、合并元数据并写入 `pages.json`。加载器使用 unconfig 按来源顺序发现并加载首个有效配置：内置 parser 直接解析 JSON 内容，需要执行 JavaScript / TypeScript 时调用 `loadScript()`；自定义 parser 则由调用方负责读取和解析。
+
+`loadScript()` 接收原入口路径和经过可选 transform 处理的入口文本。它通过 `bundle-require` 调用 esbuild 打包并执行脚本，过程如下：
+
+1. 在 `node_modules/.cache/uni-pages/` 下创建本次加载独占的 `load-*` 目录，并写入公共辅助模块 `runtime.mjs`。
+2. esbuild 解析入口和静态依赖。`onResolve` 按导入位置解析目标，并记录缺失导入的恢复候选；`onLoad` 读取模块，将需要转换的脚本文本与原文件路径交给 `transformConfigSource()`。
+3. `transformConfigSource()` 在内存中为每个模块注入绑定原文件位置的 `require`、`import.meta` 和动态导入函数，保留可由 esbuild 打包的调用，并生成源码映射。
+4. esbuild 将转换后的配置模块和所需辅助代码打包为 `config.mjs`，`bundle-require` 加载执行它；加载器提取配置对象，并记录参与打包的本地依赖。
+5. 成功或失败都通过 `finally` 删除本轮 `load-*` 目录。加载失败时保留已尝试的源路径及适用的缺失导入候选，供后续文件事件触发重试。
+
+临时目录中的文件由加载器管理：
+
+```text
+node_modules/.cache/uni-pages/
+└── load-<随机后缀>/
+    ├── runtime.mjs
+    └── config.mjs
+```
+
+| 文件 | 内容来源 | 用途 |
+| --- | --- | --- |
+| `runtime.mjs` | `configRuntimeSource()` 返回的 JavaScript 源码 | 提供 `createRequire`、`createMeta`、`importFrom` 等公共助手；各源模块通过注入的调用参数提供自己的路径 |
+| `config.mjs` | esbuild 汇总入口文本、打包的依赖及辅助代码生成 | 由 Node 执行并导出配置对象；外部依赖保留为导入，运行时动态目标由助手解析后加载 |
+
+例如，`config/global-style.ts` 中的 `import(target)` 会被转换成效果相当于 `importFrom(target, 'file:///app/config/global-style.ts')` 的调用。`importFrom` 使用 `import-meta-resolve` 将目标解析成 URL，再调用 Node 的 `import()`。`require(target)` 则使用 Node 的 `createRequire(原文件路径)`。每个模块分别携带自己的源位置，执行文件所在的临时目录不会改变这些调用的解析基准。
+
+```text
+配置入口文本、静态依赖 ── 内存转换 ──┐
+                                  ├── esbuild ── config.mjs ── 配置对象
+插件生成的 runtime.mjs ────────────┘                             │
+                                                               └── PageContext 合并、生成 pages.json
+```
+
+这里的 `.cache/uni-pages` 用作临时工作目录，每次加载都会生成新的产物；本轮子目录清理后，父目录可以保留。源码转换不修改项目文件，独占目录也使并发加载的产物互不覆盖。配置输入索引和事件过滤按这个目录排除内部产物，避免临时文件的写入和删除触发配置重载。
+
+这些辅助文件用于 Node 侧的配置执行。业务代码导入的 `virtual:uni-pages` 由 Vite 的 `resolveId` / `load` 钩子提供，内容来自 `PageContext` 汇总的页面元数据。
 
 ### 插件生命周期
 

@@ -9,7 +9,7 @@ import { callExpression, identifier, removePropertiesDeep } from '@babel/types'
 import { babelParse, walkAST } from 'ast-kit'
 import { transform } from 'esbuild'
 
-/** 保留字面量和 esbuild 可枚举的相对路径 glob，其他目标交给运行时解析 */
+/** 判断导入表达式能否交给 esbuild 收集依赖，未匹配的目标由运行时助手解析 */
 function isBundledSpecifier(node: Node | undefined): boolean {
   if (!node)
     return false
@@ -27,9 +27,13 @@ function isBundledSpecifier(node: Node | undefined): boolean {
 }
 
 /**
- * 为每个源模块绑定运行时解析位置
+ * 将脚本转换为绑定原文件位置的 JavaScript
  *
- * @description 先由 esbuild 区分自由 require 与局部绑定，再恢复可打包的调用；不会改写用户声明的 require
+ * @description 注入运行时解析助手；可打包的调用及用户声明的局部 require 保持原语义
+ * @param code 当前模块的源码文本
+ * @param filename 当前模块的原始绝对路径，作为该模块运行时解析的基准
+ * @param runtime 本轮生成的公共辅助模块路径，供转换后的代码导入
+ * @returns 转换后的 JavaScript，包含映射到原模块的内联源码映射
  */
 export async function transformConfigSource(code: string, filename: string, runtime: string): Promise<string> {
   let prefix = '__uni_pages_source'
@@ -53,6 +57,7 @@ export async function transformConfigSource(code: string, filename: string, runt
     },
   })
   const ast = babelParse(result.code, 'js', { allowReturnOutsideFunction: true })
+  // 可枚举的调用保留给打包器，其余动态导入改为携带原模块 URL 的函数调用
   walkAST(ast, {
     enter(node) {
       if (node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === requireName && isBundledSpecifier(node.arguments[0]))
@@ -62,6 +67,7 @@ export async function transformConfigSource(code: string, filename: string, runt
     },
   })
   const url = JSON.stringify(pathToFileURL(filename).href)
+  // 公共助手复用同一份实现，每个模块分别传入自己的 filename、dirname 和 URL
   const helpers = babelParse(`
 import { createRequire as ${prefix}_createRequire, createMeta as ${prefix}_createMeta, importFrom as ${prefix}_importFrom } from ${JSON.stringify(runtime)};
 const ${requireName} = ${prefix}_createRequire(${JSON.stringify(filename)});
@@ -74,7 +80,12 @@ const ${importName} = (specifier, options) => ${prefix}_importFrom(specifier, ${
   return `${output.code}\n//# sourceMappingURL=data:application/json;base64,${Buffer.from(JSON.stringify(output.map)).toString('base64')}`
 }
 
-/** 仅供本轮 bundle 引用的运行时桥接，动态目标沿用 Node 的加载和缓存 */
+/**
+ * 生成配置执行所需的公共辅助模块源码
+ *
+ * @description 调用方将返回文本写入本轮 runtime.mjs；各助手按传入的源位置解析，动态目标沿用 Node 缓存
+ * @returns 可供配置打包使用的 ESM 源码
+ */
 export function configRuntimeSource(): string {
   return `
 export { createRequire } from 'node:module';
