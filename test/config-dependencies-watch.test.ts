@@ -8,13 +8,11 @@ import { parse } from 'comment-json'
 import { build, createServer, normalizePath } from 'vite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import UniPages from '../packages/core/src'
-import { normalizeConfigPath } from '../packages/core/src/config-loader'
+import { configWatchDirectory, isConfigLoaderArtifact, normalizeConfigPath } from '../packages/core/src/config-loader'
 import { PageContext } from '../packages/core/src/context'
+import { flushPageUpdates } from './helpers/page-watcher'
 
 vi.hoisted(() => vi.stubEnv('UNI_PLATFORM', 'h5'))
-
-/** chokidar 丢弃同一路径 50 ms 内的重复 change，重试前必须等过这个窗口 */
-const CHANGE_THROTTLE_MS = 60
 
 let root: string
 let close: (() => Promise<unknown>) | undefined
@@ -54,14 +52,26 @@ interface WatcherSession {
 
 async function start(mode: 'dev' | 'build', extraFiles: string[] = [], userOptions: UserOptions = {}): Promise<WatcherSession> {
   const updates = vi.spyOn(PageContext.prototype, 'updatePagesJSON')
+  const contexts: PageContext[] = []
+  let events = 0
   const settleUpdates = async (): Promise<void> => {
-    await Promise.allSettled(updates.mock.results.map(result => result.value))
+    let snapshot = ''
+    let quietSince = Date.now()
+    await vi.waitFor(async () => {
+      await flushPageUpdates(contexts[0])
+      const current = `${events}:${updates.mock.calls.length}`
+      if (snapshot !== current) {
+        snapshot = current
+        quietSince = Date.now()
+      }
+      expect(Date.now() - quietSince, '配置事件与更新队列应收敛').toBeGreaterThanOrEqual(250)
+    }, { timeout: 10000, interval: 50 })
   }
   let watched: FSWatcher | undefined
   let registrationCount = (): number => 0
   const history = new Map<string, object[]>()
   const record = (kind: string, event: string, file: string, watchedPath?: string): void => {
-    const key = path.basename(file)
+    const key = normalizeConfigPath(file, root)
     const events = history.get(key) || []
     events.push({ time: Math.round(performance.now()), kind, event, file: normalizePath(file), watchedPath })
     history.set(key, events.slice(-20))
@@ -76,21 +86,25 @@ async function start(mode: 'dev' | 'build', extraFiles: string[] = [], userOptio
       file: absolute,
       exists: fs.existsSync(absolute),
       parentEntries: entries,
-      events: history.get(path.basename(file)) || [],
+      events: history.get(normalizeConfigPath(absolute, root)) || [],
     })
   }
-  let ready!: () => void
+  let markReady!: () => void
   const readyPromise = new Promise<void>((resolve) => {
-    ready = resolve
+    markReady = resolve
   })
   const setup = PageContext.prototype.setupWatcher
   vi.spyOn(PageContext.prototype, 'setupWatcher').mockImplementation(async function (this: PageContext, watcher) {
+    contexts.push(this)
     watched = watcher as unknown as FSWatcher
     const add = vi.spyOn(watched, 'add')
     registrationCount = () => add.mock.calls.length
-    watched.on('all', (event, file) => record('all', event, file))
+    watched.on('all', (event, file) => {
+      events++
+      record('all', event, file)
+    })
     watched.on('raw', (event, file, details) => record('raw', event, file, details?.watchedPath))
-    watched.once('ready', ready)
+    watched.once('ready', markReady)
     const result = setup.call(this, watcher)
     if (mode === 'dev' && extraFiles.length === 0)
       expect(add).not.toHaveBeenCalled()
@@ -134,41 +148,54 @@ async function start(mode: 'dev' | 'build', extraFiles: string[] = [], userOptio
     for (const file of targets)
       expect(watchedFiles).toContain(normalizeConfigPath(path.join(root, file), root))
   }, { timeout: 10000 })
-  await settleUpdates()
-  const save = async (file: string, content: string, stage = 'save'): Promise<void> => {
-    const absolute = normalizePath(path.join(root, file))
+  const ready = async (file: string): Promise<void> => {
+    const absolute = normalizeConfigPath(path.join(root, file), root)
+    const directory = configWatchDirectory(absolute)
+    await vi.waitFor(() => {
+      const entries = Object.entries(watched!.getWatched())
+      const files = entries.flatMap(([parent, names]) => names.map(name => normalizeConfigPath(path.join(parent, name), root)))
+      if (fs.existsSync(absolute))
+        expect(files, `订阅尚未覆盖 ${file}`).toContain(absolute)
+      expect(entries.map(([parent]) => normalizeConfigPath(parent, root))).toContain(directory)
+    }, { timeout: 10000 })
+    const prefix = `.config-watch-ready-${Math.random().toString(36).slice(2)}-`
+    const sentinels: string[] = []
     let observed = false
-    const onEvent = (event: string, filepath: string): void => {
-      if ((event === 'add' || event === 'change') && normalizePath(filepath) === absolute)
+    const onEvent = (_event: string, target: string): void => {
+      if (path.basename(target).startsWith(prefix))
         observed = true
     }
     watched!.on('all', onEvent)
     try {
-      // chokidar 只在 mtimeMs 变化时才发 change，而且对同一路径 50 ms 内的重复 change
-      // 直接丢弃。写完把 mtime 推到比原值大，并在被节流时等过窗口再推一次；
-      // Date 会把毫秒截成整数，所以推进后的值必须比原值大，不能只加一次
-      const previousStat = fs.existsSync(absolute) ? fs.statSync(absolute) : undefined
-      let nextMtime = Math.max(Date.now() + 1, (previousStat?.mtimeMs ?? 0) + 1)
+      await vi.waitFor(() => {
+        const sentinel = path.join(directory, `${prefix}${sentinels.length}`)
+        sentinels.push(sentinel)
+        fs.writeFileSync(sentinel, '')
+        expect(observed, `原生订阅尚未覆盖 ${directory}`).toBe(true)
+      }, { timeout: 10000, interval: 100 })
+    }
+    finally {
+      watched!.off('all', onEvent)
+      for (const sentinel of sentinels)
+        fs.rmSync(sentinel, { force: true })
+    }
+    await settleUpdates()
+  }
+  await ready(extraFiles[0] ?? (fs.existsSync(path.join(root, 'pages.config.ts')) ? 'pages.config.ts' : 'src/pages/index.vue'))
+  const save = async (file: string, content: string, stage = 'save'): Promise<void> => {
+    const absolute = normalizeConfigPath(path.join(root, file), root)
+    let observed = false
+    const onEvent = (event: string, filepath: string): void => {
+      if ((event === 'add' || event === 'change') && normalizeConfigPath(filepath, root) === absolute)
+        observed = true
+    }
+    try {
+      await ready(file)
+      watched!.on('all', onEvent)
       record('write', stage, absolute)
       write(file, content)
-      fs.utimesSync(absolute, new Date(nextMtime), new Date(nextMtime))
-      const waitForEvent = (): Promise<void> =>
-        vi.waitFor(() => expect(observed, `${stage}: watcher event for ${file}`).toBe(true), { timeout: 10000, interval: 10 })
-      try {
-        await waitForEvent()
-      }
-      catch (initialFailure) {
-        // 上一次 change 还在节流窗口里，等到窗口过去后用更大的 mtime 再触发一次
-        await delay(CHANGE_THROTTLE_MS)
-        nextMtime = Math.max(Date.now() + 1, fs.statSync(absolute).mtimeMs + 1)
-        fs.utimesSync(absolute, new Date(nextMtime), new Date(nextMtime))
-        try {
-          await waitForEvent()
-        }
-        catch {
-          throw initialFailure
-        }
-      }
+      await vi.waitFor(() => expect(observed, `${stage}: 原生配置事件 ${file}`).toBe(true), { timeout: 10000, interval: 10 })
+      await settleUpdates()
     }
     catch (error) {
       throw new Error(`Config watcher failed: ${diagnose(stage, file)}`, { cause: error })
@@ -184,6 +211,7 @@ async function start(mode: 'dev' | 'build', extraFiles: string[] = [], userOptio
       if (normalizePath(filepath) === absolute)
         observed = true
     }
+    await ready(file)
     watched!.on('unlink', onUnlink)
     try {
       record('remove', 'unlink', absolute)
@@ -220,7 +248,73 @@ describe('真实配置依赖 watcher', () => {
       await save(filename, serialize('entry-updated'))
       await settleUpdates()
       expect(output().globalStyle.navigationBarTitleText).toBe('entry-updated')
-    }, 30000)
+    }, 45000)
+
+    it.each([
+      ['settings.bundled_config.ts', 'entry'],
+      ['__unconfig_constants.ts', 'entry'],
+      ['settings.bundled_config.ts', 'direct'],
+      ['__unconfig_constants.ts', 'direct'],
+      ['settings.bundled_config.ts', 'nested'],
+      ['__unconfig_constants.ts', 'nested'],
+    ])('%s 作为 %s 可单次修改、删除恢复，并隔离 transform 产物', async (filename, position) => {
+      const entry = position === 'entry' ? filename : 'pages.config.ts'
+      const target = position === 'nested' ? `nested/${filename}` : filename
+      fs.mkdirSync(path.join(root, 'nested'))
+      const code = (title: string): string => `export default { globalStyle: { navigationBarTitleText: '${title}' } }`
+      write(target, code('before'))
+      if (position === 'direct')
+        write(entry, `export { default } from './${target}'`)
+      if (position === 'nested') {
+        write(entry, `export { default } from './nested/module.ts'`)
+        write('nested/module.ts', `export { default } from './${filename}'`)
+      }
+      const neighbor = `__unconfig_${entry}`
+      write(neighbor, 'real-neighbor')
+      const { watcher, save, remove, scheduledUpdates, settleUpdates } = await start(mode, [entry, target], {
+        configSource: { files: entry, extensions: [], transform: code => `${code}\n// transformed in memory` },
+      })
+      expect(output().globalStyle.navigationBarTitleText).toBe('before')
+      await save(target, code('after'))
+      expect(output().globalStyle.navigationBarTitleText).toBe('after')
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      await remove(target)
+      expect(output().globalStyle?.navigationBarTitleText).toBe(position === 'entry' ? undefined : 'after')
+      await save(target, code('restored'))
+      expect(output().globalStyle.navigationBarTitleText).toBe('restored')
+      if (position !== 'entry') {
+        await save('next.ts', code('next'))
+        await save(entry, `export { default } from './next.ts'`)
+        expect(output().globalStyle.navigationBarTitleText).toBe('next')
+        const before = scheduledUpdates()
+        await save(target, code('obsolete'))
+        expect(scheduledUpdates()).toBe(before)
+        expect(output().globalStyle.navigationBarTitleText).toBe('next')
+      }
+      await settleUpdates()
+      const subscriptions = Object.entries(watcher.getWatched()).flatMap(([directory, names]) => [directory, ...names.map(name => path.join(directory, name))])
+      expect(subscriptions.filter(file => isConfigLoaderArtifact(file, path.join(root, 'node_modules/.cache/uni-pages')))).toEqual([])
+      expect(fs.readdirSync(path.join(root, 'node_modules/.cache/uni-pages'))).toEqual([])
+      expect(fs.readFileSync(path.join(root, neighbor), 'utf8')).toBe('real-neighbor')
+    }, 45000)
+
+    it.each(['missing', 'syntax', 'runtime'])('连续 %s 失败只保留当前恢复路径', async (failure) => {
+      const { save, scheduledUpdates } = await start(mode)
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      const config = (file: string): string => `import { title } from './${file}'; export default { globalStyle: { navigationBarTitleText: title } }`
+      for (const file of ['a.ts', 'b.ts']) {
+        if (failure !== 'missing')
+          await save(file, failure === 'syntax' ? 'export const title =' : `throw new Error('broken'); export const title = 'unused'`)
+        await save('pages.config.ts', config(file))
+        expect(output().globalStyle.navigationBarTitleText).toBe('initial')
+      }
+      const before = scheduledUpdates()
+      await save('a.ts', `export const title = 'obsolete'`)
+      expect(scheduledUpdates()).toBe(before)
+      expect(output().globalStyle.navigationBarTitleText).toBe('initial')
+      await save('b.ts', `export const title = 'recovered'`)
+      expect(output().globalStyle.navigationBarTitleText).toBe('recovered')
+    }, 45000)
 
     it.each(['config/custom.ts', 'config/package.json'])('目录导入在补建 %s 后恢复', async (missingFile) => {
       fs.mkdirSync(path.join(root, 'config'))
@@ -253,7 +347,7 @@ describe('真实配置依赖 watcher', () => {
       await save(missingFile, files[missingFile])
       await settleUpdates()
       expect(output().globalStyle.navigationBarTitleText).toBe('directory-recovered')
-    }, 30000)
+    }, 45000)
   })
 
   it.each(['dev', 'build'] as const)('%s 监听根目录外的 workspace 包真实路径', async (mode) => {
@@ -276,7 +370,7 @@ describe('真实配置依赖 watcher', () => {
       close = undefined
       fs.rmSync(workspace, { recursive: true, force: true })
     }
-  }, 15000)
+  }, 45000)
 
   it.each(['dev', 'build'] as const)('%s 监听依赖变更、切换依赖及删除恢复，并释放监听', async (mode) => {
     fs.mkdirSync(path.join(root, 'node_modules/unused'), { recursive: true })
@@ -353,34 +447,36 @@ describe('真实配置依赖 watcher', () => {
     await delay(200)
     expect(scheduledUpdates()).toBe(updatesAfterClose)
     expect(fs.readFileSync(path.join(root, 'src/pages.json'), 'utf8')).toBe(contentAfterClose)
-  }, 30000)
+  }, 45000)
 
-  it.each([
-    ['./leaf-next', 'leaf-next.tsx'],
-    ['./dot.name', 'dot.name.ts'],
-    ['./typed.js', 'typed.ts'],
-  ])('h5 缺失导入 %s 在创建 %s 后恢复', async (specifier, filename) => {
-    const { save } = await start('dev')
-    await waitTitle('initial')
-    const load = PageContext.prototype.loadUserPagesConfig
-    let failed = false
-    vi.spyOn(PageContext.prototype, 'loadUserPagesConfig').mockImplementation(async function (this: PageContext) {
-      try {
-        await load.call(this)
-      }
-      catch (error) {
-        failed = true
-        throw error
-      }
-    })
-    await save('pages.config.ts', `import { title } from '${specifier}'; export default { globalStyle: { navigationBarTitleText: title } }`)
-    await vi.waitFor(() => expect(failed).toBe(true), { timeout: 10000 })
-    await save(filename, `export const title = 'resolved'`)
-    await waitTitle('resolved')
-  }, 15000)
+  describe.each(['dev', 'build'] as const)('%s 缺失导入恢复', (mode) => {
+    it.each([
+      ['./leaf-next', 'leaf-next.tsx'],
+      ['./dot.name', 'dot.name.ts'],
+      ['./typed.js', 'typed.ts'],
+    ])('缺失导入 %s 在创建 %s 后恢复', async (specifier, filename) => {
+      const { save } = await start(mode)
+      await waitTitle('initial')
+      const load = PageContext.prototype.loadUserPagesConfig
+      let failed = false
+      vi.spyOn(PageContext.prototype, 'loadUserPagesConfig').mockImplementation(async function (this: PageContext) {
+        try {
+          await load.call(this)
+        }
+        catch (error) {
+          failed = true
+          throw error
+        }
+      })
+      await save('pages.config.ts', `import { title } from '${specifier}'; export default { globalStyle: { navigationBarTitleText: title } }`)
+      await vi.waitFor(() => expect(failed).toBe(true), { timeout: 10000 })
+      await save(filename, `export const title = 'resolved'`)
+      await waitTitle('resolved')
+    }, 45000)
+  })
 
-  it('h5 新依赖执行失败后，只修复依赖也能恢复', async () => {
-    const { save } = await start('dev')
+  it.each(['dev', 'build'] as const)('%s 新依赖执行失败后，只修复依赖也能恢复', async (mode) => {
+    const { save } = await start(mode)
     await waitTitle('initial')
     const load = PageContext.prototype.loadUserPagesConfig
     let failed = false
@@ -399,10 +495,10 @@ describe('真实配置依赖 watcher', () => {
     expect(output().globalStyle.navigationBarTitleText).toBe('initial')
     await save('throws.ts', `export const title = 'runtime-fixed'`)
     await waitTitle('runtime-fixed')
-  }, 15000)
+  }, 45000)
 
-  it('h5 的语法错误和新增缺失导入修复后继续更新', async () => {
-    const { save } = await start('dev')
+  it.each(['dev', 'build'] as const)('%s 的语法错误和新增缺失导入修复后继续更新', async (mode) => {
+    const { save } = await start(mode)
     await waitTitle('initial')
     const load = PageContext.prototype.loadUserPagesConfig
     let failed = 0
@@ -425,5 +521,5 @@ describe('真实配置依赖 watcher', () => {
     fs.mkdirSync(path.join(root, 'missing'))
     await save('missing/title.ts', `export const title = 'created'`)
     await waitTitle('created')
-  }, 30000)
+  }, 45000)
 })
