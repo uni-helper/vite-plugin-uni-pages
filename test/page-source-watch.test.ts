@@ -16,7 +16,7 @@ const { default: chokidar } = await import(require.resolve('chokidar'))
 const roots: string[] = []
 const watchers: PageSourceWatch[] = []
 
-function fixture(polling = 'false') {
+function fixture(polling = 'false', autoStart = true) {
   vi.stubEnv('CHOKIDAR_USEPOLLING', polling)
   const workspace = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-source-watch-')))
   roots.push(workspace)
@@ -54,10 +54,11 @@ function fixture(polling = 'false') {
   watchers.push(sourceWatch)
   const refresh = () => {
     refreshPageDirectories(options)
-    sourceWatch.refresh([])
+    sourceWatch.refresh()
   }
   refresh()
-  sourceWatch.start()
+  if (autoStart)
+    sourceWatch.start()
   return { workspace, root, target, alias, content, entrances, watch, watchFile, unwatchFile, pollingEntrances, options, onStructure, sourceWatch, refresh }
 }
 
@@ -74,9 +75,109 @@ describe('当前页面来源的监听范围', () => {
   it('目标存在时只递归监听目标，目录入口采用非递归观察', () => {
     const { workspace, target, content, watch } = fixture()
     expect(content.add.mock.calls.flat(2)).toEqual([normalizePath(target)])
-    expect(vi.mocked(chokidar.watch).mock.calls[0]?.[1]).toMatchObject({ followSymlinks: true })
+    expect(vi.mocked(chokidar.watch).mock.calls[0]?.[1]).toMatchObject({ followSymlinks: false })
     expect(watch.mock.calls.every(call => (call as unknown as [string, { recursive: boolean }])[1].recursive === false)).toBe(true)
     expect(content.add.mock.calls.flat(2)).not.toContain(normalizePath(workspace))
+  })
+
+  it('超出安全整数范围的目录身份变化仍重建内容订阅和恢复入口', () => {
+    const { target, content, entrances, refresh } = fixture()
+    const parent = normalizePath(path.dirname(target))
+    const previous = 9007199254740992n
+    let inode = previous
+    const lstat = fs.lstatSync
+    const stat = fs.statSync
+    vi.spyOn(fs, 'lstatSync').mockImplementation(((file: fs.PathLike, options?: { bigint?: boolean }) => {
+      const result = Reflect.apply(lstat, fs, [file, options]) as fs.Stats | fs.BigIntStats
+      if (normalizePath(String(file)) === normalizePath(target))
+        result.ino = options?.bigint ? inode : Number(inode)
+      return result
+    }) as typeof fs.lstatSync)
+    vi.spyOn(fs, 'statSync').mockImplementation(((file: fs.PathLike, options?: { bigint?: boolean }) => {
+      const result = Reflect.apply(stat, fs, [file, options]) as fs.Stats | fs.BigIntStats
+      if (normalizePath(String(file)) === parent)
+        result.ino = options?.bigint ? inode : Number(inode)
+      return result
+    }) as typeof fs.statSync)
+    refresh()
+    const entrance = entrances.get(parent)!
+    content.close.mockClear()
+    content.add.mockClear()
+
+    inode = previous + 1n
+    expect(Number(inode)).toBe(Number(previous))
+    entrance.emit('change', 'rename', path.basename(target))
+
+    expect(content.close).toHaveBeenCalledOnce()
+    expect(content.add).toHaveBeenCalledExactlyOnceWith([normalizePath(target)])
+    expect(entrance.close).toHaveBeenCalledOnce()
+    expect(entrances.get(parent)).not.toBe(entrance)
+  })
+
+  it.each(['EACCES', 'EPERM'])('嵌套目录读取遇到 %s 时继续发现其他有效来源', (code) => {
+    const { root, target, alias, options, content, sourceWatch, refresh } = fixture()
+    options.dir = 'src'
+    const denied = path.join(root, 'src/denied')
+    fs.mkdirSync(denied)
+    const read = fs.readdirSync
+    vi.spyOn(fs, 'readdirSync').mockImplementation(((file: fs.PathLike, options: unknown) => {
+      if (normalizePath(String(file)) === normalizePath(denied))
+        throw Object.assign(new Error('Permission denied'), { code })
+      return Reflect.apply(read, fs, [file, options])
+    }) as typeof fs.readdirSync)
+
+    expect(refresh).not.toThrow()
+    expect(content.add).toHaveBeenLastCalledWith([normalizePath(path.join(root, 'src')), normalizePath(target)])
+    const file = normalizePath(path.join(target, 'index.vue'))
+    expect(sourceWatch.fileForEvent(file, file)).toBe(normalizePath(path.join(alias, 'index.vue')))
+  })
+
+  it('嵌套目录读取遇到未知文件系统错误时仍抛出', () => {
+    const { target, sourceWatch } = fixture()
+    const read = fs.readdirSync
+    const error = Object.assign(new Error('I/O error'), { code: 'EIO' })
+    vi.spyOn(fs, 'readdirSync').mockImplementation(((file: fs.PathLike, options: unknown) => {
+      if (normalizePath(String(file)) === normalizePath(target))
+        throw error
+      return Reflect.apply(read, fs, [file, options])
+    }) as typeof fs.readdirSync)
+
+    expect(() => sourceWatch.refresh()).toThrow(error)
+  })
+
+  it.skipIf(process.platform === 'win32')('链接目标不可读时跳过来源，start 不中断，恢复后可重新发现', () => {
+    const { target, content, sourceWatch } = fixture('false', false)
+    const locked = path.dirname(target)
+    fs.chmodSync(locked, 0o000)
+    try {
+      expect(() => sourceWatch.start({}, ['**/node_modules/**'])).not.toThrow()
+      expect((sourceWatch as unknown as { started: boolean }).started).toBe(true)
+      expect(content.add).not.toHaveBeenCalled()
+    }
+    finally {
+      fs.chmodSync(locked, 0o755)
+    }
+
+    sourceWatch.refresh()
+    expect(content.add).toHaveBeenLastCalledWith([normalizePath(target)])
+  })
+
+  it('来源发现失败时回滚 start 并允许后续重试', () => {
+    const { target, content, sourceWatch } = fixture('false', false)
+    const read = fs.readdirSync
+    const error = Object.assign(new Error('I/O error'), { code: 'EIO' })
+    vi.spyOn(fs, 'readdirSync').mockImplementation(((file: fs.PathLike, options: unknown) => {
+      if (normalizePath(String(file)) === normalizePath(target))
+        throw error
+      return Reflect.apply(read, fs, [file, options])
+    }) as typeof fs.readdirSync)
+
+    expect(() => sourceWatch.start()).toThrow(error)
+    expect((sourceWatch as unknown as { started: boolean }).started).toBe(false)
+
+    vi.mocked(fs.readdirSync).mockRestore()
+    expect(() => sourceWatch.start()).not.toThrow()
+    expect(content.add).toHaveBeenLastCalledWith([normalizePath(target)])
   })
 
   it('缺失目标保留来源关联，恢复后关闭临时祖先观察', () => {
@@ -173,6 +274,7 @@ describe('当前页面来源的监听范围', () => {
 
     fs.rmSync(path.dirname(target), { recursive: true })
     observer.emit('change', fs.statSync(workspace), fs.statSync(workspace))
+    await Promise.resolve()
     expect(onStructure).toHaveBeenCalledOnce()
     expect(unwatchFile).toHaveBeenCalledWith(parent, ownListener)
     expect(observer.listeners('change')).toEqual([otherListener])
@@ -180,6 +282,7 @@ describe('当前页面来源的监听范围', () => {
 
     fs.mkdirSync(target, { recursive: true })
     pollingEntrances.get(normalizePath(workspace))!.emit('change', fs.statSync(workspace), fs.statSync(workspace))
+    await Promise.resolve()
     expect(onStructure).toHaveBeenCalledTimes(2)
     expect(watch).not.toHaveBeenCalled()
 
@@ -206,5 +309,142 @@ describe('当前页面来源的监听范围', () => {
     refresh()
     expect(content.add).not.toHaveBeenCalled()
     expect(watch).not.toHaveBeenCalled()
+  })
+
+  it('嵌套悬空链接没有页面候选时仍观察目标恢复', () => {
+    const { workspace, root, target, options, content, entrances, onStructure, refresh } = fixture()
+    options.dir = 'src'
+    fs.rmSync(path.dirname(target), { recursive: true })
+    refresh()
+    const ancestor = entrances.get(normalizePath(workspace))!
+    expect(ancestor).toBeDefined()
+    content.add.mockClear()
+
+    fs.mkdirSync(target, { recursive: true })
+    ancestor.emit('change', 'rename', 'shared')
+
+    expect(onStructure).toHaveBeenCalledOnce()
+    expect(content.add).toHaveBeenLastCalledWith([normalizePath(path.join(root, 'src')), normalizePath(target)])
+    expect(ancestor.close).toHaveBeenCalledOnce()
+  })
+
+  it('交叉别名共用目标，移除一个入口后保留另一个入口的订阅', () => {
+    const { root, target, alias, options, content, sourceWatch, refresh } = fixture()
+    const second = path.join(root, 'src/second')
+    fs.symlinkSync(target, second, process.platform === 'win32' ? 'junction' : 'dir')
+    options.dir = 'src'
+    refresh()
+    expect(content.add).toHaveBeenLastCalledWith([normalizePath(path.join(root, 'src')), normalizePath(target)])
+
+    fs.unlinkSync(alias)
+    refresh()
+
+    const file = normalizePath(path.join(target, 'index.vue'))
+    expect(sourceWatch.fileForEvent(file, file)).toBe(normalizePath(path.join(second, 'index.vue')))
+    expect(content.add).toHaveBeenLastCalledWith([normalizePath(path.join(root, 'src')), normalizePath(target)])
+  })
+
+  it('嵌套链接逐层展开，循环不扩张订阅且独立别名继续有效', () => {
+    const { workspace, root, target, options, content, sourceWatch, refresh } = fixture()
+    const nested = path.join(workspace, 'nested')
+    fs.mkdirSync(nested)
+    fs.symlinkSync(nested, path.join(target, 'nested'), process.platform === 'win32' ? 'junction' : 'dir')
+    fs.symlinkSync(target, path.join(nested, 'back'), process.platform === 'win32' ? 'junction' : 'dir')
+    fs.symlinkSync(nested, path.join(root, 'src/second'), process.platform === 'win32' ? 'junction' : 'dir')
+    options.dir = 'src'
+    refresh()
+
+    expect(content.add.mock.lastCall?.[0].slice().sort()).toEqual([path.join(root, 'src'), target, nested].map(normalizePath).sort())
+    const file = normalizePath(path.join(nested, 'index.vue'))
+    expect(sourceWatch.fileForEvent(file, file)).toBe(normalizePath(path.join(root, 'src/alias/nested/index.vue')))
+  })
+
+  it('重叠物理目标取消父级来源后仍保留子级来源', () => {
+    const { root, target, alias, options, content, sourceWatch, refresh } = fixture()
+    const child = path.join(target, 'child')
+    fs.mkdirSync(child)
+    const second = path.join(root, 'src/second')
+    fs.symlinkSync(child, second, process.platform === 'win32' ? 'junction' : 'dir')
+    options.dir = 'src'
+    refresh()
+    expect(content.add).toHaveBeenLastCalledWith([normalizePath(path.join(root, 'src')), normalizePath(target)])
+
+    fs.unlinkSync(alias)
+    refresh()
+
+    expect(content.add).toHaveBeenLastCalledWith([normalizePath(path.join(root, 'src')), normalizePath(child)])
+    const file = normalizePath(path.join(child, 'index.vue'))
+    expect(sourceWatch.fileForEvent(file, file)).toBe(normalizePath(path.join(second, 'index.vue')))
+    const old = normalizePath(path.join(target, 'old.vue'))
+    expect(sourceWatch.fileForEvent(old, old)).toBeUndefined()
+  })
+
+  it('共享目标分别应用词法排除，移除允许入口后重新收窄过滤', () => {
+    const { root, target, options, content, refresh } = fixture()
+    const second = path.join(root, 'src/second')
+    fs.symlinkSync(target, second, process.platform === 'win32' ? 'junction' : 'dir')
+    options.dir = 'src'
+    options.exclude = ['src/alias/private']
+    refresh()
+    const ignored = () => vi.mocked(chokidar.watch).mock.lastCall![1]!.ignored as (file: string) => boolean
+    const file = path.join(target, 'private/index.vue')
+    expect(ignored()(file)).toBe(false)
+    content.close.mockClear()
+
+    fs.unlinkSync(second)
+    refresh()
+
+    expect(content.close).toHaveBeenCalledOnce()
+    expect(ignored()(file)).toBe(true)
+  })
+
+  it('被排除的嵌套链接不展开目标也不建立恢复入口', () => {
+    const { workspace, root, target, options, content, entrances, refresh } = fixture()
+    options.dir = 'src'
+    options.exclude = ['src/alias']
+    refresh()
+    content.add.mockClear()
+    fs.rmSync(path.dirname(target), { recursive: true })
+    refresh()
+
+    expect(content.add).not.toHaveBeenCalled()
+    expect(entrances.has(normalizePath(workspace))).toBe(false)
+    expect(vi.mocked(chokidar.watch).mock.lastCall![1]!.followSymlinks).toBe(false)
+    expect(content.add.mock.calls.flat(2)).not.toContain(normalizePath(path.join(root, 'src/alias')))
+  })
+
+  it('直接自环保留链接入口，改指有效目标后可以恢复', () => {
+    const { workspace, root, options, content, entrances, sourceWatch, refresh } = fixture()
+    const loop = path.join(root, 'src/loop')
+    const target = path.join(workspace, 'replacement')
+    fs.symlinkSync(loop, loop, process.platform === 'win32' ? 'junction' : 'dir')
+    options.dir = 'src'
+    refresh()
+    content.add.mockClear()
+    fs.mkdirSync(target)
+    fs.unlinkSync(loop)
+    fs.symlinkSync(target, loop, process.platform === 'win32' ? 'junction' : 'dir')
+    entrances.get(normalizePath(path.dirname(loop)))!.emit('change', 'rename', 'loop')
+
+    expect(content.add.mock.lastCall?.[0]).toContain(normalizePath(target))
+    const file = normalizePath(path.join(target, 'index.vue'))
+    expect(sourceWatch.fileForEvent(file, file)).toBe(normalizePath(path.join(loop, 'index.vue')))
+  })
+
+  it('原生目录通知没有文件名时仍发现新增的悬空链接', async () => {
+    const { workspace, root, options, content, entrances, refresh } = fixture()
+    options.dir = 'src'
+    refresh()
+    const target = path.join(workspace, 'later/pages')
+    fs.symlinkSync(target, path.join(root, 'src/later'), process.platform === 'win32' ? 'junction' : 'dir')
+
+    content.emit('raw', 'rename', null, { watchedPath: path.join(root, 'src') })
+    await Promise.resolve()
+    const entrance = entrances.get(normalizePath(workspace))!
+    expect(entrance).toBeDefined()
+    fs.mkdirSync(target, { recursive: true })
+    entrance.emit('change', 'rename', 'later')
+
+    expect(content.add.mock.lastCall?.[0]).toContain(normalizePath(target))
   })
 })

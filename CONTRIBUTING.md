@@ -65,7 +65,8 @@ test/
 ├── page-content-refresh.test.ts         页面删建、ready 补扫与增量读取缓存
 ├── page-update-coalescing.test.ts       连续 watcher 事件的合并与读取上界
 ├── page-symlink-*.test.ts               符号链接事件映射、嵌套/外部目标恢复与真实 watcher
-├── page-source-watch.test.ts            当前来源、内容订阅与非递归恢复入口的生命周期
+├── page-source-watch.test.ts            来源关系、交叉/循环链接、权限失败、启动重试、物理订阅去重与非递归恢复入口
+├── page-watch-sources.test.ts           链接目标真实路径、权限/竞态降级、Unicode 与别名膨胀上限
 ├── page-watch-options.test.ts           Vite 监听开关、轮询/写稳定性选项与忽略规则
 ├── page-watch-ownership.test.ts         页面文件事件单一处理、原子替换与外部/依赖别名的监听覆盖
 ├── page-watch-filter.test.ts            Vite 忽略规则的词法路径、相对与否定模式匹配

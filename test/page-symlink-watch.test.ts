@@ -1,4 +1,4 @@
-import type { FSWatcher } from 'vite'
+import type { FSWatcher, ServerOptions } from 'vite'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -66,7 +66,7 @@ async function waitForSubscription(watchers: readonly FSWatcher[], directory: st
   }
 }
 
-async function start(root: string, mode: 'serve' | 'build') {
+async function start(root: string, mode: 'serve' | 'build', watchOptions?: ServerOptions['watch']) {
   vi.stubEnv('VITE_ROOT_DIR', root)
   vi.stubEnv('UNI_PLATFORM', 'h5')
   write(path.join(root, 'pages.config.json'), '{}')
@@ -83,16 +83,26 @@ async function start(root: string, mode: 'serve' | 'build') {
   }
   let queue: ContextQueue
   const subscriptions: { file: string, recursive: boolean, closed: boolean }[] = []
+  const lockDirectory = normalizePath(path.join(root, 'pages.json.lock'))
+  const isLockPath = (file: string): boolean => file === lockDirectory || file.startsWith(`${lockDirectory}/`)
   const watch = fs.watch
   vi.spyOn(fs, 'watch').mockImplementation(((file: fs.PathLike, ...args: any[]) => {
     const subscription = { file: normalizePath(String(file)), recursive: !!args[0]?.recursive, closed: false }
     subscriptions.push(subscription)
     const observed = (watch as any)(file, ...args) as fs.FSWatcher
-    observed.on('change', (event, filename) => events.push({ event: `native:${event}`, file: normalizePath(path.join(String(file), String(filename ?? ''))) }))
+    observed.on('change', (event, filename) => {
+      // 临时锁目录的底层通知不属于页面或恢复入口事件
+      if (isLockPath(subscription.file))
+        return
+      const changed = normalizePath(path.join(String(file), String(filename ?? '')))
+      if (!isLockPath(changed))
+        events.push({ event: `native:${event}`, file: changed })
+    })
     observed.once('close', () => subscription.closed = true)
     return observed
   }) as typeof fs.watch)
   let scans = 0
+  let writes = 0
   const setup = PageContext.prototype.setupWatcher
   vi.spyOn(PageContext.prototype, 'setupWatcher').mockImplementation(async function (this: PageContext, observed) {
     queue = this as unknown as ContextQueue
@@ -107,6 +117,7 @@ async function start(root: string, mode: 'serve' | 'build') {
     outDir: '.',
     dts: false,
     onAfterScanPages: () => scans++,
+    onAfterWriteFile: () => writes++,
   })
   if (mode === 'serve') {
     const server = await createServer({
@@ -115,7 +126,7 @@ async function start(root: string, mode: 'serve' | 'build') {
       appType: 'custom',
       logLevel: 'silent',
       plugins: [plugin],
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, watch: watchOptions },
     })
     close = () => server.close()
   }
@@ -140,26 +151,49 @@ async function start(root: string, mode: 'serve' | 'build') {
     return trackWatcher(watcher!)
   }
 
+  let settleId = 0
   const settle = async (): Promise<void> => {
+    const id = ++settleId
+    const before = { events: events.length, updates: updates.mock.calls.length, scans, writes }
     let snapshot = ''
     let quietSince = Date.now()
-    await vi.waitFor(async () => {
-      contentWatcher()
-      while (true) {
-        const update = queue.pendingUpdate
-        await queue.pendingPageFlush
-        await update
-        if (!queue.pendingPageFlush && !queue.pendingPageUpdate && update === queue.pendingUpdate)
-          break
-      }
-      contentWatcher()
-      const current = `${events.length}:${updates.mock.calls.length}`
-      if (snapshot !== current) {
-        snapshot = current
-        quietSince = Date.now()
-      }
-      expect(Date.now() - quietSince, '原生事件与更新队列应先收敛').toBeGreaterThanOrEqual(250)
-    }, { timeout: 10000, interval: 50 })
+    try {
+      await vi.waitFor(async () => {
+        contentWatcher()
+        while (true) {
+          const update = queue.pendingUpdate
+          await queue.pendingPageFlush
+          await update
+          if (!queue.pendingPageFlush && !queue.pendingPageUpdate && update === queue.pendingUpdate)
+            break
+        }
+        contentWatcher()
+        const current = `${events.length}:${updates.mock.calls.length}`
+        if (snapshot !== current) {
+          snapshot = current
+          quietSince = Date.now()
+        }
+        expect(Date.now() - quietSince, '原生事件与更新队列应先收敛').toBeGreaterThanOrEqual(250)
+      }, { timeout: 10000, interval: 50 })
+    }
+    catch (error) {
+      const received = events.slice(before.events)
+      const eventCounts = received.reduce<Record<string, number>>((counts, { event }) => {
+        counts[event] = (counts[event] ?? 0) + 1
+        return counts
+      }, {})
+      throw new Error(`Watcher did not settle: ${JSON.stringify({
+        mode,
+        settleId: id,
+        eventCounts,
+        updates: updates.mock.calls.length - before.updates,
+        scans: scans - before.scans,
+        writes: writes - before.writes,
+        recentEvents: received.slice(-20),
+        recentUpdates: updates.mock.calls.slice(before.updates).slice(-5),
+        pending: !!queue.pendingPageFlush || !!queue.pendingPageUpdate,
+      })}`, { cause: error })
+    }
   }
   await settle()
   const expectBoundedScope = (unrelated: string): void => {
@@ -169,7 +203,7 @@ async function start(root: string, mode: 'serve' | 'build') {
     for (const watcher of watchers)
       expect(Object.keys(watcher.getWatched()).map(normalizePath).filter(belongsToUnrelated), '监听清单不应覆盖无关项目').toEqual([])
   }
-  return { watchers, events, settle, subscriptions, expectBoundedScope, contentWatcher }
+  return { watchers, events, settle, subscriptions, expectBoundedScope, contentWatcher, updates }
 }
 
 afterEach(async () => {
@@ -318,4 +352,132 @@ describe.each(['serve', 'build'] as const)('%s 符号链接页面监听', (mode)
     await vi.waitFor(() => expect(paths()).toContain('src/pages/later/d'), { timeout: 10000 })
     await settle()
   }, 30000)
+
+  it('嵌套链接初始目标缺失时，单次创建后恢复页面及后续修改', async () => {
+    const workspace = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-nested-missing-')))
+    roots.push(workspace)
+    const root = path.join(workspace, 'app')
+    const target = path.join(workspace, 'external/pages')
+    const file = path.join(target, 'profile.vue')
+    page(path.join(root, 'src/pages/index.vue'), '首页')
+    fs.symlinkSync(target, path.join(root, 'src/pages/feature'), process.platform === 'win32' ? 'junction' : 'dir')
+    const { settle } = await start(root, mode)
+    const title = () => output(root).pages.find((entry: any) => entry.path === 'src/pages/feature/profile')?.style.navigationBarTitleText
+
+    page(file, '创建')
+    await vi.waitFor(() => expect(title()).toBe('创建'), { timeout: 10000 })
+    await settle()
+
+    page(file, '修改')
+    await vi.waitFor(() => expect(title()).toBe('修改'), { timeout: 10000 })
+    await settle()
+  }, 30000)
+
+  it('交叉嵌套来源改指后新旧目标分别有效，最后一个旧入口删除后释放订阅', async () => {
+    const workspace = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-nested-cross-')))
+    roots.push(workspace)
+    const root = path.join(workspace, 'app')
+    const previous = path.join(workspace, 'previous')
+    const target = path.join(workspace, 'replacement')
+    const alias = path.join(root, 'src/pages/feature')
+    const second = path.join(root, 'src/pages/second')
+    page(path.join(root, 'src/pages/index.vue'), '首页')
+    page(path.join(previous, 'profile.vue'), '旧目标')
+    page(path.join(target, 'profile.vue'), '新目标')
+    for (const source of [alias, second])
+      fs.symlinkSync(previous, source, process.platform === 'win32' ? 'junction' : 'dir')
+    const { settle, updates, contentWatcher } = await start(root, mode)
+    const title = (name: string) => output(root).pages.find((entry: any) => entry.path === `src/pages/${name}/profile`)?.style.navigationBarTitleText
+
+    fs.unlinkSync(alias)
+    fs.symlinkSync(target, alias, process.platform === 'win32' ? 'junction' : 'dir')
+    await vi.waitFor(() => {
+      expect(title('feature')).toBe('新目标')
+      expect(title('second')).toBe('旧目标')
+    }, { timeout: 10000 })
+    await settle()
+
+    page(path.join(target, 'profile.vue'), '新目标修改')
+    page(path.join(previous, 'profile.vue'), '旧目标修改')
+    await vi.waitFor(() => {
+      expect(title('feature')).toBe('新目标修改')
+      expect(title('second')).toBe('旧目标修改')
+    }, { timeout: 10000 })
+    await settle()
+
+    fs.unlinkSync(second)
+    await vi.waitFor(() => expect(title('second')).toBeUndefined(), { timeout: 10000 })
+    await settle()
+    const events = vi.fn()
+    contentWatcher().on('all', events)
+    updates.mockClear()
+    page(path.join(previous, 'profile.vue'), '失效来源')
+    page(path.join(previous, 'added.vue'), '失效新增')
+    await new Promise(resolve => setTimeout(resolve, 300))
+    await settle()
+    expect(events).not.toHaveBeenCalled()
+    expect(updates).not.toHaveBeenCalled()
+  }, 30000)
+
+  it('运行中新建多层悬空链接，目标恢复及中间层改指后持续更新', async () => {
+    const workspace = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-nested-chain-')))
+    roots.push(workspace)
+    const root = path.join(workspace, 'app')
+    const container = path.join(workspace, 'container')
+    const target = path.join(workspace, 'target/pages')
+    const replacement = path.join(workspace, 'replacement/pages')
+    page(path.join(root, 'src/pages/index.vue'), '首页')
+    fs.mkdirSync(container)
+    fs.symlinkSync(container, path.join(root, 'src/pages/feature'), process.platform === 'win32' ? 'junction' : 'dir')
+    const { settle, contentWatcher } = await start(root, mode)
+    const title = () => output(root).pages.find((entry: any) => entry.path === 'src/pages/feature/nested/profile')?.style.navigationBarTitleText
+    const nested = path.join(container, 'nested')
+    fs.symlinkSync(target, nested, process.platform === 'win32' ? 'junction' : 'dir')
+    await settle()
+
+    page(path.join(target, 'profile.vue'), '创建')
+    await vi.waitFor(() => expect(title()).toBe('创建'), { timeout: 10000 })
+    await settle()
+
+    fs.unlinkSync(nested)
+    fs.symlinkSync(replacement, nested, process.platform === 'win32' ? 'junction' : 'dir')
+    await vi.waitFor(() => expect(title()).toBeUndefined(), { timeout: 10000 })
+    await settle()
+    page(path.join(replacement, 'profile.vue'), '改指恢复')
+    await vi.waitFor(() => expect(title()).toBe('改指恢复'), { timeout: 10000 })
+    await waitForSubscription([contentWatcher()], replacement)
+    await settle()
+    page(path.join(replacement, 'profile.vue'), '继续修改')
+    await vi.waitFor(() => expect(title()).toBe('继续修改'), { timeout: 10000 })
+    await settle()
+  }, 40000)
+
+  it('多层链接形成循环时订阅保持有界且正常页面继续更新', async () => {
+    const workspace = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-nested-cycle-')))
+    roots.push(workspace)
+    const root = path.join(workspace, 'app')
+    const first = path.join(workspace, 'first')
+    const second = path.join(workspace, 'second')
+    page(path.join(root, 'src/pages/index.vue'), '首页')
+    page(path.join(first, 'a.vue'), 'A')
+    page(path.join(second, 'b.vue'), 'B')
+    for (const [target, source] of [
+      [first, path.join(root, 'src/pages/feature')],
+      [second, path.join(first, 'nested')],
+      [first, path.join(second, 'back')],
+    ]) {
+      fs.symlinkSync(target!, source!, process.platform === 'win32' ? 'junction' : 'dir')
+    }
+    // Vite 共享 watcher 不展开循环，页面目标仍由插件独立发现和订阅
+    const { settle, contentWatcher } = await start(root, mode, { followSymlinks: false, useFsEvents: false })
+    const watched = Object.keys(contentWatcher().getWatched()).map(normalizePath)
+    expect(watched).toContain(normalizePath(first))
+    expect(watched).toContain(normalizePath(second))
+    expect(watched.filter(directory => directory.includes('/back') || directory.includes('/nested'))).toEqual([])
+    expect(output(root).pages).toHaveLength(3)
+
+    page(path.join(second, 'b.vue'), 'B 修改')
+    await vi.waitFor(() => expect(output(root).pages.find((entry: any) => entry.path === 'src/pages/feature/nested/b')?.style.navigationBarTitleText).toBe('B 修改'), { timeout: 10000 })
+    await settle()
+  }, 20000)
 })
