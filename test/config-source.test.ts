@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
+import { normalizePath } from 'vite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PagesConfigLoader } from '../packages/core/src/config-loader'
 import { configRuntimeSource, transformConfigSource } from '../packages/core/src/config-source'
@@ -60,7 +61,7 @@ describe('配置模块的源位置', () => {
         nullPrototype: true,
       })
     }
-    expect(result.dependencies.map(file => path.relative(root, file)).sort()).toEqual(['literal.cjs', 'nested/literal.cjs', 'nested/module.ts', 'pages.config.ts'])
+    expect(result.dependencies.map(file => normalizePath(path.relative(root, file))).sort()).toEqual(['literal.cjs', 'nested/literal.cjs', 'nested/module.ts', 'pages.config.ts'])
     expect(cacheFiles()).toEqual([])
   })
 
@@ -121,7 +122,7 @@ describe('配置模块的源位置', () => {
     const second = await load()
     expect(first.config).toEqual({ cjs: 'runtime-before', esm: 'esm-before', literal: 'literal-before', globRequire: 'glob-before', globImport: 'glob-before' })
     expect(second.config).toEqual({ cjs: 'runtime-before', esm: 'esm-before', literal: 'literal-after', globRequire: 'glob-after', globImport: 'glob-after' })
-    expect(second.dependencies.map(file => path.relative(root, file)).sort()).toEqual(['glob/a.cjs', 'literal.cjs', 'pages.config.ts'])
+    expect(second.dependencies.map(file => normalizePath(path.relative(root, file))).sort()).toEqual(['glob/a.cjs', 'literal.cjs', 'pages.config.ts'])
   })
 
   it('计算式 import 保留异步失败、说明符转换及 import options', async () => {
@@ -143,16 +144,16 @@ throw new Error(value.title)
 export default {}`
     write('pages.config.ts', code)
     write('runtime.mjs', configRuntimeSource())
-    write('compiled.mjs', await transformConfigSource(code, source, runtime))
+    write('compiled.mjs', await transformConfigSource(code, source, pathToFileURL(runtime).href))
     const stack = execFileSync(process.execPath, ['--enable-source-maps', '--input-type=module', '-e', `try { await import(${JSON.stringify(sourceURL('compiled.mjs'))}) } catch (error) { console.log(error.stack) }`], { encoding: 'utf8' })
-    expect(stack).toContain(`${source}:5:`)
+    expect(normalizePath(stack)).toContain(`${normalizePath(source)}:5:`)
   })
 
   it('计算式缺失目标不扩展自动恢复集合', async () => {
     write('pages.config.ts', `const target = './missing.cjs'; export default require(target)`)
     const loader = new PagesConfigLoader(root)
     await expect(loader.load([{ files: 'pages.config.ts', extensions: [] }])).rejects.toThrow()
-    expect([...loader.recoveryPaths]).toEqual([path.join(root, 'pages.config.ts')])
+    expect([...loader.recoveryPaths]).toEqual([normalizePath(path.join(root, 'pages.config.ts'))])
     expect([...loader.recoveryCandidates]).toEqual([])
     expect([...loader.recoveryDirectories]).toEqual([])
     expect(cacheFiles()).toEqual([])
@@ -165,11 +166,11 @@ describe('transform 与产物隔离', () => {
     write(file, original)
     write(`__unconfig_${file}`, 'real-neighbor')
     const transform = vi.fn((code: string, filepath: string) => {
-      expect(filepath).toBe(path.join(root, file))
+      expect(normalizePath(filepath)).toBe(normalizePath(path.join(root, file)))
       return code.replace('original', 'transformed')
     })
     const rewrite = vi.fn((config: any, filepath: string) => {
-      expect(filepath).toBe(path.join(root, file))
+      expect(normalizePath(filepath)).toBe(normalizePath(path.join(root, file)))
       expect(config.globalStyle.navigationBarTitleText).toBe('transformed')
       expect(config.filename).toBe(path.join(root, file))
       expect(fs.readFileSync(path.join(root, `__unconfig_${file}`), 'utf8')).toBe('real-neighbor')
@@ -204,12 +205,12 @@ describe('transform 与产物隔离', () => {
       transform: (code, file) => {
         calls.push('transform')
         expect(code).toBe('original')
-        expect(file).toBe(path.join(root, 'pages.config.ts'))
+        expect(normalizePath(file)).toBe(normalizePath(path.join(root, 'pages.config.ts')))
         return 'transformed'
       },
       parser: (file) => {
         calls.push('parser')
-        expect(file).toBe(path.join(root, 'pages.config.ts'))
+        expect(normalizePath(file)).toBe(normalizePath(path.join(root, 'pages.config.ts')))
         expect(fs.readFileSync(file, 'utf8')).toBe('original')
         expect(fs.readFileSync(path.join(root, '__unconfig_pages.config.ts'), 'utf8')).toBe('real-neighbor')
         expect(cacheFiles()).toEqual([])
@@ -246,12 +247,12 @@ describe('transform 与产物隔离', () => {
     write('pages.config.ts', `const target = './runtime.cjs'; export default { value: (await import(target)).default }`)
     const result = await load()
     expect(result.config).toEqual({ value: 'runtime' })
-    expect(result.dependencies).toEqual([path.join(root, 'pages.config.ts')])
+    expect(result.dependencies).toEqual([normalizePath(path.join(root, 'pages.config.ts'))])
     expect(cacheFiles()).toEqual([])
     write('pages.config.ts', `const target = './missing.cjs'; export default await import(target)`)
     const loader = new PagesConfigLoader(root)
     await expect(loader.load([{ files: 'pages.config.ts', extensions: [] }])).rejects.toThrow()
-    expect([...loader.recoveryPaths]).toEqual([path.join(root, 'pages.config.ts')])
+    expect([...loader.recoveryPaths]).toEqual([normalizePath(path.join(root, 'pages.config.ts'))])
     expect([...loader.recoveryCandidates]).toEqual([])
     expect(cacheFiles()).toEqual([])
   })

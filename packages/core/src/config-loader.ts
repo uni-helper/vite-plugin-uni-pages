@@ -166,7 +166,7 @@ export class PagesConfigLoader {
     const cacheDirectory = this.artifactDirectory
     mkdirSync(cacheDirectory, { recursive: true })
     const bundleDirectory = await mkdtemp(path.join(cacheDirectory, 'load-'))
-    const runtime = path.join(bundleDirectory, 'runtime.mjs')
+    const runtime = normalizePath(path.join(bundleDirectory, 'runtime.mjs'))
     // bundle-require 校验入口扩展名；无扩展名和自定义扩展名仍按原路径读取
     const entry = scriptExtensions.test(source) ? source : path.join(bundleDirectory, 'entry.ts')
     try {
@@ -192,7 +192,7 @@ export class PagesConfigLoader {
             setup(build) {
               build.onResolve({ filter: /.*/ }, async (args) => {
                 if (args.kind === 'entry-point')
-                  return { path: source }
+                  return { path: path.resolve(sourcePath) }
                 if (args.pluginData?.resolvingPackage)
                   return
                 if (/^(?:node:|file:|data:)/.test(args.path))
@@ -235,7 +235,7 @@ export class PagesConfigLoader {
                 if (file !== sourcePath && !scriptExtensions.test(file))
                   return
                 const contents = file === sourcePath ? code : await readFile(args.path, 'utf8')
-                return { contents: await transformConfigSource(contents, file, runtime), loader: 'js' }
+                return { contents: await transformConfigSource(contents, path.resolve(file), runtime), loader: 'js' }
               })
             },
           }],

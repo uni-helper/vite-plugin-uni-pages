@@ -74,7 +74,7 @@ describe('config loader temporary artifacts never reach the watcher', () => {
       expect(ctx.pagesGlobConfig?.globalStyle?.navigationBarTitleText).toBe('before')
       const update = vi.spyOn(ctx, 'updatePagesJSON')
       await ctx.setupWatcher(watcherStub as any)
-      expect(added).toContain(path.join(tmpDir, target))
+      expect(added).toContain(normalizeConfigPath(path.join(tmpDir, target), tmpDir))
       fs.writeFileSync(path.join(tmpDir, target), `export default { globalStyle: { navigationBarTitleText: 'after' } }`)
       watcherStub.emit('change', path.join(tmpDir, target))
       await Promise.all(update.mock.results.map(result => result.value))
