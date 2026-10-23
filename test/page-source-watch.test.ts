@@ -16,7 +16,7 @@ const { default: chokidar } = await import(require.resolve('chokidar'))
 const roots: string[] = []
 const watchers: PageSourceWatch[] = []
 
-function fixture(polling = 'false') {
+function fixture(polling = 'false', autoStart = true) {
   vi.stubEnv('CHOKIDAR_USEPOLLING', polling)
   const workspace = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-source-watch-')))
   roots.push(workspace)
@@ -57,7 +57,8 @@ function fixture(polling = 'false') {
     sourceWatch.refresh()
   }
   refresh()
-  sourceWatch.start()
+  if (autoStart)
+    sourceWatch.start()
   return { workspace, root, target, alias, content, entrances, watch, watchFile, unwatchFile, pollingEntrances, options, onStructure, sourceWatch, refresh }
 }
 
@@ -142,6 +143,41 @@ describe('当前页面来源的监听范围', () => {
     }) as typeof fs.readdirSync)
 
     expect(() => sourceWatch.refresh()).toThrow(error)
+  })
+
+  it.skipIf(process.platform === 'win32')('链接目标不可读时跳过来源，start 不中断，恢复后可重新发现', () => {
+    const { target, content, sourceWatch } = fixture('false', false)
+    const locked = path.dirname(target)
+    fs.chmodSync(locked, 0o000)
+    try {
+      expect(() => sourceWatch.start({}, ['**/node_modules/**'])).not.toThrow()
+      expect((sourceWatch as unknown as { started: boolean }).started).toBe(true)
+      expect(content.add).not.toHaveBeenCalled()
+    }
+    finally {
+      fs.chmodSync(locked, 0o755)
+    }
+
+    sourceWatch.refresh()
+    expect(content.add).toHaveBeenLastCalledWith([normalizePath(target)])
+  })
+
+  it('来源发现失败时回滚 start 并允许后续重试', () => {
+    const { target, content, sourceWatch } = fixture('false', false)
+    const read = fs.readdirSync
+    const error = Object.assign(new Error('I/O error'), { code: 'EIO' })
+    vi.spyOn(fs, 'readdirSync').mockImplementation(((file: fs.PathLike, options: unknown) => {
+      if (normalizePath(String(file)) === normalizePath(target))
+        throw error
+      return Reflect.apply(read, fs, [file, options])
+    }) as typeof fs.readdirSync)
+
+    expect(() => sourceWatch.start()).toThrow(error)
+    expect((sourceWatch as unknown as { started: boolean }).started).toBe(false)
+
+    vi.mocked(fs.readdirSync).mockRestore()
+    expect(() => sourceWatch.start()).not.toThrow()
+    expect(content.add).toHaveBeenLastCalledWith([normalizePath(target)])
   })
 
   it('缺失目标保留来源关联，恢复后关闭临时祖先观察', () => {

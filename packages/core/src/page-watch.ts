@@ -15,7 +15,7 @@ import { isPageDirectoryEvent, isPageFileInDirectories, normalizePagePattern, re
 import { isMissingFsError, isTargetFile } from './files'
 import { getPageRules } from './page-rules'
 import { createPageWatchFilter } from './page-watch-filter'
-import { collectPageWatchSources, resolveWatchTarget } from './page-watch-sources'
+import { collectPageWatchSources, isUnavailableSourceError, PAGE_WATCH_SOURCE_LIMIT, resolveWatchTarget } from './page-watch-sources'
 
 interface EntranceWatch {
   watcher: EventEmitter
@@ -33,7 +33,8 @@ function isDirectory(file: string): boolean {
     return fs.statSync(file, { throwIfNoEntry: false })?.isDirectory() ?? false
   }
   catch (error) {
-    if (!isMissingFsError(error) && (error as NodeJS.ErrnoException).code !== 'ELOOP')
+    // 不可读目录按不可用处理：监听发现是辅助能力，不能让它中断页面生成
+    if (!isMissingFsError(error) && !isUnavailableSourceError(error) && (error as NodeJS.ErrnoException).code !== 'ELOOP')
       throw error
     return false
   }
@@ -52,6 +53,7 @@ export class PageSourceWatch {
   private readonly closing = new Set<Promise<void>>()
   private sourceRefreshQueued = false
   private started = false
+  private warnedSourceLimit = false
   private usePolling = false
   private interval = 100
   private awaitWriteFinish: ChokidarOptions['awaitWriteFinish']
@@ -64,6 +66,7 @@ export class PageSourceWatch {
     private readonly onFile: (event: 'add' | 'change' | 'unlink', file: string) => void,
     private readonly onStructure: () => void,
     private readonly onError: (error: unknown) => void,
+    private readonly onWarning: (message: string) => void = () => {},
   ) {
     this.rules = getPageRules(options)
   }
@@ -84,7 +87,14 @@ export class PageSourceWatch {
       ? undefined
       : createPageWatchFilter(ignored, this.options.root, options.cwd ?? process.cwd())
     this.started = true
-    this.refresh()
+    try {
+      this.refresh()
+    }
+    catch (error) {
+      // 初始化失败不能留下 started=true 的僵尸实例；调用方可在后续生成时重试 start
+      this.started = false
+      throw error
+    }
   }
 
   private ignoresSource(source: string, stats?: Stats): boolean {
@@ -98,6 +108,9 @@ export class PageSourceWatch {
           entry = fs.statSync(current, { throwIfNoEntry: false })
         }
         catch (error) {
+          // 不可读路径无法建立有效订阅；按已忽略处理，避免权限问题中断页面生成
+          if (isUnavailableSourceError(error))
+            return true
           if (!isMissingFsError(error) && (error as NodeJS.ErrnoException).code !== 'ELOOP')
             throw error
         }
@@ -216,6 +229,15 @@ export class PageSourceWatch {
     this.files = sources.files
     this.links = sources.links
     this.reconcile()
+    if (sources.truncated) {
+      if (!this.warnedSourceLimit) {
+        this.warnedSourceLimit = true
+        this.onWarning(`[vite-plugin-uni-pages] Page watch discovery reached the ${PAGE_WATCH_SOURCE_LIMIT} linked-source safety limit and stopped expanding this round. Pages are still generated, but sources beyond the limit are not watched while it is reached. Narrow the page roots or exclude unused links to restore full watch coverage.`)
+      }
+    }
+    else {
+      this.warnedSourceLimit = false
+    }
   }
 
   fileForEvent(file: string, identity: string): string | undefined {
@@ -256,6 +278,7 @@ export class PageSourceWatch {
     this.recoveryWatchers.clear()
     this.contentKey = ''
     this.contentRules = undefined
+    this.warnedSourceLimit = false
     const watcher = this.watcher
     this.watcher = undefined
     await Promise.all([watcher?.close(), ...this.closing])
@@ -451,7 +474,8 @@ export class PageSourceWatch {
         this.recoveryWatchers.set(directory, entry)
       }
       catch (error) {
-        if (!isMissingFsError(error))
+        // 入口目录暂时不可读时跳过本轮观察，权限恢复后由后续刷新重建
+        if (!isMissingFsError(error) && !isUnavailableSourceError(error))
           this.onError(error)
       }
     }

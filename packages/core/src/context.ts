@@ -72,6 +72,8 @@ export class PageContext {
   private pendingPageUpdate: { full: boolean, files: Set<string> } | undefined
   /** 当前事件更新循环；dispose 时等待它排空 */
   private pendingPageFlush: Promise<void> | undefined
+  /** 页面监听启动参数；初始化失败时保留，后续生成会重试 */
+  private pageWatcherStart: { options: Parameters<PageSourceWatch['start']>[0], ignored: Parameters<PageSourceWatch['start']>[1] } | undefined
 
   /** 失败恢复以此为基准，避免混入前几轮失败的临时路径 */
   private lastSuccessfulConfigDependencyPaths: string[] = []
@@ -147,6 +149,7 @@ export class PageContext {
       },
       () => this.queuePageUpdate(),
       error => this.logUpdateFailure(error),
+      message => this.logger?.warn(message, { timestamp: true }),
     )
     // 调试日志逻辑
     const debugOption = this.options.debug
@@ -202,6 +205,7 @@ export class PageContext {
     refreshPageDirectories(this.options)
     await this.scanPages()
     await this.scanSubPages()
+    this.startPageWatcher()
     this.pageWatcher.refresh()
     await this.mergePageMetaData()
     await this.mergeSubPageMetaData()
@@ -217,7 +221,7 @@ export class PageContext {
 
     this._server = server
     // Vite 5 内部使用 chokidar v3；其 watcher 在运行时与 chokidar v5 的 API 兼容
-    this.setupWatcher(server.watcher as unknown as FSWatcher)
+    void this.setupWatcher(server.watcher as unknown as FSWatcher).catch(error => this.logUpdateFailure(error))
   }
 
   /**
@@ -305,10 +309,31 @@ export class PageContext {
     this.watchedConfigPaths.set(watcher, new Set())
     this.watchedConfigIndex.set(watcher, { files: new Set(), directories: [] })
     this.refreshConfigWatchers()
-    this.pageWatcher.refresh()
     const watchDisabled = (this._server?.watcher as unknown) === watcher && this._server?.config.server.watch === null
-    if (!watchDisabled)
-      this.pageWatcher.start(watcher.options, (this._server?.watcher as unknown) === watcher ? this._server?.watcher.options.ignored : undefined)
+    if (!watchDisabled) {
+      this.pageWatcherStart = {
+        options: watcher.options,
+        ignored: (this._server?.watcher as unknown) === watcher ? this._server?.watcher.options.ignored : undefined,
+      }
+      this.startPageWatcher()
+    }
+  }
+
+  /**
+   * 启动页面监听
+   *
+   * @description 初始化失败只记录并保留启动参数，后续生成会重新尝试；监听属于辅助
+   * 能力，不能阻断页面生成，也不能留下未处理的拒绝
+   */
+  private startPageWatcher(): void {
+    if (!this.pageWatcherStart)
+      return
+    try {
+      this.pageWatcher.start(this.pageWatcherStart.options, this.pageWatcherStart.ignored)
+    }
+    catch (error) {
+      this.logUpdateFailure(error)
+    }
   }
 
   /** 解绑本插件回调；共享 watcher 的关闭仍由 Vite 负责 */
@@ -319,6 +344,7 @@ export class PageContext {
     this.watchedConfigPaths.clear()
     this.watchedConfigIndex.clear()
     this._server = undefined
+    this.pageWatcherStart = undefined
     await this.pageWatcher.close()
     await this.pendingPageFlush
     await this.pendingUpdate
@@ -504,6 +530,7 @@ export class PageContext {
       await this.scanPages(!incremental)
       await this.scanSubPages(!incremental)
       this.options.onAfterScanPages(this.pages, this.subPages)
+      this.startPageWatcher()
       this.pageWatcher.refresh()
     }
 
