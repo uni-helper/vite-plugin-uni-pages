@@ -63,17 +63,11 @@ export function configWatchDirectory(filepath: string): string {
   return normalizePath(directory)
 }
 
-/**
- * 判断文件名是否为配置加载过程的临时产物
- *
- * `bundle-require` 在配置入口旁写 `*.bundled_<id>.mjs` 后立刻删除，unconfig
- * 会写 `__unconfig_*`。这些文件存在时间极短，监听它们有两个后果：
- * 事件会被误当成配置变更；Windows 上 chokidar 对已删除的文件调 `fs.watch`
- * 会抛 EPERM，作为未处理的拒绝直接让进程退出。因此监听路径和事件过滤
- * 都要排除它们。
- */
-export function isConfigLoaderArtifact(basename: string): boolean {
-  return basename.includes('.bundled_') || basename.startsWith('__unconfig_')
+/** 判断路径是否位于加载器专用产物目录，真实输入的文件名不受限制 */
+export function isConfigLoaderArtifact(filepath: string, root: string): boolean {
+  const directory = path.resolve(root, 'node_modules/.cache/uni-pages')
+  const relative = path.relative(directory, path.resolve(root, filepath))
+  return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
 }
 
 /** 配置加载结果及本次成功求值涉及的文件 */
