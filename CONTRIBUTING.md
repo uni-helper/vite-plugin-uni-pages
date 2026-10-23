@@ -73,9 +73,11 @@ test/
 ├── subpackage-user-pages-path.test.ts   配置里的分包 pages 按 root 写相对 path
 ├── concurrent-pages-json.test.ts        多终端并发读写 pages.json
 ├── files*.test.ts                       文件工具与文件锁
-├── config-dependencies*.test.ts         配置本地依赖加载与 unconfig 回调兼容
-├── config-artifact-watch.test.ts        配置加载临时产物不进监听
-├── config-recovery-watch.test.ts        连续失败后的配置恢复监听
+├── config-dependencies.test.ts          配置本地依赖加载与 unconfig 回调兼容
+├── config-source.test.ts                每模块源位置、动态缓存边界、transform 隔离与清理
+├── config-dependencies-watch.test.ts    dev/build 单次修改、依赖切换、连续失败与恢复
+├── config-artifact-watch.test.ts        真实输入与专用产物目录的身份、监听过滤
+├── config-recovery-watch.test.ts        连续失败恢复范围的确定性事件回归
 ├── config-watch-fast-path.test.ts       配置 watcher 路径匹配开销
 ├── watcher-config-path.test.ts          watcher 归一化配置变更路径
 ├── watcher-dir-boundary.test.ts         页面文件只在配置目录内匹配
@@ -102,3 +104,5 @@ vite-plugin-uni-pages/
 ```
 
 core 包的内部架构（模块划分、依赖关系、生命周期与关键设计决策）见 [packages/core/README.md 的「架构」章节](./packages/core/README.md#架构)。
+
+配置 watcher 回归在目标路径注册和独立哨兵就绪后，只修改一次待测文件，分别检查真实 Chokidar 事件、生成结果和队列收敛。事件超时应输出诊断并失败，不得再次 touch 业务文件补触发。运行时动态目标的解析、缓存、依赖登记和失败恢复应分别断言，不能从首次加载成功推导自动更新能力。

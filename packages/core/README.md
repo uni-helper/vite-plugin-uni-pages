@@ -136,7 +136,43 @@ export const globalStyle = {
 
 配置或依赖暂时出现语法错误、缺失文件时，watch 模式保留上次成功的产物并报告错误；修复后继续更新。已加载的配置入口删除后会使用空配置，重建入口后恢复加载。首次加载失败会终止初始化。
 
-计算式动态导入、`fs.readFile()` 等运行时读取、`node_modules` 变更及应用的 `resolve.alias` 不在自动依赖监听范围内。自定义 `configSource.parser` 保持原有调用方式，其自行读取的文件不会自动加入依赖集合；`transform` 和 `rewrite` 的调用顺序保持不变。
+配置入口和依赖按实际路径识别，文件名可以包含 `.bundled_` 或以 `__unconfig_` 开头。例如 `settings.bundled_config.ts`、`config/__unconfig_constants.ts` 都能正常加载和更新。
+
+#### 源位置与运行时加载
+
+入口及打包进配置的嵌套模块分别使用自己的源位置。`__dirname`、`__filename`、`import.meta.url`、`import.meta.dirname`、`import.meta.filename` 指向对应源文件；计算式 `require(name)`、`require.resolve(name)`、`import(name)` 和 `import.meta.resolve(name)` 也从该模块解析。
+
+```text
+app/
+├── pages.config.ts
+├── runtime.cjs             # 导出 entry
+└── config/
+    ├── module.ts
+    └── runtime.cjs         # 导出 nested
+```
+
+例如两个模块都执行以下代码时，`pages.config.ts` 读取 `app/runtime.cjs`，`config/module.ts` 读取 `app/config/runtime.cjs`：
+
+```ts
+const target = './runtime.cjs'
+const value = require(target)
+const resolved = import.meta.resolve(target)
+```
+
+静态依赖会随配置重新打包、求值。运行时才确定目标的 `require(name)` / `import(name)` 由 Node 加载并沿用 Node 缓存：仅修改目标不会自动触发配置更新，重新加载入口也可能继续读到缓存值。运行时加载失败后，仅补建或修复动态目标也不保证触发恢复；需要自动更新时，优先使用上面的静态导入。`import.meta.resolve()` 只返回解析后的 URL，不代表目标已经加载。
+
+运行时解析区分包的 `import` / `require` 条件导出，支持模块所属包的 `#imports`。ESM 解析使用 `import-meta-resolve`，不接管 Node 自定义 loader、`--conditions` 等额外命令行解析选项。`fs.readFile()` 等自行读取、`node_modules` 变更和应用的 `resolve.alias` 仍不在自动依赖监听范围内。
+
+#### transform 与自定义 parser
+
+`configSource` 对实际加载的入口按 `transform → parser → rewrite` 的顺序执行已提供的回调，成功加载时各调用一次；前一步失败会终止后续回调。回调接收原配置入口路径。
+
+| parser | 读取内容 | 依赖跟踪 |
+| --- | --- | --- |
+| 内置 `auto`、`json`、`import` | 使用内存中的 transform 结果；未返回有效字符串时使用原内容 | 脚本打包收集到的本地输入参与监听 |
+| 自定义函数 | 收到原入口，读取该文件时得到原内容 | parser 自行读取的其他文件不自动加入依赖集合 |
+
+transform 不再生成入口旁的 `__unconfig_*` 文件，已有同名真实文件不会被覆写或删除。加载器只在 `node_modules/.cache/uni-pages/` 内创建每次加载独占的产物目录，并在加载成功或失败后清理。该目录专供加载器使用，不作为配置输入监听；多个独立 loader 的产物互不覆盖。
 
 ### 页面级配置 definePage
 
@@ -830,7 +866,8 @@ export default defineConfig({
 index.ts          Vite 插件入口 — configResolved / transform / configureServer / resolveId / load
 context.ts        PageContext 编排核心 — 配置加载、扫描、合并、串行生成、监听编排、虚拟模块与 HMR
 pipeline.ts       纯流水线入口 — createPages / generateAll，root 和 platform 从外部传入，测试直接走这里
-config-loader.ts  配置加载 — unconfig 装载、本地依赖与恢复候选收集、监听路径归一化
+config-loader.ts  配置加载 — unconfig 发现与回调、内存转换、隔离产物、本地依赖与恢复候选
+config-source.ts  源位置适配 — 每模块运行时解析、静态调用保留、源码映射
 directories.ts    目录发现 — glob 展开、subPackages root 映射与扫描目录投影
 page-rules.ts     页面规则 — 基于 Vite root 编译排除模式，统一扫描与事件判定
 page-sources.ts   扫描来源与页面归属 — 来源身份、代表选择、生成路由冲突与文件族校验
@@ -860,7 +897,8 @@ types.ts          公共类型定义（Options / UserOptions / ResolvedOptions�
 ```shell
 index.ts
   ├─ context.ts（编排核心）
-  │    ├─ config-loader.ts             配置装载与恢复监听
+  │    ├─ config-loader.ts             配置装载、产物身份与恢复监听
+  │    │    └─ config-source.ts        源位置适配与运行时解析
   │    ├─ options.ts ── directories.ts 选项解析与目录发现
   │    ├─ files.ts                     扫描与文件锁
   │    ├─ page.ts ── macro.ts ── condition.ts
