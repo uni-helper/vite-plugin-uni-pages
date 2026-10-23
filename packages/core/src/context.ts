@@ -267,7 +267,7 @@ export class PageContext {
       const excluded = this.generatedFilePaths()
       // 自己写的生成物不参与任何匹配，先走这步，免得为每个
       // pages.json 事件白做一次路径解析
-      if (excluded.includes(eventPath) || isConfigLoaderArtifact(eventPath, this.root))
+      if (excluded.includes(eventPath) || isConfigLoaderArtifact(eventPath, this.configLoader.artifactDirectory))
         return
 
       // 未直接命中的路径仍需解析，以识别符号链接别名；直接命中就不查文件系统
@@ -279,7 +279,7 @@ export class PageContext {
         index.files.has(absolute)
         || (mightBeConfig && index.directories.some(dir => absolute.startsWith(`${dir}/`)))
       )
-      if (excluded.includes(absolute) || isConfigLoaderArtifact(absolute, this.root) || !isConfigPath)
+      if (excluded.includes(absolute) || isConfigLoaderArtifact(absolute, this.configLoader.artifactDirectory) || !isConfigPath)
         return
 
       debug.pages(`Config changed: ${absolute}`)
@@ -379,7 +379,7 @@ export class PageContext {
   private refreshConfigWatchers(): void {
     // 只按专用目录排除产物，不从真实输入的文件名推断身份
     const files = [...this.pagesConfigSourcePaths, ...this.pagesConfigDependencyPaths, ...this.configRecoveryCandidates]
-      .filter(file => !isConfigLoaderArtifact(file, this.root))
+      .filter(file => !isConfigLoaderArtifact(normalizeConfigPath(file, this.root), this.configLoader.artifactDirectory))
     // 监听现存父目录可发现新建文件；事件仍按当前依赖集合过滤
     const paths = [...new Set([
       ...files,

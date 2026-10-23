@@ -45,6 +45,7 @@ catalog:
   debug: ^4.4.3
   esbuild: ^0.28.2
   eslint: ^10.12.0
+  import-meta-resolve: ^4.2.0
   lodash.groupby: ^4.6.0
   magic-string: ^1.4.3
   picomatch: ^4.0.7

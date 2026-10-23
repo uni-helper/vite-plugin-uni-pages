@@ -1,12 +1,13 @@
 import type { PagesConfig } from '@uni-helper/uni-pages-types'
 import type { LoadConfigSource } from 'unconfig'
 import { existsSync, mkdirSync, realpathSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { bundleRequire } from 'bundle-require'
 import { loadConfig } from 'unconfig'
 import { normalizePath } from 'vite'
+import { configRuntimeSource, transformConfigSource } from './config-source'
 
 const scriptExtensions = /\.[cm]?[jt]sx?$/
 /** 目录恢复监听接受的文件类型；已知配置入口与依赖不受此限制 */
@@ -64,9 +65,8 @@ export function configWatchDirectory(filepath: string): string {
 }
 
 /** 判断路径是否位于加载器专用产物目录，真实输入的文件名不受限制 */
-export function isConfigLoaderArtifact(filepath: string, root: string): boolean {
-  const directory = path.resolve(root, 'node_modules/.cache/uni-pages')
-  const relative = path.relative(directory, path.resolve(root, filepath))
+export function isConfigLoaderArtifact(filepath: string, directory: string): boolean {
+  const relative = path.relative(directory, filepath)
   return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
 }
 
@@ -90,8 +90,12 @@ export class PagesConfigLoader {
   /** 目录导入的恢复范围，覆盖 package.json 和自定义入口 */
   readonly recoveryDirectories = new Set<string>()
   private readonly knownSources = new Set<string>()
+  /** 产物目录的物理路径，供输入索引和事件过滤使用 */
+  readonly artifactDirectory: string
 
-  constructor(private readonly root: string) {}
+  constructor(private readonly root: string) {
+    this.artifactDirectory = normalizeConfigPath(path.join(root, 'node_modules/.cache/uni-pages'), root)
+  }
 
   async load(sources: LoadConfigSource<PagesConfig>[]): Promise<LoadedPagesConfig> {
     this.recoveryCandidates.clear()
@@ -99,44 +103,32 @@ export class PagesConfigLoader {
     const dependencies = new Set<string>()
     const attemptedPaths = new Set<string>()
     const normalize = (filepath: string): string => normalizeConfigPath(filepath, this.root)
-    const adapted = sources.map((source): LoadConfigSource<PagesConfig> => {
-      if (typeof source.parser === 'function')
-        return source
-
-      const transformed = new Set<string>()
-      return {
-        ...source,
-        transform: source.transform
-          ? async (code, filepath) => {
-            const result = await source.transform!(code, filepath)
-            if (result)
-              transformed.add(filepath)
-            return result
+    const adapted = sources.map((source): LoadConfigSource<PagesConfig> => ({
+      ...source,
+      // transform 在 parser 内执行，避免 unconfig 写入入口旁的同名文件
+      transform: undefined,
+      parser: async (filepath) => {
+        attemptedPaths.add(normalize(filepath))
+        if (typeof source.parser === 'function') {
+          if (source.transform)
+            await source.transform(await readFile(filepath, 'utf8'), filepath)
+          return source.parser(filepath)
+        }
+        let code = await readFile(filepath, 'utf8')
+        if (source.transform)
+          code = await source.transform(code, filepath) || code
+        const parser = source.parser || 'auto'
+        if (parser === 'json' || path.extname(filepath) === '.json')
+          return JSON.parse(code)
+        if (parser === 'auto') {
+          try {
+            return JSON.parse(code)
           }
-          : undefined,
-        parser: async (filepath) => {
-          attemptedPaths.add(normalize(filepath))
-          const target = transformed.has(filepath)
-            ? path.join(path.dirname(filepath), `__unconfig_${path.basename(filepath)}`)
-            : filepath
-          const parser = source.parser || 'auto'
-          if (parser === 'json')
-            return JSON.parse(await readFile(target, 'utf8'))
-          if (parser === 'auto') {
-            try {
-              return JSON.parse(await readFile(target, 'utf8'))
-            }
-            catch {}
-          }
-          // 未知扩展名继续交给 unconfig，保留调用方自定义扩展的原有加载方式
-          if (!scriptExtensions.test(target)) {
-            const result = await loadConfig<PagesConfig>({ sources: [{ files: target, parser: 'import' }], defaults: {} })
-            return result.config
-          }
-          return this.loadScript(target, filepath, dependencies, attemptedPaths)
-        },
-      }
-    })
+          catch {}
+        }
+        return this.loadScript(filepath, code, dependencies, attemptedPaths)
+      },
+    }))
 
     try {
       const result = await loadConfig<PagesConfig>({ cwd: this.root, sources: adapted, defaults: {} })
@@ -165,36 +157,27 @@ export class PagesConfigLoader {
     }
   }
 
-  private async loadScript(target: string, source: string, dependencies: Set<string>, attempted: Set<string>): Promise<PagesConfig> {
-    const targetPath = normalizeConfigPath(target, this.root)
+  private async loadScript(source: string, code: string, dependencies: Set<string>, attempted: Set<string>): Promise<PagesConfig> {
     const sourcePath = normalizeConfigPath(source, this.root)
     const importDirectories = new Set<string>()
     const recoveryCandidates = new Set<string>()
     const root = this.root
-    // 临时产物必须写在监听范围之外
-    //
-    // 默认位置是配置入口旁边，chokidar 读到它、准备监听时文件已经删了，
-    // Windows 上 `fs.watch` 抛 EPERM；这个异常从异步目录遍历里冒出来，
-    // 没人接，进程直接退出。node_modules 各平台的监听器都跳过，
-    // 放这里既避开了监听，又不改变 node_modules 查找起点。
-    const bundleDirectory = path.join(this.root, 'node_modules/.cache/uni-pages')
-    const outputFile = (file: string): string => {
-      mkdirSync(bundleDirectory, { recursive: true })
-      const name = `${path.basename(file).replace(/[^\w.-]/g, '_')}.bundled_${Math.random().toString(36).slice(2)}.mjs`
-      return path.join(bundleDirectory, name)
-    }
-    const toSourcePath = (file: string): string => {
-      const absolute = normalizeConfigPath(file, this.root)
-      return absolute === targetPath ? sourcePath : absolute
-    }
+    // 每次加载独占目录；转换文本只在内存中流转，源码目录不产生中间文件
+    const cacheDirectory = this.artifactDirectory
+    mkdirSync(cacheDirectory, { recursive: true })
+    const bundleDirectory = await mkdtemp(path.join(cacheDirectory, 'load-'))
+    const runtime = path.join(bundleDirectory, 'runtime.mjs')
+    // bundle-require 校验入口扩展名；无扩展名和自定义扩展名仍按原路径读取
+    const entry = scriptExtensions.test(source) ? source : path.join(bundleDirectory, 'entry.ts')
     try {
+      await writeFile(runtime, configRuntimeSource())
       const { mod, dependencies: inputs } = await bundleRequire<Record<string, unknown>>({
-        filepath: target,
+        filepath: entry,
         cwd: this.root,
         format: 'esm',
         tsconfig: false,
         preserveTemporaryFile: false,
-        getOutputFile: outputFile,
+        getOutputFile: () => path.join(bundleDirectory, 'config.mjs'),
         // 外部包先按原导入位置解析，避免临时产物改变 node_modules 查找起点
         notExternal: [/.*/],
         esbuildOptions: {
@@ -208,11 +191,15 @@ export class PagesConfigLoader {
             name: 'uni-pages-config-inputs',
             setup(build) {
               build.onResolve({ filter: /.*/ }, async (args) => {
-                if (args.kind === 'entry-point' || args.pluginData?.resolvingPackage)
+                if (args.kind === 'entry-point')
+                  return { path: source }
+                if (args.pluginData?.resolvingPackage)
                   return
+                if (/^(?:node:|file:|data:)/.test(args.path))
+                  return { path: args.path, external: true }
                 if (args.path.startsWith('.') || path.isAbsolute(args.path)) {
                   const directory = normalizeConfigPath(path.resolve(args.resolveDir, args.path), root)
-                  if (!isNodeModulesPath(directory)) {
+                  if (!isNodeModulesPath(directory) && !isConfigLoaderArtifact(directory, cacheDirectory)) {
                     // 导入目标可能是尚未创建的目录；仅保留其内部范围，不放宽到父目录
                     importDirectories.add(directory)
                     for (const candidate of recoveryCandidatesFor(args.path, args.resolveDir))
@@ -239,18 +226,24 @@ export class PagesConfigLoader {
                 }
               })
               // 在执行前保留输入文件；新依赖执行抛错时，修复该文件也能触发重载
-              build.onLoad({ filter: /.*/, namespace: 'file' }, (args) => {
-                const file = toSourcePath(args.path)
-                if (!isNodeModulesPath(file))
+              build.onLoad({ filter: /.*/, namespace: 'file' }, async (args) => {
+                const file = normalizeConfigPath(args.path, root)
+                if (file === runtime)
+                  return { contents: await readFile(runtime, 'utf8'), loader: 'js' }
+                if (!isNodeModulesPath(file) && !isConfigLoaderArtifact(file, cacheDirectory))
                   attempted.add(file)
+                if (file !== sourcePath && !scriptExtensions.test(file))
+                  return
+                const contents = file === sourcePath ? code : await readFile(args.path, 'utf8')
+                return { contents: await transformConfigSource(contents, file, runtime), loader: 'js' }
               })
             },
           }],
         },
       })
       for (const input of inputs) {
-        const file = toSourcePath(input)
-        if (!isNodeModulesPath(file))
+        const file = normalizeConfigPath(input, root)
+        if (!isNodeModulesPath(file) && !isConfigLoaderArtifact(file, cacheDirectory))
           dependencies.add(file)
       }
       // 对齐 jiti 的 default:true 解包，再处理 unconfig 的嵌套 default 对象
@@ -268,6 +261,9 @@ export class PagesConfigLoader {
           this.recoveryDirectories.add(directory)
       }
       throw error
+    }
+    finally {
+      await rm(bundleDirectory, { recursive: true, force: true })
     }
   }
 }

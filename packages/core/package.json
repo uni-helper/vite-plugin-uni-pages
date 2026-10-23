@@ -68,6 +68,7 @@
     "comment-json": "catalog:",
     "debug": "catalog:",
     "esbuild": "catalog:",
+    "import-meta-resolve": "catalog:",
     "lodash.groupby": "catalog:",
     "magic-string": "catalog:",
     "picomatch": "catalog:",

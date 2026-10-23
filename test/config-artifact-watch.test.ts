@@ -5,7 +5,7 @@ import path from 'node:path'
 import { createServer } from 'vite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import UniPages, { PageContext } from '../packages/core/src'
-import { isConfigLoaderArtifact } from '../packages/core/src/config-loader'
+import { isConfigLoaderArtifact, normalizeConfigPath } from '../packages/core/src/config-loader'
 import { mockPageWatchers } from './helpers/page-watcher'
 
 vi.hoisted(() => vi.stubEnv('UNI_PLATFORM', 'h5'))
@@ -37,10 +37,11 @@ describe('config loader temporary artifacts never reach the watcher', () => {
   })
 
   it('只识别专用目录内的产物', () => {
-    expect(isConfigLoaderArtifact(path.join(tmpDir, 'node_modules/.cache/uni-pages/load/output.mjs'), tmpDir)).toBe(true)
-    expect(isConfigLoaderArtifact(path.join(tmpDir, 'node_modules/.cache/uni-pages-other/config.ts'), tmpDir)).toBe(false)
-    expect(isConfigLoaderArtifact('settings.bundled_config.ts', tmpDir)).toBe(false)
-    expect(isConfigLoaderArtifact('__unconfig_constants.ts', tmpDir)).toBe(false)
+    const directory = path.join(tmpDir, 'node_modules/.cache/uni-pages')
+    expect(isConfigLoaderArtifact(path.join(tmpDir, 'node_modules/.cache/uni-pages/load/output.mjs'), directory)).toBe(true)
+    expect(isConfigLoaderArtifact(path.join(tmpDir, 'node_modules/.cache/uni-pages-other/config.ts'), directory)).toBe(false)
+    expect(isConfigLoaderArtifact(path.join(tmpDir, 'settings.bundled_config.ts'), directory)).toBe(false)
+    expect(isConfigLoaderArtifact(path.join(tmpDir, '__unconfig_constants.ts'), directory)).toBe(false)
   })
 
   it('专用目录内的产物不进入订阅或触发更新', async () => {
@@ -70,7 +71,7 @@ describe('config loader temporary artifacts never reach the watcher', () => {
       mockPageWatchers()
       ctx = new PageContext({ configSource: { files: entry, extensions: [] }, dts: false }, tmpDir, 'h5')
       await ctx.loadUserPagesConfig()
-      expect(ctx.pagesGlobConfig.globalStyle?.navigationBarTitleText).toBe('before')
+      expect(ctx.pagesGlobConfig?.globalStyle?.navigationBarTitleText).toBe('before')
       const update = vi.spyOn(ctx, 'updatePagesJSON')
       await ctx.setupWatcher(watcherStub as any)
       expect(added).toContain(path.join(tmpDir, target))
@@ -78,7 +79,7 @@ describe('config loader temporary artifacts never reach the watcher', () => {
       watcherStub.emit('change', path.join(tmpDir, target))
       await Promise.all(update.mock.results.map(result => result.value))
       expect(update).toHaveBeenCalledTimes(1)
-      expect(ctx.pagesGlobConfig.globalStyle?.navigationBarTitleText).toBe('after')
+      expect(ctx.pagesGlobConfig?.globalStyle?.navigationBarTitleText).toBe('after')
     })
   })
 
@@ -105,7 +106,7 @@ describe('config loader temporary artifacts never reach the watcher', () => {
     const server = await createServer({
       root,
       configFile: false,
-      plugins: [UniPages({ dts: false })],
+      plugins: [UniPages({ dts: false, configSource: { files: 'pages.config', transform: code => code.replace('ok', 'transformed') } })],
       css: { postcss: {} },
       server: { middlewareMode: true, hmr: false },
       logLevel: 'silent',
@@ -119,7 +120,7 @@ describe('config loader temporary artifacts never reach the watcher', () => {
       spy.mockRestore()
     }
 
-    expect(watched.filter(target => target.includes('.bundled_') || target.includes('__unconfig_'))).toEqual([])
+    expect(watched.filter(target => isConfigLoaderArtifact(normalizeConfigPath(target, root), path.join(root, 'node_modules/.cache/uni-pages')))).toEqual([])
     fs.rmSync(root, { recursive: true, force: true })
   })
 })
