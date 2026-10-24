@@ -90,6 +90,40 @@ describe('配置模块的源位置', () => {
     }
   })
 
+  it('根外 workspace 模块的运行时目标按模块自身位置解析', async () => {
+    const base = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-config-source-workspace-')))
+    try {
+      const app = path.join(base, 'app')
+      const shared = path.join(base, 'shared')
+      fs.mkdirSync(app)
+      fs.mkdirSync(shared)
+      fs.writeFileSync(path.join(app, 'package.json'), '{"type":"module"}')
+      fs.writeFileSync(path.join(shared, 'package.json'), '{"name":"shared-config","type":"module","exports":"./index.ts"}')
+      fs.writeFileSync(path.join(app, 'title.cjs'), `module.exports = 'app'`)
+      fs.writeFileSync(path.join(shared, 'title.cjs'), `module.exports = 'shared'`)
+      fs.writeFileSync(path.join(shared, 'index.ts'), `const target = './title.cjs'; export default { required: require(target), imported: (await import(target)).default, url: import.meta.url }`)
+      fs.mkdirSync(path.join(app, 'node_modules'))
+      fs.symlinkSync(shared, path.join(app, 'node_modules/shared-config'), 'junction')
+      fs.writeFileSync(path.join(app, 'pages.config.ts'), `import shared from 'shared-config'; export default shared`)
+
+      const result = await new PagesConfigLoader(app).load([{ files: 'pages.config.ts', extensions: [] }])
+      expect(result.config).toEqual({
+        required: 'shared',
+        imported: 'shared',
+        url: pathToFileURL(path.join(shared, 'index.ts')).href,
+      })
+      expect(result.dependencies).toEqual(expect.arrayContaining([
+        normalizePath(path.join(shared, 'index.ts')),
+        normalizePath(path.join(app, 'pages.config.ts')),
+      ]))
+      // 运行时目标沿用 Node 缓存，不进入依赖集合
+      expect(result.dependencies).not.toContain(normalizePath(path.join(shared, 'title.cjs')))
+    }
+    finally {
+      fs.rmSync(base, { recursive: true, force: true })
+    }
+  })
+
   it.each([
     `const require = (name) => name; export default require('local')`,
     `import require from './local.ts'; export default require('local')`,
