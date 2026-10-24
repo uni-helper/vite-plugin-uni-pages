@@ -1,4 +1,4 @@
-import type { InlineConfig, Plugin } from 'vite'
+import type { InlineConfig, Plugin, Rollup } from 'vite'
 import type { UniPagesPlugin } from '../packages/core/src'
 import { Buffer } from 'node:buffer'
 import fs from 'node:fs'
@@ -87,23 +87,36 @@ async function startServer(root: string, pages: UniPagesPlugin) {
   return server
 }
 
-async function startWatch(root: string, pages: UniPagesPlugin) {
+async function startWatch(root: string, pages: UniPagesPlugin, watch: Rollup.WatcherOptions = {}) {
+  const listening = deferred()
   const closedBundle = vi.fn()
-  const options = config(root, pages, [{ name: 'observe-completed-bundle', closeBundle: closedBundle }])
-  const watcher = await build({ ...options, build: { ...options.build, watch: {} } })
+  const options = config(root, pages, [{
+    name: 'observe-completed-bundle',
+    buildStart: () => listening.promise,
+    closeBundle: closedBundle,
+  }])
+  const watcher = await build({ ...options, build: { ...options.build, watch } })
   if (Array.isArray(watcher) || !('on' in watcher))
     throw new Error('Expected a build watcher')
   closers.push(() => watcher.close())
-  await new Promise<void>((resolve, reject) => {
-    watcher.on('event', (event) => {
-      if (event.code === 'END')
-        resolve()
-      else if (event.code === 'ERROR')
-        reject(event.error)
-    })
+  const nextEnd = () => new Promise<void>((resolve, reject) => {
+    const onEvent = (event: Rollup.RollupWatcherEvent) => {
+      if (event.code === 'END' || event.code === 'ERROR') {
+        watcher.off('event', onEvent)
+        if (event.code === 'END')
+          resolve()
+        else
+          reject(event.error)
+      }
+    }
+    watcher.on('event', onEvent)
   })
-  expect(closedBundle).toHaveBeenCalled()
-  return watcher
+  const firstEnd = nextEnd()
+  // 先登记结束事件，再允许首轮构建继续
+  listening.resolve()
+  await firstEnd
+  expect(closedBundle).toHaveBeenCalledOnce()
+  return { watcher, closedBundle, nextEnd }
 }
 
 function expectOutput(root: string, routes: Routes, title: string, expectedPages: string[]): void {
@@ -150,11 +163,31 @@ describe('插件实例生命周期', () => {
       await server.close()
     }
     else {
-      const watcher = await startWatch(root, pages)
+      const { watcher } = await startWatch(root, pages)
       await watcher.close()
     }
     updateFixture(root)
 
+    expectOutput(root, await buildRoutes(root, pages), '第二轮', ['pages/detail', 'pages/index'])
+  })
+
+  it('构建监听的两轮 closeBundle 都保留占用，整个 watcher 关闭后才能重新准备', async () => {
+    const root = fixture()
+    const pages = UniPages()
+    const entry = path.join(root, 'entry.js')
+    const watchFile = vi.spyOn(fs, 'watchFile')
+    const { watcher, closedBundle, nextEnd } = await startWatch(root, pages, { chokidar: { usePolling: true, interval: 20 } })
+    await vi.waitFor(() => expect(watchFile.mock.calls.some(([file]) => path.resolve(String(file)) === entry)).toBe(true))
+    const rebuilt = nextEnd()
+
+    fs.writeFileSync(entry, 'export { pages, subPackages } from "virtual:uni-pages"; export const round = 2')
+    await rebuilt
+
+    expect(closedBundle).toHaveBeenCalledTimes(2)
+    expect(fs.readFileSync(path.join(root, 'dist/entry.mjs'), 'utf8')).toContain('round')
+    await expect(buildRoutes(root, pages)).rejects.toThrow(/active|already|overlap/i)
+    await watcher.close()
+    updateFixture(root)
     expectOutput(root, await buildRoutes(root, pages), '第二轮', ['pages/detail', 'pages/index'])
   })
 
@@ -218,7 +251,7 @@ describe('插件实例生命周期', () => {
   it.each(['开发服务器', '构建监听'] as const)('%s 活跃时拒绝复用，并保留原会话的虚拟模块', async (mode) => {
     const root = fixture()
     const pages = UniPages()
-    const current = mode === '开发服务器' ? await startServer(root, pages) : await startWatch(root, pages)
+    const current = mode === '开发服务器' ? await startServer(root, pages) : (await startWatch(root, pages)).watcher
     await expect(buildRoutes(root, pages)).rejects.toThrow(/active|already|overlap/i)
     const nextRoot = fixture('另一项目')
     fs.writeFileSync(path.join(nextRoot, 'src/pages/other.vue'), '<template><view>另一项目</view></template>')
