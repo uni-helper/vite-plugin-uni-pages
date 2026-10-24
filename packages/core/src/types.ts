@@ -171,7 +171,7 @@ export interface Options {
   /**
    * 页面配置文件的加载来源
    *
-   * 基于 unconfig，支持合并多个配置来源
+   * @description 基于 unconfig，按来源顺序加载首个有效配置
    *
    * @default 'pages.config'
    * @since 0.2.7

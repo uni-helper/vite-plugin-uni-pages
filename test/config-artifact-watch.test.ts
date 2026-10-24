@@ -1,66 +1,86 @@
+import { EventEmitter } from 'node:events'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { createServer } from 'vite'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import UniPages, { PageContext } from '../packages/core/src'
-import { isConfigLoaderArtifact } from '../packages/core/src/config-loader'
+import { isConfigLoaderArtifact, normalizeConfigPath } from '../packages/core/src/config-loader'
+import { mockPageWatchers } from './helpers/page-watcher'
 
 vi.hoisted(() => vi.stubEnv('UNI_PLATFORM', 'h5'))
-
-/**
- * 配置加载的临时产物不能被监听。
- *
- * `bundle-require` 在配置入口旁边写一个 `pages.config.bundled_<id>.mjs`
- * 再立刻删掉，unconfig 写 `__unconfig_*`。这些文件几乎不存在，却会
- * 以两种方式造成伤害：事件被当成配置变更多跑一轮；Windows 上 chokidar
- * 扫描到它、调 `fs.watch` 时文件已经没了，抛出的 EPERM 变成未处理的
- * 拒绝，直接带走进程。所以监听路径、事件过滤、目录遍历三处都要挡掉。
- */
 
 describe('config loader temporary artifacts never reach the watcher', () => {
   let tmpDir: string
   let ctx: PageContext
 
   const added: string[] = []
-  const watcherStub = {
+  const watcherStub = Object.assign(new EventEmitter(), {
     add: (paths: string[] | string) => {
       added.push(...(Array.isArray(paths) ? paths : [paths]))
     },
-    on: vi.fn(),
-    off: vi.fn(),
-  }
+  })
 
-  beforeAll(async () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-watch-artifacts-'))
+  beforeEach(async () => {
+    tmpDir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-watch-artifacts-')))
     fs.mkdirSync(path.join(tmpDir, 'src/pages'), { recursive: true })
     fs.writeFileSync(path.join(tmpDir, 'src/pages/index.vue'), '<template><div/></template>', 'utf-8')
     ctx = new PageContext({ dir: 'src/pages', outDir: 'src', dts: false }, tmpDir, 'h5')
     vi.spyOn(ctx, 'updatePagesJSON').mockResolvedValue(false)
   })
 
-  afterAll(() => {
+  afterEach(async () => {
+    await ctx.disposeWatchers()
+    vi.restoreAllMocks()
+    added.length = 0
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it('recognizes bundled and unconfig artifacts by name', () => {
-    expect(isConfigLoaderArtifact('pages.config.bundled_51wkla4irr2.mjs')).toBe(true)
-    expect(isConfigLoaderArtifact('__unconfig_pages.config.ts')).toBe(true)
-    expect(isConfigLoaderArtifact('pages.config.ts')).toBe(false)
-    expect(isConfigLoaderArtifact('leaf.ts')).toBe(false)
+  it('只识别专用目录内的产物', () => {
+    const directory = path.join(tmpDir, 'node_modules/.cache/uni-pages')
+    expect(isConfigLoaderArtifact(path.join(tmpDir, 'node_modules/.cache/uni-pages/load/output.mjs'), directory)).toBe(true)
+    expect(isConfigLoaderArtifact(path.join(tmpDir, 'node_modules/.cache/uni-pages-other/config.ts'), directory)).toBe(false)
+    expect(isConfigLoaderArtifact(path.join(tmpDir, 'settings.bundled_config.ts'), directory)).toBe(false)
+    expect(isConfigLoaderArtifact(path.join(tmpDir, '__unconfig_constants.ts'), directory)).toBe(false)
   })
 
-  it('does not watch a stale bundled artifact left next to the entry', async () => {
-    const artifact = path.join(tmpDir, 'pages.config.bundled_stale.mjs')
-    fs.writeFileSync(artifact, 'export default {}', 'utf-8')
+  it('专用目录内的产物不进入订阅或触发更新', async () => {
+    const artifact = path.join(tmpDir, 'node_modules/.cache/uni-pages/load/output.mjs')
     ctx.pagesConfigSourcePaths = [path.join(tmpDir, 'pages.config.ts')]
-    // 临时产物混进依赖集合（装载失败的恢复路径就会带上它）
     ctx.pagesConfigDependencyPaths = [path.join(tmpDir, 'leaf.ts'), artifact]
-
     await ctx.setupWatcher(watcherStub as any)
+    expect(added).not.toContain(artifact)
+    expect(added).toContain(path.join(tmpDir, 'leaf.ts'))
+    watcherStub.emit('change', artifact)
+    expect(ctx.updatePagesJSON).not.toHaveBeenCalled()
+  })
 
-    expect(added.some(file => file.includes('pages.config.bundled_stale.mjs'))).toBe(false)
-    expect(added.some(file => file.includes('leaf.ts'))).toBe(true)
+  describe.each(['settings.bundled_config.ts', '__unconfig_constants.ts'])('%s 是真实输入', (filename) => {
+    it.each(['入口', '直接依赖', '嵌套依赖'])('%s 修改后仍触发更新', async (position) => {
+      const entry = position === '入口' ? filename : 'pages.config.ts'
+      const target = position === '嵌套依赖' ? `nested/${filename}` : filename
+      fs.mkdirSync(path.join(tmpDir, 'nested'))
+      fs.writeFileSync(path.join(tmpDir, target), `export default { globalStyle: { navigationBarTitleText: 'before' } }`)
+      if (position === '直接依赖')
+        fs.writeFileSync(path.join(tmpDir, entry), `export { default } from './${filename}'`)
+      if (position === '嵌套依赖') {
+        fs.writeFileSync(path.join(tmpDir, 'nested/module.ts'), `export { default } from './${filename}'`)
+        fs.writeFileSync(path.join(tmpDir, entry), `export { default } from './nested/module.ts'`)
+      }
+      await ctx.disposeWatchers()
+      mockPageWatchers()
+      ctx = new PageContext({ configSource: { files: entry, extensions: [] }, dts: false }, tmpDir, 'h5')
+      await ctx.loadUserPagesConfig()
+      expect(ctx.pagesGlobConfig?.globalStyle?.navigationBarTitleText).toBe('before')
+      const update = vi.spyOn(ctx, 'updatePagesJSON')
+      await ctx.setupWatcher(watcherStub as any)
+      expect(added).toContain(normalizeConfigPath(path.join(tmpDir, target), tmpDir))
+      fs.writeFileSync(path.join(tmpDir, target), `export default { globalStyle: { navigationBarTitleText: 'after' } }`)
+      watcherStub.emit('change', path.join(tmpDir, target))
+      await Promise.all(update.mock.results.map(result => result.value))
+      expect(update).toHaveBeenCalledTimes(1)
+      expect(ctx.pagesGlobConfig?.globalStyle?.navigationBarTitleText).toBe('after')
+    })
   })
 
   // 过滤监听列表躲不开目录遍历：chokidar 读到新文件就会去 fs.watch 它，
@@ -86,7 +106,7 @@ describe('config loader temporary artifacts never reach the watcher', () => {
     const server = await createServer({
       root,
       configFile: false,
-      plugins: [UniPages({ dts: false })],
+      plugins: [UniPages({ dts: false, configSource: { files: 'pages.config', transform: code => code.replace('ok', 'transformed') } })],
       css: { postcss: {} },
       server: { middlewareMode: true, hmr: false },
       logLevel: 'silent',
@@ -100,7 +120,7 @@ describe('config loader temporary artifacts never reach the watcher', () => {
       spy.mockRestore()
     }
 
-    expect(watched.filter(target => target.includes('.bundled_') || target.includes('__unconfig_'))).toEqual([])
+    expect(watched.filter(target => isConfigLoaderArtifact(normalizeConfigPath(target, root), path.join(root, 'node_modules/.cache/uni-pages')))).toEqual([])
     fs.rmSync(root, { recursive: true, force: true })
   })
 })

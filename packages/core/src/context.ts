@@ -262,13 +262,12 @@ export class PageContext {
       const index = this.watchedConfigIndex.get(watcher)
       const basename = path.basename(filepath)
       const mightBeConfig = configFileExtensions.test(basename)
-        && !isConfigLoaderArtifact(basename)
 
       const eventPath = normalizePath(path.resolve(this.root, normalizePath(filepath)))
       const excluded = this.generatedFilePaths()
       // 自己写的生成物不参与任何匹配，先走这步，免得为每个
       // pages.json 事件白做一次路径解析
-      if (excluded.includes(eventPath))
+      if (excluded.includes(eventPath) || isConfigLoaderArtifact(eventPath, this.configLoader.artifactDirectory))
         return
 
       // 未直接命中的路径仍需解析，以识别符号链接别名；直接命中就不查文件系统
@@ -280,7 +279,7 @@ export class PageContext {
         index.files.has(absolute)
         || (mightBeConfig && index.directories.some(dir => absolute.startsWith(`${dir}/`)))
       )
-      if (excluded.includes(absolute) || !isConfigPath)
+      if (excluded.includes(absolute) || isConfigLoaderArtifact(absolute, this.configLoader.artifactDirectory) || !isConfigPath)
         return
 
       debug.pages(`Config changed: ${absolute}`)
@@ -378,10 +377,9 @@ export class PageContext {
    * 故意留的兜底）。
    */
   private refreshConfigWatchers(): void {
-    // 配置加载的临时产物不能进监听集合：它们写完就删，Windows 上
-    // chokidar 对消失了的目标调 fs.watch 会抛 EPERM
+    // 排除临时产物目录，避免加载器写入和清理文件时再次触发配置重载
     const files = [...this.pagesConfigSourcePaths, ...this.pagesConfigDependencyPaths, ...this.configRecoveryCandidates]
-      .filter(file => !isConfigLoaderArtifact(path.basename(file)))
+      .filter(file => !isConfigLoaderArtifact(normalizeConfigPath(file, this.root), this.configLoader.artifactDirectory))
     // 监听现存父目录可发现新建文件；事件仍按当前依赖集合过滤
     const paths = [...new Set([
       ...files,

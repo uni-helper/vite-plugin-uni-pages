@@ -74,9 +74,12 @@ test/
 ├── subpackage-user-pages-path.test.ts   配置里的分包 pages 按 root 写相对 path
 ├── concurrent-pages-json.test.ts        多终端并发读写 pages.json
 ├── files*.test.ts                       文件工具与文件锁
-├── config-dependencies*.test.ts         配置本地依赖加载与 unconfig 回调兼容
-├── config-artifact-watch.test.ts        配置加载临时产物不进监听
-├── config-recovery-watch.test.ts        连续失败后的配置恢复监听
+├── config-dependencies.test.ts          配置本地依赖加载与 unconfig 回调兼容
+├── config-source.test.ts                每模块源位置、根外 workspace、动态缓存边界与 transform 隔离
+├── config-source-cleanup.test.ts        加载目录清理失败不改变结果或原始错误，残留产物仍隔离
+├── config-dependencies-watch.test.ts    dev/build 单次修改、依赖切换、连续失败与恢复
+├── config-artifact-watch.test.ts        真实输入与专用产物目录的身份、监听过滤
+├── config-recovery-watch.test.ts        连续失败恢复范围的确定性事件回归
 ├── config-watch-fast-path.test.ts       配置 watcher 路径匹配开销
 ├── watcher-config-path.test.ts          watcher 归一化配置变更路径
 ├── watcher-dir-boundary.test.ts         页面文件只在配置目录内匹配
@@ -88,6 +91,16 @@ test/
 ```
 
 平台相关的快照测试通过 seam 注入 `platform`，并用 `vi.mock` / `vi.stubEnv` 隔离环境变量与文件系统，保证不同环境下结果确定。
+
+### 配置加载与监听
+
+源位置用例应建立完整的调用链：配置入口静态导入辅助模块，辅助模块再执行待测的相对加载。入口和辅助模块可各自加载同名、不同内容的目标文件，以确认每个调用使用自己的源位置。静态依赖与运行时动态目标分别验证加载、缓存、监听和失败恢复行为。
+
+真实 watcher 用例应先确认目标路径已注册，再在目标父目录中用独立哨兵文件确认事件可达，之后只修改一次待测文件。分别断言文件系统事件已收到、产物已更新、待处理队列已收敛。事件超时输出诊断并失败，避免额外修改待测文件掩盖订阅遗漏。
+
+清理失败属于环境异常，用例应断言加载结果和原始错误都不被清理错误替换，并确认残留的 `load-*` 目录仍被输入索引和监听排除。成功路径的测试继续以父目录为空作为常规验收条件。
+
+源码到临时执行文件的数据流见[脚本配置的加载流程](./packages/core/README.md#脚本配置的加载流程)。
 
 ## 项目结构
 
