@@ -13,6 +13,7 @@ import {
   GENERATION_MARKER_PREFIX,
   hasGenerationMarker,
   isGenerationMarker,
+  orderVariantLists,
   platformsExcluding,
   resolvePlatformUnion,
   sortVariants,
@@ -27,6 +28,8 @@ import { mergeTabBarProps, renderTabBarListLines, renderTabBarPropLines } from '
  * - 多个平台共用一个文件时，用 #ifdef 注释区分各自的条目（合并规则
  *   的核心在 platform-variants.ts，数组侧的适配在这里，对象侧
  *   tabBar 属性的适配在 tab-bar.ts）
+ * - tabBar list 的条目顺序：配置覆盖全部既有条目时按配置顺序输出，
+ *   否则新增条目落到声明位置、既有条目保持磁盘序（规则 6）
  * - 合并时保持首页排最前
  * - 写入"由插件生成"的标记，靠它识别哪些条目是插件写的
  * - 序列化格式（缩进、换行）
@@ -187,6 +190,7 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
 
   // pages
   const oldPagesArray = oldPages as unknown as CommentArray<CommentObject> | undefined
+  // pages 不参与配置序重排：首页前置子系统会接管相对顺序（规则 6）
   pageJson.pages = mergePlatformItems(oldPagesArray, currentPlatform, data.pages, 'path').items as unknown as Pages
 
   // mergePlatformItems 内部用 Map 保存条目，顺序可能和首页在前的
@@ -270,7 +274,10 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
   // 的条目从 list 中退出，其他平台的条目在自己的 #ifdef 块后面继续
   // 存活。pages.json 是各平台共享的，当前平台没有 tabBar，不代表可以
   // 删掉其他平台已经生成的整个区块
-  const tabBarMerge = mergePlatformItems(oldTabBarObj?.list, currentPlatform, list || [], 'pagePath')
+  // tabBar list 按配置顺序摆放（规则 6）：配置覆盖全部条目时整体重排；
+  // 未覆盖时只落位新增条目，既有条目保持磁盘序。tab 顺序用户直接可
+  // 见，且没有首页前置子系统的约束
+  const tabBarMerge = mergePlatformItems(oldTabBarObj?.list, currentPlatform, list || [], 'pagePath', { orderByConfig: true })
   let tabBarBodyLines: string[] | undefined
 
   if (tabBarMerge.items.length === 0) {
@@ -532,6 +539,20 @@ interface MergedPlatformItems {
 }
 
 /**
+ * {@link mergePlatformItems} 的输出顺序选项
+ */
+interface MergePlatformItemsOptions {
+  /**
+   * 按配置顺序摆放条目（规则 6）：配置覆盖全部既有键时整体重排；
+   * 未覆盖时只把新增键插到声明位置，既有键保持磁盘序。
+   * 只有 tabBar list 启用——tab 顺序用户直接可见，pages 数组由
+   * 首页前置子系统接管（各平台可声明不同首页，配置序重排会翻转
+   * 首页变体的相对顺序）
+   */
+  orderByConfig?: boolean
+}
+
+/**
  * 合并多平台的配置条目（数组侧适配器）。
  *
  * 处理条件编译注释（#ifdef / #ifndef / #endif），把 pages.json 里
@@ -546,9 +567,11 @@ interface MergedPlatformItems {
  * @param currentPlatform - 当前平台标识（如 H5、MP-WEIXIN）
  * @param items - 新配置条目数组
  * @param uniqueKeyName - 用于识别条目唯一性的字段名（如 'path' 或 'pagePath'）
+ * @param options - 输出顺序选项，见 {@link MergePlatformItemsOptions}
  * @returns 带 #ifdef 块的合并条目，以及平台全集与拥有平台
  */
-function mergePlatformItems<T extends object = Record<string, unknown>>(source: CommentArray<CommentObject> | undefined, currentPlatform: string, items: T[], uniqueKeyName: keyof ExcludeIndexSignature<T>): MergedPlatformItems {
+function mergePlatformItems<T extends object = Record<string, unknown>>(source: CommentArray<CommentObject> | undefined, currentPlatform: string, items: T[], uniqueKeyName: keyof ExcludeIndexSignature<T>, options: MergePlatformItemsOptions = {}): MergedPlatformItems {
+  const { orderByConfig = false } = options
   const src = source || new CommentArray<CommentObject>()
   currentPlatform = currentPlatform.toUpperCase()
 
@@ -557,6 +580,11 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
 
   // 2. 遍历现有数组，逐个判断，以 uniqueKey 的值为键放进 mergedMap
   const mergedMap = new Map<string, MultiPlatformItem<T>[]>()
+  // 磁盘上出现过的键及首次出现顺序，包括马上会被当前平台替换的旧条目。
+  // 判断“新增键”必须用它而不是合并后的 map：只属于当前平台的旧条目在
+  // 下面会被跳过，之后又被本次配置加回来，但它不是新增条目，不能跟着
+  // 配置挪位置
+  const sourceOrder = orderByConfig ? { seen: new Set<string>(), order: [] as string[] } : undefined
   // 取这个键的变体列表，没有就建一个并注册进 mergedMap
   const variantsOf = (uniqueKey: string): MultiPlatformItem<T>[] => {
     const list = mergedMap.get(uniqueKey) || []
@@ -570,6 +598,10 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
 
     if (!uniqueKey) {
       continue
+    }
+    if (sourceOrder && !sourceOrder.seen.has(uniqueKey)) {
+      sourceOrder.seen.add(uniqueKey)
+      sourceOrder.order.push(uniqueKey)
     }
 
     // 检查条目前面有没有条件编译注释
@@ -621,6 +653,10 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
     variantsOf(uniqueKey).push({ payload: item, valueStr: stringifyForCompare(item), platforms, platformStr: platforms.join(' || ') })
   }
 
+  // 记下磁盘上已有键的顺序：部分覆盖时只给真正新增的键落位，既有
+  // 键保持磁盘序（规则 6）
+  const orderOptions = sourceOrder ? { diskOrder: sourceOrder.order } : undefined
+
   // 3. 把本次扫描的条目合并进 mergedMap
   // 扫描条目上的 `type` 标记按设计保留（后面运行里 ensureHomePageFirst
   // 找首页要用它）；只有比较两条配置相不相等时才把它拿掉
@@ -664,8 +700,16 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
   // 把生成标记写进 result 的 Symbol.for(`before:0`)
   result[Symbol.for('before:0') as CommentSymbol] = [lineComment(` ${GENERATION_MARKER_PREFIX} ${platformUnionStr}`)]
 
-  // 按插入顺序处理元素
-  for (const [_, list] of mergedMap) {
+  // 计算输出顺序：只有 tabBar list 启用配置序摆放（orderByConfig 由
+  // 调用方决定）。配置覆盖全部既有键时整体重排；否则只把本次新增的
+  // 键插到声明位置，既有键保持磁盘序（规则见 platform-variants 的
+  // orderVariantLists）
+  const declaredKeys = orderByConfig
+    ? items.map(item => item[uniqueKeyName] as unknown).filter((key): key is string => typeof key === 'string' && key.length > 0)
+    : null
+
+  // 按输出顺序处理元素
+  for (const list of orderVariantLists(mergedMap, declaredKeys, orderOptions)) {
     for (const { payload: item, platformStr, passthrough } of list) {
       result.push(item as unknown as CommentObject)
 

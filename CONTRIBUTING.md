@@ -31,7 +31,7 @@ pnpm coverage
 pnpm lint
 
 # 类型检查
-pnpm type-check
+pnpm typecheck
 
 # 启动 playground 调试
 pnpm play:mp-weixin
@@ -55,6 +55,7 @@ test/
 ├── uni-platform-dots.test.ts            文件名中的点只有后缀位才算平台后缀
 ├── pages-json-*.test.ts                 pages.json 生成细节（空行、首页排序与平台、
 │                                        纯合并 seam、子包收敛、tabBar 按平台、EPERM 重试）
+├── pages-json-entry-order.test.ts       tabBar list 条目顺序（新增落位、全量重排、pages 不重排）
 ├── subpackage-glob.test.ts              分包 glob、root 映射与冲突检查
 ├── subpackage-glob-watcher.test.ts      目录监听边界与 watch 就绪
 ├── subpackage-root-sources.test.ts      默认与显式 root 决议、别名来源及冲突信息
