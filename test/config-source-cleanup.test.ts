@@ -23,6 +23,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   fs.rmSync(root, { recursive: true, force: true })
 })
 
@@ -48,5 +50,45 @@ describe('配置加载目录清理失败', () => {
     await expect(load(loader)).rejects.toThrow('config failed')
     expect([...loader.recoveryPaths]).toEqual([normalizeConfigPath(path.join(root, 'pages.config.ts'), root)])
     expect(cacheEntries()).toHaveLength(1)
+  })
+})
+
+describe('配置临时文件由加载器统一清理', () => {
+  it.each([
+    { label: '正常导出，无 unlink 错误', throws: false, inject: false },
+    { label: '正常导出，注入 unlink EPERM', throws: false, inject: true },
+    { label: '配置抛错，无 unlink 错误', throws: true, inject: false },
+    { label: '配置抛错，注入 unlink EPERM', throws: true, inject: true },
+  ])('$label', async ({ throws, inject }) => {
+    const originalError = new Error('config failed')
+    if (throws) {
+      vi.stubGlobal('__uniPagesConfigCleanupError', originalError)
+      fs.writeFileSync(path.join(root, 'pages.config.ts'), `throw globalThis.__uniPagesConfigCleanupError\nexport default {}`)
+    }
+    const loader = new PagesConfigLoader(root)
+    const originalUnlink = fs.promises.unlink
+    vi.spyOn(fs.promises, 'unlink').mockImplementation(async (filepath) => {
+      if (inject && path.basename(String(filepath)) === 'config.mjs')
+        throw Object.assign(new Error('config.mjs is locked'), { code: 'EPERM' })
+      return originalUnlink(filepath)
+    })
+    remove.mockImplementation(fs.promises.rm)
+
+    // 保留真实打包、求值和目录删除，只在依赖尝试单独删除产物时注入错误
+    const result = await load(loader).then(value => ({ value, error: undefined }), error => ({ value: undefined, error }))
+    expect(cacheEntries()).toEqual([])
+    expect(remove).toHaveBeenCalledExactlyOnceWith(expect.any(String), {
+      recursive: true,
+      force: true,
+      maxRetries: 3,
+      retryDelay: 50,
+    })
+    if (throws) {
+      expect(result.error).toBe(originalError)
+    }
+    else {
+      expect(result.error).toBeUndefined()
+      expect(result.value).toMatchObject({ config: { globalStyle: { navigationBarTitleText: 'loaded' } } })
+    }
   })
 })
