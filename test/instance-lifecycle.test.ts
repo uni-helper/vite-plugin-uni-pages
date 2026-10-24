@@ -36,7 +36,7 @@ function closeHook(pages: UniPagesPlugin, name: 'closeWatcher' | 'closeBundle'):
 }
 
 function fixture(title = '第一轮'): string {
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-lifecycle-')))
+  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-lifecycle-')))
   roots.push(root)
   fs.mkdirSync(path.join(root, 'src/pages'), { recursive: true })
   fs.writeFileSync(path.join(root, 'src/pages/index.vue'), '<template><view>首页</view></template>')
@@ -177,7 +177,7 @@ describe('插件实例生命周期', () => {
     const entry = path.join(root, 'entry.js')
     const watchFile = vi.spyOn(fs, 'watchFile')
     const { watcher, closedBundle, nextEnd } = await startWatch(root, pages, { chokidar: { usePolling: true, interval: 20 } })
-    await vi.waitFor(() => expect(watchFile.mock.calls.some(([file]) => path.resolve(String(file)) === entry)).toBe(true))
+    await vi.waitFor(() => expect(watchFile.mock.calls.map(([file]) => path.resolve(String(file)))).toContain(entry))
     const rebuilt = nextEnd()
 
     fs.writeFileSync(entry, 'export { pages, subPackages } from "virtual:uni-pages"; export const round = 2')

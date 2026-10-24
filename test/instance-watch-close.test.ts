@@ -183,7 +183,7 @@ describe('构建监听关闭后的迟到钩子', () => {
         })
       })
       const entry = path.join(root, 'entry.js')
-      await vi.waitFor(() => expect(watchFile.mock.calls.some(([file]) => path.resolve(String(file)) === entry)).toBe(true))
+      await vi.waitFor(() => expect(watchFile.mock.calls.map(([file]) => path.resolve(String(file)))).toContain(entry))
       fs.appendFileSync(entry, '\n// first update')
       await secondStarted.promise
       // 越过 chokidar 的 50 ms change 节流窗口，再提交下一次独立修改
