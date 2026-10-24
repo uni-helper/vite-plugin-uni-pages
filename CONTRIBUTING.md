@@ -86,6 +86,9 @@ test/
 ├── watcher-update-failure.test.ts       监听更新失败只记日志不抛出
 ├── declaration-*.test.ts                声明生成：tab 页过滤与失败后的通知
 ├── prepare.test.ts                      pages.prepare()
+├── instance-lifecycle.test.ts           真实 Vite 构建与关闭、顺序复用、prepare 约束和重叠占用
+├── instance-watch-close.test.ts         已关闭构建的迟到加载与清理不影响新会话
+├── context-disposal.test.ts             受控异步 gate 下的初始化、更新队列与关闭交错
 ├── repro-dup.test.ts                    重复路由回归
 └── types.test.ts                        类型断言
 ```
@@ -99,6 +102,8 @@ test/
 真实 watcher 用例应先确认目标路径已注册，再在目标父目录中用独立哨兵文件确认事件可达，之后只修改一次待测文件。分别断言文件系统事件已收到、产物已更新、待处理队列已收敛。事件超时输出诊断并失败，避免额外修改待测文件掩盖订阅遗漏。
 
 清理失败属于环境异常，用例应断言加载结果和原始错误都不被清理错误替换，并确认残留的 `load-*` 目录仍被输入索引和监听排除。成功路径的测试继续以父目录为空作为常规验收条件。
+
+实例复用用例应等待真实 `build()`、`server.close()` 或构建 watcher 的 `close()` 完成后再启动下一轮，同时检查 `pages.json`、虚拟模块和声明文件。`resolveConfig()` 只验证初始化，不能代替构建结束；构建监听的单轮 `closeBundle` 也不能代替整个监听会话结束。关闭竞态使用受控异步 gate，分别验证已开始的生成排空、尚未开始的更新取消和迟到的监听注册失效。
 
 源码到临时执行文件的数据流见[脚本配置的加载流程](./packages/core/README.md#脚本配置的加载流程)。
 
