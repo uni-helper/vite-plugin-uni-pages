@@ -1,5 +1,5 @@
 import type { FSWatcher } from 'chokidar'
-import type { InitializationSource, UniPagesPlugin, UserOptions } from './types'
+import type { UniPagesPlugin, UserOptions } from './types'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
@@ -44,26 +44,24 @@ export type * from '@uni-helper/uni-pages-types'
  * @returns Vite 插件实例
  */
 export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugin {
-  let ctx: PageContext
-  let buildWatcher: FSWatcher | undefined
-  /**
-   * 当前初始化状态：`{ root, platform, platformSuffix }` 是它的参数，
-   * 同时记下这次初始化是谁发起的（`source`）。
-   *
-   * `source` 用来区分两种“参数变了”：
-   * - `'prepare'` 发起的，参数变了是真冲突，要报错（调用方明确指定了
-   *   一套参数，却被另一套接管）
-   * - `'vite'` 发起的，参数变了只是 Vite 又跑了一次 `resolveConfig`
-   *   （嵌套构建、`build()` 复用一个插件实例、用户换了 root 或平台），
-   *   这种情况下重建上下文，和这个钩子以前的行为一致
-   */
-  let initialization: {
+  interface Parameters {
     root: string
     platform: string
     platformSuffix: boolean
-    source: InitializationSource
+  }
+  interface Initialization {
+    params: Parameters
+    context: PageContext
     promise: Promise<UniPagesPlugin>
-  } | undefined
+    prepared: boolean
+    ready: boolean
+    vite: boolean
+    watching: boolean
+    buildWatcher?: FSWatcher
+    closing?: Promise<void>
+  }
+  let initialization: Initialization | undefined
+  let preparedParams: Parameters | undefined
 
   // 保留普通用法的同步占位；推导目录不存在时跳过占位，不在可能错误的
   // 根目录创建目录。这里的 root 只能从 VITE_ROOT_DIR 或 cwd 猜，真正的
@@ -84,19 +82,27 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
       if (typeof options?.platformSuffix !== 'boolean') {
         return Promise.reject(new TypeError('[vite-plugin-uni-pages] prepare() requires an explicit boolean platformSuffix option.'))
       }
-      return initialize(options.root ?? process.env.VITE_ROOT_DIR ?? process.cwd(), options.platformSuffix, 'prepare')
+      try {
+        return initialize(options.root ?? process.env.VITE_ROOT_DIR ?? process.cwd(), options.platformSuffix, 'prepare').promise
+      }
+      catch (error) {
+        return Promise.reject(error)
+      }
     },
     /**
      * Vite configResolved 钩子
      * 初始化 PageContext，设置 logger，生成初始 pages.json
      */
     async configResolved(config) {
-      await initialize(config.root, config.plugins.some(v => v.name === 'vite-plugin-uni-platform'), 'vite')
-
-      if (config.command === 'build') {
-        if (config.build.watch) {
-          const lockDirectory = normalizeConfigPath(`${ctx.resolvedPagesJSONPath}.lock`, config.root)
-          buildWatcher = chokidar.watch([], {
+      const state = initialize(config.root, config.plugins.some(v => v.name === 'vite-plugin-uni-platform'), 'vite')
+      state.watching = config.command === 'build' && !!config.build.watch
+      try {
+        await state.promise
+        if (state.closing)
+          throw new Error('[vite-plugin-uni-pages] The pages context was closed during initialization.')
+        if (state.watching) {
+          const lockDirectory = normalizeConfigPath(`${state.context.resolvedPagesJSONPath}.lock`, config.root)
+          state.buildWatcher = chokidar.watch([], {
             ignoreInitial: true,
             // 配置依赖按解析后的路径注册，目录恢复观察不递归跟随页面链接
             followSymlinks: false,
@@ -106,18 +112,21 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
                 || absolute === lockDirectory || absolute.startsWith(`${lockDirectory}/`)
             },
           })
-          await ctx.setupWatcher(buildWatcher)
+          await state.context.setupWatcher(state.buildWatcher)
         }
+      }
+      catch (error) {
+        await release(state)
+        throw error
       }
     },
     async closeWatcher() {
-      await ctx?.disposeWatchers()
-      await buildWatcher?.close()
-      buildWatcher = undefined
+      if (initialization)
+        await release(initialization)
     },
     async closeBundle() {
-      if (!buildWatcher)
-        await ctx?.disposeWatchers()
+      if (initialization && !initialization.watching)
+        await release(initialization)
     },
     /**
      * 代码转换钩子
@@ -163,7 +172,7 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
      * 设置文件监听与 HMR 支持
      */
     configureServer(server) {
-      ctx.setupViteServer(server)
+      initialization?.context.setupViteServer(server)
     },
     /**
      * 模块解析钩子
@@ -179,57 +188,85 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
      */
     load(id) {
       if (id === RESOLVED_MODULE_ID_VIRTUAL)
-        return ctx.virtualModule()
+        return initialization?.context.virtualModule()
     },
   }
 
-  function initialize(root: string, platformSuffix: boolean, source: InitializationSource): Promise<UniPagesPlugin> {
+  function initialize(root: string, platformSuffix: boolean, source: 'prepare' | 'vite'): Initialization {
     const resolvedRoot = normalizePath(path.resolve(root))
     const platform = process.env.UNI_PLATFORM
     if (!platform) {
-      return Promise.reject(new Error('[vite-plugin-uni-pages] UNI_PLATFORM must be set before initializing pages. Run through the uni-app CLI or set the compilation platform before calling the plugin.'))
+      throw new Error('[vite-plugin-uni-pages] UNI_PLATFORM must be set before initializing pages. Run through the uni-app CLI or set the compilation platform before calling the plugin.')
     }
+    const params = { root: resolvedRoot, platform, platformSuffix }
+    if (initialization?.closing || (source === 'vite' && initialization?.vite))
+      throw new Error('[vite-plugin-uni-pages] This plugin instance already has an active Vite session. Wait for it to close, or create a separate UniPages() instance for overlapping builds and servers.')
 
+    const expected = preparedParams ?? initialization?.params
+    const mismatched = expected && (Object.keys(params) as (keyof Parameters)[]).find(key => expected[key] !== params[key])
+    if (mismatched)
+      throw new Error(`[vite-plugin-uni-pages] ${mismatched} does not match the initialized pages context. Use the same root, UNI_PLATFORM and UniPlatform setting for prepare() and Vite.`)
     if (initialization) {
-      const params = { root: resolvedRoot, platform, platformSuffix }
-      const mismatched = (Object.entries(params) as [keyof typeof params, string | boolean][]).find(([key, value]) => initialization![key] !== value)?.[0]
-
-      if (!mismatched)
-        return initialization.promise
-
-      // 已经跑完、且两边都不是 prepare() 发起的：Vite 自己又配了一次，
-      // 按新参数重建。以前的代码每次 configResolved 都新建上下文，
-      // 这里恢复那个行为
-      if (initialization.source === 'vite' && source === 'vite') {
-        initialization = undefined
+      if (source === 'prepare') {
+        initialization.prepared = true
+        if (initialization.ready)
+          preparedParams = params
       }
       else {
-        return Promise.reject(new Error(`[vite-plugin-uni-pages] ${mismatched} does not match the initialized pages context. Use the same root, UNI_PLATFORM and UniPlatform setting for prepare() and Vite.`))
+        initialization.vite = true
       }
+      return initialization
     }
-
-    const state = {
-      root: resolvedRoot,
-      platform,
-      platformSuffix,
-      source,
+    const context = new PageContext(userOptions, resolvedRoot, platform)
+    context.withUniPlatform = platformSuffix
+    context.setLogger(createLogger(undefined, { prefix: '[vite-plugin-uni-pages]' }))
+    const state: Initialization = {
+      params,
+      context,
+      prepared: source === 'prepare',
+      ready: false,
+      vite: source === 'vite',
+      watching: false,
       // 先保存进行中状态，再开始生成，重复调用共享一次初始化
       promise: Promise.resolve().then(async () => {
-        const context = new PageContext(userOptions, resolvedRoot, platform)
-        context.withUniPlatform = platformSuffix
-        context.setLogger(createLogger(undefined, { prefix: '[vite-plugin-uni-pages]' }))
         await context.updatePagesJSON()
-        ctx = context
+        if (state.closing)
+          throw new Error('[vite-plugin-uni-pages] The pages context was closed during initialization.')
+        state.ready = true
+        if (state.prepared)
+          preparedParams = params
         return plugin
-      }).catch((error) => {
-        // 失败的上下文可能已有部分缓存，重试时重新创建
-        if (initialization === state)
+      }).catch(async (error) => {
+        await context.disposeWatchers()
+        if (initialization === state && !state.closing)
           initialization = undefined
         throw error
       }),
     }
     initialization = state
-    return state.promise
+    return state
+  }
+
+  function release(state: Initialization): Promise<void> {
+    if (!state.closing) {
+      const disposing = state.context.disposeWatchers()
+      state.closing = (async () => {
+        try {
+          await disposing
+        }
+        finally {
+          await state.promise.catch(() => {})
+          try {
+            await state.buildWatcher?.close()
+          }
+          finally {
+            if (initialization === state)
+              initialization = undefined
+          }
+        }
+      })()
+    }
+    return state.closing
   }
 
   return plugin
