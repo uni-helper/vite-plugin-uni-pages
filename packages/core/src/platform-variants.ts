@@ -20,8 +20,9 @@ import type { CommentArray, CommentLineToken, CommentObject, CommentSymbol } fro
  * 5. 覆盖平台并集才裸输出：没被包裹的条目所有平台都看得见，覆盖面
  *    小的变体必须包进 #ifdef，免得漏进其他平台的构建产物（比较
  *    platformStr 与并集串，在两侧的渲染处执行）
- * 6. 配置覆盖全部既有条目时按配置顺序输出：声明顺序是权威顺序，每
- *    次运行把文件归位、不依赖构建历史；没覆盖时保持磁盘序，避免两
+ * 6. 配置顺序优先摆放条目：配置覆盖全部既有条目时整个列表按配置顺
+ *    序输出；没覆盖时只把本次新增的条目插到它在配置里最近的前一个
+ *    条目之后，既有条目保持磁盘序——既让新增条目不垫底，也不会让两
  *    端构建来回翻转（{@link orderVariantLists}）。是否启用由调用方
  *    决定：目前只有 tabBar list 启用——tab 顺序是用户直接可见的顺
  *    序；pages 数组另有「首页变体提到最前」的子系统（各平台可以声
@@ -118,6 +119,22 @@ export function sortVariants<P>(variants: PlatformVariant<P>[]): void {
 }
 
 /**
+ * {@link orderVariantLists} 的输入选项
+ */
+export interface OrderVariantListsOptions {
+  /**
+   * 本次合并前磁盘上已有的键，用于识别新增键。省略时视为所有键都
+   * 已存在，即不做新增键落位
+   */
+  existingKeys?: ReadonlySet<string>
+  /**
+   * 磁盘上原有键的顺序，可包含即将被本次配置加回来的旧键。省略时
+   * 使用 mergedMap 的迭代顺序
+   */
+  diskOrder?: readonly string[]
+}
+
+/**
  * 决定变体列表的输出顺序（规则 6）
  *
  * 此前条目一律按磁盘上的旧顺序输出、配置里新增的条目追加到末尾：
@@ -125,45 +142,69 @@ export function sortVariants<P>(variants: PlatformVariant<P>[]): void {
  * （比如某平台把一个新条目声明在 tabBar 第二位，生成的文件里却垫
  * 着底，该平台编译剥掉注释后实际顺序就是错的）。
  *
- * 只有本次配置声明了全部既有键时才按配置顺序重排：这时配置就是全量
- * 超集，它声明的顺序是唯一已知的权威顺序，每次运行都会把文件归位。
- * 注意：两个平台的配置都声明了全部键但顺序不同时，文件跟随最后写入
- * 者的顺序——每次构建产物各自正确（各自平台剥掉注释后的顺序就是它
- * 自己配置的顺序），共享文件则与平台收敛行为一样由最后写入者定稿。
- * 配置没覆盖全部键时（某平台没有另一些平台的条目，谁也不知道完整顺
- * 序）保持磁盘序——强行重排会让两端构建来回翻转。
+ * 排序分两种情况：
+ * - 配置声明了全部既有键：这是全量超集，声明顺序是唯一已知的权威
+ *   顺序，整个列表按配置顺序输出
+ * - 配置没有覆盖全部键（其他平台有本平台不认识的条目，谁也不知道
+ *   完整顺序）：既有键保持磁盘序，只把本次新增的键插到它前面最近
+ *   的、已在输出里的声明键之后；没有这样的前驱就放到最前。既有键
+ *   之间的相对顺序永不变动，所以两端构建不会来回翻转
  *
- * @param mergedMap - 键 → 变体列表的合并结果
+ * 两个平台的配置都覆盖全部键但顺序不同时，共享文件跟随最后写入者。
+ * 条目内容相同而合并成一条时没有按平台区分的副本，另一个正在运行
+ * 的平台在下一次生成前可能读到对方顺序；并发开发时建议各平台保持
+ * 一致的完整 tab 顺序。
+ *
+ * @param mergedMap - 键 → 变体列表的合并结果。迭代顺序一般是磁盘序，
+ * 但被跳过的当前平台旧条目会追加到末尾，需要靠 options.diskOrder 修正
  * @param declaredKeys - 本次配置声明的键，按配置顺序，可含新增键；
- * 传 null 表示不启用配置序重排，保持磁盘序
+ * 传 null 表示不启用配置序摆放，保持磁盘序
+ * @param options - 已有键与磁盘序，见 {@link OrderVariantListsOptions}
  * @returns 按输出顺序排列的变体列表（mergedMap 中列表的原引用）
  */
-export function orderVariantLists<P, V extends PlatformVariant<P> = PlatformVariant<P>>(mergedMap: Map<string, V[]>, declaredKeys: string[] | null): V[][] {
-  if (mergedMap.size === 0)
-    return []
+export function orderVariantLists<P, V extends PlatformVariant<P> = PlatformVariant<P>>(mergedMap: Map<string, V[]>, declaredKeys: string[] | null, options: OrderVariantListsOptions = {}): V[][] {
+  const diskOrder = [...mergedMap.keys()]
+  if (mergedMap.size === 0 || declaredKeys === null)
+    return diskOrder.map(key => mergedMap.get(key)!)
 
-  if (declaredKeys === null)
-    return [...mergedMap.values()]
+  // 去重并丢掉不在合并结果里的键：调用方传入的键应该都存在，这里
+  // 只让顺序计算不依赖调用方的额外保证
+  const declared = [...new Set(declaredKeys)].filter(key => mergedMap.has(key))
+  const declaredSet = new Set(declared)
 
-  // 配置没有声明全部既有键：保持磁盘序
-  const declared = new Set(declaredKeys)
-  if (![...mergedMap.keys()].every(key => declared.has(key)))
-    return [...mergedMap.values()]
+  // 配置覆盖全部既有键：整体按配置顺序输出
+  if (diskOrder.every(key => declaredSet.has(key)))
+    return declared.map(key => mergedMap.get(key)!)
 
-  // 按配置顺序取变体列表；配置新增的键自然落在它声明的位置上。
-  // 去重与 if (list) 是防御：唯一调用点已用 Set 去重、upsert 也保证
-  // 声明过的键都注册进了 map，正常流程走不到这两个分支
-  const lists: V[][] = []
-  const seen = new Set<string>()
-  for (const key of declaredKeys) {
-    if (seen.has(key))
+  // 部分覆盖：既有键保持磁盘序，只落位本次新增的键。磁盘序要包含
+  // 那些在合并时被跳过、随后又被本次配置加回来的旧键，它们的原始
+  // 位置不能丢（否则每次重跑都会把它们甩到末尾，文件来回翻转）
+  const existing = options.existingKeys ?? new Set(diskOrder)
+  const ordered = (options.diskOrder ?? diskOrder).filter(key => existing.has(key) && mergedMap.has(key))
+  const placed = new Set(ordered)
+  for (const [index, key] of declared.entries()) {
+    if (placed.has(key))
       continue
-    seen.add(key)
-    const list = mergedMap.get(key)
-    if (list)
-      lists.push(list)
+    // 找配置里前面最近的、已经在输出里的键作为锚点
+    let anchor = -1
+    for (let i = index - 1; i >= 0; i--) {
+      const candidate = ordered.indexOf(declared[i])
+      if (candidate !== -1) {
+        anchor = candidate
+        break
+      }
+    }
+    ordered.splice(anchor + 1, 0, key)
+    placed.add(key)
   }
-  return lists
+  // 补上因输入不一致而没排到的键，保证不丢条目
+  for (const key of diskOrder) {
+    if (!placed.has(key)) {
+      ordered.push(key)
+      placed.add(key)
+    }
+  }
+  return ordered.map(key => mergedMap.get(key)!)
 }
 
 /**
