@@ -8,6 +8,7 @@ import { bundleRequire } from 'bundle-require'
 import { loadConfig } from 'unconfig'
 import { normalizePath } from 'vite'
 import { configRuntimeSource, transformConfigSource } from './config-source'
+import { debug } from './logger'
 
 const scriptExtensions = /\.[cm]?[jt]sx?$/
 /** 目录恢复监听接受的文件类型；已知配置入口与依赖不受此限制 */
@@ -64,7 +65,13 @@ export function configWatchDirectory(filepath: string): string {
   return normalizePath(directory)
 }
 
-/** 判断路径是否位于加载器专用产物目录 */
+/**
+ * 判断路径是否位于加载器专用产物目录内
+ *
+ * @param filepath 待判断的绝对路径，应已通过 {@link normalizeConfigPath} 归一化
+ * @param directory 专用产物目录的绝对路径；目录本身也算产物
+ * @returns 位于目录内时返回 true，相邻前缀或父路径返回 false
+ */
 export function isConfigLoaderArtifact(filepath: string, directory: string): boolean {
   const relative = path.relative(directory, filepath)
   return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
@@ -280,7 +287,14 @@ export class PagesConfigLoader {
       throw error
     }
     finally {
-      await rm(bundleDirectory, { recursive: true, force: true })
+      // 清理失败不能改变本次加载的结果，也不能覆盖原始错误；残留目录仍被
+      // 产物身份过滤排除，不会进入输入索引或监听
+      try {
+        await rm(bundleDirectory, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 })
+      }
+      catch (error) {
+        debug.error('Failed to remove config loader directory %s:', bundleDirectory, error)
+      }
     }
   }
 }
