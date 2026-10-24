@@ -125,19 +125,20 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
       if (state?.command !== 'build')
         return
       // watcher 关闭后旧构建仍可能继续，钩子须保留原会话的归属
-      const hooks: Pick<UniPagesPlugin, 'load' | 'closeWatcher' | 'closeBundle'> = {
+      const hooks: Pick<UniPagesPlugin, 'options' | 'load' | 'closeWatcher' | 'closeBundle'> = {
+        options: undefined,
         load: id => loadVirtualModule(state, id),
         closeWatcher: () => release(state),
         closeBundle: () => state.watching ? undefined : release(state),
       }
       const plugins = Array.isArray(options.plugins) ? options.plugins : [options.plugins]
-      return {
-        ...options,
+      // watcher 各轮共享此数组，原地替换使关闭前已排队的下一轮也保留归属
+      plugins.forEach((candidate, index) => {
         // Vite 的 SSR 构建会复制插件并包装转换钩子，options 函数保留原身份
-        plugins: plugins.map(candidate => candidate && typeof candidate === 'object' && 'options' in candidate && candidate.options === plugin.options
-          ? { ...candidate, ...hooks }
-          : candidate),
-      }
+        if (candidate && typeof candidate === 'object' && 'options' in candidate && candidate.options === plugin.options)
+          plugins[index] = { ...candidate, ...hooks }
+      })
+      return { ...options, plugins }
     },
     async closeWatcher() {
       if (initialization)

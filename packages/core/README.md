@@ -1008,7 +1008,7 @@ node_modules/.cache/uni-pages/
 1. **插件工厂调用**（同步）— 预检 `pages.json` 是否存在且合法（此时 `config.root` 未知，回退到 `VITE_ROOT_DIR` / `process.cwd()` 解析路径）
 2. **`configResolved`**（异步）— 占用当前实例，创建 `PageContext` 或接管匹配的 `prepare()` 结果，检测是否与 `vite-plugin-uni-platform` 协同，完成首次 pages.json 生成；`build --watch` 模式下另建 watcher，接收配置文件事件与页面目录结构通知，同时启动自有页面监听器
 3. **`configureServer`**（dev）— 从 Vite 的 `server.watcher` 接收配置文件及其依赖的事件和页面目录结构通知，并按 Vite 的监听开关、忽略规则和轮询设置启动自有页面监听器；产物更新后失效虚拟模块并通知浏览器 full-reload
-4. **`options`**（build）— 将本插件的虚拟模块与关闭钩子绑定到当前会话，供 Rollup 构建使用；已关闭构建的迟到钩子仍属于原会话
+4. **`options`**（build）— 将本插件的虚拟模块与关闭钩子绑定到当前会话，供 Rollup 构建使用；watcher 各轮沿用该绑定，已关闭构建的迟到钩子及已排队轮次仍属于原会话
 5. **`transform`** — 从 vue / nvue / uvue 文件中移除 `definePage` 宏调用，避免运行时报错
 6. **`resolveId` / `load`** — 提供 `virtual:uni-pages` 虚拟模块，暴露所有页面元数据
 7. **`closeWatcher` / `closeBundle`** — 普通构建和 dev 的 `closeBundle`、构建监听的 `closeWatcher` 结束会话；构建监听每轮 `closeBundle` 保留会话。结束时解绑共享 watcher 回调、关闭自有 watcher 并排空已开始的生成，完成后释放实例占用和当前上下文；共享 watcher 由 Vite 关闭
