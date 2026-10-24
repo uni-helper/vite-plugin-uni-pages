@@ -300,6 +300,51 @@ describe('插件实例生命周期', () => {
     expect(parser).toHaveBeenCalledTimes(2)
   })
 
+  it('初始化清理失败时保留原始错误，修复后可以重试', async () => {
+    const root = fixture()
+    const parser = vi.fn()
+      .mockRejectedValueOnce(new Error('配置加载失败'))
+      .mockResolvedValue({ globalStyle: { navigationBarTitleText: '恢复后' } })
+    const pages = UniPages({ configSource: { files: 'pages.config.json', extensions: [], parser } })
+    const dispose = PageContext.prototype.disposeWatchers
+    vi.spyOn(PageContext.prototype, 'disposeWatchers').mockImplementationOnce(async function (this: PageContext) {
+      await dispose.call(this)
+      throw new Error('清理失败')
+    })
+
+    await expect(buildRoutes(root, pages)).rejects.toThrow('配置加载失败')
+    expectOutput(root, await buildRoutes(root, pages), '恢复后', ['pages/index', 'pages/removed'])
+    expect(parser).toHaveBeenCalledTimes(2)
+  })
+
+  it('关闭时资源释放失败只记录错误，不阻止顺序复用', async () => {
+    const root = fixture()
+    const pages = UniPages()
+    const dispose = vi.spyOn(PageContext.prototype, 'disposeWatchers').mockRejectedValueOnce(new Error('清理失败'))
+
+    expectOutput(root, await buildRoutes(root, pages), '第一轮', ['pages/index', 'pages/removed'])
+    expectOutput(root, await buildRoutes(root, pages), '第一轮', ['pages/index', 'pages/removed'])
+    expect(dispose).toHaveBeenCalled()
+  })
+
+  it('建图前失败的实例保持占用，换用新实例可以继续', async () => {
+    const root = fixture()
+    const pages = UniPages()
+    // Vite 在建图前失败时不会调用本插件的关闭钩子；README 记录了该边界
+    await expect(build({
+      ...config(root, pages),
+      plugins: [pages, {
+        name: 'fail-after-config-resolved',
+        configResolved() {
+          throw new Error('建图前失败')
+        },
+      }],
+    })).rejects.toThrow('建图前失败')
+    await expect(buildRoutes(root, pages)).rejects.toThrow(/active|already|overlap/i)
+
+    expectOutput(root, await buildRoutes(root, UniPages()), '第一轮', ['pages/index', 'pages/removed'])
+  })
+
   it.each(['closeBundle', 'closeWatcher'] as const)('初始化期间调用 %s 会等待释放，且不再启动监听', async (closingHook) => {
     const root = fixture()
     const entered = deferred()

@@ -219,7 +219,7 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
     }
     const params = { root: resolvedRoot, platform, platformSuffix }
     if (initialization?.closing || (source !== 'prepare' && initialization?.command))
-      throw new Error('[vite-plugin-uni-pages] This plugin instance already has an active Vite session. Wait for it to close, or create a separate UniPages() instance for overlapping builds and servers.')
+      throw new Error('[vite-plugin-uni-pages] This plugin instance already has an active Vite session. Wait for it to close, or create a separate UniPages() instance for overlapping builds and servers. If Vite exited before starting Rollup or the dev server, this instance cannot be released either.')
 
     const expected = preparedParams ?? initialization?.params
     const mismatched = expected && (Object.keys(params) as (keyof InitializationParams)[]).find(key => expected[key] !== params[key])
@@ -256,9 +256,17 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
           preparedParams = params
         return plugin
       }).catch(async (error) => {
-        await context.disposeWatchers()
-        if (initialization === state && !state.closing)
-          initialization = undefined
+        // 清理失败不能覆盖原始生成错误，也不能阻止失败后的重试
+        try {
+          await context.disposeWatchers()
+        }
+        catch (cleanupError) {
+          reportReleaseFailure(state, cleanupError)
+        }
+        finally {
+          if (initialization === state && !state.closing)
+            initialization = undefined
+        }
         throw error
       }),
     }
@@ -274,6 +282,16 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
     return state.context.virtualModule()
   }
 
+  /** 记录释放失败；关闭流程不因清理错误失败 */
+  function reportReleaseFailure(state: Initialization, error: unknown): void {
+    state.context.logger?.error(`Failed to release the pages context: ${error instanceof Error ? error.message : error}`, { timestamp: true, error: error instanceof Error ? error : undefined })
+  }
+
+  /**
+   * 释放当前会话
+   *
+   * @description 解绑监听、等待已开始的生成并关闭构建 watcher；清理错误只记录，完成后释放实例占用
+   */
   function release(state: Initialization): Promise<void> {
     if (!state.closing) {
       const disposing = state.context.disposeWatchers()
@@ -281,10 +299,17 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
         try {
           await disposing
         }
+        catch (error) {
+          // 释放失败只记录，不能覆盖构建结果或初始化错误，也不能阻止后续重试
+          reportReleaseFailure(state, error)
+        }
         finally {
           await state.promise.catch(() => {})
           try {
             await state.buildWatcher?.close()
+          }
+          catch (error) {
+            reportReleaseFailure(state, error)
           }
           finally {
             if (initialization === state)
