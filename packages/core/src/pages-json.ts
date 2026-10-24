@@ -584,7 +584,7 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
   // 判断“新增键”必须用它而不是合并后的 map：只属于当前平台的旧条目在
   // 下面会被跳过，之后又被本次配置加回来，但它不是新增条目，不能跟着
   // 配置挪位置
-  const sourceOrder = orderByConfig ? { keys: new Set<string>(), order: [] as string[] } : undefined
+  const sourceOrder = orderByConfig ? { seen: new Set<string>(), order: [] as string[] } : undefined
   // 取这个键的变体列表，没有就建一个并注册进 mergedMap
   const variantsOf = (uniqueKey: string): MultiPlatformItem<T>[] => {
     const list = mergedMap.get(uniqueKey) || []
@@ -599,8 +599,8 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
     if (!uniqueKey) {
       continue
     }
-    if (sourceOrder && !sourceOrder.keys.has(uniqueKey)) {
-      sourceOrder.keys.add(uniqueKey)
+    if (sourceOrder && !sourceOrder.seen.has(uniqueKey)) {
+      sourceOrder.seen.add(uniqueKey)
       sourceOrder.order.push(uniqueKey)
     }
 
@@ -653,9 +653,9 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
     variantsOf(uniqueKey).push({ payload: item, valueStr: stringifyForCompare(item), platforms, platformStr: platforms.join(' || ') })
   }
 
-  // 记下磁盘上已有的键与顺序：部分覆盖时只给真正新增的键落位，既有
+  // 记下磁盘上已有键的顺序：部分覆盖时只给真正新增的键落位，既有
   // 键保持磁盘序（规则 6）
-  const orderOptions = sourceOrder ? { existingKeys: sourceOrder.keys, diskOrder: sourceOrder.order } : undefined
+  const orderOptions = sourceOrder ? { diskOrder: sourceOrder.order } : undefined
 
   // 3. 把本次扫描的条目合并进 mergedMap
   // 扫描条目上的 `type` 标记按设计保留（后面运行里 ensureHomePageFirst

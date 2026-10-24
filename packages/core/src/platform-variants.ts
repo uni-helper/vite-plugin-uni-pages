@@ -123,13 +123,8 @@ export function sortVariants<P>(variants: PlatformVariant<P>[]): void {
  */
 export interface OrderVariantListsOptions {
   /**
-   * 本次合并前磁盘上已有的键，用于识别新增键。省略时视为所有键都
-   * 已存在，即不做新增键落位
-   */
-  existingKeys?: ReadonlySet<string>
-  /**
-   * 磁盘上原有键的顺序，可包含即将被本次配置加回来的旧键。省略时
-   * 使用 mergedMap 的迭代顺序
+   * 本次合并前磁盘上已有键的顺序，可包含即将被本次配置加回来的旧键。
+   * 省略时视为所有键都已存在，并使用 mergedMap 的迭代顺序
    */
   diskOrder?: readonly string[]
 }
@@ -159,7 +154,7 @@ export interface OrderVariantListsOptions {
  * 但被跳过的当前平台旧条目会追加到末尾，需要靠 options.diskOrder 修正
  * @param declaredKeys - 本次配置声明的键，按配置顺序，可含新增键；
  * 传 null 表示不启用配置序摆放，保持磁盘序
- * @param options - 已有键与磁盘序，见 {@link OrderVariantListsOptions}
+ * @param options - 磁盘上已有键的顺序，见 {@link OrderVariantListsOptions}
  * @returns 按输出顺序排列的变体列表（mergedMap 中列表的原引用）
  */
 export function orderVariantLists<P, V extends PlatformVariant<P> = PlatformVariant<P>>(mergedMap: Map<string, V[]>, declaredKeys: string[] | null, options: OrderVariantListsOptions = {}): V[][] {
@@ -179,8 +174,8 @@ export function orderVariantLists<P, V extends PlatformVariant<P> = PlatformVari
   // 部分覆盖：既有键保持磁盘序，只落位本次新增的键。磁盘序要包含
   // 那些在合并时被跳过、随后又被本次配置加回来的旧键，它们的原始
   // 位置不能丢（否则每次重跑都会把它们甩到末尾，文件来回翻转）
-  const existing = options.existingKeys ?? new Set(diskOrder)
-  const ordered = (options.diskOrder ?? diskOrder).filter(key => existing.has(key) && mergedMap.has(key))
+  const existingOrder = options.diskOrder ?? diskOrder
+  const ordered = existingOrder.filter(key => mergedMap.has(key))
   const placed = new Set(ordered)
   for (const [index, key] of declared.entries()) {
     if (placed.has(key))

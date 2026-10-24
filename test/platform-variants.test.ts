@@ -107,7 +107,7 @@ describe('orderVariantLists', () => {
     ])
 
     // b 插到声明里的前驱 a 之后，既有键 a、x、c 保持磁盘序
-    expect(orderVariantLists(mergedMap, ['a', 'b', 'c'], { existingKeys: new Set(['a', 'x', 'c']) }).map(list => list[0].payload)).toEqual([
+    expect(orderVariantLists(mergedMap, ['a', 'b', 'c'], { diskOrder: ['a', 'x', 'c'] }).map(list => list[0].payload)).toEqual([
       { v: 'a' },
       { v: 'b' },
       { v: 'x' },
@@ -125,7 +125,7 @@ describe('orderVariantLists', () => {
     ])
 
     // b 落在 a 之后，d 落在 c 之后；新增键之间仍按配置顺序
-    expect(orderVariantLists(mergedMap, ['a', 'b', 'c', 'd'], { existingKeys: new Set(['a', 'x', 'c']) }).map(list => list[0].payload)).toEqual([
+    expect(orderVariantLists(mergedMap, ['a', 'b', 'c', 'd'], { diskOrder: ['a', 'x', 'c'] }).map(list => list[0].payload)).toEqual([
       { v: 'a' },
       { v: 'b' },
       { v: 'x' },
@@ -143,7 +143,7 @@ describe('orderVariantLists', () => {
     ])
 
     // 配置漏掉 x，覆盖不了全部键：对既有键的重排不生效，磁盘序稳定
-    expect(orderVariantLists(mergedMap, ['c', 'b', 'a'], { existingKeys: new Set(['a', 'x', 'b', 'c']) }).map(list => list[0].payload)).toEqual([
+    expect(orderVariantLists(mergedMap, ['c', 'b', 'a'], { diskOrder: ['a', 'x', 'b', 'c'] }).map(list => list[0].payload)).toEqual([
       { v: 'a' },
       { v: 'x' },
       { v: 'b' },
@@ -160,7 +160,7 @@ describe('orderVariantLists', () => {
 
     // 配置只有 a、c（b 属于其它平台），也没有新增键：保持磁盘序，
     // 避免两端构建来回翻转
-    expect(orderVariantLists(mergedMap, ['a', 'c'], { existingKeys: new Set(['a', 'b', 'c']) }).map(list => list[0].payload)).toEqual([{ v: 'a' }, { v: 'b' }, { v: 'c' }])
+    expect(orderVariantLists(mergedMap, ['a', 'c'], { diskOrder: ['a', 'b', 'c'] }).map(list => list[0].payload)).toEqual([{ v: 'a' }, { v: 'b' }, { v: 'c' }])
   })
 
   it('keeps the disk position of a key that was skipped and re-added', () => {
@@ -172,10 +172,7 @@ describe('orderVariantLists', () => {
       ['b', [variant(['H5'], 'b', { v: 'b' })]],
     ])
 
-    expect(orderVariantLists(mergedMap, ['a', 'c'], {
-      existingKeys: new Set(['a', 'b', 'c']),
-      diskOrder: ['a', 'b', 'c'],
-    }).map(list => list[0].payload)).toEqual([{ v: 'a' }, { v: 'b' }, { v: 'c' }])
+    expect(orderVariantLists(mergedMap, ['a', 'c'], { diskOrder: ['a', 'b', 'c'] }).map(list => list[0].payload)).toEqual([{ v: 'a' }, { v: 'b' }, { v: 'c' }])
   })
 
   it('keeps variant groups and their internal order intact when keys are reordered', () => {
