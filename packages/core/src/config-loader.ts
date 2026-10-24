@@ -200,7 +200,8 @@ export class PagesConfigLoader {
         cwd: this.root,
         format: 'esm',
         tsconfig: false,
-        preserveTemporaryFile: false,
+        // 由加载器统一清理独占目录，避免依赖的单文件删除错误覆盖求值结果
+        preserveTemporaryFile: true,
         getOutputFile: () => path.join(bundleDirectory, 'config.mjs'),
         // 外部包先按原导入位置解析，避免临时产物改变 node_modules 查找起点
         notExternal: [/.*/],

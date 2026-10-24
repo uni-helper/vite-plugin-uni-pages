@@ -62,6 +62,8 @@ export class PageContext {
   /** 生成物（pages.json、d.ts）的绝对路径，只在首次事件时算一次 */
   private generatedPathsCache: string[] | undefined
   private pendingUpdate: Promise<void> = Promise.resolve()
+  private disposed = false
+  private disposal: Promise<void> | undefined
   /** 随扫描更新的 Page 来源，用于复用检查和冲突诊断 */
   private readonly pageSources = new WeakMap<Page, PageSource>()
   /** 扫描候选独立于归属裁剪后的输出映射，保留非代表来源的内容缓存 */
@@ -216,7 +218,7 @@ export class PageContext {
    * @param server - Vite 开发服务器实例
    */
   setupViteServer(server: ViteDevServer): void {
-    if (this._server === server)
+    if (this.disposed || this._server === server)
       return
 
     this._server = server
@@ -255,7 +257,7 @@ export class PageContext {
    * @param watcher - 配置文件及目录结构事件使用的 chokidar 监听器
    */
   async setupWatcher(watcher: FSWatcher): Promise<void> {
-    if (this.watchers.has(watcher))
+    if (this.disposed || this.watchers.has(watcher))
       return
 
     const onConfigFile = (filepath: string): void => {
@@ -325,7 +327,7 @@ export class PageContext {
    * 能力，不能阻断页面生成，也不能留下未处理的拒绝
    */
   private startPageWatcher(): void {
-    if (!this.pageWatcherStart)
+    if (this.disposed || !this.pageWatcherStart)
       return
     try {
       this.pageWatcher.start(this.pageWatcherStart.options, this.pageWatcherStart.ignored)
@@ -335,8 +337,17 @@ export class PageContext {
     }
   }
 
-  /** 解绑本插件回调；共享 watcher 的关闭仍由 Vite 负责 */
+  /**
+   * 释放本上下文的监听与待处理更新
+   *
+   * @description 关闭后不再接受监听注册或更新；已开始的生成会完成，重复调用等待同一次释放
+   * 共享 watcher 的关闭仍由 Vite 负责
+   */
   async disposeWatchers(): Promise<void> {
+    if (this.disposal)
+      return this.disposal
+    this.disposed = true
+    this.pendingPageUpdate = undefined
     for (const dispose of this.watchers.values())
       dispose()
     this.watchers.clear()
@@ -344,9 +355,16 @@ export class PageContext {
     this.watchedConfigIndex.clear()
     this._server = undefined
     this.pageWatcherStart = undefined
-    await this.pageWatcher.close()
-    await this.pendingPageFlush
-    await this.pendingUpdate
+    this.disposal = (async () => {
+      try {
+        await this.pageWatcher.close()
+      }
+      finally {
+        await this.pendingPageFlush
+        await this.pendingUpdate
+      }
+    })()
+    return this.disposal
   }
 
   /** 补充未覆盖的监听路径，注册成功后记账，失败时保留重试机会 */
@@ -406,7 +424,7 @@ export class PageContext {
   /** 配置变化的完整更新：失败只记录，不让 Promise 拒绝 */
   private async updatePagesAndNotify(): Promise<void> {
     try {
-      if (await this.updatePagesJSON())
+      if (await this.updatePagesJSON() && !this.disposed)
         this.onUpdate()
     }
     catch (error) {
@@ -427,6 +445,8 @@ export class PageContext {
    * @param filepath - 只读取该页面；省略时执行完整扫描
    */
   private queuePageUpdate(filepath?: string): void {
+    if (this.disposed)
+      return
     if (!this.pendingPageUpdate)
       this.pendingPageUpdate = { full: false, files: new Set() }
     if (filepath)
@@ -457,7 +477,7 @@ export class PageContext {
             : files.size === 1
               ? await this.updatePagesJSON([...files][0])
               : await this.enqueuePagesUpdate([...files])
-          if (updated)
+          if (updated && !this.disposed)
             this.onUpdate()
         }
         catch (error) {
@@ -491,7 +511,7 @@ export class PageContext {
    * @description 同一实例的调用按顺序执行；指定页面时尝试增量读取，页面尚未收录或物理身份变化时执行完整刷新
    *
    * @param filepath 变更页面的绝对路径或相对 root 的路径；省略时执行完整刷新
-   * @returns pages.json 写入新内容时为 `true`，内容未变或跳过生成时为 `false`
+   * @returns pages.json 写入新内容时为 `true`，内容未变、上下文已关闭或跳过生成时为 `false`
    * @throws 生成、写入或声明输出失败时拒绝；声明输出失败前 pages.json 可能已更新
    */
   async updatePagesJSON(filepath?: string): Promise<boolean> {
@@ -499,7 +519,9 @@ export class PageContext {
   }
 
   private enqueuePagesUpdate(files?: readonly string[]): Promise<boolean> {
-    const update = this.pendingUpdate.then(() => this.generatePagesJSON(files))
+    if (this.disposed)
+      return Promise.resolve(false)
+    const update = this.pendingUpdate.then(() => this.disposed ? false : this.generatePagesJSON(files))
     this.pendingUpdate = update.then(() => {}, () => {})
     return update
   }

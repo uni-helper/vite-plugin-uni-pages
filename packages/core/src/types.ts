@@ -17,7 +17,11 @@ export interface PrepareOptions {
   platformSuffix: boolean
 }
 
-/** 支持提前生成页面配置的 Vite 插件实例 */
+/**
+ * 支持提前生成页面配置的 Vite 插件实例
+ *
+ * @description 同一实例可在构建或开发服务器关闭后顺序复用；重叠运行的构建和服务器须各自创建实例
+ */
 export interface UniPagesPlugin extends Plugin {
   /**
    * 等待页面配置与已启用的声明文件生成，返回当前插件实例
@@ -25,20 +29,14 @@ export interface UniPagesPlugin extends Plugin {
    * @description
    * - 在创建需要读取 pages.json 的下游插件之前等待此方法完成
    * - 使用调用时的 UNI_PLATFORM；根目录、平台和后缀规则必须与 Vite 初始化一致
-   * - 相同参数的并发或重复调用只初始化一次，失败后可重试
+   * - 当前准备期间相同参数的并发或重复调用共享结果，首次 Vite 接管复用该结果
+   * - Vite 会话关闭后再次调用会重新生成；成功准备过的根目录、平台和后缀约束持续有效
+   * - 生成失败后可重试
    *
-   * @throws 参数冲突、编译平台缺失或生成失败时拒绝 Promise
+   * @throws 参数冲突、编译平台缺失、实例正在关闭或生成失败时拒绝 Promise
    */
   prepare: (options: PrepareOptions) => Promise<UniPagesPlugin>
 }
-
-/**
- * 谁发起了这次初始化。
- *
- * `'prepare'` 是调用方主动指定了一套参数，参数不一致属于错误；`'vite'`
- * 是 Vite 自己跑钩子，参数变了只说明它又配置了一次，按新参数重建即可。
- */
-export type InitializationSource = 'prepare' | 'vite'
 
 /**
  * 从对象类型中排除索引签名键，仅保留显式键

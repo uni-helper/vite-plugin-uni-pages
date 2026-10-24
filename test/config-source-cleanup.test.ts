@@ -23,6 +23,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   fs.rmSync(root, { recursive: true, force: true })
 })
 
@@ -48,5 +50,39 @@ describe('配置加载目录清理失败', () => {
     await expect(load(loader)).rejects.toThrow('config failed')
     expect([...loader.recoveryPaths]).toEqual([normalizeConfigPath(path.join(root, 'pages.config.ts'), root)])
     expect(cacheEntries()).toHaveLength(1)
+  })
+})
+
+describe('配置临时文件由加载器统一清理', () => {
+  it.each([
+    { label: '正常导出', throws: false },
+    { label: '配置抛错', throws: true },
+  ])('$label', async ({ throws }) => {
+    const originalError = new Error('config failed')
+    if (throws) {
+      vi.stubGlobal('__uniPagesConfigCleanupError', originalError)
+      fs.writeFileSync(path.join(root, 'pages.config.ts'), `throw globalThis.__uniPagesConfigCleanupError\nexport default {}`)
+    }
+    const loader = new PagesConfigLoader(root)
+    const unlink = vi.spyOn(fs.promises, 'unlink')
+    remove.mockImplementation(fs.promises.rm)
+
+    // 保留真实打包、求值和目录删除；bundle-require 不单独删除执行产物
+    const result = await load(loader).then(value => ({ value, error: undefined }), error => ({ value: undefined, error }))
+    expect(cacheEntries()).toEqual([])
+    expect(unlink.mock.calls.map(([file]) => path.basename(String(file)))).not.toContain('config.mjs')
+    expect(remove).toHaveBeenCalledExactlyOnceWith(expect.any(String), {
+      recursive: true,
+      force: true,
+      maxRetries: 3,
+      retryDelay: 50,
+    })
+    if (throws) {
+      expect(result.error).toBe(originalError)
+    }
+    else {
+      expect(result.error).toBeUndefined()
+      expect(result.value).toMatchObject({ config: { globalStyle: { navigationBarTitleText: 'loaded' } } })
+    }
   })
 })
