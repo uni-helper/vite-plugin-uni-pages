@@ -1,9 +1,16 @@
 <a href="https://uni-helper.js.org/vite-plugin-uni-pages"><img src="./banner.svg" alt="banner" width="100%"/></a>
 
-<p style="text-align: center">
-  <a href="https://github.com/uni-helper/vite-plugin-uni-pages/stargazers"><img src="https://img.shields.io/github/stars/uni-helper/vite-plugin-uni-pages?colorA=005947&colorB=eee&style=for-the-badge" alt="Stars"></a>
-  <a href="https://npmx.dev/package/@uni-helper/vite-plugin-uni-pages"><img src="https://img.shields.io/npm/dm/@uni-helper/vite-plugin-uni-pages?colorA=005947&colorB=eee&style=for-the-badge" alt="Downloads"></a>
-  <a href="https://npmx.dev/package/@uni-helper/vite-plugin-uni-pages"><img src="https://img.shields.io/npm/v/@uni-helper/vite-plugin-uni-pages?colorA=005947&colorB=eee&style=for-the-badge" alt="NPM Version"></a>
+# vite-plugin-uni-pages
+
+<p align="center">
+  <img src="./logo.svg" alt="logo" width="256" height="256"/>
+</p>
+
+<p align="center">
+  <a href="https://github.com/uni-helper/vite-plugin-uni-pages/blob/main/LICENSE"><img src="https://img.shields.io/github/license/uni-helper/vite-plugin-uni-pages?style=for-the-badge&labelColor=005947&color=eee" alt="License"></a>
+  <a href="https://github.com/uni-helper/vite-plugin-uni-pages/stargazers"><img src="https://img.shields.io/github/stars/uni-helper/vite-plugin-uni-pages?style=for-the-badge&labelColor=005947&color=eee" alt="Stars"></a>
+  <a href="https://npmx.dev/package/@uni-helper/vite-plugin-uni-pages"><img src="https://img.shields.io/npm/v/@uni-helper/vite-plugin-uni-pages?style=for-the-badge&labelColor=005947&color=eee" alt="NPM Version"></a>
+  <a href="https://npmx.dev/package/@uni-helper/vite-plugin-uni-pages"><img src="https://img.shields.io/npm/dm/@uni-helper/vite-plugin-uni-pages?style=for-the-badge&labelColor=005947&color=eee" alt="NPM Downloads"></a>
 </p>
 <p style="text-align: center">
   <a href="https://github.com/kejunmao"><img src="https://img.shields.io/badge/Author-KeJun-blue?style=for-the-badge" alt="Author"></a>
