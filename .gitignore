@@ -1,6 +1,8 @@
 .cache
 .DS_Store
 .idea
+.netlify
+.wrangler
 *.log
 *.tgz
 coverage

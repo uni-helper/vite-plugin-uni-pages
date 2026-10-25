@@ -1,0 +1,9 @@
+name = "vite-plugin-uni-pages-docs"
+compatibility_date = "2026-10-25"
+
+# VitePress 输出静态文件，无需 Worker 脚本；在仓库根目录执行
+# pnpm docs:build 后，用 wrangler deploy 发布
+[assets]
+directory = "./docs/.vitepress/dist"
+html_handling = "auto-trailing-slash"
+not_found_handling = "404-page"
