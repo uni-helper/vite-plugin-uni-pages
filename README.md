@@ -1,9 +1,9 @@
-<a href="https://uni-helper.js.org/vite-plugin-uni-pages"><img src="./banner.svg" alt="banner" width="100%"/></a>
+<a href="https://uni-helper.js.org/vite-plugin-uni-pages"><img src="https://cdn.jsdelivr.net/gh/uni-helper/viet-plugin-uni-pages@main/banner.svg" alt="banner" width="100%"/></a>
 
 # vite-plugin-uni-pages
 
 <p align="center">
-  <img src="./logo.svg" alt="logo" width="256" height="256"/>
+  <img src="https://cdn.jsdelivr.net/gh/uni-helper/viet-plugin-uni-pages@main/logo.svg" alt="logo" width="256" height="256"/>
 </p>
 
 <p align="center">
