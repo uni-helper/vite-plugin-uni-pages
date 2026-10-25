@@ -51,12 +51,16 @@ export function mergeTabBarProps(
   for (const [key, variants] of rawProps || []) {
     if (key === 'list')
       continue
+    // 先登记键，再过滤变体。当前平台自己的旧属性在下面会被跳过，如果
+    // 只等存活变体来建键，这个键会从 Map 里消失、再被本次配置追加到
+    // 末尾，两个平台轮流运行时属性顺序每次都会翻转
+    const keyVariants = variantsOf(key)
     for (const raw of variants) {
       const valueStr = JSON.stringify(raw.value)
       if (valueStr === undefined)
         continue
       if (raw.condition?.startsWith('#ifndef')) {
-        variantsOf(key).push({ payload: raw.value, valueStr, platforms: null, platformStr: '', passthrough: { before: raw.beforeComments, after: raw.afterComments } })
+        keyVariants.push({ payload: raw.value, valueStr, platforms: null, platformStr: '', passthrough: { before: raw.beforeComments, after: raw.afterComments } })
         continue
       }
       let platforms: string[]
@@ -68,7 +72,7 @@ export function mergeTabBarProps(
       }
       if (platforms.length === 0)
         continue
-      variantsOf(key).push({ payload: raw.value, valueStr, platforms, platformStr: platforms.join(' || '), passthrough: null })
+      keyVariants.push({ payload: raw.value, valueStr, platforms, platformStr: platforms.join(' || '), passthrough: null })
     }
   }
 
@@ -79,6 +83,13 @@ export function mergeTabBarProps(
         continue
       upsertCurrentVariant(variantsOf(key), value, valueStr, currentPlatform)
     }
+  }
+
+  // 只属于其他平台、且本轮没有任何变体存活的键不输出；保留键的登记
+  // 顺序即可，渲染阶段不需要空列表
+  for (const [key, variants] of merged) {
+    if (variants.length === 0)
+      merged.delete(key)
   }
 
   // 规则见 platform-variants 的 sortVariants：#ifndef 属性（空
@@ -112,20 +123,26 @@ export function renderTabBarPropLines(merged: Map<string, TabBarPropVariant[]>, 
   const unionStr = platformUnion.join(' || ')
   const lines: string[] = []
 
+  // 手写的块注释可能有多行，逐行写成 // 才能保持合法 JSONC。直接拼
+  // 原始文本会把第二行起的内容裸着写进文件
+  const pushComments = (comments: string[]): void => {
+    for (const comment of comments) {
+      for (const line of comment.split(/\r?\n/)) {
+        const text = line.trim()
+        if (text)
+          lines.push(`${unit}${unit}// ${text}`)
+      }
+    }
+  }
+
   for (const [key, variants] of merged) {
     for (const variant of variants) {
       const valueText = indentContinuation(cjStringify(variant.payload, null, format?.indent ?? 2), unit + unit)
       const propLine = `${unit}${unit}${JSON.stringify(key)}: ${valueText},`
       if (variant.passthrough) {
-        for (const comment of variant.passthrough.before) {
-          if (comment)
-            lines.push(`${unit}${unit}// ${comment}`)
-        }
+        pushComments(variant.passthrough.before)
         lines.push(propLine)
-        for (const comment of variant.passthrough.after) {
-          if (comment)
-            lines.push(`${unit}${unit}// ${comment}`)
-        }
+        pushComments(variant.passthrough.after)
         continue
       }
       if (variant.platformStr === unionStr) {

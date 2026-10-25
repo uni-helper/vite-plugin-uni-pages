@@ -16,13 +16,17 @@ import { PageContext } from '../packages/core/src'
 describe('watcher normalizes config change paths before matching sources', () => {
   let tmpDir: string
   let ctx: PageContext
-  let changeHandler: ((path: string) => void) | undefined
+  const changeHandlers: ((path: string) => void)[] = []
+  const dispatch = (file: string): void => {
+    for (const handler of changeHandlers)
+      handler(file)
+  }
 
   const watcherStub = {
     add: vi.fn(),
     on: (event: string, handler: (path: string) => void) => {
       if (event === 'change')
-        changeHandler = handler
+        changeHandlers.push(handler)
     },
   }
 
@@ -38,19 +42,19 @@ describe('watcher normalizes config change paths before matching sources', () =>
 
   it('reacts to an event path that only differs by a redundant segment', () => {
     // 归一化前两个字符串不相等；归一化后指向同一个配置文件
-    changeHandler!(`${tmpDir}/src/../pages.config.ts`)
+    dispatch(`${tmpDir}/src/../pages.config.ts`)
     expect(ctx.updatePagesJSON).toHaveBeenCalled()
   })
 
   it('still reacts to an exact source path', () => {
     vi.mocked(ctx.updatePagesJSON).mockClear()
-    changeHandler!(`${tmpDir}/pages.config.ts`)
+    dispatch(`${tmpDir}/pages.config.ts`)
     expect(ctx.updatePagesJSON).toHaveBeenCalled()
   })
 
   it('still ignores files outside the config sources and page dirs', () => {
     vi.mocked(ctx.updatePagesJSON).mockClear()
-    changeHandler!(`${tmpDir}/untracked/notes.txt`)
+    dispatch(`${tmpDir}/untracked/notes.txt`)
     expect(ctx.updatePagesJSON).not.toHaveBeenCalled()
   })
 })

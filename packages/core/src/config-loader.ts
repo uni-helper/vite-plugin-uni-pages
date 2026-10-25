@@ -14,12 +14,17 @@ const scriptExtensions = /\.[cm]?[jt]sx?$/
 /** 目录恢复监听接受的文件类型；已知配置入口与依赖不受此限制 */
 export const configFileExtensions = /\.(?:[cm]?[jt]sx?|json)$/
 /** 省略扩展名时 esbuild 会依次尝试的后缀，用于列举恢复候选文件 */
-const candidateExtensions = ['', '.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.json']
+const candidateExtensions = ['', '.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs', '.json']
 /** TS 约定里 `./x.js` 指向的就是 `./x.ts`，恢复候选也得列上 */
 const typescriptAliases: Record<string, string[]> = { '.cjs': ['.cts'], '.js': ['.ts', '.tsx'], '.mjs': ['.mts'] }
 
 function isNodeModulesPath(filepath: string): boolean {
   return normalizePath(filepath).split('/').includes('node_modules')
+}
+
+/** JSON 文件可能带 BOM 保存，JSON.parse 不接受它 */
+function stripBom(code: string): string {
+  return code.charCodeAt(0) === 0xFEFF ? code.slice(1) : code
 }
 
 /**
@@ -133,10 +138,10 @@ export class PagesConfigLoader {
           code = await source.transform(code, filepath) || code
         const parser = source.parser || 'auto'
         if (parser === 'json' || path.extname(filepath) === '.json')
-          return JSON.parse(code)
+          return JSON.parse(stripBom(code))
         if (parser === 'auto') {
           try {
-            return JSON.parse(code)
+            return JSON.parse(stripBom(code))
           }
           catch {}
         }
@@ -210,6 +215,9 @@ export class PagesConfigLoader {
           target: 'node22',
           conditions: [],
           mainFields: ['main'],
+          // 与 unconfig/jiti 的行为保持一致：省略扩展名的导入也要能命中
+          // .mjs/.cjs/.mts/.cts，目录导入同样按这些后缀找 index
+          resolveExtensions: ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs', '.json'],
           // ESM 产物中的本地 CJS 依赖仍可调用原生 require
           banner: { js: `import { createRequire as __uniPagesCreateRequire } from 'node:module'; const require = __uniPagesCreateRequire(import.meta.url);` },
           plugins: [{
@@ -270,6 +278,13 @@ export class PagesConfigLoader {
         const file = normalizeConfigPath(input, root)
         if (!isNodeModulesPath(file) && !isConfigLoaderArtifact(file, cacheDirectory))
           dependencies.add(file)
+      }
+      // 目录导入的入口由 package.json 的 main/exports 决定；清单本身
+      // 也是依赖，修改入口指向后要重新加载
+      for (const directory of importDirectories) {
+        const manifest = normalizeConfigPath(path.join(directory, 'package.json'), root)
+        if (existsSync(manifest) && !isNodeModulesPath(manifest) && !isConfigLoaderArtifact(manifest, cacheDirectory))
+          dependencies.add(manifest)
       }
       // 对齐 jiti 的 default:true 解包，再处理 unconfig 的嵌套 default 对象
       return unwrapConfig(mod.default ?? mod) as PagesConfig

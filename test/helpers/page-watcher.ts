@@ -17,6 +17,7 @@ interface MockPageWatcher extends EventEmitter {
 interface PageWatchState {
   watcher?: MockPageWatcher
   recoveryWatchers: ReadonlyMap<string, unknown>
+  started: boolean
 }
 
 function watcher(): MockPageWatcher {

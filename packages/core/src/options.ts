@@ -48,7 +48,7 @@ export function resolveOptions(userOptions: UserOptions, viteRoot: string = proc
 
   const resolvedHomePage = typeof homePage === 'string' ? [homePage] : homePage
   const resolvedConfigSource = typeof configSource === 'string' ? [{ files: configSource } as LoadConfigSource<PagesConfig>] : configSource
-  const resolvedDts = !dts ? false : typeof dts === 'string' ? dts : resolve(root, 'uni-pages.d.ts')
+  const resolvedDts = !dts ? false : typeof dts === 'string' ? resolve(root, dts) : resolve(root, 'uni-pages.d.ts')
 
   const resolvedOptions: ResolvedOptions = {
     dts: resolvedDts,

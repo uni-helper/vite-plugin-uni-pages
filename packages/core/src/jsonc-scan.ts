@@ -133,7 +133,9 @@ function readJsonStringToken(content: string, start: number): [string, number] |
  * tabBar 不是对象、或文件结构看不懂时返回 undefined。
  */
 export function extractTabBarProps(content: string): Map<string, RawTabBarProp[]> | undefined {
-  let i = skipJsoncFiller(content, 0)
+  // 编辑器可能带 BOM 保存；comment-json 能解析 BOM，文本扫描也必须
+  // 跳过它，否则整个 tabBar 属性区被当成读不懂，其他平台的值会被删
+  let i = skipJsoncFiller(content, content.charCodeAt(0) === 0xFEFF ? 1 : 0)
   if (content[i] !== '{')
     return undefined
   i = skipJsoncFiller(content, i + 1)

@@ -5,7 +5,7 @@ import path from 'node:path'
 import { parse } from 'comment-json'
 import { createServer } from 'vite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import UniPages, { PageContext } from '../packages/core/src'
+import UniPages, { generateAll, PageContext } from '../packages/core/src'
 import { PageSourceWatch } from '../packages/core/src/page-watch'
 
 vi.hoisted(() => vi.stubEnv('UNI_PLATFORM', 'h5'))
@@ -110,5 +110,24 @@ describe('声明生成失败后的页面更新通知', () => {
     expect(onAfterWriteFile).not.toHaveBeenCalled()
     expect(invalidate).not.toHaveBeenCalled()
     expect(send).not.toHaveBeenCalled()
+  })
+})
+
+describe('自定义声明路径', () => {
+  it('相对路径以项目根目录为基准，当前工作目录不影响输出位置', async () => {
+    root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-dts-path-')))
+    fs.mkdirSync(path.join(root, 'src/pages'), { recursive: true })
+    fs.writeFileSync(path.join(root, 'src/pages/index.vue'), '<template><view/></template>')
+    vi.stubEnv('UNI_PLATFORM', 'h5')
+
+    const { updated } = await generateAll({
+      dir: 'src/pages',
+      outDir: 'src',
+      dts: 'types/uni-pages.d.ts',
+      homePage: 'pages/index',
+    }, { root })
+
+    expect(updated).toBe(true)
+    expect(fs.existsSync(path.join(root, 'types/uni-pages.d.ts'))).toBe(true)
   })
 })

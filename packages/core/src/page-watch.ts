@@ -71,6 +71,11 @@ export class PageSourceWatch {
     this.rules = getPageRules(options)
   }
 
+  /** 内容监听是否已建立；启动失败时调用方可用其他事件源重试 */
+  get running(): boolean {
+    return this.started
+  }
+
   start(options: Pick<ChokidarOptions, 'usePolling' | 'interval' | 'cwd' | 'awaitWriteFinish' | 'atomic'> = {}, ignored?: WatchOptions['ignored']): void {
     if (this.started)
       return
@@ -206,6 +211,8 @@ export class PageSourceWatch {
     if (!this.started)
       return
     const rules = getPageRules(this.options)
+    // 保留上一轮的根：glob 匹配到的目录被删除后虽然不在本轮展开结果里，
+    // 仍要从其父目录观察重建
     const currentDirectories = new Set([
       ...this.roots,
       ...this.options.dirs.map(dir => normalizePath(path.resolve(this.options.root, dir))),
@@ -232,7 +239,7 @@ export class PageSourceWatch {
     if (sources.truncated) {
       if (!this.warnedSourceLimit) {
         this.warnedSourceLimit = true
-        this.onWarning(`[vite-plugin-uni-pages] Page watch discovery reached the ${PAGE_WATCH_SOURCE_LIMIT} linked-source safety limit and stopped expanding this round. Pages are still generated, but sources beyond the limit are not watched while it is reached. Narrow the page roots or exclude unused links to restore full watch coverage.`)
+        this.onWarning(`Page watch discovery reached the ${PAGE_WATCH_SOURCE_LIMIT} linked-source safety limit and stopped expanding this round. Pages are still generated, but sources beyond the limit are not watched while it is reached. Narrow the page roots or exclude unused links to restore full watch coverage.`)
       }
     }
     else {

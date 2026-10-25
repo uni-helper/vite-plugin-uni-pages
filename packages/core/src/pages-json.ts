@@ -617,13 +617,35 @@ function mergePlatformItems<T extends object = Record<string, unknown>>(source: 
     // 块一定出自用户之手。#endif 在输出时补写；挂在后续条目前面的
     // 游离 #endif 被上面的匹配规则跳过，重建包裹层时自然丢掉
     if (conditionalComment?.value.trim().startsWith('#ifndef')) {
+      // 只保留开启这个块的那条指令和用户写的说明文字。comment-json
+      // 会把上一个块收尾的 #endif（输出在值的逗号后面）挂到当前条目
+      // 前面；照抄的话每次重跑都会多一个游离的 #endif，块也会越套越乱。
+      // #ifdef 等其他指令同理丢弃，这个条目只归 #ifndef 管
+      const sanitizedBefore: CommentToken[] = []
+      let openingKept = false
+      for (const comment of beforeComments || []) {
+        if (isGenerationMarker(comment))
+          continue
+        if (comment.type === 'BlankLine') {
+          sanitizedBefore.push(comment)
+          continue
+        }
+        if (/^#(?:ifdef|ifndef|endif)/.test(comment.value.trim())) {
+          if (!openingKept && comment === conditionalComment) {
+            sanitizedBefore.push(comment)
+            openingKept = true
+          }
+          continue
+        }
+        sanitizedBefore.push(comment)
+      }
       variantsOf(uniqueKey).push({
         payload: item,
         valueStr: stringifyForCompare(item),
         platforms: null,
         platformStr: '',
         passthrough: {
-          before: [...(beforeComments || [])].filter(c => !isGenerationMarker(c)),
+          before: sanitizedBefore,
           after: [lineComment(' #endif')],
         },
       })

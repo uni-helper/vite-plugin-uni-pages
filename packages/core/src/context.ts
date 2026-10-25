@@ -15,7 +15,7 @@ import { configFileExtensions, configWatchDirectory, isConfigLoaderArtifact, nor
 import { RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import { writeDeclaration } from './declaration'
 import { getSubPackageDirectorySources, refreshPageDirectories } from './directories'
-import { checkPagesJsonFileSync, getPageFiles, resolvePagesJsonPath } from './files'
+import { checkPagesJsonFileSync, getPageFiles, isTargetFile, resolvePagesJsonPath } from './files'
 import { debug } from './logger'
 import { resolveOptions } from './options'
 import { Page } from './page'
@@ -79,6 +79,12 @@ export class PageContext {
 
   /** 失败恢复以此为基准，避免混入前几轮失败的临时路径 */
   private lastSuccessfulConfigDependencyPaths: string[] = []
+
+  /** 最近一次刷新登记的配置依赖，用于识别本次加载新增的依赖 */
+  private lastConfigWatchFiles = new Set<string>()
+  private configWatchInitialized = false
+  /** 依赖集合在生成期间扩大，结束后需要补跑一轮 */
+  private configWatchExpanded = false
 
   /** 当前配置本地依赖及加载失败后仍需监听的恢复路径 */
   pagesConfigDependencyPaths: string[] = []
@@ -291,11 +297,25 @@ export class PageContext {
       if (queryPageRules(false, () => this.pageDirectoryForEvent(directory)))
         this.queuePageUpdate()
     }
+    // 自有内容监听启动失败时，共享 watcher 仍会收到页面事件；用它重试
+    // 启动，避免一次临时文件系统错误让整个会话不再跟随页面变化
+    const onSharedPageFile = (filepath: string): void => {
+      if (this.disposed || this.pageWatcher.running || !this.pageWatcherStart)
+        return
+      if (!isTargetFile(normalizePath(filepath)))
+        return
+      this.startPageWatcher()
+      if (this.pageWatcher.running)
+        this.queuePageUpdate()
+    }
     // 配置首次加载与订阅就绪之间的变化可能被 ignoreInitial 吞掉
     const onReady = (): void => this.queuePageUpdate()
     watcher.on('add', onConfigFile)
     watcher.on('change', onConfigFile)
     watcher.on('unlink', onConfigFile)
+    watcher.on('add', onSharedPageFile)
+    watcher.on('change', onSharedPageFile)
+    watcher.on('unlink', onSharedPageFile)
     watcher.on('addDir', onDirectory)
     watcher.on('unlinkDir', onDirectory)
     watcher.on('ready', onReady)
@@ -303,6 +323,9 @@ export class PageContext {
       watcher.off('add', onConfigFile)
       watcher.off('change', onConfigFile)
       watcher.off('unlink', onConfigFile)
+      watcher.off('add', onSharedPageFile)
+      watcher.off('change', onSharedPageFile)
+      watcher.off('unlink', onSharedPageFile)
       watcher.off('addDir', onDirectory)
       watcher.off('unlinkDir', onDirectory)
       watcher.off('ready', onReady)
@@ -381,7 +404,7 @@ export class PageContext {
         added.add(file)
     }
     catch (error) {
-      this.logger?.error(`[vite-plugin-uni-pages] Failed to watch ${description}: ${error instanceof Error ? error.message : error}`, { timestamp: true, error: error instanceof Error ? error : undefined })
+      this.logger?.error(`Failed to watch ${description}: ${error instanceof Error ? error.message : error}`, { timestamp: true, error: error instanceof Error ? error : undefined })
     }
   }
 
@@ -397,7 +420,13 @@ export class PageContext {
   private refreshConfigWatchers(): void {
     // 排除临时产物目录，避免加载器写入和清理文件时再次触发配置重载
     const files = [...this.pagesConfigSourcePaths, ...this.pagesConfigDependencyPaths, ...this.configRecoveryCandidates]
-      .filter(file => !isConfigLoaderArtifact(normalizeConfigPath(file, this.root), this.configLoader.artifactDirectory))
+      .map(file => normalizeConfigPath(file, this.root))
+      .filter(file => !isConfigLoaderArtifact(file, this.configLoader.artifactDirectory))
+    const expanded = this.configWatchInitialized && files.some(file => !this.lastConfigWatchFiles.has(file))
+    this.lastConfigWatchFiles = new Set(files)
+    this.configWatchInitialized = true
+    if (expanded)
+      this.configWatchExpanded = true
     // 监听现存父目录可发现新建文件；事件仍按当前依赖集合过滤
     const paths = [...new Set([
       ...files,
@@ -407,7 +436,7 @@ export class PageContext {
     // 父目录（尤其是项目 root）会覆盖其下所有路径，过滤事件时只看真实依赖，
     // 否则 root 会把任何路径都当成需要保留的
     const index = {
-      files: new Set(files.map(file => normalizeConfigPath(file, this.root))),
+      files: new Set(files),
       directories: this.configRecoveryDirectories.map(dir => normalizeConfigPath(dir, this.root)),
     }
     for (const watcher of this.watchers.keys()) {
@@ -434,7 +463,7 @@ export class PageContext {
 
   /** 记录 watcher 更新失败，避免未处理的拒绝终止进程 */
   private logUpdateFailure(error: unknown): void {
-    this.logger?.error(`[vite-plugin-uni-pages] Failed to update pages.json after a file change: ${error instanceof Error ? error.message : error}`, { timestamp: true, error: error instanceof Error ? error : undefined })
+    this.logger?.error(`Failed to update pages.json after a file change: ${error instanceof Error ? error.message : error}`, { timestamp: true, error: error instanceof Error ? error : undefined })
   }
 
   /**
@@ -612,6 +641,14 @@ export class PageContext {
 
     if (result.updated) {
       this.options.onAfterWriteFile(this.resolvedPagesJSONPath, result.content)
+    }
+
+    // 配置加载期间刚发现的依赖这时才进入监听集合，它在此之前发生的
+    // 修改可能已经被启动时的索引过滤掉了。补跑一轮，用最新内容再生成
+    // 一次；下一轮依赖集合没有扩大，不会再排下一次
+    if (this.configWatchExpanded && !this.disposed) {
+      this.configWatchExpanded = false
+      this.queuePageUpdate()
     }
 
     return result.updated

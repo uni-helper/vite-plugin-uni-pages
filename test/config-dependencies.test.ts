@@ -130,6 +130,83 @@ describe('配置本地依赖加载', () => {
     expect(ctx.pagesConfigDependencyPaths).toEqual([configPath('pages.config.ts')])
   })
 
+  it('省略扩展名时解析 mjs、cjs 与目录入口', async () => {
+    fs.mkdirSync(path.join(root, 'folder'), { recursive: true })
+    write('leaf.mjs', `export default { title: 'mjs' }`)
+    write('folder/index.cjs', `module.exports = { suffix: '-cjs' }`)
+    write('pages.config.ts', `import mjs from './leaf'; import cjs from './folder'; export default { globalStyle: { navigationBarTitleText: mjs.title + cjs.suffix } }`)
+    const ctx = context()
+    await ctx.loadUserPagesConfig()
+    expect(title(ctx)).toBe('mjs-cjs')
+    expect(ctx.pagesConfigDependencyPaths).toEqual(expect.arrayContaining([
+      configPath('leaf.mjs'),
+      configPath('folder/index.cjs'),
+      configPath('pages.config.ts'),
+    ]))
+    write('leaf.mjs', `export default { title: 'updated' }`)
+    await ctx.loadUserPagesConfig()
+    expect(title(ctx)).toBe('updated-cjs')
+  })
+
+  it('目录导入的 package.json 参与依赖，切换入口后重新求值', async () => {
+    fs.mkdirSync(path.join(root, 'config'), { recursive: true })
+    write('config/package.json', JSON.stringify({ type: 'module', main: './first.ts' }))
+    write('config/first.ts', `export default { title: 'first' }`)
+    write('config/second.ts', `export default { title: 'second' }`)
+    write('pages.config.ts', `import config from './config'; export default { globalStyle: { navigationBarTitleText: config.title } }`)
+    const ctx = context()
+    await ctx.loadUserPagesConfig()
+    expect(title(ctx)).toBe('first')
+    expect(ctx.pagesConfigDependencyPaths).toEqual(expect.arrayContaining([
+      configPath('config/package.json'),
+      configPath('config/first.ts'),
+    ]))
+    write('config/package.json', JSON.stringify({ type: 'module', main: './second.ts' }))
+    await ctx.loadUserPagesConfig()
+    expect(title(ctx)).toBe('second')
+    expect(ctx.pagesConfigDependencyPaths).toContain(configPath('config/package.json'))
+    expect(ctx.pagesConfigDependencyPaths).not.toContain(configPath('config/first.ts'))
+  })
+
+  it('带 BOM 的 JSON 配置可正常加载', async () => {
+    write('pages.config.json', `\uFEFF${JSON.stringify({ globalStyle: { navigationBarTitleText: 'bom-json' } })}`)
+    const ctx = context()
+    await ctx.loadUserPagesConfig()
+    expect(title(ctx)).toBe('bom-json')
+  })
+
+  it('加载期间新增依赖被修改时补跑一轮生成', async () => {
+    const scope = globalThis as Record<string, unknown>
+    const key = `__uniPagesRace${Date.now()}`
+    let entered!: () => void
+    const enteredPromise = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    let release!: () => void
+    scope[`${key}Gate`] = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    scope[`${key}Enter`] = entered
+
+    write('pages.config.ts', `export default { globalStyle: { navigationBarTitleText: 'base' } }`)
+    const ctx = context()
+    await ctx.updatePagesJSON()
+    expect(title(ctx)).toBe('base')
+
+    write('leaf.ts', `export const title = 'before'`)
+    write('pages.config.ts', `import { title } from './leaf.ts'; globalThis.${key}Enter(); await globalThis.${key}Gate; export default { globalStyle: { navigationBarTitleText: title } }`)
+    const generation = ctx.updatePagesJSON()
+    await enteredPromise
+    write('leaf.ts', `export const title = 'after'`)
+    release()
+    await generation
+
+    await vi.waitFor(() => expect(title(ctx)).toBe('after'))
+    expect(ctx.pagesConfigDependencyPaths).toContain(configPath('leaf.ts'))
+    delete scope[`${key}Gate`]
+    delete scope[`${key}Enter`]
+  })
+
   it.each(['js', 'mjs', 'cjs', 'json'])('本地 %s 依赖更新后，TS 配置读取新值', async (extension) => {
     const source = (value: string): string => extension === 'json'
       ? JSON.stringify({ title: value })
