@@ -45,12 +45,12 @@ describe('config loader temporary artifacts never reach the watcher', () => {
   })
 
   it('专用目录内的产物不进入订阅或触发更新', async () => {
-    const artifact = path.join(tmpDir, 'node_modules/.cache/uni-pages/load/output.mjs')
-    ctx.pagesConfigSourcePaths = [path.join(tmpDir, 'pages.config.ts')]
-    ctx.pagesConfigDependencyPaths = [path.join(tmpDir, 'leaf.ts'), artifact]
+    const artifact = normalizeConfigPath(path.join(tmpDir, 'node_modules/.cache/uni-pages/load/output.mjs'), tmpDir)
+    ctx.pagesConfigSourcePaths = [normalizeConfigPath(path.join(tmpDir, 'pages.config.ts'), tmpDir)]
+    ctx.pagesConfigDependencyPaths = [normalizeConfigPath(path.join(tmpDir, 'leaf.ts'), tmpDir), artifact]
     await ctx.setupWatcher(watcherStub as any)
     expect(added).not.toContain(artifact)
-    expect(added).toContain(path.join(tmpDir, 'leaf.ts'))
+    expect(added).toContain(normalizeConfigPath(path.join(tmpDir, 'leaf.ts'), tmpDir))
     watcherStub.emit('change', artifact)
     expect(ctx.updatePagesJSON).not.toHaveBeenCalled()
   })
