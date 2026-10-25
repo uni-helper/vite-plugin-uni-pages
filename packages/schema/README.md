@@ -12,6 +12,8 @@
 
 为 uni-app 的 `pages.json` 提供 schema。
 
+完整文档见 [在线文档](https://uni-helper.js.org/vite-plugin-uni-pages)。
+
 不想看文档？直接问 AI 🤖 <a href="https://deepwiki.com/uni-helper/vite-plugin-uni-pages"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
 
 > **请考虑持续[赞助](https://github.com/ModyQyW/sponsors)以维持该项目的持续健康发展，非常感谢！🙏**

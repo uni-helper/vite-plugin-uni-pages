@@ -4,7 +4,7 @@
 
 ## 前置条件
 
-- [Node.js](https://nodejs.org/) 24（见仓库根目录 `.nvmrc` / `.node-version`）
+- [Node.js](https://nodejs.org/) 26（见仓库根目录 `.node-version`）
 - [pnpm](https://pnpm.io/) 12.14.0（由 `package.json` 的 `packageManager` 字段锁定，建议配合 Corepack 使用）
 
 ## 常用命令
@@ -32,6 +32,10 @@ pnpm lint
 
 # 类型检查
 pnpm typecheck
+
+# 文档站
+pnpm docs:dev
+pnpm docs:build
 
 # 启动 playground 调试
 pnpm play:mp-weixin
@@ -63,6 +67,7 @@ test/
 ├── scan-ownership-output.test.ts        聚合配置元数据与 pages.json、虚拟模块、声明一致性
 ├── page-exclude.test.ts                 页面排除基准、模式语义与目录发现一致性
 ├── page-exclude-watch.test.ts           页面排除与配置依赖在真实 watcher 下的隔离
+├── page-rule-traversal.test.ts          目录剪枝与排除规则的遍历一致性
 ├── page-content-refresh.test.ts         页面删建、ready 补扫与增量读取缓存
 ├── page-update-coalescing.test.ts       连续 watcher 事件的合并与读取上界
 ├── page-symlink-*.test.ts               符号链接事件映射、嵌套/外部目标恢复与真实 watcher
