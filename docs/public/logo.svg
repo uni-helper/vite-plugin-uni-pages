@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 256 256">
+  <title>uni-helper/vite-plugin-uni-pages logo</title>
+  <g fill="none" stroke="#2B9939" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 100 52 H 190 A 14 14 0 0 1 204 66 V 100" opacity="0.48"/>
+    <path d="M 76 76 H 166 A 14 14 0 0 1 180 90 V 124" opacity="0.74"/>
+    <rect x="52" y="100" width="104" height="104" rx="14"/>
+    <path d="M 80 152 H 126"/>
+    <path d="M 114 140 L 126 152 L 114 164"/>
+  </g>
+</svg>

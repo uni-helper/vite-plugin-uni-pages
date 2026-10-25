@@ -2,6 +2,7 @@ trustPolicy: off
 shellEmulator: true
 
 packages:
+  - docs
   - 'packages/*'
   - playground
 
@@ -58,6 +59,7 @@ catalog:
   unconfig: ^7.5.0
   unrun: ^0.3.1
   vite: ^5.4.21
+  vitepress: ^1.6.4
   vitest: ^3.2.7
   vue: ~3.4.38
   vue-i18n: ^9.14.0

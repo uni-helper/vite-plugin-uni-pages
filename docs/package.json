@@ -1,0 +1,15 @@
+{
+  "name": "docs",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "vitepress build .",
+    "dev": "vitepress dev .",
+    "preview": "vitepress preview ."
+  },
+  "devDependencies": {
+    "vitepress": "catalog:",
+    "vue": "catalog:"
+  }
+}
