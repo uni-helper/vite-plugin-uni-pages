@@ -48,7 +48,7 @@ export default defineUniPages({
 })
 ```
 
-其中 `pages` 和 `subPackages` 会和扫描结果合并，其他字段原样写进 `pages.json`。完整的 `pages.json` 类型由 `@uni-helper/uni-pages-types` 提供。
+其中 `pages`、`subPackages` 和 `tabBar` 会和扫描结果合并，其他字段原样写进 `pages.json`。`tabBar` 的规则见下文，完整的 `pages.json` 类型由 `@uni-helper/uni-pages-types` 提供。
 
 ## 覆盖页面配置
 

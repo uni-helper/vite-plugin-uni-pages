@@ -1004,7 +1004,7 @@ pipeline.ts ── context.ts              测试与外部调用的流水线入�
 
 - **配置监听计划**：`ConfigWatchIndex` 持有最近一次加载的文件、恢复目录与注册路径。`PagesConfigLoader` 只提供来源、依赖和恢复输入，`PageContext` 调 `buildConfigWatchPlan()` 后只消费 `match()` 与 `watchPaths()`，不再复制恢复状态。
 - **扫描计划**：每轮 `createScanPlan()` 产出一份 `ScanPlan`，包含主包目录、分包来源、最终 root 与编译规则。页面扫描、监听和目录事件判定读同一份值；`applyScanPlan()` 只把 `dirs`、`subPackages`、`subPackageRootMap` 同步回 `ResolvedOptions`，供既有调用方兼容读取。
-- **生成快照**：`generatePagesJSON()` 完成后创建 `PagesSnapshot`，虚拟模块、路由字符串与声明文件都从快照取值；创建时复制数组与 tabBar 列表，后续工作字段的增删不会改变本次结果。`Page.load()` 返回内容快照，`Page.getPageMeta()` 返回副本，合并阶段写入的首页标记不会留在读取缓存里。
+- **生成快照**：`generatePagesJSON()` 在写入前创建 `PagesSnapshot`，虚拟模块、路由字符串与声明文件都从快照取值；创建时复制数组与 tabBar 列表，后续工作字段的增删不会改变本次结果。`Page.load()` 返回内容快照，`Page.getPageMeta()` 返回副本，合并阶段写入的首页标记不会留在读取缓存里。
 
 计划与快照都是模块内部的值，公开入口 `mergePagesJson()`、`writePagesJson()`、`updatePagesJSON()` 与虚拟模块形状保持不变。测试可以直接构造或断言这些值，不必通过 `PageContext` 的私有字段推断时序。
 
