@@ -50,6 +50,19 @@ describe('扫描计划', () => {
     expect(plan.subPackageSources[0]!.identity).toBeDefined()
   })
 
+  it('排除规则同时约束主包目录发现与计划规则', () => {
+    const workspace = fixture()
+    workspace.writePage('src/pages/private/index.vue')
+    workspace.writePage('src/pages/public/index.vue')
+    const options = resolveOptions({ dir: 'src/pages', exclude: ['src/pages/private'] }, workspace.root)
+
+    const plan = createScanPlan(options)
+
+    expect(plan.mainDirs).toEqual(['src/pages'])
+    expect(plan.rules.isExcluded(workspace.path('src/pages/private/index.vue'))).toBe(true)
+    expect(plan.rules.isExcluded(workspace.path('src/pages/public/index.vue'))).toBe(false)
+  })
+
   it('兼容投影同步回 ResolvedOptions', () => {
     const workspace = fixture()
     workspace.writePage('src/pkg/a/pages/detail.vue')

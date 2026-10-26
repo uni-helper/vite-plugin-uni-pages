@@ -1,30 +1,21 @@
+import type { Logger } from 'vite'
 import fs from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
 import { normalizePath } from 'vite'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Page } from '../packages/core/src/page'
+import { createFixture } from './helpers/fixture'
 
-const roots: string[] = []
-
-function fixture(definition = ''): { page: Page, file: string, logger: { warn: ReturnType<typeof vi.fn> } } {
-  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-page-snapshot-')))
-  roots.push(root)
-  const file = normalizePath(path.join(root, 'pages/detail.vue'))
-  fs.mkdirSync(path.dirname(file), { recursive: true })
-  fs.writeFileSync(file, `<script setup>${definition}</script><template><view /></template>`)
+function fixture(definition?: string) {
+  const workspace = createFixture('uni-pages-page-snapshot-')
+  workspace.writePage('pages/detail.vue', definition || undefined)
+  const file = normalizePath(workspace.path('pages/detail.vue'))
   const logger = { warn: vi.fn() }
-  const page = new Page({ platform: 'h5', logger: logger as any }, {
+  const page = new Page({ platform: 'h5', getLogger: () => logger as unknown as Logger }, {
     relativePath: 'pages/detail',
     absolutePath: file,
   })
-  return { page, file, logger }
+  return { page, file, logger, workspace }
 }
-
-afterEach(() => {
-  for (const root of roots.splice(0))
-    fs.rmSync(root, { recursive: true, force: true })
-})
 
 describe('page 读取快照', () => {
   it('一次读取返回元数据与补全后的 tabBar', async () => {
@@ -74,12 +65,25 @@ describe('page 读取快照', () => {
     expect(changed.meta.style?.navigationBarTitleText).toBe('新标题')
   })
 
-  it('宏失败时保留上次快照并告警，修复后可以恢复', async () => {
-    const { page, file, logger } = fixture(`definePage(() => { throw new Error('snapshot failure') })`)
+  it('getPageMeta 返回副本，合并阶段的首页标记不会写进读取快照', async () => {
+    const { page } = fixture()
 
+    const first = await page.getPageMeta()
+    first.type = 'home'
+    const second = await page.getPageMeta()
+
+    expect(second.type).toBe('page')
+  })
+
+  it('宏失败时保留上次成功快照并告警，修复后可以恢复', async () => {
+    const { page, file, logger } = fixture(`definePage({ style: { navigationBarTitleText: '上次成功' } })`)
+    const loaded = await page.load()
+    expect(loaded.meta.style?.navigationBarTitleText).toBe('上次成功')
+
+    fs.writeFileSync(file, `<script setup>definePage(() => { throw new Error('snapshot failure') })</script><template><view /></template>`)
+    page.invalidate()
     const failed = await page.load()
-    expect(failed.meta).toEqual({ path: 'pages/detail' })
-    expect(failed.changed).toBe(true)
+    expect(failed.meta.style?.navigationBarTitleText).toBe('上次成功')
     expect(logger.warn).toHaveBeenCalledOnce()
     expect(String(logger.warn.mock.calls[0]![0])).toContain('snapshot failure')
 

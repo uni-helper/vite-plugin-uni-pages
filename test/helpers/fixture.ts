@@ -3,7 +3,6 @@ import type { FSWatcher, InlineConfig, ViteDevServer } from 'vite'
 import type { MockInstance } from 'vitest'
 import type { UserOptions } from '../../packages/core/src'
 import type { FakeWatcher } from './page-watcher'
-import { EventEmitter } from 'node:events'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -12,7 +11,7 @@ import { parse } from 'comment-json'
 import { createServer, normalizePath } from 'vite'
 import { afterAll, afterEach, expect, vi } from 'vitest'
 import { PageContext } from '../../packages/core/src'
-import { currentPageWatcher, flushPageUpdates, mockPageWatchers, pageWatchState } from './page-watcher'
+import { createFakeWatcher, currentPageWatcher, flushPageUpdates, mockPageWatchers, pageWatchState } from './page-watcher'
 
 /**
  * 测试夹具：临时工作区 + 受控 watcher + 收敛助手。
@@ -98,8 +97,7 @@ export interface TestFixture {
   /** 读取文本文件 */
   read: (relativePath: string) => string
   /** 读取并解析 pages.json；可传上下文自动定位输出路径 */
-  pagesJson: <T = PagesConfig>(source?: PageContext | string) => T
-  exists: (relativePath: string) => boolean
+  pagesJson: <T = PagesConfig>(source?: PageContext) => T
   remove: (relativePath: string) => void
   /** 创建符号链接；目录链接在 Windows 上退化为 junction */
   symlink: (target: string, linkPath: string, type?: 'file' | 'dir') => void
@@ -128,7 +126,6 @@ interface FixtureState {
   root: string
   contexts: PageContext[]
   servers: ViteDevServer[]
-  restores: Array<() => void>
   entrances?: Map<string, FakeWatcher>
 }
 
@@ -137,8 +134,7 @@ async function disposeState(state: FixtureState): Promise<void> {
     await context.disposeWatchers()
   for (const server of state.servers.splice(0).reverse())
     await server.close()
-  for (const restore of state.restores.splice(0).reverse())
-    restore()
+  vi.restoreAllMocks()
   vi.unstubAllEnvs()
   fs.rmSync(state.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
 }
@@ -198,15 +194,12 @@ export function createFixture(prefix = 'uni-pages-', options: FixtureOptions = {
     root,
     contexts: [],
     servers: [],
-    restores: [],
   }
   states.push(state)
 
   function ensureWatchers(): Map<string, FakeWatcher> {
-    if (!state.entrances) {
+    if (!state.entrances)
       state.entrances = mockPageWatchers().entrances as Map<string, FakeWatcher>
-      state.restores.push(() => vi.restoreAllMocks())
-    }
     return state.entrances
   }
 
@@ -230,16 +223,9 @@ export function createFixture(prefix = 'uni-pages-', options: FixtureOptions = {
     read(relativePath) {
       return fs.readFileSync(fixture.path(relativePath), 'utf8')
     },
-    pagesJson<T = PagesConfig>(source?: PageContext | string): T {
-      const file = typeof source === 'string'
-        ? fixture.path(source)
-        : source
-          ? source.resolvedPagesJSONPath
-          : fixture.path('src/pages.json')
+    pagesJson<T = PagesConfig>(source?: PageContext): T {
+      const file = source ? source.resolvedPagesJSONPath : fixture.path('src/pages.json')
       return parse(fs.readFileSync(file, 'utf8')) as T
-    },
-    exists(relativePath) {
-      return fs.existsSync(fixture.path(relativePath))
     },
     remove(relativePath) {
       fs.rmSync(fixture.path(relativePath), { recursive: true, force: true })
@@ -256,6 +242,8 @@ export function createFixture(prefix = 'uni-pages-', options: FixtureOptions = {
       return context
     },
     async vite(context, config = {}) {
+      if (state.entrances)
+        throw new Error('fixture.vite() 与 fixture.watch() 不能共用；真实 watcher 用例请另建夹具')
       const server = await createServer({
         root: context.options.root,
         configFile: false,
@@ -269,19 +257,24 @@ export function createFixture(prefix = 'uni-pages-', options: FixtureOptions = {
       return server
     },
     async watch(context) {
+      if (state.servers.length)
+        throw new Error('fixture.watch() 与 fixture.vite() 不能共用；受控 watcher 用例请另建夹具')
       const entrances = ensureWatchers()
-      const shared = Object.assign(new EventEmitter(), {
-        add: vi.fn(),
-        options: {},
-      }) as FakeWatcher
+      const shared = createFakeWatcher()
       await context.setupWatcher(shared as unknown as Parameters<PageContext['setupWatcher']>[0])
+      const initial = currentPageWatcher(context)
       return {
         shared,
         get page() {
           return currentPageWatcher(context)
         },
         emit(event, file) {
-          currentPageWatcher(context)?.emit(event, file)
+          // 刷新后当前 watcher 可能被替换或暂时为空；像调用方一样回退到
+          // 启动时的实例，仍能派发“已脱离来源”的事件
+          const watcher = currentPageWatcher(context) ?? initial
+          if (!watcher)
+            throw new Error('页面 watcher 尚未启动；需要只派发共享 watcher 事件时用 watch.shared')
+          watcher.emit(event, file)
         },
         emitEntrance(file, event, ...args) {
           entrances.get(normalizePath(file))?.emit(event, ...args)
@@ -308,6 +301,8 @@ export function createFixture(prefix = 'uni-pages-', options: FixtureOptions = {
       await vi.waitFor(() => {
         expect(owned()).toBeDefined()
       })
+      if ((owned() as unknown as FakeWatcher | undefined)?.__controlled)
+        throw new Error('受控 watcher 没有真实就绪事件；请改用 watch.settle()')
       const watchers = [server?.watcher, owned()].filter((watcher): watcher is FSWatcher => Boolean(watcher))
       await Promise.all(watchers.map(watcher => waitForReady(watcher)))
     },

@@ -1,42 +1,33 @@
-import fs from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import type { InternalPages } from '../packages/core/src/types'
+import { describe, expect, it } from 'vitest'
+import { createPagesSnapshot } from '../packages/core/src/pages-snapshot'
 import { createPages, generateAll } from '../packages/core/src/pipeline'
+import { createFixture } from './helpers/fixture'
 
-const roots: string[] = []
-
-function fixture(): string {
-  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-pages-snapshot-')))
-  roots.push(root)
-  fs.mkdirSync(path.join(root, 'src/pages/index'), { recursive: true })
-  fs.mkdirSync(path.join(root, 'src/pkg/pages'), { recursive: true })
-  fs.writeFileSync(path.join(root, 'src/pages/index/index.vue'), `<script setup>definePage({ type: 'home', tabBar: { text: '首页' } })</script><template><view /></template>`)
-  fs.writeFileSync(path.join(root, 'src/pkg/pages/detail.vue'), '<template><view /></template>')
-  fs.writeFileSync(path.join(root, 'pages.config.ts'), `export default { globalStyle: { navigationBarTitleText: '快照' } }`)
-  return root
+function fixture() {
+  const workspace = createFixture('uni-pages-pages-snapshot-')
+  workspace.writePage('src/pages/index/index.vue', { type: 'home', tabBar: { text: '首页' } })
+  workspace.writePage('src/pkg/pages/detail.vue')
+  workspace.writeConfig(`export default { globalStyle: { navigationBarTitleText: '快照' } }`, 'pages.config.ts')
+  return workspace
 }
-
-afterEach(() => {
-  for (const root of roots.splice(0))
-    fs.rmSync(root, { recursive: true, force: true })
-})
 
 describe('pages snapshot', () => {
   it('未写文件时由扫描结果合成快照', async () => {
-    const root = fixture()
-    const ctx = await createPages({ subPackages: [{ dir: 'src/pkg/pages', root: 'pkg' }], dts: false }, { root, platform: 'h5' })
+    const workspace = fixture()
+    const ctx = await createPages({ subPackages: [{ dir: 'src/pkg/pages', root: 'pkg' }], dts: false }, { root: workspace.root, platform: 'h5' })
 
     const snapshot = ctx.snapshot
     expect(snapshot.pages.map(page => page.path)).toEqual(['pages/index/index'])
+    expect(snapshot.pages).not.toBe(ctx.pageMetaData)
     expect(snapshot.subPackages).toMatchObject([{ root: 'pkg', pages: [{ path: 'pages/detail' }] }])
     expect(ctx.resolveRoutes()).toContain('pages/index/index')
     expect(ctx.virtualModule()).toContain('pages/index/index')
   })
 
   it('生成后快照包含配置、首页与 tabBar，虚拟模块读取同一份结果', async () => {
-    const root = fixture()
-    const { ctx, updated } = await generateAll({ subPackages: [{ dir: 'src/pkg/pages', root: 'pkg' }], dts: false }, { root, platform: 'h5' })
+    const workspace = fixture()
+    const { ctx, updated } = await generateAll({ subPackages: [{ dir: 'src/pkg/pages', root: 'pkg' }], dts: false }, { root: workspace.root, platform: 'h5' })
 
     expect(updated).toBe(true)
     const snapshot = ctx.snapshot
@@ -45,5 +36,20 @@ describe('pages snapshot', () => {
     expect(snapshot.tabBar?.list).toMatchObject([{ pagePath: 'pages/index/index', text: '首页' }])
     expect(ctx.resolveRoutes()).toBe(JSON.stringify(snapshot.pages, null, 2))
     expect(ctx.resolveSubRoutes()).toBe(JSON.stringify(snapshot.subPackages, null, 2))
+  })
+
+  it('创建快照时复制容器，后续工作字段增删不改变已取出的结果', () => {
+    const pages: InternalPages = [{ path: 'pages/index' }]
+    const subPackages = [{ root: 'pkg', pages: [{ path: 'detail' }] }]
+    const tabBar = { list: [{ pagePath: 'pages/index', text: '首页' }] }
+    const snapshot = createPagesSnapshot({ pages, subPackages, tabBar, homePath: 'pages/index' })
+
+    pages.push({ path: 'pages/later' })
+    subPackages.push({ root: 'later', pages: [] })
+    tabBar.list.push({ pagePath: 'pages/later', text: '后加' })
+
+    expect(snapshot.pages.map(page => page.path)).toEqual(['pages/index'])
+    expect(snapshot.subPackages.map(pkg => pkg.root)).toEqual(['pkg'])
+    expect(snapshot.tabBar?.list).toHaveLength(1)
   })
 })

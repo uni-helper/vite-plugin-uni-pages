@@ -61,6 +61,11 @@ test/
 ├── pages-json-*.test.ts                 pages.json 生成细节（空行、首页排序与平台、
 │                                        纯合并 seam、子包收敛、tabBar 按平台、EPERM 重试）
 ├── pages-json-entry-order.test.ts       tabBar list 条目顺序（新增落位、全量重排、pages 不重排）
+├── pages-json-items.test.ts             数组适配器：跨平台条目合并与 #ifdef/#ifndef 包裹
+├── pages-json-structure.test.ts         首页前置与过期子包删除的注释跟随
+├── page-snapshot.test.ts                页面读取快照、失败回退与首页标记隔离
+├── pages-snapshot.test.ts               生成快照的容器复制与虚拟模块一致性
+├── scan-plan.test.ts                    扫描计划的目录、来源、root 与规则
 ├── subpackage-glob.test.ts              分包 glob、root 映射与冲突检查
 ├── subpackage-glob-watcher.test.ts      目录监听边界与 watch 就绪
 ├── subpackage-root-sources.test.ts      默认与显式 root 决议、别名来源及冲突信息
@@ -71,6 +76,7 @@ test/
 ├── page-rule-traversal.test.ts          目录剪枝与排除规则的遍历一致性
 ├── page-content-refresh.test.ts         页面删建、ready 补扫与增量读取缓存
 ├── page-update-coalescing.test.ts       连续 watcher 事件的合并与读取上界
+├── page-watcher-recovery.test.ts        页面监听启动失败后的恢复
 ├── page-symlink-*.test.ts               符号链接事件映射、嵌套/外部目标恢复与真实 watcher
 ├── page-source-watch.test.ts            来源关系、交叉/循环链接、权限失败、启动重试、物理订阅去重与非递归恢复入口
 ├── page-watch-sources.test.ts           链接目标真实路径、权限/竞态降级、Unicode 与别名膨胀上限
@@ -86,6 +92,7 @@ test/
 ├── config-dependencies-watch.test.ts    dev/build 单次修改、依赖切换、连续失败与恢复
 ├── config-artifact-watch.test.ts        真实输入与专用产物目录的身份、监听过滤
 ├── config-recovery-watch.test.ts        连续失败恢复范围的确定性事件回归
+├── config-watch.test.ts                 配置监听计划的归一化、恢复范围与展开判定
 ├── config-watch-fast-path.test.ts       配置 watcher 路径匹配开销
 ├── watcher-config-path.test.ts          watcher 归一化配置变更路径
 ├── watcher-dir-boundary.test.ts         页面文件只在配置目录内匹配
@@ -113,20 +120,28 @@ fixture.writeConfig()
 fixture.writePage('src/pages/index.vue', { style: { navigationBarTitleText: '首页' } })
 const ctx = fixture.context({ dir: 'src/pages', outDir: 'src' })
 await ctx.updatePagesJSON()
-expect(fixture.pagesJson(ctx).pages[0].path).toBe('pages/index')
+expect(fixture.pagesJson(ctx).pages?.[0]?.path).toBe('pages/index')
 ```
 
 受控 watcher 用例通过 `watch()` 获得共享 watcher、当前页面 watcher、事件派发和收敛等待；真实 Vite 用例用 `vite()` 创建并注册 server，用 `ready()` / `probeVite()` 等待就绪并观察共享与自有 watcher 的事件。两者都只暴露调用方也能看到的接缝，`pageWatcher`、`pendingUpdate`、`pendingPageFlush` 等内部状态只在夹具实现里读取一次。
 
 ```ts
+// 受控 watcher：同一个夹具里不要同时调用 vite()
 const watch = await fixture.watch(ctx)
 watch.emit('change', fixture.path('src/pages/index.vue'))
 await watch.settle()
 
-const server = await fixture.vite(ctx, { server: { middlewareMode: true } })
-const probe = fixture.probeVite(ctx, server)
+// 真实 Vite watcher：另建一个夹具
+const realtime = createFixture('uni-pages-realtime-')
+realtime.writePage('pages/index.vue')
+const realtimeCtx = realtime.context({ dir: 'pages', outDir: '.', dts: false })
+await realtimeCtx.updatePagesJSON()
+const server = await realtime.vite(realtimeCtx)
+const probe = realtime.probeVite(realtimeCtx, server)
 await probe.settle()
 ```
+
+`watch()` 与 `vite()` 共用会替换 `chokidar` / `fs` 监听实现，夹具会直接抛错提醒；两类用例请分开建夹具。
 
 夹具没有覆盖到的场景，先扩展夹具接口，不要在用例里新增强转到 core 私有字段。确需真实文件系统时序的用例继续按下一节的规则等待就绪与收敛。
 

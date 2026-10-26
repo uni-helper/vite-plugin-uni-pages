@@ -1,27 +1,22 @@
-import fs from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
 import { normalizePath } from 'vite'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { normalizeConfigPath } from '../packages/core/src/config-loader'
 import { buildConfigWatchPlan, ConfigWatchIndex } from '../packages/core/src/config-watch'
+import { createFixture } from './helpers/fixture'
 
-const roots: string[] = []
-
-function fixture(): { root: string, artifactDirectory: string } {
-  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-config-watch-')))
-  roots.push(root)
-  fs.mkdirSync(path.join(root, 'node_modules/.cache/uni-pages'), { recursive: true })
-  fs.mkdirSync(path.join(root, 'config'), { recursive: true })
-  fs.writeFileSync(path.join(root, 'pages.config.ts'), 'export default {}')
-  fs.writeFileSync(path.join(root, 'leaf.ts'), 'export default {}')
-  return { root, artifactDirectory: normalizeConfigPath(path.join(root, 'node_modules/.cache/uni-pages'), root) }
+function fixture() {
+  const workspace = createFixture('uni-pages-config-watch-')
+  workspace.write('node_modules/.cache/uni-pages/.keep', '')
+  workspace.write('config/.keep', '')
+  workspace.writeConfig('export default {}', 'pages.config.ts')
+  workspace.writeConfig('export default {}', 'leaf.ts')
+  return {
+    workspace,
+    root: workspace.root,
+    artifactDirectory: normalizeConfigPath(workspace.path('node_modules/.cache/uni-pages'), workspace.root),
+  }
 }
-
-afterEach(() => {
-  for (const root of roots.splice(0))
-    fs.rmSync(root, { recursive: true, force: true })
-})
 
 describe('配置监听计划', () => {
   it('归一化文件、补入父目录，并排除加载器产物', () => {
@@ -71,16 +66,30 @@ describe('配置监听计划', () => {
     expect(index.match('untracked.ts', [])).toBeUndefined()
   })
 
+  it('恢复目录按路径段匹配，不误伤共享前缀的兄弟目录', () => {
+    const { root, artifactDirectory } = fixture()
+    const index = new ConfigWatchIndex(root, artifactDirectory)
+    index.update(buildConfigWatchPlan({
+      root,
+      artifactDirectory,
+      sourcePaths: ['pages.config.ts'],
+      dependencyPaths: [],
+      recoveryDirectories: ['config'],
+    }))
+
+    expect(index.match('config-other/custom.ts', [])).toBeUndefined()
+    expect(index.match('config/nested/custom.ts', [])).toBe(normalizeConfigPath('config/nested/custom.ts', root))
+  })
+
   it('生成物和加载器产物永远不匹配', () => {
     const { root, artifactDirectory } = fixture()
-    const plan = buildConfigWatchPlan({
+    const index = new ConfigWatchIndex(root, artifactDirectory)
+    index.update(buildConfigWatchPlan({
       root,
       artifactDirectory,
       sourcePaths: ['pages.config.ts'],
       dependencyPaths: ['leaf.ts'],
-    })
-    const index = new ConfigWatchIndex(root, artifactDirectory)
-    index.update(plan)
+    }))
 
     const generated = normalizeConfigPath('src/pages.json', root)
     const artifact = normalizeConfigPath('node_modules/.cache/uni-pages/load/config.mjs', root)
@@ -91,25 +100,44 @@ describe('配置监听计划', () => {
   it('共享根目录下的路径不重复注册，依赖扩大只消费一次', () => {
     const { root, artifactDirectory } = fixture()
     const index = new ConfigWatchIndex(root, artifactDirectory)
-    const first = buildConfigWatchPlan({
+    index.update(buildConfigWatchPlan({
       root,
       artifactDirectory,
       sourcePaths: ['pages.config.ts'],
       dependencyPaths: [],
-    })
-    index.update(first)
+    }))
     expect(index.watchPaths(normalizeConfigPath('.', root))).toEqual([])
     expect(index.consumeExpanded()).toBe(false)
 
-    const second = buildConfigWatchPlan({
+    index.update(buildConfigWatchPlan({
       root,
       artifactDirectory,
       sourcePaths: ['pages.config.ts'],
       dependencyPaths: ['leaf.ts'],
-    })
-    index.update(second)
+    }))
     expect(index.consumeExpanded()).toBe(true)
     expect(index.consumeExpanded()).toBe(false)
     expect(index.watchPaths()).toContain(normalizePath(path.join(root, 'leaf.ts')))
+  })
+
+  it('依赖集合缩小不算扩大，不会触发补跑', () => {
+    const { root, artifactDirectory } = fixture()
+    const index = new ConfigWatchIndex(root, artifactDirectory)
+    index.update(buildConfigWatchPlan({
+      root,
+      artifactDirectory,
+      sourcePaths: ['pages.config.ts'],
+      dependencyPaths: ['leaf.ts'],
+    }))
+    index.consumeExpanded()
+
+    index.update(buildConfigWatchPlan({
+      root,
+      artifactDirectory,
+      sourcePaths: ['pages.config.ts'],
+      dependencyPaths: [],
+    }))
+
+    expect(index.consumeExpanded()).toBe(false)
   })
 })

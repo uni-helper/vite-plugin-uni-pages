@@ -13,6 +13,8 @@ export interface FakeWatcher extends EventEmitter {
   add: Mock
   close: Mock<() => Promise<void>>
   options?: Record<string, unknown>
+  /** 标记这是受控替身，真实 watcher 的就绪等待不能用在它身上 */
+  __controlled: true
 }
 
 interface PageWatchState {
@@ -21,7 +23,8 @@ interface PageWatchState {
   started: boolean
 }
 
-function watcher(): FakeWatcher {
+/** 创建一个带 add/close 的 watcher 替身；受控监听和测试共享 watcher 共用 */
+export function createFakeWatcher(): FakeWatcher {
   const emitter = new EventEmitter()
   return Object.assign(emitter, {
     add: vi.fn(),
@@ -29,7 +32,12 @@ function watcher(): FakeWatcher {
       emitter.removeAllListeners()
     }),
     options: {},
+    __controlled: true as const,
   })
+}
+
+function watcher(): FakeWatcher {
+  return createFakeWatcher()
 }
 
 /** 只替换原生事件源，保留页面监听的注册、来源刷新和关闭流程 */
