@@ -8,9 +8,9 @@ import type { CommentArray, CommentLineToken, CommentObject, CommentSymbol } fro
  * 手写的 #ifndef 变体没有正向平台列表，按「原样保留」处理。
  *
  * 合并规则只在这里写一遍，两类调用方共用：
- * 1. 排除当前平台：现有变体的平台列表先去掉当前平台——本次运行总会
+ * 1. 排除当前平台：现有变体的平台列表先去掉当前平台，本轮总会
  *    写出自己的版本（{@link platformsExcluding}）
- * 2. 内容相同则叠加平台：和现有变体内容相同的本次载荷不另开变体，
+ * 2. 内容相同则叠加平台：和现有变体内容相同的本轮载荷不另开变体，
  *    把当前平台叠进它的平台列表；内容相同的手写 #ifndef 变体优先，
  *    跳过不写（{@link upsertCurrentVariant}）
  * 3. 手写 #ifndef 永不修改：否定条件翻译不成正向平台列表，变体连同
@@ -21,10 +21,10 @@ import type { CommentArray, CommentLineToken, CommentObject, CommentSymbol } fro
  *    小的变体必须包进 #ifdef，免得漏进其他平台的构建产物（比较
  *    platformStr 与并集串，在两侧的渲染处执行）
  * 6. 配置顺序优先摆放条目：配置覆盖全部既有条目时整个列表按配置顺
- *    序输出；没覆盖时只把本次新增的条目插到它在配置里最近的前一个
- *    条目之后，既有条目保持磁盘序——既让新增条目不垫底，也不会让两
+ *    序输出；没覆盖时只把新增的条目插到它在配置里最近的前一个
+ *    条目之后，既有条目保持磁盘序，既让新增条目不垫底，也不会让两
  *    端构建来回翻转（{@link orderVariantLists}）。是否启用由调用方
- *    决定：目前只有 tabBar list 启用——tab 顺序是用户直接可见的顺
+ *    决定：目前只有 tabBar list 启用，tab 顺序是用户直接可见的顺
  *    序；pages 数组另有「首页变体提到最前」的子系统（各平台可以声
  *    明不同首页，首页变体的相对顺序按首次出现序保持字节级稳定），
  *    配置序重排会翻转它，故暂不参与
@@ -32,7 +32,7 @@ import type { CommentArray, CommentLineToken, CommentObject, CommentSymbol } fro
  * 两类适配器往里喂数据：数组侧（pages / subPackages / tabBar.list）
  * 从 comment-json 的注释符号里读 #ifdef（pages-json.ts 的
  * mergePlatformItems），对象侧（tabBar 外观属性）从原始文本里读重复
- * 键（tab-bar.ts 的 mergeTabBarProps——comment-json 解析时同一个键
+ * 键（tab-bar.ts 的 mergeTabBarProps：comment-json 解析时同一个键
  * 只留最后一个，「同一个属性按平台写多个值」只能靠文本扫描捞回来）。
  */
 
@@ -65,7 +65,7 @@ export function platformsExcluding(platformList: string, currentPlatform: string
 }
 
 /**
- * 把本次运行的一个载荷并入变体列表（规则 2）：
+ * 把本轮的一个载荷并入变体列表（规则 2）：
  * - 内容相同的手写 #ifndef 变体优先：当前平台没被排除时，那条
  *   #ifndef 已经覆盖了它；当前平台正好被排除时，尊重手写的隐藏规
  *   则。两种情况下再单独写一份都会产生重复路由或覆盖用户的条件
@@ -73,7 +73,7 @@ export function platformsExcluding(platformList: string, currentPlatform: string
  * - 没有内容相同的变体：新建只属于当前平台的变体
  *
  * @param variants - 同一个键下已有的变体列表，原地修改
- * @param payload - 本次运行的载荷
+ * @param payload - 本轮的载荷
  * @param valueStr - 载荷的比较字符串
  * @param currentPlatform - 当前平台标识（大写）
  * @param compatible - 可选的额外相容判断。数组侧用它区分两个平台各自
@@ -109,7 +109,7 @@ export function upsertCurrentVariant<P>(
  *
  * 当前平台的变体在收集时被排除、并入时又补到列表末尾，两个平台轮流
  * 运行（dev:h5 和 dev:mp-weixin 交替写）时，同一个键的变体顺序就会
- * 来回翻转——条件编译的结果没变，但文件每次都有无意义的变动。
+ * 来回翻转。条件编译的结果没变，但文件每次都有无意义的变动。
  * platformStr 由排好序的平台列表拼成，手写 #ifndef 变体是空串、排最
  * 前。排序是稳定的：并列时（同键两组平台列表相同，只出现在手写文件
  * 里）保持收集顺序
@@ -123,7 +123,7 @@ export function sortVariants<P>(variants: PlatformVariant<P>[]): void {
  */
 export interface OrderVariantListsOptions {
   /**
-   * 本次合并前磁盘上已有键的顺序，可包含即将被本次配置加回来的旧键。
+   * 合并前磁盘上已有键的顺序，可包含即将被当前配置加回来的旧键。
    * 省略时视为所有键都已存在，并使用 mergedMap 的迭代顺序
    */
   diskOrder?: readonly string[]
@@ -141,7 +141,7 @@ export interface OrderVariantListsOptions {
  * - 配置声明了全部既有键：这是全量超集，声明顺序是唯一已知的权威
  *   顺序，整个列表按配置顺序输出
  * - 配置没有覆盖全部键（其他平台有本平台不认识的条目，谁也不知道
- *   完整顺序）：既有键保持磁盘序，只把本次新增的键插到它前面最近
+ *   完整顺序）：既有键保持磁盘序，只把新增的键插到它前面最近
  *   的、已在输出里的声明键之后；没有这样的前驱就放到最前。既有键
  *   之间的相对顺序永不变动，所以两端构建不会来回翻转
  *
@@ -152,7 +152,7 @@ export interface OrderVariantListsOptions {
  *
  * @param mergedMap - 键 → 变体列表的合并结果。迭代顺序一般是磁盘序，
  * 但被跳过的当前平台旧条目会追加到末尾，需要靠 options.diskOrder 修正
- * @param declaredKeys - 本次配置声明的键，按配置顺序，可含新增键；
+ * @param declaredKeys - 配置声明的键，按配置顺序，可含新增键；
  * 传 null 表示不启用配置序摆放，保持磁盘序
  * @param options - 磁盘上已有键的顺序，见 {@link OrderVariantListsOptions}
  * @returns 按输出顺序排列的变体列表（mergedMap 中列表的原引用）
@@ -171,8 +171,8 @@ export function orderVariantLists<P, V extends PlatformVariant<P> = PlatformVari
   if (diskOrder.every(key => declaredSet.has(key)))
     return declared.map(key => mergedMap.get(key)!)
 
-  // 部分覆盖：既有键保持磁盘序，只落位本次新增的键。磁盘序要包含
-  // 那些在合并时被跳过、随后又被本次配置加回来的旧键，它们的原始
+  // 部分覆盖：既有键保持磁盘序，只落位新增的键。磁盘序要包含
+  // 那些在合并时被跳过、随后又被当前配置加回来的旧键，它们的原始
   // 位置不能丢（否则每次重跑都会把它们甩到末尾，文件来回翻转）
   const existingOrder = options.diskOrder ?? diskOrder
   const ordered = existingOrder.filter(key => mergedMap.has(key))
@@ -226,7 +226,7 @@ export function collectVariantPlatforms<P>(mergedMap: Map<string, PlatformVarian
  * 没被包裹的条目在 uni-app 条件编译下所有平台都看得见，所以只有
  * 覆盖了全部平台的变体才能"裸着"输出（规则 5）。
  *
- * 当前平台一定在全集里，哪怕这次运行一个变体都没贡献——比如页面
+ * 当前平台一定在全集里，哪怕这次运行一个变体都没贡献。比如页面
  * 只在 H5 存在，而 MP-WEIXIN 运行把每个页面都 definePage(null) 掉了。
  * 如果只从剩下的条目推全集，全集就只有 'H5'，H5 专属条目看起来
  * "覆盖了全集"，会不加包裹地输出，泄漏进微信的构建产物。老版本按
@@ -242,7 +242,7 @@ export function collectVariantPlatforms<P>(mergedMap: Map<string, PlatformVarian
  * 裹，不会泄漏。
  *
  * 只增不减的代价：彻底不用的平台会一直留在标记里。这无害，但别
- * 手工去改标记行——想清理就删掉整个生成的 pages.json，下次运行会
+ * 手工去改标记行。想清理就删掉整个生成的 pages.json，下次运行会
  * 从头生成。
  */
 export function resolvePlatformUnion<P>(mergedMap: Map<string, PlatformVariant<P>[]>, currentPlatform: string, lastPlatforms: string[]): string[] {

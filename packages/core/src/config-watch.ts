@@ -5,7 +5,7 @@ import { configFileExtensions, configWatchDirectory, isConfigLoaderArtifact, nor
 /**
  * 配置监听计划：一次配置加载需要监听的输入，以及用于恢复的目录范围。
  *
- * 加载器只负责说明本次加载涉及哪些文件；这里把「源文件、依赖、缺失候选、
+ * 加载器只负责说明一次加载涉及哪些文件；这里把「源文件、依赖、缺失候选、
  * 恢复目录」换算成最终的文件集合与注册路径。事件判定也在这里完成，避免
  * PageContext 再复制一份加载器的恢复状态。
  */

@@ -82,7 +82,7 @@ export function isConfigLoaderArtifact(filepath: string, directory: string): boo
   return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
 }
 
-/** 配置加载结果及本次成功求值涉及的文件 */
+/** 配置加载结果及这次成功求值涉及的文件 */
 export interface LoadedPagesConfig {
   config: PagesConfig
   sources: string[]
@@ -105,7 +105,7 @@ export interface ConfigWatchInput {
 export class PagesConfigLoader {
   /** 装载失败时仍需监听重建的入口与已尝试路径 */
   readonly recoveryPaths = new Set<string>()
-  /** 本次失败中具体缺哪个文件；优先按它判断，命中时不看目录 */
+  /** 这次失败中具体缺哪个文件；优先按它判断，命中时不看目录 */
   readonly recoveryCandidates = new Set<string>()
   /** 目录导入的恢复范围，覆盖 package.json 和自定义入口 */
   readonly recoveryDirectories = new Set<string>()
@@ -342,7 +342,7 @@ export class PagesConfigLoader {
       throw error
     }
     finally {
-      // 清理失败不能改变本次加载的结果，也不能覆盖原始错误；残留目录仍被
+      // 清理失败不能改变这次加载的结果，也不能覆盖原始错误；残留目录仍被
       // 产物身份过滤排除，不会进入输入索引或监听
       try {
         await rm(bundleDirectory, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 })

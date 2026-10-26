@@ -1,11 +1,11 @@
 import type { Pages } from './pages'
 
 /**
- * subPackages 数组的元素类型，即应用的子包
+ * subPackages 数组的元素类型，即应用的分包
  */
 export interface SubPackage {
   /**
-   * 子包的根目录
+   * 分包的根目录
    */
   root: string
 
@@ -19,12 +19,12 @@ export interface SubPackage {
   independent?: boolean
 
   /**
-   * 子包由哪些页面组成，参数同 pages
+   * 分包由哪些页面组成，参数同 pages
    */
   pages: Pages
 
   /**
-   * 子包的插件
+   * 分包的插件
    */
   plugins?: Record<string, any>
 

@@ -208,7 +208,7 @@ export interface Options {
   dir: string
 
   /**
-   * uni-app 分包加载的子包页面目录
+   * uni-app 分包加载的页面目录
    *
    * @description
    * 支持字符串或对象形式的目录 glob，开发期间自动发现新增、删除和重命名的目录
@@ -335,15 +335,15 @@ export interface ResolvedOptions extends Omit<Options, 'homePage' | 'configSourc
   configSource: LoadConfigSource<PagesConfig>[]
 
   /**
-   * 解析后的子包目录列表
+   * 解析后的分包目录列表
    */
   subPackages: string[]
 
-  /** 原始子包目录规则，用于重新发现目录 */
+  /** 原始分包目录规则，用于重新发现目录 */
   subPackagePatterns: (string | SubPackageConfig)[]
 
   /**
-   * 子包目录的 root 映射（目录 -> 最终 root）
+   * 分包目录的 root 映射（目录 -> 最终 root）
    *
    * @description 未登记的目录继续使用相对 outDir 的默认 root
    */
@@ -351,7 +351,7 @@ export interface ResolvedOptions extends Omit<Options, 'homePage' | 'configSourc
 }
 
 /**
- * 子包配置接口
+ * 分包配置接口
  * 为 monorepo 支持，允许自定义 pages.json 中的 root 路径
  *
  * monorepo 项目中页面可能位于项目根目录之外（如 ../../packages/login/src/pages）。

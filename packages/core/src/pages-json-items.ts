@@ -77,7 +77,7 @@ export interface MergePlatformItemsOptions {
   /**
    * 按配置顺序摆放条目（规则 6）：配置覆盖全部既有键时整体重排；
    * 未覆盖时只把新增键插到声明位置，既有键保持磁盘序。
-   * 只有 tabBar list 启用——tab 顺序用户直接可见，pages 数组由
+   * 只有 tabBar list 启用，tab 顺序用户直接可见，pages 数组由
    * 首页前置子系统接管（各平台可声明不同首页，配置序重排会翻转
    * 首页变体的相对顺序）
    */
@@ -88,7 +88,7 @@ export interface MergePlatformItemsOptions {
  * 合并多平台的配置条目（数组侧适配器）。
  *
  * 处理条件编译注释（#ifdef / #ifndef / #endif），把 pages.json 里
- * 已有的条目和本次扫描的条目合并成一个数组；合并规则（同值叠平台、
+ * 已有的条目和本轮扫描的条目合并成一个数组；合并规则（同值叠平台、
  * 排除当前平台、排序、并集）用 platform-variants.ts 的共享核心。
  *
  * @param source - 现有条目数组（来自 pages.json）
@@ -110,7 +110,7 @@ export function mergePlatformItems<T extends object = Record<string, unknown>>(s
   const mergedMap = new Map<string, MultiPlatformItem<T>[]>()
   // 磁盘上出现过的键及首次出现顺序，包括马上会被当前平台替换的旧条目。
   // 判断“新增键”必须用它而不是合并后的 map：只属于当前平台的旧条目在
-  // 下面会被跳过，之后又被本次配置加回来，但它不是新增条目，不能跟着
+  // 下面会被跳过，之后又被当前配置加回来，但它不是新增条目，不能跟着
   // 配置挪位置
   const sourceOrder = orderByConfig ? { seen: new Set<string>(), order: [] as string[] } : undefined
   const variantsOf = (uniqueKey: string): MultiPlatformItem<T>[] => {
@@ -160,10 +160,10 @@ export function mergePlatformItems<T extends object = Record<string, unknown>>(s
         platforms = platformsExcluding(match[1], currentPlatform)
     }
 
-    // 剩下的平台只有当前平台自己（或为空）时，跳过这个条目——
-    // 本次运行会写出自己的版本。
+    // 剩下的平台只有当前平台自己（或为空）时，跳过这个条目：
+    // 本轮会写出自己的版本。
     // 注意：没有生成标记、也没包 #ifdef 的手写条目也会在这里被丢掉
-    // （当它不在本次扫描结果里时，解析出的平台列表是空的）。这是
+    // （当它不在本轮扫描结果里时，解析出的平台列表是空的）。这是
     // 一直以来的行为，保持不变；想每次运行都保留的手写页面，请写进
     // pages.config.ts 的 `pages`，它会无条件合并进来
     if (platforms.length === 0)
@@ -176,7 +176,7 @@ export function mergePlatformItems<T extends object = Record<string, unknown>>(s
   // 键保持磁盘序（规则 6）
   const orderOptions = sourceOrder ? { diskOrder: sourceOrder.order } : undefined
 
-  // 3. 把本次扫描的条目合并进 mergedMap
+  // 3. 把本轮扫描的条目合并进 mergedMap
   // 扫描条目上的 `type` 标记按设计保留（后面运行里 ensureHomePageFirst
   // 找首页要用它）；只有比较两条配置相不相等时才把它拿掉
   for (const item of items) {
@@ -217,7 +217,7 @@ export function mergePlatformItems<T extends object = Record<string, unknown>>(s
   result[Symbol.for('before:0') as CommentSymbol] = [lineComment(` ${GENERATION_MARKER_PREFIX} ${platformUnionStr}`)]
 
   // 计算输出顺序：只有 tabBar list 启用配置序摆放（orderByConfig 由
-  // 调用方决定）。配置覆盖全部既有键时整体重排；否则只把本次新增的
+  // 调用方决定）。配置覆盖全部既有键时整体重排；否则只把新增的
   // 键插到声明位置，既有键保持磁盘序（规则见 platform-variants 的
   // orderVariantLists）
   const declaredKeys = orderByConfig

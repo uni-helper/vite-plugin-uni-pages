@@ -59,10 +59,10 @@ test/
 ├── platform-variants.test.ts            平台变体表的合并与排序规则
 ├── uni-platform-dots.test.ts            文件名中的点只有后缀位才算平台后缀
 ├── pages-json-*.test.ts                 pages.json 生成细节（空行、首页排序与平台、
-│                                        纯合并 seam、子包收敛、tabBar 按平台、EPERM 重试）
+│                                        纯合并 seam、分包收敛、tabBar 按平台、EPERM 重试）
 ├── pages-json-entry-order.test.ts       tabBar list 条目顺序（新增落位、全量重排、pages 不重排）
 ├── pages-json-items.test.ts             数组适配器：跨平台条目合并与 #ifdef/#ifndef 包裹
-├── pages-json-structure.test.ts         首页前置与过期子包删除的注释跟随
+├── pages-json-structure.test.ts         首页前置与过期分包删除的注释跟随
 ├── page-snapshot.test.ts                页面读取快照、失败回退与首页标记隔离
 ├── pages-snapshot.test.ts               生成快照的容器复制与虚拟模块一致性
 ├── scan-plan.test.ts                    扫描计划的目录、来源、root 与规则

@@ -12,7 +12,7 @@ export const debug = {
   options: Debug('vite-plugin-uni-pages:options'),
   /** 主包页面扫描日志 */
   pages: Debug('vite-plugin-uni-pages:pages'),
-  /** 子包页面扫描日志 */
+  /** 分包页面扫描日志 */
   subPages: Debug('vite-plugin-uni-pages:subPages'),
   /** 错误日志 */
   error: Debug('vite-plugin-uni-pages:error'),

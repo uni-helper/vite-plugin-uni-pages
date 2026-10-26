@@ -31,14 +31,14 @@ import { mergeTabBarProps, renderTabBarListLines, renderTabBarPropLines } from '
  *
  * 当前平台用不到的区块怎么处理，分两种情况：
  * - tabBar 的外观属性：uni-app 条件编译能把整段剥掉，保留并包上 #ifdef
- * - 没有任何页面的子包：构建产物里会留下指向不存在目录的空壳，直接删掉
+ * - 没有任何页面的分包：构建产物里会留下指向不存在目录的空壳，直接删掉
  */
 
 /** 由扫描/合并流水线组装出的路由数据 */
 export interface PagesJsonData {
   /** 主包页面配置 */
   pages: InternalPages
-  /** 子包页面配置 */
+  /** 分包页面配置 */
   subPackages: SubPackages
   /** 解析后的 tabBar 配置 */
   tabBar?: TabBar
@@ -175,7 +175,7 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
 
   // pages 和 subPackages 必须是数组。手写错型（比如把数组写成了对象）
   // 时，subPackages 会在后面的遍历里抛出不知所云的 TypeError，
-  // pages 的已有内容则被静默丢掉——这里统一给成和解析错误同样式的
+  // pages 的已有内容则被静默丢掉。这里统一给成和解析错误同样式的
   // 明确报错
   for (const [field, value] of Object.entries({ pages: oldPages, subPackages: oldSubPackages })) {
     if (value != null && !Array.isArray(value))
@@ -201,15 +201,15 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
   for (const item of data.subPackages) {
     newSubPackages.set(item.root, item)
   }
-  // 用新的配置更新 pages.json 中已存在的子包
+  // 用新的配置更新 pages.json 中已存在的分包
   const subPackagesArray = pageJson.subPackages as unknown as CommentArray<CommentObject>
   const staleRoots: string[] = []
   for (const existing of subPackagesArray as unknown as SubPackage[]) {
     const sub = newSubPackages.get(existing.root)
     if (sub) {
       // plugins 来自用户配置，跟着配置走：配置里有就写入，配置里删了
-      // 就清掉。是不是插件生成的要在覆盖 pages 前判断——合并结果一
-      // 律带新的生成标记，看合并后的数组永远为真。手写子包（没有
+      // 就清掉。是不是插件生成的要在覆盖 pages 前判断，合并结果一
+      // 律带新的生成标记，看合并后的数组永远为真。手写分包（没有
       // 标记）的 plugins 不碰
       const wasGenerated = hasGenerationMarker(existing.pages as unknown as CommentArray<CommentObject> | undefined)
       existing.pages = mergePlatformItems(existing.pages as unknown as CommentArray<CommentObject>, currentPlatform, sub.pages, 'path').items as unknown as Pages
@@ -222,19 +222,19 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
       newSubPackages.delete(existing.root)
     }
     else if (hasGenerationMarker(existing.pages as unknown as CommentArray<CommentObject> | undefined)) {
-      // 本次运行扫描不到、但确实是插件生成的子包（每个页面都通过
+      // 本轮扫描不到、但确实是插件生成的分包（每个页面都通过
       // definePage(null) 退出，或目录被删了）：当前平台已经看不到它
-      // 的任何页面，整个删掉。如果不删，这个 root 会以空子包的形式
+      // 的任何页面，整个删掉。如果不删，这个 root 会以空分包的形式
       // 进入本平台的构建产物（app.json 里留一个 pages 为空的 root，
       // 指向不存在的目录）。删掉不丢状态：每个平台每次运行都会重新
       // 扫描并重写自己的条目，其他平台的进程下次写入时会把它加回来。
-      // 手写的子包没有生成标记，原样保留
+      // 手写的分包没有生成标记，原样保留
       staleRoots.push(existing.root)
     }
   }
-  // 删掉上面收集的插件生成子包，注释和条目一起带走
+  // 删掉上面收集的插件生成分包，注释和条目一起带走
   removeStaleSubPackages(subPackagesArray, staleRoots)
-  // 追加 pages.json 中尚不存在的子包
+  // 追加 pages.json 中尚不存在的分包
   for (const [_, newSub] of newSubPackages) {
     const subPackage: SubPackage = {
       root: newSub.root,
@@ -254,7 +254,7 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
   // （由测试锁定）
   const contributesProps = !!(list && list.length)
   const oldTabBarObj = oldTabBar as unknown as ({ list?: CommentArray<CommentObject> } & Partial<TabBar>) | undefined
-  // 即使本次运行没有 tabBar，也要针对当前平台清理列表：只属于本平台
+  // 即使本轮没有 tabBar，也要针对当前平台清理列表：只属于本平台
   // 的条目从 list 中退出，其他平台的条目在自己的 #ifdef 块后面继续
   // 存活。pages.json 是各平台共享的，当前平台没有 tabBar，不代表可以
   // 删掉其他平台已经生成的整个区块
@@ -292,7 +292,7 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
     }
     // tabBar 只对拥有至少一个 list 条目的平台可见。uni-app 的条件
     // 编译会把整个被包裹的属性剥掉，所以没有 tabBar 的平台本来就不
-    // 该有这个区块——不包 #ifdef 的话，它们的构建产物会带上
+    // 该有这个区块。不包 #ifdef 的话，它们的构建产物会带上
     // `tabBar: { "list": [] }` 这样的空壳
     const tabBarPlatformStr = tabBarMerge.owningPlatforms.join(' || ')
     // owningPlatforms 为空说明 list 里只剩手写 #ifndef 条目：显示与否
@@ -319,7 +319,7 @@ function isPrettyFormat(format: PagesJsonFormatOptions | undefined): boolean {
 
 /**
  * 不碰文件系统，只做计算：把路由数据合并进现有 pages.json 文本
- * （多平台 `#ifdef` 块、首页重排、生成标记、过期子包清理）并序列化
+ * （多平台 `#ifdef` 块、首页重排、生成标记、过期分包清理）并序列化
  * 成字符串。文件锁、变更检测和原子写入都在 {@link writePagesJson}
  * 里；测试直接用字符串检查这个函数。
  *

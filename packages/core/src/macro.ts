@@ -350,7 +350,7 @@ async function parseCode(options: { imports: string[], code: string, filename: s
     // 创建支持动态 import 的新 VM 上下文。
     // 这不是安全沙箱：故意暴露宿主的 `globalThis`（宏代码可能合法地
     // 读取 process.env 等），宏代码因此拥有完整的 Node 能力。vm 边界
-    // 只防误伤——语法错误、死循环（超时）、意外的全局变量——不防恶意
+    // 只防误伤（语法错误、死循环导致的超时、意外的全局变量），不防恶意
     // 代码。definePage 本就是构建期的用户代码；安装一个不受信任的
     // 项目已经意味着信任它的开发期脚本。
     const vmContext = {
@@ -365,7 +365,7 @@ async function parseCode(options: { imports: string[], code: string, filename: s
       // 没被发现）。这个文件名只用来定位，不会真的去读它。
       // 另外 require 按 Node 规则解析：导入要写全扩展名，`./title.mjs`、
       // `./title.ts` 都行（engines 门槛内的 Node 自带 TS 剥离），TS 里
-      // 省略扩展名的 `./title` 不行——require 不做 TS 的扩展名补全
+      // 省略扩展名的 `./title` 不行，require 不做 TS 的扩展名补全
       require: createRequire(path.join(dir, 'define-page.mjs')),
       // 宏代码里的动态 import() 会被上面的 TypeScript 编译改写成
       // require()，因此实际走不到这个绑定；留着它只是兜底（比如未来

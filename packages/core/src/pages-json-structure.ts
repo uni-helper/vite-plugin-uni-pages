@@ -83,14 +83,14 @@ export function ensureHomePageFirst(pagesArray: InternalPages | undefined, homeP
 }
 
 /**
- * 删除本轮扫描不到、但确实由插件生成的子包。
+ * 删除本轮扫描不到、但确实由插件生成的分包。
  *
- * 不删的话，这个 root 会以空子包进入本平台构建产物（app.json 里留
- * 一个指向不存在目录的 pages 数组）。手写子包没有生成标记，原样保留。
+ * 不删的话，这个 root 会以空分包进入本平台构建产物（app.json 里留
+ * 一个指向不存在目录的 pages 数组）。手写分包没有生成标记，原样保留。
  *
  * 倒序遍历；删除条目注释符号再 splice，让 comment-json 把 `#ifdef`
  * 块和用户注释一起带走。`after-value:i`（条目的 `}` 和 `,` 之间的
- * 用户注释）也必须删掉——splice 只挪注释、不删注释。
+ * 用户注释）也必须删掉：splice 只挪注释、不删注释。
  */
 export function removeStaleSubPackages(subPackagesArray: CommentArray<CommentObject>, staleRoots: readonly string[]): void {
   for (let i = subPackagesArray.length - 1; i >= 0; i--) {

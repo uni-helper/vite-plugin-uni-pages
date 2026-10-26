@@ -246,7 +246,7 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
       ready: false,
       command: source === 'prepare' ? undefined : source,
       watching: false,
-      // 先保存进行中状态，再开始生成，重复调用共享一次初始化
+      // 先保存进行中的状态，再开始生成，重复调用共享一次初始化
       promise: Promise.resolve().then(async () => {
         await context.updatePagesJSON()
         if (state.closing)

@@ -238,7 +238,7 @@ function parseTabBarProps(content: string, interiorStart: number): Map<string, R
         // #ifndef 属性自带完整包裹：开头指令统一重写为本属性的条件
         // （块里的后续属性自己的注释里没有它），结尾统一用合成的
         // #endif。注释里其他属性留下的结构性指令（上一个块的 #endif、
-        // 重复的 #ifndef）全部滤掉——每个属性的包裹都是独立配对的，
+        // 重复的 #ifndef）全部滤掉：每个属性的包裹都是独立配对的，
         // 多余的指令只会输出成悬空的空块或没闭合的块；用户写的普通
         // 注释（说明文字）保留在指令后面
         storedBefore = [
@@ -253,7 +253,7 @@ function parseTabBarProps(content: string, interiorStart: number): Map<string, R
       props.set(key, variants)
     }
     catch {
-      // 值解析不出来：丢弃这条，本次运行会用自己的配置重写这个属性
+      // 值解析不出来：丢弃这条，本轮会用自己的配置重写这个属性
     }
   }
 }

@@ -95,7 +95,7 @@ export class PageContext {
   subPages = new Map<string, Map<string, Page>>()
   /** 主包页面配置数组，用于生成 pages.json 的 pages 字段 */
   pageMetaData: InternalPages = []
-  /** 子包页面配置数组，用于生成 pages.json 的 subPackages 字段 */
+  /** 分包页面配置数组，用于生成 pages.json 的 subPackages 字段 */
   subPageMetaData: SubPackages = []
   /**
    * 最近一次合并出的 tabBar（配置文件与 definePage 声明的合体）。
@@ -191,7 +191,7 @@ export class PageContext {
   }
 
   /**
-   * 按顺序跑完扫描与合并：先扫描主包和子包的页面，再合并它们的
+   * 按顺序跑完扫描与合并：先扫描主包和分包的页面，再合并它们的
    * 信息。步骤顺序只维护在这里，调用方和测试都不用关心。
    */
   async scanAndMerge(): Promise<void> {
@@ -455,7 +455,7 @@ export class PageContext {
    *
    * 页面事件的回调走这里而不是直接调 {@link updatePagesJSON}：一旦
    * 它拒绝（拿不到文件锁、声明文件写不进去），就成了未处理的拒绝，
-   * Node 默认直接终止进程——开发时正在编辑文件，一次偶发的锁冲突
+   * Node 默认直接终止进程。开发时正在编辑文件，一次偶发的锁冲突
    * 不该把 dev server 打死。用户改一次文件就会再触发一次事件，
    * 所以这里报错即可。
    */
@@ -658,8 +658,8 @@ export class PageContext {
   }
 
   /**
-   * 将子包路由数据解析为 JSON 字符串
-   * @returns 子包页面配置的 JSON 字符串
+   * 将分包路由数据解析为 JSON 字符串
+   * @returns 分包页面配置的 JSON 字符串
    */
   resolveSubRoutes(): string {
     return cjStringify(this.snapshot.subPackages, null, 2)
@@ -869,7 +869,7 @@ export class PageContext {
     // 关闭页面合并时没有扫描结果，不需要为空的来源集合再展开一次目录
     const subSources = this.options.mergePages ? this.subPackageSourcesByDir() : new Map<string, SubPackageDirectorySource>()
     const groups: [string | undefined, Map<string, Page>][] = [[undefined, this.pages], ...this.subPages]
-    // 宏可能异步求值，保持并行读取，来源决议仍按原顺序进行
+    // 宏可能异步求值，保持并行读取，来源决议仍按原顺序
     await Promise.all(groups.flatMap(([, pages]) => [...pages.values()].map(page => page.ensureLoaded())))
     for (const [dir, pages] of groups) {
       const root = dir === undefined ? undefined : this.subPackageRoot(dir)
@@ -926,7 +926,7 @@ export class PageContext {
   /**
    * 解析 pages 规则并设置页面类型
    * @param pages 页面路径映射
-   * @param packageType 页面包类型（主包或子包）
+   * @param packageType 页面包类型（主包或分包）
    * @param overrides 自定义页面配置
    * @returns pages 规则
    */
@@ -1008,7 +1008,7 @@ export class PageContext {
   }
 
   /**
-   * 合并子包页面配置
+   * 合并分包页面配置
    *
    * @description 静态、glob 和回调来源先按最终 root 汇集，再对整组应用一次配置覆盖，
    * 保留手工页面和分包 plugins 配置
@@ -1027,7 +1027,7 @@ export class PageContext {
 
     for (const [root, pages] of pagesByRoot) {
       const globPackage = subPackages?.find(v => v.root === root)
-      // 用户配置里的子包页面路径按 pages.json 的惯例相对 root 书写
+      // 用户配置里的分包页面路径按 pages.json 的惯例相对 root 书写
       // （如 root 为 'pkg' 时写 'detail'）。合并前先换算成和扫描结果
       // 一样的基准（相对 outDir），两边路径才能对上号，合并后也才能
       // 统一转回相对 root 的形式；不做这一步，用户路径会被当成相对
@@ -1048,12 +1048,12 @@ export class PageContext {
       packagesByRoot.set(root, {
         root,
         pages: parsedPages,
-        // 为该子包保留用户配置中的 plugins 配置
+        // 为该分包保留用户配置中的 plugins 配置
         ...(globPackage?.plugins && { plugins: globPackage.plugins }),
       })
     }
 
-    // 用户在配置里写了子包、但这次扫描没有扫到对应目录时，原样带上
+    // 用户在配置里写了分包、但这次扫描没有扫到对应目录时，原样带上
     for (const { root, pages, plugins } of subPackages) {
       if (root && !packagesByRoot.has(root)) {
         packagesByRoot.set(root, {
@@ -1159,7 +1159,7 @@ function mergePageMetaDataArray(pageMetaData: InternalPages): InternalPages {
       // 时，下面的 Object.assign 会整体覆盖累积结果，这和旧版的原地
       // 实现一致。有两处检查故意和旧实现不同：合并目标永远是全新
       // 对象（旧代码会改动 Page 缓存共享的 style 对象，把脏键带到
-      // 下一次运行），判断用 Object.hasOwn 而不是看值真不真——继承来的
+      // 下一次运行），判断看键是否存在（Object.hasOwn），不看值真不真；继承来的
       // style 键不算条目自己的，Object.assign 也从不拷贝继承键。
       // 实践中 style 值都是普通对象（JSON 解析 / 对象字面量）
       if (!Object.hasOwn(page, 'style'))

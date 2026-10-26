@@ -9,7 +9,7 @@ import { normalizePath } from 'vite'
 export interface DeclarationInput {
   /** 主包页面配置 */
   pages: InternalPages
-  /** 子包页面配置 */
+  /** 分包页面配置 */
   subPackages: SubPackages
   /** 合并后的 tabBar（配置文件与 definePage 声明的合体） */
   tabBar?: TabBar

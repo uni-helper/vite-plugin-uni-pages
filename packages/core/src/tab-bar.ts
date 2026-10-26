@@ -10,7 +10,7 @@ import { platformsExcluding, sortVariants, upsertCurrentVariant } from './platfo
  *
  * 对象侧适配器：属性变体从 pages.json 的原始文本里提取（重复键，
  * 见 jsonc-scan.ts），合并规则用 platform-variants.ts 的共享核心，
- * 渲染绕开 comment-json 手工拼行——comment-json 的对象表达不了
+ * 渲染绕开 comment-json 手工拼行：comment-json 的对象表达不了
  * 「同一个键出现多次」，序列化时占位符替换发生在 pages-json.ts 的
  * mergePagesJson 里。
  */
@@ -52,7 +52,7 @@ export function mergeTabBarProps(
     if (key === 'list')
       continue
     // 先登记键，再过滤变体。当前平台自己的旧属性在下面会被跳过，如果
-    // 只等存活变体来建键，这个键会从 Map 里消失、再被本次配置追加到
+    // 只等存活变体来建键，这个键会从 Map 里消失、再被当前配置追加到
     // 末尾，两个平台轮流运行时属性顺序每次都会翻转
     const keyVariants = variantsOf(key)
     for (const raw of variants) {
