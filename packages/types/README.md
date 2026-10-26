@@ -12,7 +12,7 @@
 
 为 `uni-app` 的 `pages.json` 提供 TypeScript 类型。
 
-完整文档见 [在线文档](https://uni-helper.js.org/vite-plugin-uni-pages)。
+完整文档见 [uni-helper.js.org](https://uni-helper.js.org/vite-plugin-uni-pages)，另有 [Netlify](https://vite-plugin-uni-pages.netlify.app) 和 [Cloudflare Pages](https://vite-plugin-uni-pages.pages.dev) 镜像。
 
 不想看文档？直接问 AI 🤖 <a href="https://deepwiki.com/uni-helper/vite-plugin-uni-pages"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
 

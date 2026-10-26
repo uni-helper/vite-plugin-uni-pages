@@ -19,6 +19,8 @@
 
 在 Vite 驱动的 uni-app 上使用基于文件的路由系统。
 
+📖 在线文档：[uni-helper.js.org](https://uni-helper.js.org/vite-plugin-uni-pages)、[Netlify](https://vite-plugin-uni-pages.netlify.app)、[Cloudflare Pages](https://vite-plugin-uni-pages.pages.dev)。
+
 不想看文档？直接问 AI 🤖 <a href="https://deepwiki.com/uni-helper/vite-plugin-uni-pages"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
 
 > **请考虑持续[赞助](https://github.com/ModyQyW/sponsors)以维持该项目的持续健康发展，非常感谢！🙏**
@@ -31,7 +33,7 @@ pnpm i -D @uni-helper/vite-plugin-uni-pages
 
 ## 使用
 
-📖 请阅读[在线文档](https://uni-helper.js.org/vite-plugin-uni-pages)或各包 README 文档了解使用方法。
+📖 请阅读上述在线文档或各包 README 文档了解使用方法。
 
 ```ts
 // vite.config.mts
