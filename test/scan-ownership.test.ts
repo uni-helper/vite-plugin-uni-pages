@@ -14,10 +14,11 @@ function fixture(): string {
   return root
 }
 
-function page(root: string, filename: string, macro?: string): void {
+function page(root: string, filename: string, macro?: string): string {
   const file = path.join(root, filename)
   fs.mkdirSync(path.dirname(file), { recursive: true })
   fs.writeFileSync(file, `${macro ? `<script setup lang="ts">${macro}</script>` : ''}<template><view /></template>`)
+  return file
 }
 
 function alias(root: string, target: string, link: string): void {
@@ -128,6 +129,23 @@ describe('扫描目录的 root 意图与页面归属', () => {
 
     expect(ctx.subPageMetaData).toHaveLength(1)
     expect(subPaths(ctx)).toEqual(['../../../external/pages/index'])
+  })
+
+  it('自定义 root 下 root 与页面 path 拼起来仍是页面相对 outDir 的位置', async () => {
+    // uni-app 用 root + page.path 定位页面源文件。根外目录或与物理位置
+    // 无关的 root 会让 path 里出现 '..'，看着难看，但拼起来必须落在真实
+    // 文件上；只把 path 改成相对扫描目录会指向不存在的页面
+    const workspace = fixture()
+    const root = path.join(workspace, 'apps/app')
+    fs.mkdirSync(path.join(root, 'src'), { recursive: true })
+    const pageFile = page(workspace, 'packages/login/src/pages/detail.vue')
+    const ctx = await createPages({
+      subPackages: [{ dir: '../../packages/login/src/pages', root: 'packages/login/src/pages' }],
+    }, { root })
+
+    const expected = path.relative(path.join(root, 'src'), pageFile).replace(/\\/g, '/').replace(/\.vue$/, '')
+    const pkg = ctx.subPageMetaData.find(item => item.root === 'packages/login/src/pages')!
+    expect(path.posix.join(pkg.root, pkg.pages[0]!.path)).toBe(expected)
   })
 
   it.each([false, true])('alias 的单文件排除不会丢掉 real 的有效页面，alias 在前：%s', async (aliasFirst) => {
