@@ -42,6 +42,55 @@ function isDirectory(file: string): boolean {
   }
 }
 
+/**
+ * 一轮监听刷新内复用的 Vite ignored 判定
+ *
+ * 监听检查沿候选路径逐级询问 ignored，同一批页面共享的祖先目录会在
+ * 大量候选之间重复出现。每个路径在一轮内只求值一次，stat 次数从
+ * “候选数 × 深度”降到“路径数”。来源结构或权限变化由下一次 refresh
+ * 的 clear() 重新计算。
+ */
+export class SourceIgnoreIndex {
+  private readonly verdicts = new Map<string, boolean>()
+
+  constructor(private readonly ignored: (file: string, stats?: Stats) => boolean) {}
+
+  /** 丢弃本轮结论；新的来源结构、忽略规则或权限要重新询问 */
+  clear(): void {
+    this.verdicts.clear()
+  }
+
+  /** 判定路径是否被忽略；祖先结论会被后代复用 */
+  matches(file: string, stats?: Stats): boolean {
+    const cached = this.verdicts.get(file)
+    if (cached !== undefined)
+      return cached
+    let entry = stats
+    if (!entry) {
+      try {
+        entry = fs.statSync(file, { throwIfNoEntry: false })
+      }
+      catch (error) {
+        // 不可读路径无法建立有效订阅；按已忽略处理，不能借权限问题中断生成
+        if (isUnavailableSourceError(error)) {
+          this.verdicts.set(file, true)
+          return true
+        }
+        if (!isMissingFsError(error) && (error as NodeJS.ErrnoException).code !== 'ELOOP')
+          throw error
+      }
+    }
+    if (this.ignored(file, entry)) {
+      this.verdicts.set(file, true)
+      return true
+    }
+    const parent = normalizePath(path.dirname(file))
+    const inherited = parent === file ? false : this.matches(parent)
+    this.verdicts.set(file, inherited)
+    return inherited
+  }
+}
+
 /** 当前词法页面来源、物理内容订阅及非递归入口观察 */
 export class PageSourceWatch {
   private rules: ReturnType<typeof getPageRules>
@@ -61,6 +110,8 @@ export class PageSourceWatch {
   private awaitWriteFinish: ChokidarOptions['awaitWriteFinish']
   private atomic: ChokidarOptions['atomic']
   private ignored: ((file: string, stats?: Stats) => boolean) | undefined
+  /** 当前 ignored 规则的判定缓存，随刷新清空 */
+  private sourceIgnored: SourceIgnoreIndex | undefined
   watcher?: FSWatcher
 
   constructor(
@@ -93,6 +144,7 @@ export class PageSourceWatch {
     this.ignored = ignored === undefined || (Array.isArray(ignored) && ignored.length === 0)
       ? undefined
       : createPageWatchFilter(ignored, this.options.root, options.cwd ?? process.cwd())
+    this.sourceIgnored = this.ignored ? new SourceIgnoreIndex(this.ignored) : undefined
     this.started = true
     try {
       this.refresh(plan ?? createScanPlan(this.options))
@@ -105,30 +157,7 @@ export class PageSourceWatch {
   }
 
   private ignoresSource(source: string, stats?: Stats): boolean {
-    if (!this.ignored)
-      return false
-    let current = source
-    while (true) {
-      let entry = current === source ? stats : undefined
-      if (!entry) {
-        try {
-          entry = fs.statSync(current, { throwIfNoEntry: false })
-        }
-        catch (error) {
-          // 不可读路径无法建立有效订阅；按已忽略处理，避免权限问题中断页面生成
-          if (isUnavailableSourceError(error))
-            return true
-          if (!isMissingFsError(error) && (error as NodeJS.ErrnoException).code !== 'ELOOP')
-            throw error
-        }
-      }
-      if (this.ignored(current, entry))
-        return true
-      const parent = normalizePath(path.dirname(current))
-      if (parent === current)
-        return false
-      current = parent
-    }
+    return this.sourceIgnored?.matches(source, stats) ?? false
   }
 
   private createContentWatcher(): FSWatcher {
@@ -212,6 +241,8 @@ export class PageSourceWatch {
   refresh(plan: ScanPlan): void {
     if (!this.started)
       return
+    // 来源结构、忽略规则或权限可能变了，本轮重新询问 Vite ignored
+    this.sourceIgnored?.clear()
     const rules = plan.rules
     // 保留上一轮的根：glob 匹配到的目录被删除后虽然不在本轮展开结果里，
     // 仍要从其父目录观察重建
@@ -283,6 +314,7 @@ export class PageSourceWatch {
     this.recoveryWatchers.clear()
     this.contentKey = ''
     this.contentRules = undefined
+    this.sourceIgnored = undefined
     this.warnedSourceLimit = false
     const watcher = this.watcher
     this.watcher = undefined
