@@ -142,6 +142,7 @@ const lockQueues = new Map<string, Promise<unknown>>()
  * @param task - 在锁内运行的异步任务；返回值原样返回给调用方
  * @param retry - 锁被别人拿着时的重试次数，默认 3
  * @returns `task` 的结果；一直拿不到锁时为 `undefined`
+ * @throws 权限不足、路径缺失等非竞争错误原样抛出，不重试
  */
 export function withFileLock<T>(path: string, task: () => Promise<T>, retry = 3): Promise<T | undefined> {
   // 排在上一个人做完后开始（忽略他的成败，失败的前一个不会拖累后
@@ -168,9 +169,14 @@ async function acquireAndRun<T>(path: string, task: () => Promise<T>, retry: num
       // 所以不额外调这些参数
       release = await lockfile.lock(path, { realpath: false })
     }
-    catch {
-      // 锁被别的进程拿着，等半秒再试
-      await sleep(500)
+    catch (error) {
+      // 只有锁被别的进程拿着（ELOCKED）才值得等；权限不足、父目录缺失
+      // 之类的错误重试也没用，直接抛出，保留真实错误码和路径
+      if ((error as NodeJS.ErrnoException).code !== 'ELOCKED')
+        throw error
+      // 最后一次失败后不再等待，直接按拿不到锁返回
+      if (attempt > 1)
+        await sleep(500)
       continue
     }
 
