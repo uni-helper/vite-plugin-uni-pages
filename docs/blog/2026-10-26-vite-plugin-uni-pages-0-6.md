@@ -1,6 +1,6 @@
 ---
 title: "vite-plugin-uni-pages 0.6：统一扫描规则，开发期少重启"
-description: "0.6 统一了 exclude 和扫描来源规则，补上 prepare()、配置依赖热更新和分包目录 glob，并重构了页面监听与会话生命周期。"
+description: "0.6 统一了 exclude 和扫描来源规则，补上 prepare()、配置依赖热更新和分包目录 glob，重构了页面监听与会话生命周期，并为 uni-app x 补齐 pages.json 类型。"
 date: "2026-10-26"
 author: ModyQyW
 authorUrl: "https://github.com/ModyQyW"
@@ -10,6 +10,8 @@ outline: deep
 # vite-plugin-uni-pages 0.6：统一扫描规则，开发期少重启
 
 <p class="blog-post-meta">{{ $frontmatter.date }} · <a :href="$frontmatter.authorUrl" target="_blank" rel="noreferrer noopener">{{ $frontmatter.author }}</a></p>
+
+![vite-plugin-uni-pages 0.6 封面](https://cdn.jsdelivr.net/gh/ModyQyW/static@main/2026-10-26-uni-pages-0-6.webp)
 
 0.5 处理的是多终端并发写 `pages.json`：文件锁、原子写入、按平台的 `#ifdef` 块。那之后暴露出来的麻烦在别处。扫描来源的规则不统一，同一个页面可能被两个分包认领却没有提示。开发期间改配置依赖、改符号链接、新建分包目录，经常要重启。需要读 `pages.json` 的下游插件又总是抢在生成之前执行。
 
@@ -37,6 +39,8 @@ exclude: [
 
 `!foo` 这类否定规则现在直接报错，`!(keep).vue` 仍然可用。
 
+![0.5 每个扫描目录各匹配一次 exclude，0.6 在 Vite root 下统一匹配](https://cdn.jsdelivr.net/gh/ModyQyW/static@main/2026-10-26-exclude-basis.webp)
+
 ### 扫描来源与页面归属统一
 
 0.5 里多个目录落到同一 root 时，后扫描的页面会盖掉前面的；同一物理页面被两个分包 root 认领时也没有提示。0.6 用 realpath 判断目录和页面身份，规则固定为：
@@ -54,11 +58,13 @@ exclude: [
 
 嵌套构建、并行任务和重启场景各自调用 `UniPages()` 创建实例。`build --watch` 每轮的 `closeBundle` 不会释放会话，要等整个 watcher 关闭。
 
+![一个实例只服务一个 Vite 会话：重叠会话被拒绝，关闭后可复用，build --watch 期间保持会话](https://cdn.jsdelivr.net/gh/ModyQyW/static@main/2026-10-26-instance-session.webp)
+
 ### `UNI_PLATFORM` 必填，路径基准统一
 
 初始化读不到 `process.env.UNI_PLATFORM` 会直接报错。0.5 会以空平台继续生成，条件编译分支全部跳过，产物不对也不提示。通过 uni-app 的命令启动时这个变量总是存在，自己写脚本调用 `prepare()` 时要先设置。
 
-用脚本直接调 API 的项目还要看两个路径基准。`dts` 传字符串时相对 Vite root 解析，0.5 是相对当前工作目录直接写。`getPageFiles(directory, options)` 的 `directory` 相对 `options.root` 解析，0.5 相对 `process.cwd()`。
+用脚本直接调 API 的项目还要看路径基准。Vite `root` 在解析阶段固定为绝对路径，之后切换 `process.cwd()` 不再影响扫描和排除。`dts` 传字符串时相对 Vite root 解析，0.5 是相对当前工作目录直接写。`dts: true` 的默认输出路径也改为相对解析后的 root。`getPageFiles(directory, options)` 的 `directory` 相对 `options.root` 解析，0.5 相对 `process.cwd()`。
 
 ## 新能力
 
@@ -83,6 +89,8 @@ export default defineConfig(async () => ({
 ```
 
 数组按顺序求值，`Optimization()` 会在准备完成后才执行。`platformSuffix` 必填，要和最终是否启用 `@uni-helper/vite-plugin-uni-platform` 一致。准备阶段读取调用时的 `UNI_PLATFORM`，Vite 还没加载 `.env`，配置要用到其中的变量时先用 `loadEnv()`。`prepare()` 不会刷新下游插件已经缓存的配置，需要完整配置的插件要放在它后面创建。
+
+![prepare() 在 config 钩子读取之前生成 pages.json；0.5 的顺序会读到旧文件](https://cdn.jsdelivr.net/gh/ModyQyW/static@main/2026-10-26-prepare-timing.webp)
 
 ### 配置依赖热更新
 
@@ -112,6 +120,8 @@ UniPages({
 })
 ```
 
+目录名里带 `[`、`]` 这类 glob 元字符时要转义，写成 `app\\[prod\\]/src/pages` 这种形式。
+
 monorepo 里页面在项目根之外时，默认 root 会带 `..`，uni-app 不认。对象形式可以指定写进 `pages.json` 的 root，也可以传同步回调：
 
 ```ts
@@ -128,13 +138,17 @@ UniPages({
 
 `src/packages/account/pages/profile.vue` 会生成 root `packages/account`、页面 path `pages/profile`。root 只决定写进 `pages.json` 的 `subPackages.root`，页面 path 仍然按文件相对 `outDir` 的实际位置换算。根外目录的 path 会带 `..`，和 root 拼起来正好是源文件的位置，uni-app 靠这个组合定位页面。规则和迁移细节见[分包](/advanced/subpackages)。
 
+![分包 glob 匹配目录并映射到 root，root 与页面 path 组合定位源文件](https://cdn.jsdelivr.net/gh/ModyQyW/static@main/2026-10-26-subpackage-root.webp)
+
 ### 页面监听：链接、重建和增量读取
 
-0.6 把页面内容监听从 Vite 的共享 watcher 里拆了出来。插件自己订阅解析后的物理目标，Vite 的共享 watcher 负责配置文件事件和目录结构通知。这样符号链接页面能跟着改：链接改指到新目录、目标删除后重建、目录里再套链接，都会继续更新 `pages.json`。悬空链接和循环链接按暂不可用处理，恢复后下一轮重新发现。单轮来源发现最多登记 1024 个链接来源，超过后告警并停止展开，页面生成不受影响。
+0.6 把页面内容监听从 Vite 的共享 watcher 里拆了出来。插件自己订阅解析后的物理目标，配置文件事件和目录结构通知仍由 Vite 的共享 watcher 负责（`build --watch` 下是构建 watcher）。这样符号链接页面能跟着改：链接改指到新目录、目标删除后重建、目录里再套链接，都会继续更新 `pages.json`。悬空链接和循环链接按暂不可用处理，恢复后下一轮重新发现。单轮来源发现最多登记 1024 个链接来源，超过后告警并停止展开，页面生成不受影响。
 
 普通内容修改只重读与这个物理文件关联的页面，元数据没变就跳过配置加载和写盘。新增、删除、链接改指、watcher 恢复这类结构变化才走完整扫描，生成期间到达的事件合并到下一轮。H5 开发时，Vite 的 `server.watch.ignored`、`usePolling`、`interval`、`awaitWriteFinish`、`atomic` 会转发给内容 watcher，`CHOKIDAR_USEPOLLING` 和 `CHOKIDAR_INTERVAL` 也认。
 
-开发期间配置或依赖出错、扫描冲突时，`pages.json` 保留上一次成功的内容，错误只记录日志，不会终止开发服务器。修好文件后继续更新。监听细节和 Windows 上的注意事项见[监听与符号链接](/advanced/watchers-and-symlinks)。
+开发期间配置或依赖出错、扫描冲突时，`pages.json` 保留上一次成功的内容，错误只记录日志，不会终止开发服务器。首次加载失败仍会终止初始化。修好文件后继续更新。监听细节和 Windows 上的注意事项见[监听与符号链接](/advanced/watchers-and-symlinks)。
+
+![页面监听：内容变更按 metadata 决定跳过或写入，结构变化走完整扫描，符号链接改指后可恢复](https://cdn.jsdelivr.net/gh/ModyQyW/static@main/2026-10-26-page-watch.webp)
 
 ## pages.json 的几处收尾
 
@@ -146,7 +160,7 @@ UniPages({
 
 ## 类型、文档和测试
 
-`@uni-helper/uni-pages-types` 补齐了 uni-app x 的 `pages.json` 字段，schema 重新生成。上一篇文章最后提到 0.6 会支持 uni-app x，这次补的是类型层。
+`@uni-helper/uni-pages-types` 已按 uni-app x 文档补齐 `pages.json` 字段（[8c5e968](https://github.com/uni-helper/vite-plugin-uni-pages/commit/8c5e968c35047ad17cd72ec8f5e7c811e6d5e4c5)），schema 重新生成。上一篇文章最后提到 0.6 会支持 uni-app x，这个支持已经落地。`.uvue` 页面本来就在扫描范围内，页面、tabBar 和分包里的 uni-app x 字段现在也有对应的类型提示。
 
 仓库里新增了 VitePress 文档站，按指南、API、进阶、FAQ 和迁移指南分开，带 Netlify 与 Cloudflare Pages 的部署配置。
 
@@ -156,11 +170,19 @@ UniPages({
 
 1. 升级依赖，先跑一次构建，检查 `pages.json` 的差异。
 2. 按 Vite root 重写 `exclude`；要保留依赖里的页面时显式关掉或缩小默认值。
-3. 检查 `subPackages`：多个声明指向同一目录或页面时，处理新出现的页面和冲突报错。
-4. 检查实例用法：并行构建、`server.restart()`、`build --watch` 期间复用同一实例的地方，改成每次创建。
-5. 脚本里补 `UNI_PLATFORM`；用了 `dts` 字符串或 `getPageFiles` 的脚本检查路径基准。
+3. 检查 `subPackages`：多个声明指向同一目录或页面时，处理新出现的页面和冲突报错；目录名里的 `[`、`]` 等元字符要转义。
+4. 检查实例用法：并行构建、`server.restart()`、`build --watch` 期间再次启动 Vite 的地方，改成每次创建实例。
+5. 脚本里补 `UNI_PLATFORM`；用了 `dts` 或 `getPageFiles` 的脚本检查路径基准。
 
 完整规则和旧写法对照见[迁移指南](/other/migration)。
+
+## 致谢
+
+感谢 [@Vanisper](https://github.com/Vanisper) 提交的扫描归属、页面监听、配置依赖热更新、`prepare()` 和分包 glob 等 PR。也感谢在 [#294](https://github.com/uni-helper/vite-plugin-uni-pages/issues/294) 里做的那轮规则复核，扫描归属、配置加载、实例生命周期和页面监听的边界在那里归成了四组。
+
+感谢 [@liujiayii](https://github.com/liujiayii) 修正配置覆盖全部条目时 tabBar 条目的落位（[#299](https://github.com/uni-helper/vite-plugin-uni-pages/pull/299)）。
+
+monorepo 分包和 uni-app x 的需求分别来自 [#271](https://github.com/uni-helper/vite-plugin-uni-pages/issues/271) 和 [#293](https://github.com/uni-helper/vite-plugin-uni-pages/issues/293)，也谢谢提出这些场景的 [@shikangsheng](https://github.com/shikangsheng)、[@cq112233](https://github.com/cq112233)，以及所有提交复现和反馈的朋友。
 
 ## 相关链接
 
