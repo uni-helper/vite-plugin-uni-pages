@@ -95,7 +95,7 @@ export class PageSourceWatch {
       : createPageWatchFilter(ignored, this.options.root, options.cwd ?? process.cwd())
     this.started = true
     try {
-      this.refresh(plan)
+      this.refresh(plan ?? createScanPlan(this.options))
     }
     catch (error) {
       // 初始化失败不能留下 started=true 的僵尸实例；调用方可在后续生成时重试 start
@@ -209,7 +209,7 @@ export class PageSourceWatch {
   }
 
   /** 来源声明或扫描结果变化后重新解析当前目标 */
-  refresh(plan: ScanPlan = createScanPlan(this.options)): void {
+  refresh(plan: ScanPlan): void {
     if (!this.started)
       return
     const rules = plan.rules
@@ -327,7 +327,8 @@ export class PageSourceWatch {
   private refreshFromEntrance(): void {
     try {
       const previous = this.sourceSignature()
-      this.refresh()
+      // 入口变化可能带来新的 glob 目录；重新生成计划，避免只观察旧目录
+      this.refresh(createScanPlan(this.options))
       if (this.sourceSignature() !== previous)
         this.onStructure()
     }

@@ -14,6 +14,8 @@ export interface PageSource extends ScanSourceCoordinate {
   identity: string
   /** 最终分包 root；undefined 表示主包 */
   root?: string
+  /** 声明该来源的原始目录规则，用于归属冲突诊断；hook 页面可能缺失 */
+  rulePattern?: string
 }
 
 /** 当前平台有效的页面及其完整生成路由 */

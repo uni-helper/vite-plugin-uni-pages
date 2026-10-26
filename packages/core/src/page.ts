@@ -10,7 +10,6 @@ import { evaluateDefinePage } from './macro'
 /** Page 读取页面内容所需的环境；不再依赖整个 PageContext */
 export interface PageEnvironment {
   platform: string
-  logger?: Logger
   /** 读取时取得当前 logger，覆盖 setLogger 在 Page 创建之后才发生的情况 */
   getLogger?: () => Logger | undefined
 }
@@ -80,9 +79,14 @@ export class Page {
     return this.snapshot ?? this.fallbackSnapshot()
   }
 
-  /** 获取页面配置，保留给既有调用方 */
+  /**
+   * 获取页面配置，保留给既有调用方
+   *
+   * 返回副本：合并阶段会原地写 `type: 'home'`，不能让首页标记留在
+   * 读取快照里，否则增量更新会继续把旧首页当成首页。
+   */
   async getPageMeta(forceUpdate = false): Promise<InternalPageItem> {
-    return (await this.load(forceUpdate)).meta
+    return { ...(await this.load(forceUpdate)).meta }
   }
 
   /** 获取 tabBar 项，保留给既有调用方 */
@@ -130,7 +134,7 @@ export class Page {
       debug.error(err)
       // 光写进 debug 通道用户看不见：宏求值失败时页面退回默认配置，
       // 而转换阶段照样会把宏从产物里删掉，必须在正常输出里留下信号
-      const logger = this.environment.getLogger?.() ?? this.environment.logger
+      const logger = this.environment.getLogger?.()
       logger?.warn(err?.message ?? String(err), { timestamp: true })
       return
     }

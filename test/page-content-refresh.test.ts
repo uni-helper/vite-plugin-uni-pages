@@ -1,5 +1,5 @@
 import type { PagesConfig } from '@uni-helper/uni-pages-types'
-import type { PageContext, UserOptions } from '../packages/core/src'
+import type { InternalPageItem, PageContext, UserOptions } from '../packages/core/src'
 import fs from 'node:fs'
 import path from 'node:path'
 import { normalizePath } from 'vite'
@@ -49,6 +49,33 @@ it('重叠主分包的 skipped 候选在增量更新时共同刷新，保持分�
     root: 'pages',
     pages: [{ path: 'index', style: { navigationBarTitleText: '重新启用' } }],
   }])
+})
+
+it('onBeforeScanPages 新建的 glob 目录参与同一轮扫描', async () => {
+  const workspace = createFixture('uni-pages-content-refresh-')
+  workspace.writePage('src/main/pages/index.vue')
+  const ctx = workspace.context({ dir: 'src/*/pages', outDir: 'src' })
+  ctx.options.onBeforeScanPages = () => {
+    workspace.writePage('src/late/pages/late.vue')
+  }
+  await ctx.updatePagesJSON()
+
+  expect(ctx.pageMetaData.map(page => page.path).sort()).toEqual(['late/pages/late', 'main/pages/index'])
+})
+
+it('增量更新切换首页时，旧的首页标记不会留在读取快照里', async () => {
+  const workspace = createFixture('uni-pages-content-refresh-')
+  workspace.writePage('src/pages/index.vue')
+  workspace.writePage('src/pages/about.vue', { style: { navigationBarTitleText: '关于' } })
+  const ctx = workspace.context({ dir: 'src/pages', outDir: 'src' })
+  await ctx.updatePagesJSON()
+  expect(workspace.pagesJson(ctx).pages?.map(page => page.path)).toEqual(['pages/index', 'pages/about'])
+
+  const about = normalizePath(workspace.path('src/pages/about.vue'))
+  workspace.writePage('src/pages/about.vue', { type: 'home', style: { navigationBarTitleText: '关于' } })
+  await ctx.updatePagesJSON(about)
+
+  expect(workspace.pagesJson(ctx).pages?.map(page => page.path)).toEqual(['pages/about', 'pages/index'])
 })
 
 describe.each(scopes)('$name 页面内容刷新', (scope) => {
@@ -146,7 +173,7 @@ describe.each(scopes)('$name 页面内容刷新', (scope) => {
 
     workspace.writePage(scope.file, macro('普通修改'))
     expect(await ctx.updatePagesJSON(file)).toBe(true)
-    expect(pages(ctx, scope.sub).find((page: any) => page.path === scope.route)?.style?.navigationBarTitleText).toBe('普通修改')
+    expect(pages(ctx, scope.sub).find((page: InternalPageItem) => page.path === scope.route)?.style?.navigationBarTitleText).toBe('普通修改')
     expect(readFile.mock.calls.filter(call => call[0] === file)).toHaveLength(1)
     expect(readFile.mock.calls.filter(call => call[0] === otherFile)).toHaveLength(0)
 

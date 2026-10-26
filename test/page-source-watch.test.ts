@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { refreshPageDirectories } from '../packages/core/src/directories'
 import { resolveOptions } from '../packages/core/src/options'
 import { PageSourceWatch } from '../packages/core/src/page-watch'
+import { createScanPlan } from '../packages/core/src/scan-plan'
 
 const require = createRequire(new URL('../packages/core/package.json', import.meta.url))
 const { default: chokidar } = await import(require.resolve('chokidar'))
@@ -54,7 +55,7 @@ function fixture(polling = 'false', autoStart = true) {
   watchers.push(sourceWatch)
   const refresh = () => {
     refreshPageDirectories(options)
-    sourceWatch.refresh()
+    sourceWatch.refresh(createScanPlan(options))
   }
   refresh()
   if (autoStart)
@@ -133,7 +134,7 @@ describe('当前页面来源的监听范围', () => {
   })
 
   it('嵌套目录读取遇到未知文件系统错误时仍抛出', () => {
-    const { target, sourceWatch } = fixture()
+    const { options, target, sourceWatch } = fixture()
     const read = fs.readdirSync
     const error = Object.assign(new Error('I/O error'), { code: 'EIO' })
     vi.spyOn(fs, 'readdirSync').mockImplementation(((file: fs.PathLike, options: unknown) => {
@@ -142,11 +143,11 @@ describe('当前页面来源的监听范围', () => {
       return Reflect.apply(read, fs, [file, options])
     }) as typeof fs.readdirSync)
 
-    expect(() => sourceWatch.refresh()).toThrow(error)
+    expect(() => sourceWatch.refresh(createScanPlan(options))).toThrow(error)
   })
 
   it.skipIf(process.platform === 'win32')('链接目标不可读时跳过来源，start 不中断，恢复后可重新发现', () => {
-    const { target, content, sourceWatch } = fixture('false', false)
+    const { options, target, content, sourceWatch } = fixture('false', false)
     const locked = path.dirname(target)
     fs.chmodSync(locked, 0o000)
     try {
@@ -158,7 +159,7 @@ describe('当前页面来源的监听范围', () => {
       fs.chmodSync(locked, 0o755)
     }
 
-    sourceWatch.refresh()
+    sourceWatch.refresh(createScanPlan(options))
     expect(content.add).toHaveBeenLastCalledWith([normalizePath(target)])
   })
 

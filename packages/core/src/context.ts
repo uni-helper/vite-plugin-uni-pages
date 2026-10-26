@@ -65,7 +65,7 @@ export class PageContext {
   private disposed = false
   private disposal: Promise<void> | undefined
   /** 本轮扫描的目录、分包来源与规则；扫描和监听共用 */
-  private scanPlan!: ScanPlan
+  private scanPlan: ScanPlan | undefined
   /** 最近一次生成的完整快照；虚拟模块、路由与声明都读它 */
   private generatedSnapshot: PagesSnapshot | undefined
   /** 随扫描更新的 Page 来源，用于复用检查和冲突诊断 */
@@ -200,7 +200,7 @@ export class PageContext {
     await this.scanPages()
     await this.scanSubPages()
     this.startPageWatcher()
-    this.pageWatcher.refresh(this.scanPlan)
+    this.pageWatcher.refresh(this.requireScanPlan())
     await this.mergePageMetaData()
     await this.mergeSubPageMetaData()
   }
@@ -209,6 +209,13 @@ export class PageContext {
   private refreshScanPlan(): void {
     this.scanPlan = createScanPlan(this.options)
     applyScanPlan(this.options, this.scanPlan)
+  }
+
+  /** 扫描与监听阶段读取本轮计划；计划在 refreshScanPlan 之后必定存在 */
+  private requireScanPlan(): ScanPlan {
+    if (!this.scanPlan)
+      throw new Error('[vite-plugin-uni-pages] Scan plan is not ready')
+    return this.scanPlan
   }
 
   /**
@@ -532,13 +539,14 @@ export class PageContext {
     this.options.onAfterLoadUserConfig(this.pagesGlobConfig)
 
     if (this.options.mergePages) {
-      this.refreshScanPlan()
+      // hook 可能新建扫描目录（例如 glob 匹配的新目录），计划要在 hook 之后生成
       this.options.onBeforeScanPages()
+      this.refreshScanPlan()
       await this.scanPages(!incremental)
       await this.scanSubPages(!incremental)
       this.options.onAfterScanPages(this.pages, this.subPages)
       this.startPageWatcher()
-      this.pageWatcher.refresh(this.scanPlan)
+      this.pageWatcher.refresh(this.requireScanPlan())
     }
 
     this.options.onBeforeMergePageMetaData(this.pages, this.pagesGlobConfig)
@@ -712,9 +720,10 @@ export class PageContext {
    * @description 各目录分别执行文件排除，物理别名保留到页面有效性与归属决议阶段
    */
   private async scanPages(refreshContent = true): Promise<void> {
+    const plan = this.requireScanPlan()
     const pages = new Map<string, Page>()
-    for (const [matchIndex, dir] of this.scanPlan.mainDirs.entries()) {
-      for (const pagePath of getPagePaths(dir, this.options, this.scanPlan.basePath)) {
+    for (const [matchIndex, dir] of plan.mainDirs.entries()) {
+      for (const pagePath of getPagePaths(dir, this.options, plan.basePath)) {
         if (pages.has(pagePath.absolutePath))
           continue
         const page = this.trackPage(pagePath, this.pages.get(pagePath.absolutePath) ?? this.mainPageCandidates.get(pagePath.absolutePath), {
@@ -758,7 +767,7 @@ export class PageContext {
       ruleIndex: source.ruleIndex,
       matchIndex: source.matchIndex,
       rootSource: source.rootSource,
-      rulePattern: source.rulePattern ?? this.configuredRule(source),
+      rulePattern: this.configuredRule(source),
     })
     return page
   }
@@ -802,11 +811,12 @@ export class PageContext {
    * @description 同一物理目录的不同别名仍分别执行文件排除，避免某个别名被排除后漏页
    */
   private async scanSubPages(refreshContent = true): Promise<void> {
+    const plan = this.requireScanPlan()
     const paths: Record<string, PagePath[]> = {}
     const subPages = new Map<string, Map<string, Page>>()
     const sources = this.subPackageSourcesByDir()
     for (const [dir, source] of sources) {
-      const pagePaths = getPagePaths(dir, this.options, this.scanPlan.basePath)
+      const pagePaths = getPagePaths(dir, this.options, plan.basePath)
       paths[dir] = pagePaths
 
       const pages = new Map<string, Page>()
@@ -831,7 +841,8 @@ export class PageContext {
    */
   private subPackageSourcesByDir(): Map<string, SubPackageDirectorySource> {
     const selected = new Map<string, SubPackageDirectorySource>()
-    const sources = this.scanPlan?.subPackageSources ?? createScanPlan(this.options).subPackageSources
+    // 计划只在 scanAndMerge 之后才可能被调用；为空说明目录尚未扫描，不能在此重新发现
+    const sources = this.scanPlan?.subPackageSources ?? []
     for (const source of sources) {
       const previous = selected.get(source.absolute)
       if (!previous || comparePageSources(source, previous) < 0)
@@ -877,6 +888,7 @@ export class PageContext {
         if (!identity)
           continue
         const source = dir === undefined ? undefined : subSources.get(dir)
+        const ruleIndex = source?.ruleIndex ?? original?.ruleIndex ?? this.options.subPackages.indexOf(dir!)
         candidates.push({
           ...original,
           ...source,
@@ -886,8 +898,11 @@ export class PageContext {
           dir: dir ?? original?.dir ?? this.options.dir,
           root,
           explicitRoot: source?.explicitRoot ?? original?.explicitRoot ?? false,
-          ruleIndex: source?.ruleIndex ?? original?.ruleIndex ?? this.options.subPackages.indexOf(dir!),
+          ruleIndex,
           matchIndex: source?.matchIndex ?? original?.matchIndex ?? 0,
+          // 扫描后的 hook 可能直接创建 Page，没有来源记录；按当前目录补回
+          // 声明规则，诊断信息与普通扫描来源保持一致
+          rulePattern: original?.rulePattern ?? this.configuredRule({ root, ruleIndex }),
           // 按现有分包路径换算还原完整路由，确保校验与实际输出采用同一基准
           route: root === undefined
             ? effective.path
