@@ -1039,6 +1039,10 @@ export class PageContext {
           return page
         return { ...page, path: `${root}/${page.path}` }
       })
+      // 页面 path 是「文件相对 outDir 的位置」减去 root 的结果。root 与
+      // 物理位置无关、或目录在 Vite root 之外时会保留一段 '..'：
+      // uni-app 用 join(root, path) 定位源文件，去掉这段反而指向不存在的
+      // 页面。root 本身保持干净，才是这个选项要解决的问题
       const parsedPages = (await this.parsePages(pages, 'sub', overrides))
         .map(page => ({ ...page, path: normalizePath(path.relative(root, page.path)) }))
       packagesByRoot.set(root, {
