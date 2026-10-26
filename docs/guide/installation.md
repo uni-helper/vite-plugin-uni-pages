@@ -37,7 +37,7 @@ export default defineConfig({
 })
 ```
 
-`UniPages()` 必须排在 `Uni()` 前面。否则 uni-app 会在插件生成 `pages.json` 之前读取到旧内容。
+推荐把 `UniPages()` 排在 `Uni()` 前面。uni-app 在自己的 `config` 钩子里读取 `pages.json`，早于本插件写入完整内容；需要 uni-app 拿到最新配置时，用 [`prepare()`](../api/prepare.md) 或 [@uni-helper/unh](../other/faq.md)。
 
 ## 创建页面
 

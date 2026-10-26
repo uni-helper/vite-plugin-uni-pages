@@ -202,7 +202,7 @@ export const title = '首页'
 | 写法 | 加载与更新行为 |
 | --- | --- |
 | `import { title } from './title.mjs'`、`import('./title.mjs')`、`require('./title.cjs')` | 路径明确，由打包器收集；符合上述本地依赖范围的文件会被监听，并随配置重新打包、求值 |
-| esbuild 可枚举的相对路径表达式，例如 ``import(`./titles/${locale}.mjs`)`` | 由打包器展开候选文件，收集到的本地文件参与监听 |
+| esbuild 可枚举的相对路径表达式，例如 ``import(`./titles/${locale}.mjs`)`` | 由打包器展开候选文件，收集到的本地文件参与监听；一个候选文件都不存在时打包失败，配置不生效，创建文件后还要修改配置入口或重启 |
 | 未被打包器展开的 `import(target)`、`require(target)` | 以调用模块的源位置交给 Node 加载，沿用 Node 缓存；动态目标不自动加入监听集合 |
 
 上例中的 `title.mjs` 属于最后一种情况：仅修改它不会自动触发配置更新，重新加载入口也可能继续读到缓存值；仅补建或修复缺失的动态目标也不保证触发恢复。若标题文件需要随编辑自动更新，可以把 `global-style.ts` 中的加载改为 `import { title } from './title.mjs'`。

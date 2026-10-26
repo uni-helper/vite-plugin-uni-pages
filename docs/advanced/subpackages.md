@@ -57,6 +57,8 @@ UniPages({
 })
 ```
 
+`root` 只决定写进 `pages.json` 的 `subPackages.root`。页面 `path` 仍按文件相对 `outDir` 的实际位置换算，根外目录会得到带 `..` 的页面路径；它和 `root` 拼起来正好是文件相对 `outDir` 的路径，uni-app 靠这个组合定位页面源文件，`root` 本身保持干净。
+
 也可以用同步回调按匹配目录计算：
 
 ```ts

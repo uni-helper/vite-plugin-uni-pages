@@ -16,8 +16,8 @@ onBeforeMergePageMetaData(pages, pagesGlobConfig)
 onAfterMergePageMetaData(pageMetaData, subPageMetaData)
 onBeforeWriteFile(filePath)
   写入 pages.json
-onAfterWriteFile(filePath, content)
   生成类型声明（启用时）
+onAfterWriteFile(filePath, content)
 ```
 
 `onAfterWriteFile` 只在 `pages.json` 内容实际变化时调用。`pages.json` 没变时，后面的声明文件仍会检查，但不会重复触发写入回调。

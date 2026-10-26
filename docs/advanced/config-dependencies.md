@@ -76,7 +76,7 @@ export const globalStyle = { navigationBarTitleText: title }
 | 写法 | 行为 |
 | --- | --- |
 | `import { title } from './title.mjs'`、`import('./title.mjs')`、`require('./title.cjs')` | 路径明确，由打包器收集，本地文件参与监听并重新求值 |
-| 可枚举的相对表达式，例如 ``import(`./titles/${locale}.mjs`)`` | 打包器展开候选文件，收集到的本地文件参与监听；当前没有任何匹配文件时按未展开处理，新增候选文件不会自动加入监听 |
+| 可枚举的相对表达式，例如 ``import(`./titles/${locale}.mjs`)`` | 打包器展开候选文件，收集到的本地文件参与监听；一个候选文件都没有时打包失败、配置不生效，创建文件后需要修改配置入口或重启才能恢复 |
 | 未展开的 `import(target)`、`require(target)` | 按调用模块的源位置交给 Node 加载，沿用 Node 缓存，动态目标不自动加入监听集合 |
 
 `title.mjs` 属于最后一种情况。只修改它不会触发配置更新，重新加载入口也可能继续读到缓存值。需要热更新时，改成静态导入。
