@@ -1,9 +1,7 @@
 name = "vite-plugin-uni-pages-docs"
 compatibility_date = "2026-10-25"
 
-# VitePress 输出静态文件，无需 Worker 脚本；在仓库根目录执行
-# pnpm docs:build 后，用 wrangler deploy 发布
-[assets]
-directory = "./docs/.vitepress/dist"
-html_handling = "auto-trailing-slash"
-not_found_handling = "404-page"
+# Cloudflare Pages：在仓库根目录执行 pnpm docs:build 后，用
+# wrangler pages deploy 上传；Git 集成时构建命令填 pnpm docs:build，
+# 输出目录填 docs/.vitepress/dist
+pages_build_output_dir = "./docs/.vitepress/dist"
