@@ -1,173 +1,129 @@
-import type { MockInstance } from 'vitest'
-import { EventEmitter } from 'node:events'
+import type { UserOptions } from '../packages/core/src'
+import type { TestFixture } from './helpers/fixture'
 import fs from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
-import process from 'node:process'
-import { parse } from 'comment-json'
 import { normalizePath } from 'vite'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { PageContext } from '../packages/core/src'
-import { currentPageWatcher, flushPageUpdates, mockPageWatchers, pageWatchState } from './helpers/page-watcher'
-
-const roots: string[] = []
-const contexts: PageContext[] = []
-const contextsByWatcher = new WeakMap<EventEmitter, PageContext>()
-let entrances: Map<string, EventEmitter>
-
-beforeEach(() => {
-  entrances = mockPageWatchers().entrances
-})
+import { describe, expect, it, vi } from 'vitest'
+import { createFixture } from './helpers/fixture'
 
 function fixture() {
-  const workspace = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-symlink-targets-')))
-  roots.push(workspace)
-  const root = path.join(workspace, 'app')
-  const target = path.join(workspace, 'external/deep/pages')
-  fs.mkdirSync(path.join(root, 'src'), { recursive: true })
-  fs.mkdirSync(target, { recursive: true })
-  fs.symlinkSync(target, path.join(root, 'src/alias'), process.platform === 'win32' ? 'junction' : 'dir')
-  fs.writeFileSync(path.join(root, 'pages.config.json'), '{}')
-  return { workspace, root, target }
+  const workspace = createFixture('uni-pages-symlink-targets-')
+  workspace.write('external/deep/pages/.keep', '')
+  workspace.write('app/src/.keep', '')
+  workspace.symlink('external/deep/pages', 'app/src/alias', 'dir')
+  workspace.writeConfig({}, 'app/pages.config.json')
+  return { workspace, root: workspace.path('app'), target: workspace.path('external/deep/pages') }
 }
 
-function page(file: string, title: string): void {
-  fs.mkdirSync(path.dirname(file), { recursive: true })
-  fs.writeFileSync(file, `<script setup>definePage(${JSON.stringify({ style: { navigationBarTitleText: title } })})</script><template><view /></template>`)
-}
-
-function output(root: string): any {
-  return parse(fs.readFileSync(path.join(root, 'pages.json'), 'utf8'))
-}
-
-async function start(root: string) {
-  const ctx = new PageContext({ subPackages: ['src/alias'], outDir: '.', dts: false }, root, 'h5')
-  contexts.push(ctx)
+async function start(workspace: TestFixture, options: UserOptions = {}) {
+  const ctx = workspace.context({ subPackages: ['src/alias'], outDir: '.', dts: false, ...options }, 'h5', 'app')
   await ctx.updatePagesJSON()
   const updates = vi.spyOn(ctx, 'updatePagesJSON')
-  const shared = Object.assign(new EventEmitter(), { add: vi.fn() })
-  await ctx.setupWatcher(shared as unknown as Parameters<PageContext['setupWatcher']>[0])
-  const watcher = currentPageWatcher(ctx)!
-  contextsByWatcher.set(watcher, ctx)
-  return { ctx, updates, watcher, shared }
+  const watch = await workspace.watch(ctx)
+  return { ctx, updates, watch }
 }
 
-async function dispatch(watcher: EventEmitter, updates: MockInstance<PageContext['updatePagesJSON']>, event: string, file: string): Promise<void> {
+async function dispatch(updates: { mockClear: () => void }, watch: Awaited<ReturnType<TestFixture['watch']>>, event: string, file: string): Promise<void> {
   updates.mockClear()
-  const ctx = contextsByWatcher.get(watcher)!
-  const current = currentPageWatcher(ctx) ?? watcher
-  current.emit(event, file)
-  await flushPageUpdates(ctx)
+  watch.emit(event, file)
+  await watch.settle()
 }
-
-afterEach(async () => {
-  for (const ctx of contexts.splice(0))
-    await ctx.disposeWatchers()
-  vi.restoreAllMocks()
-  for (const root of roots.splice(0))
-    fs.rmSync(root, { recursive: true, force: true })
-})
 
 describe('符号链接目标恢复', () => {
   it('页面目标及其祖先不加入共享 watcher 的订阅', async () => {
-    const { root, target } = fixture()
-    page(path.join(target, 'index.vue'), '初始')
-    const { shared: watcher } = await start(root)
+    const { workspace, target } = fixture()
+    workspace.writePage(path.relative(workspace.root, path.join(target, 'index.vue')), { style: { navigationBarTitleText: '初始' } })
+    const { watch } = await start(workspace)
 
-    const added = watcher.add.mock.calls.flat(2).map(file => normalizePath(file))
+    const added = watch.shared.add.mock.calls.flat(2).map((file: string) => normalizePath(file))
     expect(added).not.toContain(normalizePath(target))
     expect(added).not.toContain(normalizePath(path.dirname(target)))
   })
 
   it('关闭页面合并时不注册页面目标监听', async () => {
-    const { root, target } = fixture()
-    page(path.join(target, 'index.vue'), '初始')
-    const ctx = new PageContext({ subPackages: ['src/alias'], outDir: '.', mergePages: false, dts: false }, root, 'h5')
-    contexts.push(ctx)
+    const { workspace, target } = fixture()
+    workspace.writePage(path.relative(workspace.root, path.join(target, 'index.vue')), { style: { navigationBarTitleText: '初始' } })
+    const ctx = workspace.context({ subPackages: ['src/alias'], outDir: '.', mergePages: false, dts: false }, 'h5', 'app')
     await ctx.updatePagesJSON()
-    const watcher = Object.assign(new EventEmitter(), { add: vi.fn() })
-    await ctx.setupWatcher(watcher as unknown as Parameters<PageContext['setupWatcher']>[0])
+    const watch = await workspace.watch(ctx)
 
-    const added = watcher.add.mock.calls.flat(2).map(file => normalizePath(file))
-    expect(added.filter(file => file.includes('/external'))).toEqual([])
-    expect(currentPageWatcher(ctx)).toBeUndefined()
-    await ctx.disposeWatchers()
+    const added = watch.shared.add.mock.calls.flat(2).map((file: string) => normalizePath(file))
+    expect(added.filter((file: string) => file.includes('/external'))).toEqual([])
+    expect(workspace.watcher(ctx)).toBeUndefined()
   })
 
   it('扫描规则收窄时仍刷新既有目录关联，忽略已脱离的旧目标', async () => {
-    const { workspace, root, target } = fixture()
+    const { workspace, target } = fixture()
     const oldFile = path.join(target, 'nested/index.vue')
-    page(oldFile, '旧目标')
-    const { ctx, updates, watcher } = await start(root)
-    const replacement = path.join(workspace, 'replacement')
-    fs.mkdirSync(replacement)
-    const alias = path.join(root, 'src/alias')
-    fs.unlinkSync(alias)
-    fs.symlinkSync(replacement, alias, process.platform === 'win32' ? 'junction' : 'dir')
+    workspace.writePage(path.relative(workspace.root, oldFile), { style: { navigationBarTitleText: '旧目标' } })
+    const { ctx, updates, watch } = await start(workspace)
+    const replacement = workspace.path('replacement')
+    workspace.write('replacement/.keep', '')
+    workspace.remove('app/src/alias')
+    workspace.symlink(replacement, 'app/src/alias', 'dir')
     ctx.options.subPackagePatterns.splice(0, 1, 'src/alias/nested')
     await ctx.updatePagesJSON()
-    expect(output(root).subPackages ?? []).toEqual([])
+    expect(workspace.pagesJson(ctx).subPackages ?? []).toEqual([])
 
-    await dispatch(watcher, updates, 'change', oldFile)
+    await dispatch(updates, watch, 'change', oldFile)
 
     expect(updates).not.toHaveBeenCalled()
   })
 
   it('扫描目录改指空目录后，旧目标事件不再调度更新', async () => {
-    const { workspace, root, target } = fixture()
+    const { workspace, target } = fixture()
     const oldFile = path.join(target, 'index.vue')
-    page(oldFile, '旧目标')
-    const { ctx, updates, watcher } = await start(root)
-    const replacement = path.join(workspace, 'replacement')
-    fs.mkdirSync(replacement)
-    const alias = path.join(root, 'src/alias')
-    fs.unlinkSync(alias)
-    fs.symlinkSync(replacement, alias, process.platform === 'win32' ? 'junction' : 'dir')
+    workspace.writePage(path.relative(workspace.root, oldFile), { style: { navigationBarTitleText: '旧目标' } })
+    const { ctx, updates, watch } = await start(workspace)
+    const replacement = workspace.path('replacement')
+    workspace.write('replacement/.keep', '')
+    workspace.remove('app/src/alias')
+    workspace.symlink(replacement, 'app/src/alias', 'dir')
     await ctx.updatePagesJSON()
-    expect(output(root).subPackages ?? []).toEqual([])
+    expect(workspace.pagesJson(ctx).subPackages ?? []).toEqual([])
 
-    await dispatch(watcher, updates, 'change', oldFile)
+    await dispatch(updates, watch, 'change', oldFile)
 
     expect(updates).not.toHaveBeenCalled()
   })
 
   it('无扩展名文件目标删除后，真实路径 add 恢复页面及后续修改', async () => {
-    const { workspace, root, target } = fixture()
-    const content = path.join(workspace, 'content')
-    page(content, '初始')
-    fs.symlinkSync(content, path.join(target, 'index.nvue'), 'file')
-    const { updates, watcher } = await start(root)
-    expect(output(root).subPackages).toMatchObject([{ root: 'src/alias', pages: [{ path: 'index', style: { navigationBarTitleText: '初始' } }] }])
+    const { workspace, target } = fixture()
+    const content = workspace.path('content')
+    workspace.writePage('content', { style: { navigationBarTitleText: '初始' } })
+    workspace.symlink(content, path.relative(workspace.root, path.join(target, 'index.nvue')), 'file')
+    const { ctx, updates, watch } = await start(workspace)
+    expect(workspace.pagesJson(ctx).subPackages).toMatchObject([{ root: 'src/alias', pages: [{ path: 'index', style: { navigationBarTitleText: '初始' } }] }])
 
     fs.unlinkSync(content)
-    await dispatch(watcher, updates, 'unlink', content)
+    await dispatch(updates, watch, 'unlink', content)
     expect(updates).toHaveBeenCalledOnce()
-    expect(output(root).subPackages ?? []).toEqual([])
+    expect(workspace.pagesJson(ctx).subPackages ?? []).toEqual([])
 
-    page(content, '恢复')
-    await dispatch(watcher, updates, 'add', content)
+    workspace.writePage('content', { style: { navigationBarTitleText: '恢复' } })
+    await dispatch(updates, watch, 'add', content)
     expect(updates).toHaveBeenCalledOnce()
-    expect(output(root).subPackages).toMatchObject([{ root: 'src/alias', pages: [{ path: 'index', style: { navigationBarTitleText: '恢复' } }] }])
+    expect(workspace.pagesJson(ctx).subPackages).toMatchObject([{ root: 'src/alias', pages: [{ path: 'index', style: { navigationBarTitleText: '恢复' } }] }])
 
-    page(content, '恢复后修改')
-    await dispatch(watcher, updates, 'change', content)
-    expect(output(root).subPackages[0].pages[0].style.navigationBarTitleText).toBe('恢复后修改')
+    workspace.writePage('content', { style: { navigationBarTitleText: '恢复后修改' } })
+    await dispatch(updates, watch, 'change', content)
+    expect(workspace.pagesJson(ctx).subPackages?.[0].pages[0].style?.navigationBarTitleText).toBe('恢复后修改')
   })
 
   it('已知物理目录内新增的页面以有效别名写入产物', async () => {
-    const { root, target } = fixture()
-    page(path.join(target, 'index.vue'), '初始')
-    const { updates, watcher } = await start(root)
+    const { workspace, target } = fixture()
+    workspace.writePage(path.relative(workspace.root, path.join(target, 'index.vue')), { style: { navigationBarTitleText: '初始' } })
+    const { ctx, updates, watch } = await start(workspace)
     const added = path.join(target, 'detail.vue')
-    page(added, '新页面')
+    workspace.writePage(path.relative(workspace.root, added), { style: { navigationBarTitleText: '新页面' } })
 
-    await dispatch(watcher, updates, 'add', added)
+    await dispatch(updates, watch, 'add', added)
 
     expect(updates).toHaveBeenCalledOnce()
-    const packages = output(root).subPackages
+    const packages = workspace.pagesJson(ctx).subPackages ?? []
     expect(packages).toHaveLength(1)
     expect(packages[0].root).toBe('src/alias')
-    expect(packages[0].pages.map((page: any) => ({ path: page.path, title: page.style.navigationBarTitleText }))).toEqual([
+    expect(packages[0].pages.map(page => ({ path: page.path, title: page.style?.navigationBarTitleText }))).toEqual([
       { path: 'detail', title: '新页面' },
       { path: 'index', title: '初始' },
     ])
@@ -177,63 +133,62 @@ describe('符号链接目标恢复', () => {
     const { workspace, root, target } = fixture()
     const file = path.join(target, 'profile.vue')
     const home = path.join(root, 'src/pages/index.vue')
-    page(file, '初始')
-    page(home, '首页')
-    const { ctx, updates, watcher, shared } = await start(root)
-    const sourceWatch = pageWatchState(ctx)
-    shared.add.mockClear()
+    workspace.writePage(path.relative(workspace.root, file), { style: { navigationBarTitleText: '初始' } })
+    workspace.writePage('app/src/pages/index.vue', { style: { navigationBarTitleText: '首页' } })
+    const { ctx, updates, watch } = await start(workspace)
+    const initialWatcher = watch.page!
+    watch.shared.add.mockClear()
     const parent = path.dirname(target)
     fs.rmSync(parent, { recursive: true })
 
     updates.mockClear()
-    entrances.get(normalizePath(parent))!.emit('change', 'rename', path.basename(parent))
-    await flushPageUpdates(ctx)
+    watch.emitEntrance(parent, 'change', 'rename', path.basename(parent))
+    await watch.settle()
 
     expect(updates).toHaveBeenCalledOnce()
-    expect(output(root).subPackages ?? []).toEqual([])
-    expect(watcher.close).toHaveBeenCalledOnce()
-    const remainingWatcher = currentPageWatcher(ctx)!
+    expect(workspace.pagesJson(ctx).subPackages ?? []).toEqual([])
+    expect(initialWatcher.close).toHaveBeenCalledOnce()
+    const remainingWatcher = watch.page!
     expect(remainingWatcher.add.mock.calls.flat(2)).toEqual([normalizePath(path.dirname(home))])
     remainingWatcher.emit('ready')
-    await flushPageUpdates(ctx)
+    await watch.settle()
     const ancestorPath = normalizePath(path.dirname(parent))
-    const ancestor = entrances.get(ancestorPath)!
-    expect(sourceWatch.recoveryWatchers.has(ancestorPath)).toBe(true)
-    expect(shared.add.mock.calls.flat(2).map(file => normalizePath(file))).not.toContain(normalizePath(path.join(workspace, 'external')))
+    expect(watch.state().recoveryPaths).toContain(ancestorPath)
+    expect(watch.shared.add.mock.calls.flat(2).map((entry: string) => normalizePath(entry))).not.toContain(normalizePath(workspace.path('external')))
 
-    shared.add.mockClear()
+    watch.shared.add.mockClear()
     updates.mockClear()
     const scans = vi.fn()
     ctx.options.onBeforeScanPages = scans
-    page(file, '目录恢复')
-    ancestor.emit('change', 'rename', path.basename(parent))
-    const restoredWatcher = currentPageWatcher(ctx)!
+    workspace.writePage(path.relative(workspace.root, file), { style: { navigationBarTitleText: '目录恢复' } })
+    watch.emitEntrance(ancestorPath, 'change', 'rename', path.basename(parent))
+    const restoredWatcher = watch.page!
     restoredWatcher.emit('ready')
-    shared.emit('addDir', path.join(root, 'src/alias'))
-    await flushPageUpdates(ctx)
+    watch.shared.emit('addDir', path.join(root, 'src/alias'))
+    await watch.settle()
 
     expect(updates.mock.calls.every(([file]) => file === undefined)).toBe(true)
     expect(updates.mock.calls.length).toBeLessThanOrEqual(2)
     expect(scans.mock.calls.length).toBeGreaterThan(0)
     expect(scans.mock.calls.length).toBeLessThanOrEqual(2)
-    expect(currentPageWatcher(ctx)).toBe(restoredWatcher)
+    expect(watch.page).toBe(restoredWatcher)
     expect(restoredWatcher).not.toBe(remainingWatcher)
     expect(remainingWatcher.close).toHaveBeenCalledOnce()
     expect(restoredWatcher.add.mock.calls.flat(2).sort()).toEqual([normalizePath(path.dirname(home)), normalizePath(target)].sort())
-    expect(sourceWatch.recoveryWatchers.has(ancestorPath)).toBe(false)
-    expect(ancestor.listenerCount('change')).toBe(0)
-    expect(shared.add.mock.calls.flat(2).map(file => normalizePath(file))).not.toContain(normalizePath(target))
-    expect(output(root).subPackages).toMatchObject([{ root: 'src/alias', pages: [{ path: 'profile', style: { navigationBarTitleText: '目录恢复' } }] }])
+    expect(watch.state().recoveryPaths).not.toContain(ancestorPath)
+    expect(watch.entrance(ancestorPath)?.listenerCount('change')).toBe(0)
+    expect(watch.shared.add.mock.calls.flat(2).map((entry: string) => normalizePath(entry))).not.toContain(normalizePath(target))
+    expect(workspace.pagesJson(ctx).subPackages).toMatchObject([{ root: 'src/alias', pages: [{ path: 'profile', style: { navigationBarTitleText: '目录恢复' } }] }])
 
     const readFile = vi.spyOn(fs.promises, 'readFile')
-    page(file, '恢复后修改')
-    await dispatch(watcher, updates, 'change', file)
+    workspace.writePage(path.relative(workspace.root, file), { style: { navigationBarTitleText: '恢复后修改' } })
+    await dispatch(updates, watch, 'change', file)
 
     const lexicalFile = normalizePath(path.join(root, 'src/alias/profile.vue'))
     expect(updates).toHaveBeenCalledOnce()
     expect(updates).toHaveBeenCalledWith(lexicalFile)
     expect(readFile.mock.calls.filter(call => call[0] === lexicalFile)).toHaveLength(1)
     expect(readFile.mock.calls.filter(call => call[0] === normalizePath(home))).toHaveLength(0)
-    expect(output(root).subPackages[0].pages[0].style.navigationBarTitleText).toBe('恢复后修改')
+    expect(workspace.pagesJson(ctx).subPackages?.[0].pages[0].style?.navigationBarTitleText).toBe('恢复后修改')
   })
 })

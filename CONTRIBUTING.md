@@ -48,6 +48,7 @@ pnpm play:web
 
 ```shell
 test/
+├── helpers/fixture.ts                   测试夹具：临时工作区、受控 watcher、收敛助手
 ├── generate-routes-*.test.ts            各平台（web / mp-weixin / mp-alipay）路由生成
 ├── generate-tabbar-web.test.ts          tabBar 生成
 ├── define-page-*.test.ts                definePage 宏：条件 DSL、null、平台行为
@@ -99,6 +100,35 @@ test/
 ```
 
 平台相关的快照测试通过 seam 注入 `platform`，并用 `vi.mock` / `vi.stubEnv` 隔离环境变量与文件系统，保证不同环境下结果确定。
+
+### 测试夹具
+
+新用例统一从 `test/helpers/fixture.ts` 的 `createFixture()` 进入，不再自己建临时目录、拼 watcher 或轮询上下文私有字段。夹具默认在每个用例结束后释放上下文、关闭 Vite server、恢复 mock 并删除目录；在 `beforeAll` 里创建时传 `{ scope: 'file' }`，等整个文件结束再清理。
+
+```ts
+import { createFixture } from './helpers/fixture'
+
+const fixture = createFixture('uni-pages-feature-')
+fixture.writeConfig()
+fixture.writePage('src/pages/index.vue', { style: { navigationBarTitleText: '首页' } })
+const ctx = fixture.context({ dir: 'src/pages', outDir: 'src' })
+await ctx.updatePagesJSON()
+expect(fixture.pagesJson(ctx).pages[0].path).toBe('pages/index')
+```
+
+受控 watcher 用例通过 `watch()` 获得共享 watcher、当前页面 watcher、事件派发和收敛等待；真实 Vite 用例用 `vite()` 创建并注册 server，用 `ready()` / `probeVite()` 等待就绪并观察共享与自有 watcher 的事件。两者都只暴露调用方也能看到的接缝，`pageWatcher`、`pendingUpdate`、`pendingPageFlush` 等内部状态只在夹具实现里读取一次。
+
+```ts
+const watch = await fixture.watch(ctx)
+watch.emit('change', fixture.path('src/pages/index.vue'))
+await watch.settle()
+
+const server = await fixture.vite(ctx, { server: { middlewareMode: true } })
+const probe = fixture.probeVite(ctx, server)
+await probe.settle()
+```
+
+夹具没有覆盖到的场景，先扩展夹具接口，不要在用例里新增强转到 core 私有字段。确需真实文件系统时序的用例继续按下一节的规则等待就绪与收敛。
 
 ### 配置加载与监听
 

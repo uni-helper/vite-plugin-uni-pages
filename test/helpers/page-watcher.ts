@@ -9,31 +9,33 @@ import { vi } from 'vitest'
 const require = createRequire(new URL('../../packages/core/package.json', import.meta.url))
 const { default: chokidar } = require('chokidar')
 
-interface MockPageWatcher extends EventEmitter {
+export interface FakeWatcher extends EventEmitter {
   add: Mock
   close: Mock<() => Promise<void>>
+  options?: Record<string, unknown>
 }
 
 interface PageWatchState {
-  watcher?: MockPageWatcher
+  watcher?: FakeWatcher
   recoveryWatchers: ReadonlyMap<string, unknown>
   started: boolean
 }
 
-function watcher(): MockPageWatcher {
+function watcher(): FakeWatcher {
   const emitter = new EventEmitter()
   return Object.assign(emitter, {
     add: vi.fn(),
     close: vi.fn(async () => {
       emitter.removeAllListeners()
     }),
+    options: {},
   })
 }
 
 /** 只替换原生事件源，保留页面监听的注册、来源刷新和关闭流程 */
-export function mockPageWatchers(): { entrances: Map<string, EventEmitter> } {
+export function mockPageWatchers(): { entrances: Map<string, FakeWatcher> } {
   vi.spyOn(chokidar, 'watch').mockImplementation(() => watcher())
-  const entrances = new Map<string, EventEmitter>()
+  const entrances = new Map<string, FakeWatcher>()
   vi.spyOn(fs, 'watch').mockImplementation(((file: string, _options: unknown, listener: (...args: any[]) => void) => {
     const observed = watcher()
     observed.on('change', listener)
@@ -59,7 +61,7 @@ export function pageWatchState(ctx: PageContext): PageWatchState {
 }
 
 /** 当前实例可能随目标变化而替换，派发事件前重新取得 */
-export function currentPageWatcher(ctx: PageContext): MockPageWatcher | undefined {
+export function currentPageWatcher(ctx: PageContext): FakeWatcher | undefined {
   return pageWatchState(ctx).watcher
 }
 

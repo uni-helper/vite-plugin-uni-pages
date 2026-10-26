@@ -1,49 +1,26 @@
-import { EventEmitter } from 'node:events'
-import fs from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { PageContext } from '../packages/core/src'
-import { currentPageWatcher, flushPageUpdates, mockPageWatchers } from './helpers/page-watcher'
+import { describe, expect, it, vi } from 'vitest'
+import { createFixture } from './helpers/fixture'
 
-const roots: string[] = []
-const contexts: PageContext[] = []
-
-beforeEach(() => {
-  mockPageWatchers()
-})
-
-async function fixture() {
-  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-watch-failure-')))
-  roots.push(root)
-  fs.mkdirSync(path.join(root, 'src/pages'), { recursive: true })
-  fs.writeFileSync(path.join(root, 'pages.config.json'), '{}')
-  const ctx = new PageContext({ dir: 'src/pages', outDir: 'src', dts: false }, root, 'h5')
-  contexts.push(ctx)
+async function setup() {
+  const fixture = createFixture('uni-pages-watch-failure-')
+  fixture.writeConfig()
+  fixture.writePage('src/pages/index.vue')
+  const ctx = fixture.context({ dir: 'src/pages', outDir: 'src', dts: false })
   const error = vi.fn()
   ctx.setLogger({ error, warn: vi.fn(), info: vi.fn(), warnOnce: vi.fn(), clearScreen: vi.fn(), hasErrorLogged: vi.fn(() => false), hasWarned: false })
-  const watcher = Object.assign(new EventEmitter(), { add: vi.fn() })
-  await ctx.setupWatcher(watcher as unknown as Parameters<PageContext['setupWatcher']>[0])
+  const watch = await fixture.watch(ctx)
   const onUpdate = vi.spyOn(ctx, 'onUpdate')
-  return { ctx, error, onUpdate, root, watcher: currentPageWatcher(ctx)! }
+  return { ctx, error, onUpdate, fixture, watch }
 }
-
-afterEach(async () => {
-  for (const ctx of contexts.splice(0))
-    await ctx.disposeWatchers()
-  vi.restoreAllMocks()
-  for (const root of roots.splice(0))
-    fs.rmSync(root, { recursive: true, force: true })
-})
 
 describe('页面更新队列的失败恢复', () => {
   it('记录失败，后续事件仍能完成更新', async () => {
-    const { ctx, error, onUpdate, root, watcher } = await fixture()
+    const { ctx, error, onUpdate, fixture, watch } = await setup()
     const failure = new Error('Failed to acquire the pages.json file lock')
     const update = vi.spyOn(ctx, 'updatePagesJSON').mockRejectedValueOnce(failure).mockResolvedValue(true)
 
-    watcher.emit('add', path.join(root, 'src/pages/new.vue'))
-    await flushPageUpdates(ctx)
+    watch.emit('add', fixture.path('src/pages/new.vue'))
+    await watch.settle()
 
     expect(error).toHaveBeenCalledWith(
       expect.stringContaining('Failed to update pages.json after a file change'),
@@ -51,8 +28,8 @@ describe('页面更新队列的失败恢复', () => {
     )
     expect(onUpdate).not.toHaveBeenCalled()
 
-    watcher.emit('change', path.join(root, 'src/pages/new.vue'))
-    await flushPageUpdates(ctx)
+    watch.emit('change', fixture.path('src/pages/new.vue'))
+    await watch.settle()
 
     expect(update).toHaveBeenCalledTimes(2)
     expect(error).toHaveBeenCalledOnce()
@@ -60,7 +37,7 @@ describe('页面更新队列的失败恢复', () => {
   })
 
   it('一次更新失败后继续处理同一 flush 中已排队的事件', async () => {
-    const { ctx, error, onUpdate, root, watcher } = await fixture()
+    const { ctx, error, onUpdate, fixture, watch } = await setup()
     const failure = new Error('Failed to write the declarations')
     let rejectUpdate!: (reason: Error) => void
     const pending = new Promise<boolean>((_, reject) => {
@@ -68,10 +45,10 @@ describe('页面更新队列的失败恢复', () => {
     })
     const update = vi.spyOn(ctx, 'updatePagesJSON').mockReturnValueOnce(pending).mockResolvedValue(true)
 
-    watcher.emit('add', path.join(root, 'src/pages/first.vue'))
-    watcher.emit('add', path.join(root, 'src/pages/second.vue'))
+    watch.emit('add', fixture.path('src/pages/first.vue'))
+    watch.emit('add', fixture.path('src/pages/second.vue'))
     rejectUpdate(failure)
-    await flushPageUpdates(ctx)
+    await watch.settle()
 
     expect(update).toHaveBeenCalledTimes(2)
     expect(error).toHaveBeenCalledOnce()
@@ -79,11 +56,11 @@ describe('页面更新队列的失败恢复', () => {
   })
 
   it('配置没有变化时不触发更新通知', async () => {
-    const { ctx, error, onUpdate, root, watcher } = await fixture()
+    const { ctx, error, onUpdate, fixture, watch } = await setup()
     vi.spyOn(ctx, 'updatePagesJSON').mockResolvedValue(false)
 
-    watcher.emit('change', path.join(root, 'src/pages/index.vue'))
-    await flushPageUpdates(ctx)
+    watch.emit('change', fixture.path('src/pages/index.vue'))
+    await watch.settle()
 
     expect(error).not.toHaveBeenCalled()
     expect(onUpdate).not.toHaveBeenCalled()

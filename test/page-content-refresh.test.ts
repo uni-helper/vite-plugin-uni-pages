@@ -1,21 +1,10 @@
 import type { PagesConfig } from '@uni-helper/uni-pages-types'
-import type { UserOptions } from '../packages/core/src'
-import { EventEmitter } from 'node:events'
+import type { PageContext, UserOptions } from '../packages/core/src'
 import fs from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
-import { parse } from 'comment-json'
 import { normalizePath } from 'vite'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { PageContext } from '../packages/core/src'
-import { currentPageWatcher, flushPageUpdates, mockPageWatchers } from './helpers/page-watcher'
-
-const roots: string[] = []
-const contexts: PageContext[] = []
-
-beforeEach(() => {
-  mockPageWatchers()
-})
+import { describe, expect, it, vi } from 'vitest'
+import { createFixture } from './helpers/fixture'
 
 const scopes = [
   { name: '主包', options: { dir: 'src/pages' }, file: 'src/pages/index.vue', route: 'pages/index', sub: false },
@@ -26,20 +15,12 @@ function macro(title: string): string {
   return `definePage({ style: { navigationBarTitleText: ${JSON.stringify(title)} }, tabBar: { text: ${JSON.stringify(title)} } })`
 }
 
-function write(file: string, definition: string): void {
-  fs.mkdirSync(path.dirname(file), { recursive: true })
-  fs.writeFileSync(file, `<script setup>${definition}</script><template><view /></template>`)
-}
-
-async function fixture(scope: { options: UserOptions, file: string }, definition = macro('初始'), dts = false): Promise<{ ctx: PageContext, file: string }> {
-  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'uni-pages-content-refresh-')))
-  roots.push(root)
-  const file = normalizePath(path.join(root, scope.file))
-  write(file, definition)
-  const ctx = new PageContext({ ...scope.options, dts }, root, 'h5')
-  contexts.push(ctx)
+async function setup(scope: { options: UserOptions, file: string }, definition = macro('初始'), dts = false) {
+  const workspace = createFixture('uni-pages-content-refresh-')
+  workspace.writePage(scope.file, definition)
+  const ctx = workspace.context({ ...scope.options, dts })
   await ctx.updatePagesJSON()
-  return { ctx, file }
+  return { ctx, file: normalizePath(workspace.path(scope.file)), workspace }
 }
 
 function pages(ctx: PageContext, sub: boolean) {
@@ -47,27 +28,20 @@ function pages(ctx: PageContext, sub: boolean) {
 }
 
 function tabBar(ctx: PageContext, file: string) {
-  const page = ctx.pages.get(file) ?? [...ctx.subPages.values()].map(pages => pages.get(file)).find(Boolean)
+  const page = ctx.pages.get(file) ?? [...ctx.subPages.values()].map(pageMap => pageMap.get(file)).find(Boolean)
   return page?.getTabBar()
 }
 
-afterEach(async () => {
-  for (const ctx of contexts.splice(0))
-    await ctx.disposeWatchers()
-  vi.restoreAllMocks()
-  for (const root of roots.splice(0))
-    fs.rmSync(root, { recursive: true, force: true })
-})
-
 it('重叠主分包的 skipped 候选在增量更新时共同刷新，保持分包优先', async () => {
-  const { ctx, file } = await fixture({
-    ...scopes[0],
-    options: { dir: 'src/pages', subPackages: [{ dir: 'src/pages', root: 'pages' }] },
-  }, 'definePage(null)')
+  const workspace = createFixture('uni-pages-content-refresh-')
+  const file = normalizePath(workspace.path('src/pages/index.vue'))
+  workspace.writePage('src/pages/index.vue', 'definePage(null)')
+  const ctx = workspace.context({ dir: 'src/pages', subPackages: [{ dir: 'src/pages', root: 'pages' }] })
+  await ctx.updatePagesJSON()
   expect(ctx.pageMetaData).toEqual([])
   expect(ctx.subPageMetaData).toEqual([])
 
-  write(file, macro('重新启用'))
+  workspace.writePage('src/pages/index.vue', macro('重新启用'))
   await ctx.updatePagesJSON(file)
 
   expect(ctx.pageMetaData).toEqual([])
@@ -79,11 +53,11 @@ it('重叠主分包的 skipped 候选在增量更新时共同刷新，保持分�
 
 describe.each(scopes)('$name 页面内容刷新', (scope) => {
   it('同路径文件快速删建后全量扫描读取新内容', async () => {
-    const { ctx, file } = await fixture(scope)
+    const { ctx, file, workspace } = await setup(scope)
     expect(pages(ctx, scope.sub)[0].style?.navigationBarTitleText).toBe('初始')
 
     fs.unlinkSync(file)
-    write(file, macro('文件重建'))
+    workspace.writePage(scope.file, macro('文件重建'))
     await ctx.updatePagesJSON()
 
     expect(pages(ctx, scope.sub)).toMatchObject([{ path: scope.route, style: { navigationBarTitleText: '文件重建' } }])
@@ -91,38 +65,37 @@ describe.each(scopes)('$name 页面内容刷新', (scope) => {
   })
 
   it('同路径目录快速删建后全量扫描读取新内容', async () => {
-    const { ctx, file } = await fixture(scope)
+    const { ctx, file, workspace } = await setup(scope)
 
     fs.rmSync(path.dirname(file), { recursive: true })
-    write(file, macro('目录重建'))
+    workspace.writePage(scope.file, macro('目录重建'))
     await ctx.updatePagesJSON()
 
     expect(pages(ctx, scope.sub)).toMatchObject([{ path: scope.route, style: { navigationBarTitleText: '目录重建' } }])
   })
 
   it('缺失期间已经扫描的页面重建后恢复', async () => {
-    const { ctx, file } = await fixture(scope)
+    const { ctx, file, workspace } = await setup(scope)
 
     fs.rmSync(path.dirname(file), { recursive: true })
     await ctx.updatePagesJSON()
     expect(pages(ctx, scope.sub)).toEqual([])
 
-    write(file, macro('缺失后恢复'))
+    workspace.writePage(scope.file, macro('缺失后恢复'))
     await ctx.updatePagesJSON()
 
     expect(pages(ctx, scope.sub)).toMatchObject([{ path: scope.route, style: { navigationBarTitleText: '缺失后恢复' } }])
   })
 
   it('ready 补扫读取已有页面的新内容', async () => {
-    const { ctx, file } = await fixture(scope)
-    const watcher = Object.assign(new EventEmitter(), { add: vi.fn() })
-    await ctx.setupWatcher(watcher as any)
+    const { ctx, workspace } = await setup(scope)
+    const watch = await workspace.watch(ctx)
     const update = vi.spyOn(ctx, 'updatePagesJSON')
 
-    write(file, macro('就绪前修改'))
-    currentPageWatcher(ctx)!.emit('ready')
+    workspace.writePage(scope.file, macro('就绪前修改'))
+    watch.emit('ready')
     expect(update).toHaveBeenCalledOnce()
-    await flushPageUpdates(ctx)
+    await watch.settle()
 
     expect(pages(ctx, scope.sub)).toMatchObject([{ path: scope.route, style: { navigationBarTitleText: '就绪前修改' } }])
   })
@@ -131,19 +104,18 @@ describe.each(scopes)('$name 页面内容刷新', (scope) => {
     const prefix = scope.sub ? 'pkg' : 'pages'
     const previous = `${prefix}/previous`
     const current = `${prefix}/current`
-    const { ctx, file } = await fixture(scope, `definePage({ path: ${JSON.stringify(previous)} })`, true)
-    const declarationPath = path.join(ctx.root, 'uni-pages.d.ts')
+    const { ctx, workspace } = await setup(scope, `definePage({ path: ${JSON.stringify(previous)} })`, true)
+    const declarationPath = workspace.path('uni-pages.d.ts')
     expect(fs.readFileSync(declarationPath, 'utf8')).toContain(`"/${previous}"`)
-    const watcher = Object.assign(new EventEmitter(), { add: vi.fn() })
-    await ctx.setupWatcher(watcher as any)
+    const watch = await workspace.watch(ctx)
     const update = vi.spyOn(ctx, 'updatePagesJSON')
 
-    write(file, `definePage({ path: ${JSON.stringify(current)} })`)
-    currentPageWatcher(ctx)!.emit('ready')
+    workspace.writePage(scope.file, `definePage({ path: ${JSON.stringify(current)} })`)
+    watch.emit('ready')
     expect(update).toHaveBeenCalledOnce()
-    await flushPageUpdates(ctx)
+    await watch.settle()
 
-    const output = parse(fs.readFileSync(ctx.resolvedPagesJSONPath, 'utf8')) as unknown as PagesConfig
+    const output = workspace.pagesJson<PagesConfig>(ctx)
     const virtual = await import(`data:text/javascript,${encodeURIComponent(ctx.virtualModule())}`) as PagesConfig
     for (const source of [output, virtual]) {
       const routes = [
@@ -157,24 +129,24 @@ describe.each(scopes)('$name 页面内容刷新', (scope) => {
   })
 
   it('scanAndMerge 重读已有页面内容', async () => {
-    const { ctx, file } = await fixture(scope)
+    const { ctx, workspace } = await setup(scope)
 
-    write(file, macro('补扫修改'))
+    workspace.writePage(scope.file, macro('补扫修改'))
     await ctx.scanAndMerge()
 
     expect(pages(ctx, scope.sub)[0].style?.navigationBarTitleText).toBe('补扫修改')
   })
 
   it('普通 change 更新配置，无配置变化时跳过完整生成', async () => {
-    const { ctx, file } = await fixture(scope)
+    const { ctx, file, workspace } = await setup(scope)
     const otherFile = normalizePath(path.join(path.dirname(file), 'other.vue'))
-    write(otherFile, macro('其他页面'))
+    workspace.writePage(path.relative(workspace.root, otherFile), macro('其他页面'))
     await ctx.updatePagesJSON()
     const readFile = vi.spyOn(fs.promises, 'readFile')
 
-    write(file, macro('普通修改'))
+    workspace.writePage(scope.file, macro('普通修改'))
     expect(await ctx.updatePagesJSON(file)).toBe(true)
-    expect(pages(ctx, scope.sub).find(page => page.path === scope.route)?.style?.navigationBarTitleText).toBe('普通修改')
+    expect(pages(ctx, scope.sub).find((page: any) => page.path === scope.route)?.style?.navigationBarTitleText).toBe('普通修改')
     expect(readFile.mock.calls.filter(call => call[0] === file)).toHaveLength(1)
     expect(readFile.mock.calls.filter(call => call[0] === otherFile)).toHaveLength(0)
 
@@ -183,10 +155,10 @@ describe.each(scopes)('$name 页面内容刷新', (scope) => {
   })
 
   it('全量更新中配置和 tabBar 共用一次页面读取', async () => {
-    const { ctx, file } = await fixture(scope)
+    const { ctx, file, workspace } = await setup(scope)
     const readFile = vi.spyOn(fs.promises, 'readFile')
 
-    write(file, macro('共享读取'))
+    workspace.writePage(scope.file, macro('共享读取'))
     await ctx.updatePagesJSON()
     expect(pages(ctx, scope.sub)[0].style?.navigationBarTitleText).toBe('共享读取')
     expect((await tabBar(ctx, file))?.text).toBe('共享读取')
@@ -194,45 +166,45 @@ describe.each(scopes)('$name 页面内容刷新', (scope) => {
   })
 
   it('全量扫描支持 definePage 配置与 null 互转', async () => {
-    const { ctx, file } = await fixture(scope)
+    const { ctx, file, workspace } = await setup(scope)
 
-    write(file, 'definePage(null)')
+    workspace.writePage(scope.file, 'definePage(null)')
     await ctx.updatePagesJSON()
     expect(pages(ctx, scope.sub)).toEqual([])
     expect(await tabBar(ctx, file)).toBeUndefined()
 
-    write(file, macro('重新收录'))
+    workspace.writePage(scope.file, macro('重新收录'))
     await ctx.updatePagesJSON()
     expect(pages(ctx, scope.sub)).toMatchObject([{ path: scope.route, style: { navigationBarTitleText: '重新收录' } }])
     expect((await tabBar(ctx, file))?.text).toBe('重新收录')
   })
 
   it.each([false, true])('读取失败每轮只告警一次，修复后下一轮扫描恢复，增量：%s', async (incremental) => {
-    const { ctx, file } = await fixture(scope, 'definePage(() => { throw new Error("refresh failure") })')
+    const { ctx, file, workspace } = await setup(scope, 'definePage(() => { throw new Error("refresh failure") })')
     const warn = vi.fn()
     ctx.setLogger({ warn } as any)
 
     await ctx.updatePagesJSON(incremental ? file : undefined)
     expect(warn.mock.calls.filter(call => String(call[0]).includes('refresh failure'))).toHaveLength(1)
 
-    write(file, macro('失败后恢复'))
+    workspace.writePage(scope.file, macro('失败后恢复'))
     await ctx.updatePagesJSON()
     expect(pages(ctx, scope.sub)[0].style?.navigationBarTitleText).toBe('失败后恢复')
     expect(warn.mock.calls.filter(call => String(call[0]).includes('refresh failure'))).toHaveLength(1)
   })
 
   it.each([false, true])('已有配置读取失败时保留上次结果，下一轮全量扫描恢复，增量：%s', async (incremental) => {
-    const { ctx, file } = await fixture(scope)
+    const { ctx, file, workspace } = await setup(scope)
     const warn = vi.fn()
     ctx.setLogger({ warn } as any)
 
-    write(file, 'definePage(() => { throw new Error("refresh failure") })')
+    workspace.writePage(scope.file, 'definePage(() => { throw new Error("refresh failure") })')
     await ctx.updatePagesJSON(incremental ? file : undefined)
     expect(pages(ctx, scope.sub)[0].style?.navigationBarTitleText).toBe('初始')
     expect((await tabBar(ctx, file))?.text).toBe('初始')
     expect(warn.mock.calls.filter(call => String(call[0]).includes('refresh failure'))).toHaveLength(1)
 
-    write(file, macro('再次恢复'))
+    workspace.writePage(scope.file, macro('再次恢复'))
     await ctx.updatePagesJSON()
     expect(pages(ctx, scope.sub)[0].style?.navigationBarTitleText).toBe('再次恢复')
   })
