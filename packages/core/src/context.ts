@@ -2,7 +2,9 @@ import type { Pages, PagesConfig, SubPackage, SubPackages, TabBar, TabBarItem } 
 import type { FSWatcher } from 'chokidar'
 import type { Logger, ModuleNode, ViteDevServer } from 'vite'
 import type { SubPackageDirectorySource } from './directories'
+import type { PageEnvironment } from './page'
 import type { PageCandidate, PageSource } from './page-sources'
+import type { PagesSnapshot } from './pages-snapshot'
 import type { ScanPlan } from './scan-plan'
 import type { InternalPages, PagePath, ResolvedOptions, UserOptions } from './types'
 import path from 'node:path'
@@ -23,6 +25,7 @@ import { Page } from './page'
 import { comparePageSources, resolvePageIdentity, selectPageSources, validateGeneratedRoutes } from './page-sources'
 import { PageSourceWatch } from './page-watch'
 import { writePagesJson } from './pages-json'
+import { createPagesSnapshot } from './pages-snapshot'
 import { applyScanPlan, createScanPlan } from './scan-plan'
 
 /**
@@ -63,6 +66,8 @@ export class PageContext {
   private disposal: Promise<void> | undefined
   /** 本轮扫描的目录、分包来源与规则；扫描和监听共用 */
   private scanPlan!: ScanPlan
+  /** 最近一次生成的完整快照；虚拟模块、路由与声明都读它 */
+  private generatedSnapshot: PagesSnapshot | undefined
   /** 随扫描更新的 Page 来源，用于复用检查和冲突诊断 */
   private readonly pageSources = new WeakMap<Page, PageSource>()
   /** 扫描候选独立于归属裁剪后的输出映射，保留非代表来源的内容缓存 */
@@ -190,6 +195,7 @@ export class PageContext {
    * 信息。步骤顺序只维护在这里，调用方和测试都不用关心。
    */
   async scanAndMerge(): Promise<void> {
+    this.generatedSnapshot = undefined
     this.refreshScanPlan()
     await this.scanPages()
     await this.scanSubPages()
@@ -519,6 +525,7 @@ export class PageContext {
       }
     }
 
+    this.generatedSnapshot = undefined
     checkPagesJsonFileSync(this.resolvedPagesJSONPath)
     this.options.onBeforeLoadUserConfig()
     await this.loadUserPagesConfig()
@@ -557,6 +564,13 @@ export class PageContext {
     // 条件编译输出写坏。tabBar 在这之前算好、存到 this.tabBar，
     // 后面的类型声明用同一份结果
     this.tabBar = await this.resolveTabBar()
+    this.generatedSnapshot = createPagesSnapshot({
+      pages: this.pageMetaData,
+      subPackages: this.subPageMetaData,
+      tabBar: this.tabBar,
+      globConfig: this.pagesGlobConfig,
+      homePath,
+    })
     const result = await writePagesJson(this.resolvedPagesJSONPath, {
       pages: this.pageMetaData,
       subPackages: this.subPageMetaData,
@@ -603,15 +617,28 @@ export class PageContext {
     return result.updated
   }
 
+  /** 最近一次生成的路由快照；未写入文件时由当前工作字段合成 */
+  get snapshot(): PagesSnapshot {
+    return this.generatedSnapshot ?? createPagesSnapshot({
+      pages: this.pageMetaData,
+      subPackages: this.subPageMetaData,
+      tabBar: this.tabBar,
+      globConfig: this.pagesGlobConfig,
+      homePath: this.pageMetaData.find(meta => meta.type === 'home')?.path,
+    })
+  }
+
   /**
    * 生成虚拟模块内容
    * 返回包含 pages 与 subPackages 导出的 JavaScript 代码
    * @returns 虚拟模块代码字符串
    */
   virtualModule(): string {
-    const pages = `export const pages = ${this.resolveRoutes()};`
-    const subPackages = `export const subPackages = ${this.resolveSubRoutes()};`
-    return [pages, subPackages].join('\n')
+    const { pages, subPackages } = this.snapshot
+    return [
+      `export const pages = ${cjStringify(pages, null, 2)};`,
+      `export const subPackages = ${cjStringify(subPackages, null, 2)};`,
+    ].join('\n')
   }
 
   /**
@@ -619,7 +646,7 @@ export class PageContext {
    * @returns 主包页面配置的 JSON 字符串
    */
   resolveRoutes(): string {
-    return cjStringify(this.pageMetaData, null, 2)
+    return cjStringify(this.snapshot.pages, null, 2)
   }
 
   /**
@@ -627,7 +654,7 @@ export class PageContext {
    * @returns 子包页面配置的 JSON 字符串
    */
   resolveSubRoutes(): string {
-    return cjStringify(this.subPageMetaData, null, 2)
+    return cjStringify(this.snapshot.subPackages, null, 2)
   }
 
   /**
@@ -676,12 +703,7 @@ export class PageContext {
       return
 
     debug.declaration('generating')
-    return writeDeclaration({
-      pages: this.pageMetaData,
-      subPackages: this.subPageMetaData,
-      tabBar: this.tabBar,
-      globConfig: this.pagesGlobConfig,
-    }, this.options.dts)
+    return writeDeclaration(this.snapshot, this.options.dts)
   }
 
   /**
@@ -724,7 +746,7 @@ export class PageContext {
     const page = previous && this.pageSources.get(previous)?.identity === identity
       && previous.path.relativePath === pagePath.relativePath
       ? previous
-      : new Page(this, pagePath)
+      : new Page(this.pageEnvironment(), pagePath)
     if (refreshContent)
       page.invalidate()
     this.pageSources.set(page, {
@@ -736,8 +758,22 @@ export class PageContext {
       ruleIndex: source.ruleIndex,
       matchIndex: source.matchIndex,
       rootSource: source.rootSource,
+      rulePattern: source.rulePattern ?? this.configuredRule(source),
     })
     return page
+  }
+
+  private pageEnvironment(): PageEnvironment {
+    // setLogger 可能在 Page 创建之后才调用，读取时再取当前 logger
+    return { platform: this.platform, getLogger: () => this.logger }
+  }
+
+  /** 页面来源的原始声明规则，用于冲突诊断；hook 页面可能没有 */
+  private configuredRule(source: Pick<PageSource, 'root' | 'ruleIndex'>): string | undefined {
+    if (source.root === undefined)
+      return this.options.dir
+    const pattern = this.options.subPackagePatterns[source.ruleIndex]
+    return typeof pattern === 'string' ? pattern : pattern?.dir
   }
 
   /**

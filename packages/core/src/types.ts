@@ -403,6 +403,8 @@ export interface ScanSourceCoordinate {
   matchIndex: number
   /** 最终分包 root 的决议来源，可能来自另一声明；主包及未关联声明的 hook 页面无此值 */
   rootSource?: ScanSourceOrigin
+  /** 声明该来源的原始目录规则，用于归属冲突诊断；hook 页面可能缺失 */
+  rulePattern?: string
 }
 
 /**

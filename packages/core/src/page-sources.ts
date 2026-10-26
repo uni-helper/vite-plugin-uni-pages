@@ -59,11 +59,7 @@ export function comparePageSources(a: Pick<ScanSourceCoordinate, 'explicitRoot' 
 function describeSource(source: PageCandidate): string {
   const declaration = source.root === undefined ? 'dir' : `subPackages[${source.ruleIndex}]`
   // 一条规则可能展开为多个目录，诊断中同时显示原始声明和实际匹配目录
-  const configured = source.root === undefined
-    ? source.page.ctx.options.dir
-    : source.page.ctx.options.subPackagePatterns[source.ruleIndex]
-  const pattern = typeof configured === 'string' ? configured : configured?.dir
-  const rule = pattern === undefined ? '' : ` rule ${JSON.stringify(pattern)}`
+  const rule = source.rulePattern === undefined ? '' : ` rule ${JSON.stringify(source.rulePattern)}`
   const owner = source.root === undefined ? 'main package' : `subpackage "${source.root}"`
   const rootSource = source.rootSource
   const rootOrigin = rootSource
