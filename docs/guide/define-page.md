@@ -1,5 +1,7 @@
 # definePage
 
+<Badge type="tip" text="v0.4.0 新增" />
+
 `definePage` 是页面级配置宏。插件在扫描时读取它，在转换时把调用从产物里删掉，所以不会影响运行时。
 
 ## 基本写法
@@ -46,6 +48,8 @@ definePage({
 
 ## 按平台跳过页面
 
+<Badge type="tip" text="v0.5.0 新增" />
+
 直接传 `null`，或者从函数里返回 `null`，页面就不会出现在当前平台的 `pages.json` 里：
 
 ```vue
@@ -62,6 +66,8 @@ definePage(({ platform }) => {
 跳过的页面不参与页面归属和路由冲突检查。
 
 ## 函数式写法
+
+<Badge type="tip" text="v0.5.0 新增" />
 
 函数参数提供当前平台和一个条件定义工具：
 
@@ -88,6 +94,8 @@ definePage(({ define }) =>
 函数可以是 `async`。返回值可以是页面配置对象、`define()` 的结果，或者 `null`。
 
 ## 引用导入的值
+
+<Badge type="tip" text="v0.5.0 新增" />
 
 宏参数里可以用页面文件导入的值：
 

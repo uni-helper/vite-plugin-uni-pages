@@ -1,5 +1,13 @@
 import { defineConfig } from 'vitepress'
 
+/**
+ * 侧边栏版本徽标。VPSidebarItem 用 v-html 渲染 item.text，这里的 HTML
+ * 会按 Badge 组件的样式显示；样式调整在 theme/custom.css。
+ */
+function versionBadge(version: string, type: 'tip' | 'warning' = 'tip'): string {
+  return `<span class="VPBadge ${type}">${version}</span>`
+}
+
 const docsSidebar = [
   {
     text: '指南',
@@ -7,7 +15,7 @@ const docsSidebar = [
       { text: '介绍', link: '/guide/introduction' },
       { text: '起步', link: '/guide/installation' },
       { text: '使用', link: '/guide/usage' },
-      { text: 'definePage', link: '/guide/define-page' },
+      { text: `definePage ${versionBadge('v0.4.0')}`, link: '/guide/define-page' },
       { text: 'pages.config', link: '/guide/pages-config' },
     ],
   },
@@ -15,21 +23,21 @@ const docsSidebar = [
     text: 'API',
     items: [
       { text: '插件选项', link: '/api/options' },
-      { text: '生命周期钩子', link: '/api/hooks' },
-      { text: 'prepare()', link: '/api/prepare' },
+      { text: `生命周期钩子 ${versionBadge('v0.0.3')}`, link: '/api/hooks' },
+      { text: `prepare() ${versionBadge('v0.6.0')}`, link: '/api/prepare' },
       { text: '虚拟模块', link: '/api/virtual-module' },
     ],
   },
   {
     text: '进阶',
     items: [
-      { text: '多平台与条件编译', link: '/advanced/multi-platform' },
-      { text: '分包', link: '/advanced/subpackages' },
-      { text: '页面排除', link: '/advanced/exclude' },
-      { text: '配置依赖热更新', link: '/advanced/config-dependencies' },
-      { text: '监听与符号链接', link: '/advanced/watchers-and-symlinks' },
-      { text: '会话与实例复用', link: '/advanced/lifecycle' },
-      { text: '输出格式', link: '/advanced/formatting' },
+      { text: `多平台与条件编译 ${versionBadge('v0.5.0')}`, link: '/advanced/multi-platform' },
+      { text: `分包 ${versionBadge('v0.1.8')}`, link: '/advanced/subpackages' },
+      { text: `页面排除 ${versionBadge('v0.0.4')}`, link: '/advanced/exclude' },
+      { text: `配置依赖热更新 ${versionBadge('v0.6.0')}`, link: '/advanced/config-dependencies' },
+      { text: `监听与符号链接 ${versionBadge('v0.6.0', 'warning')}`, link: '/advanced/watchers-and-symlinks' },
+      { text: `会话与实例复用 ${versionBadge('v0.6.0')}`, link: '/advanced/lifecycle' },
+      { text: `输出格式 ${versionBadge('v0.5.0')}`, link: '/advanced/formatting' },
     ],
   },
   {
@@ -48,6 +56,10 @@ const blogSidebar = [
     text: '博客',
     items: [
       { text: '全部文章', link: '/blog/' },
+      {
+        text: '0.6：统一扫描规则，开发期少重启',
+        link: '/blog/2026-10-26-vite-plugin-uni-pages-0-6',
+      },
       {
         text: 'vite-plugin-uni-pages 更新了什么',
         link: '/blog/2026-09-04-vite-plugin-uni-pages-0-4-0-5',

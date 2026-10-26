@@ -82,6 +82,8 @@ import { pages, subPackages } from 'virtual:uni-pages'
 
 ## 提前生成 pages.json
 
+<Badge type="tip" text="v0.6.0 新增" />
+
 有些下游插件在工厂函数执行时就会读取 `pages.json`。可以在创建它们之前等待 `prepare()`：
 
 ```ts
@@ -102,6 +104,8 @@ export default defineConfig(async () => ({
 `platformSuffix` 必填，必须和最终是否启用 `@uni-helper/vite-plugin-uni-platform` 一致。完整行为和限制见 [prepare()](../api/prepare.md)。
 
 ## 开发期间发生什么
+
+<Badge type="warning" text="v0.6.0 变更" />
 
 开发服务器启动时，插件会：
 

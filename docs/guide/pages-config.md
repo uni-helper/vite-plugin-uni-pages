@@ -30,7 +30,7 @@ pages.config.mjs
 pages.config.json
 ```
 
-配置文件可以导入本地模块，开发期间修改这些依赖会重新生成 `pages.json`，详见[配置依赖热更新](../advanced/config-dependencies.md)。
+<Badge type="tip" text="v0.6.0 新增" /> 配置文件可以导入本地模块，开发期间修改这些依赖会重新生成 `pages.json`，详见[配置依赖热更新](../advanced/config-dependencies.md)。
 
 ## 可用字段
 
@@ -71,7 +71,7 @@ export default defineUniPages({
 
 只写配置、不存在的页面也会保留。`mergePages: false` 时，插件完全不扫描页面文件，`pages` 和 `subPackages` 都以配置为准。
 
-### 子包页面路径
+### 分包页面路径
 
 配置里 `subPackages[].pages[].path` 按 `pages.json` 的惯例相对 `root` 书写：
 
@@ -101,6 +101,8 @@ export default defineUniPages({
 多个平台同时往一个 `pages.json` 写入时，`list` 的顺序和顶层属性会按平台分别保存，详见[多平台与条件编译](../advanced/multi-platform.md)。
 
 ## 自定义配置来源
+
+<Badge type="tip" text="v0.2.7 新增" />
 
 `configSource` 决定从哪里加载配置，默认 `'pages.config'`：
 

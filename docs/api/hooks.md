@@ -1,5 +1,7 @@
 # 生命周期钩子
 
+<Badge type="tip" text="v0.0.3 新增" />
+
 插件在生成流水线的固定阶段调用钩子。每个钩子只接收当前阶段的输入或输出，不传入 `PageContext`。
 
 ## 顺序
@@ -22,7 +24,7 @@ onAfterWriteFile(filePath, content)
 
 `onAfterWriteFile` 只在 `pages.json` 内容实际变化时调用。`pages.json` 没变时，后面的声明文件仍会检查，但不会重复触发写入回调。
 
-页面内容变化但元数据没变时，本次更新会提前结束，前面的加载和扫描钩子都不会触发。
+页面内容变化但元数据没变时，这次更新会提前结束，前面的加载和扫描钩子都不会触发。
 
 ## 用法
 
@@ -51,7 +53,7 @@ UniPages({
 | `onAfterScanPages` | `pages` 是主包页面映射，`subPages` 是分包目录到页面映射的映射 |
 | `onBeforeMergePageMetaData` | 扫描结果和用户配置，适合在合并前读取 |
 | `onAfterMergePageMetaData` | 最终写入的页面数组和分包数组 |
-| `onAfterWriteFile` | `content` 是本次写入的完整文件文本 |
+| `onAfterWriteFile` | `content` 是这次写入的完整文件文本 |
 
 `pages` 中的 `Page` 实例提供 `path`、`uri`、`getPageMeta()` 等方法。钩子可以读取它们，但不建议在钩子里修改内部集合，后续阶段会重新扫描。
 

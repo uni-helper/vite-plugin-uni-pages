@@ -27,6 +27,20 @@
 }
 
 /**
+ * Version badges
+ * -------------------------------------------------------------------------- */
+.VPSidebarItem .VPBadge {
+  margin-left: 6px;
+  padding: 0 6px;
+  line-height: 18px;
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+  transform: none;
+  vertical-align: 1px;
+}
+
+/**
  * Blog
  * -------------------------------------------------------------------------- */
 .blog-post-meta {

@@ -1,5 +1,7 @@
 # 分包
 
+<Badge type="tip" text="v0.1.8 新增" />
+
 `subPackages` 声明 uni-app 的分包页面目录。插件会扫描这些目录，生成 `pages.json` 的 `subPackages` 字段。
 
 ## 基本写法
@@ -19,6 +21,8 @@ src/packages/account/profile.vue
 ```
 
 ## glob 发现
+
+<Badge type="tip" text="v0.6.0 新增" />
 
 字符串和对象形式的 `dir` 都支持 glob：
 
@@ -57,7 +61,9 @@ UniPages({
 })
 ```
 
-`root` 只决定写进 `pages.json` 的 `subPackages.root`。页面 `path` 仍按文件相对 `outDir` 的实际位置换算，根外目录会得到带 `..` 的页面路径；它和 `root` 拼起来正好是文件相对 `outDir` 的路径，uni-app 靠这个组合定位页面源文件，`root` 本身保持干净。
+`root` 只决定写进 `pages.json` 的 `subPackages.root`。页面 `path` 仍按文件相对 `outDir` 的实际位置换算，根外目录会得到带 `..` 的路径。`path` 和 `root` 拼起来才是文件相对 `outDir` 的位置，uni-app 靠这个组合定位页面源文件。`root` 本身保持干净。
+
+<Badge type="tip" text="v0.6.0 新增" />
 
 也可以用同步回调按匹配目录计算：
 
@@ -103,6 +109,8 @@ UniPages({
 
 ## 页面归属
 
+<Badge type="tip" text="v0.6.0 新增" />
+
 多个声明可以指向同一目录，也可以通过符号链接指向同一页面。插件用 realpath 判断目录和页面身份：
 
 - 同一页面归属同一 root 时只保留一份
@@ -117,6 +125,8 @@ UniPages({
 代表来源按以下顺序选择：显式来源优先，其次按声明顺序，glob 内按匹配路径排序。交换声明顺序可能改变代表路径、默认 root 和页面顺序，但不会漏掉有效页面。
 
 ## 路由冲突
+
+<Badge type="tip" text="v0.6.0 新增" />
 
 不同生成来源占用同一完整路由时会报错。比较前会规范化 `.`、`..`、分隔符和末尾斜杠。
 
