@@ -30,14 +30,6 @@ features:
     details: 生成 uni-pages.d.ts 约束导航 API 的 URL，虚拟模块提供页面元数据。
 ---
 
-## 文档地址
-
-本站有多个部署地址，内容相同：
-
-- [https://uni-helper.js.org/vite-plugin-uni-pages](https://uni-helper.js.org/vite-plugin-uni-pages)
-- [https://vite-plugin-uni-pages.netlify.app](https://vite-plugin-uni-pages.netlify.app)
-- [https://vite-plugin-uni-pages.pages.dev](https://vite-plugin-uni-pages.pages.dev)
-
 <!-- markdownlint-disable -->
 <style>
 :root {

@@ -54,7 +54,7 @@ exclude: ['**/__*__/**']
 
 ## 从旧版本迁移
 
-0.5.0 之前，`exclude` 相对每个实际扫描目录解释。统一到 Vite root 后，旧规则需要补上扫描来源的前缀。
+0.6.0 之前，`exclude` 相对每个实际扫描目录解释。统一到 Vite root 后，旧规则需要补上扫描来源的前缀。
 
 例如扫描 `src/pages`、`src/packages/*/pages` 和 `../shared/pages` 时，旧的 `exclude: ['index.vue']` 应改成：
 

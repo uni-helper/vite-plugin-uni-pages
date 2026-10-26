@@ -827,6 +827,25 @@ export default defineConfig({
 
 更多上下文参考 <https://github.com/uni-helper/vite-plugin-uni-pages/issues/271>。
 
+## 0.6.0 破坏性变更
+
+升级到 0.6.0 前请阅读以下变更，完整的迁移步骤见[迁移指南](https://uni-helper.js.org/vite-plugin-uni-pages/other/migration)：
+
+- **`exclude` 基准**：相对模式改为基于 Vite `root`，命中文件、目录或任一祖先目录时排除整个子树，主包、分包、首次扫描和页面事件共用同一套规则。旧规则需要补上扫描来源的前缀，默认值也改为 `['**/node_modules/**', '**/.git/**', '**/__*__/**']`，`!foo` 这类否定规则直接报错（见上方「页面排除规则」）。
+- **扫描来源与页面归属**：同一 `root` 的重复扫描声明不再互相覆盖，显式 `root` 优先于默认值，同一物理页面的多个别名收敛为一个代表来源。跨分包认领同一页面、不同来源占用同一完整路由时报错，冲突结果不会写入 `pages.json`（见上方「扫描目录与页面归属」）。
+- **路径基准**：Vite `root` 在解析阶段固定为绝对路径；`dts` 传字符串时相对 `root` 解析；`getPageFiles(directory, options)` 的 `directory` 改为相对 `options.root`（见上方「路径基准」）。
+- **实例生命周期**：一个实例同时只服务一个 Vite 会话。开发服务器未关闭时启动构建、构建未完成时再启动、`build --watch` 期间再次启动，以及 `server.restart()` 都会报错，这些场景应各自创建 `UniPages()` 实例。顺序复用仍然可用（见上方「实例复用与关闭」）。
+- **`UNI_PLATFORM` 必填**：初始化时读不到 `process.env.UNI_PLATFORM` 会直接报错。0.5.x 会以空平台继续生成，条件编译分支全部被跳过。
+
+0.6.0 同时带来以下新能力：
+
+- `prepare()` 在 Vite 启动前完成一次生成，供工厂函数阶段读取 `pages.json` 的下游插件使用（见上方「提前生成 pages.json」）
+- `pages.config` 本地依赖热更新（见上方「配置依赖热更新」）
+- `subPackages` 目录 glob 自动发现，`root` 支持同步回调（见上方「如何自动发现分包」）
+- 页面内容变化刷新标题、路由和 `definePage(null)` 状态，符号链接页面支持嵌套链接、删除重建和恢复（见上方「页面内容与符号链接监听」）
+- 多平台 tabBar 条目按配置顺序摆放
+- `@uni-helper/uni-pages-types` 补齐 uni-app x 字段，Schema 同步重新生成，改动均为新增
+
 ## 0.5.0 破坏性变更
 
 升级到 0.5.0 前请阅读以下变更：
