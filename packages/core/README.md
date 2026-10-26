@@ -914,18 +914,25 @@ export default defineConfig({
 
 ```
 index.ts          Vite 插件入口：configResolved / transform / configureServer / resolveId / load
-context.ts        PageContext 编排核心：配置加载、扫描、合并、串行生成、监听编排、虚拟模块与 HMR
+context.ts        PageContext 编排核心：消费配置监听计划与扫描计划，串行生成、写入快照、监听与 HMR
 pipeline.ts       纯流水线入口：createPages / generateAll，root 和 platform 从外部传入，测试直接走这里
-config-loader.ts  配置加载：unconfig 发现与回调、内存转换、隔离产物、本地依赖与恢复候选
+config-loader.ts  配置加载：unconfig 发现与回调、内存转换、隔离产物、本地依赖与恢复输入
+config-watch.ts   配置监听计划：来源、依赖与恢复候选归一化为文件、恢复目录与注册路径，
+                  并负责配置事件判定
 config-source.ts  源位置适配：每模块运行时解析、静态调用保留、源码映射
-directories.ts    目录发现：glob 展开、subPackages root 映射与扫描目录投影
+directories.ts    目录发现：glob 展开、subPackages 来源发现与扫描目录投影
+scan-plan.ts      扫描计划：一次发现主包目录、分包来源、最终 root 与规则，作为不可变视图
 page-rules.ts     页面规则：基于 Vite root 编译排除模式，统一扫描与事件判定
 page-sources.ts   扫描来源与页面归属：来源身份、代表选择、生成路由冲突与文件族校验
-page-watch.ts     页面监听：当前词法来源、内容目标订阅与非递归恢复入口
+page-watch.ts     页面监听：当前词法来源、内容目标订阅与非递归恢复入口，消费扫描计划
 page-watch-sources.ts 监听依赖发现：顶层与嵌套链接解析、悬空目标保留及循环剪枝
 page-watch-filter.ts 监听过滤：将 Vite ignored 规则应用于词法来源路径
-pages-json.ts     pages.json 读-改-写：多平台 #ifdef 合并、首页排前、
-                  生成标记与过期子包清理、序列化格式化、文件锁与原子写入
+pages-json.ts     pages.json 编排：读-改-写、子包收敛、tabBar 占位、序列化格式化、
+                  文件锁与原子写入
+pages-json-items.ts 数组适配器：多平台条目合并、#ifdef / #ifndef 包裹与输出顺序
+pages-json-structure.ts 结构操作：首页前置与过期子包删除，注释随条目移动
+pages-json-tokens.ts 注释令牌：行注释、条件指令查找与 #ifndef 包裹层清理
+pages-snapshot.ts 生成快照：pages / subPackages / tabBar / globConfig / homePath 的值视图
 platform-variants.ts 平台变体表：跨平台合并的共享规则，数组侧与对象侧两类适配器共用
 tab-bar.ts        tabBar 外观属性的跨平台合并与渲染（对象侧适配器）
 jsonc-scan.ts     从 pages.json 原始文本里捞回 comment-json 解析时丢掉的重复键
@@ -933,7 +940,7 @@ files.ts          文件工具：页面扫描、路径解析、文件锁（withF
 macro.ts          definePage 宏解析：SFC 解析、单个 script 块失败不影响别的块、
                   对象 / 函数 / 异步函数三种形态求值
 condition.ts      按平台写配置：define().ifdef()/.ifndef()，扫描时就算成当前平台的普通对象
-page.ts           页面实体：文件读取、宏求值、变更检测、跳过状态
+page.ts           页面实体：文件读取、宏求值、内容快照、变更检测与跳过状态
 options.ts        选项解析：默认值合并与扫描规则保留
 declaration.ts    uni-pages.d.ts 生成，为导航 API 提供路径类型检查
 config.ts         defineUniPages 辅助函数 + 类型重导出
@@ -947,24 +954,40 @@ types.ts          公共类型定义（Options / UserOptions / ResolvedOptions�
 ```shell
 index.ts
   ├─ context.ts（编排核心）
-  │    ├─ config-loader.ts             配置装载、产物身份与恢复监听
-  │    │    └─ config-source.ts        源位置适配与运行时解析
-  │    ├─ options.ts ── directories.ts 选项解析与目录发现
+  │    ├─ config-loader.ts             配置装载、产物身份与恢复输入
+  │    │    ├─ config-source.ts        源位置适配与运行时解析
+  │    │    └─ config-watch.ts         监听计划与配置事件判定（反向读取加载器路径工具）
+  │    ├─ options.ts ── scan-plan.ts   选项解析、目录发现与不可变扫描计划
+  │    │    ├─ directories.ts          目录来源、root 决议与扫描投影
+  │    │    └─ page-rules.ts           词法范围与排除规则
   │    ├─ files.ts                     扫描与文件锁
   │    ├─ page.ts ── macro.ts ── condition.ts
   │    ├─ page-sources.ts              来源身份、代表选择与生成路由冲突
-  │    ├─ page-watch.ts                页面内容订阅与恢复入口
+  │    ├─ page-watch.ts                页面内容订阅与恢复入口，消费扫描计划
   │    │    ├─ page-watch-sources.ts   词法来源到物理目标的依赖发现
-  │    │    ├─ directories.ts / page-rules.ts 目录发现与词法范围
+  │    │    ├─ scan-plan.ts / page-rules.ts 扫描目录与词法范围
   │    │    └─ page-watch-filter.ts    Vite ignored 规则匹配
-  │    ├─ pages-json.ts                读-改-写，内含文件锁
-  │    ├─ platform-variants.ts         平台变体表（两者按类型互相引用）
-  │    ├─ tab-bar.ts ── jsonc-scan.ts  tabBar 属性合并与原文重复键扫描
+  │    ├─ pages-snapshot.ts            一次生成的只读结果视图
+  │    ├─ pages-json.ts                文档编排，内含文件锁
+  │    │    ├─ pages-json-items.ts ── pages-json-tokens.ts 数组适配器与注释令牌
+  │    │    ├─ pages-json-structure.ts 首页前置与过期子包删除
+  │    │    ├─ platform-variants.ts    平台变体表（两者按类型互相引用）
+  │    │    └─ tab-bar.ts ── jsonc-scan.ts tabBar 属性合并与原文重复键扫描
   │    └─ declaration.ts
   ├─ config-loader.ts                  插件工厂预检的路径归一化
   └─ files.ts                          pages.json 预检与路径解析
 pipeline.ts ── context.ts              测试与外部调用的流水线入口
 ```
+
+### 计划与快照
+
+生成流程里三处「先发现、后消费」的状态都是显式的值，不再靠 WeakMap、原地改写或调用方分步驱动：
+
+- **配置监听计划**：`ConfigWatchIndex` 持有最近一次加载的文件、恢复目录与注册路径。`PagesConfigLoader` 只提供来源、依赖和恢复输入，`PageContext` 调 `buildConfigWatchPlan()` 后只消费 `match()` 与 `watchPaths()`，不再复制恢复状态。
+- **扫描计划**：每轮 `createScanPlan()` 产出一份 `ScanPlan`，包含主包目录、分包来源、最终 root 与编译规则。页面扫描、监听和目录事件判定读同一份值；`applyScanPlan()` 只把 `dirs`、`subPackages`、`subPackageRootMap` 同步回 `ResolvedOptions`，供既有调用方兼容读取。
+- **生成快照**：`generatePagesJSON()` 完成后创建 `PagesSnapshot`，虚拟模块、路由字符串与声明文件都从快照取值。`Page.load()` 返回内容快照，`PageContext` 不再把可变缓存协议暴露给调用方。
+
+计划与快照都是模块内部的值，公开入口 `mergePagesJson()`、`writePagesJson()`、`updatePagesJSON()` 与虚拟模块形状保持不变。测试可以直接构造或断言这些值，不必通过 `PageContext` 的私有字段推断时序。
 
 ### 脚本配置的加载流程
 
@@ -1011,7 +1034,7 @@ node_modules/.cache/uni-pages/
 
 1. **插件工厂调用**（同步）：预检 `pages.json` 是否存在且合法（此时 `config.root` 未知，回退到 `VITE_ROOT_DIR` / `process.cwd()` 解析路径）
 2. **`configResolved`**（异步）：占用当前实例，创建 `PageContext` 或接管匹配的 `prepare()` 结果，检测是否与 `vite-plugin-uni-platform` 协同，完成首次 pages.json 生成；`build --watch` 模式下另建 watcher，接收配置文件事件与页面目录结构通知，同时启动自有页面监听器
-3. **`configureServer`**（dev）：从 Vite 的 `server.watcher` 接收配置文件及其依赖的事件和页面目录结构通知，并按 Vite 的监听开关、忽略规则和轮询设置启动自有页面监听器；产物更新后失效虚拟模块并通知浏览器 full-reload
+3. **`configureServer`**（dev）：从 Vite 的 `server.watcher` 接收配置监听计划命中与页面目录结构通知，并按 Vite 的监听开关、忽略规则和轮询设置启动自有页面监听器；产物更新后失效虚拟模块并通知浏览器 full-reload
 4. **`options`**（build）：将本插件的虚拟模块与关闭钩子绑定到当前会话，供 Rollup 构建使用；watcher 各轮沿用该绑定，已关闭构建的迟到钩子及已排队轮次仍属于原会话
 5. **`transform`**：从 vue / nvue / uvue 文件中移除 `definePage` 宏调用，避免运行时报错
 6. **`resolveId` / `load`**：提供 `virtual:uni-pages` 虚拟模块，暴露所有页面元数据

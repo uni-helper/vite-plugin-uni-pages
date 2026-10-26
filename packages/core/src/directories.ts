@@ -247,10 +247,10 @@ export function getSubPackageDirectorySources(options: ResolvedOptions): readonl
 }
 
 /**
- * 刷新扫描目录、分包 root 及来源快照
+ * 刷新扫描目录与分包 root 投影
  *
- * @description 每次扫描前调用，原地更新 options 中的目录及 root 投影，并替换来源快照
- * 目录匹配、物理身份和 root 回调均重新计算，避免沿用上一轮的目录状态
+ * @description 仅用于兼容仍读取 `ResolvedOptions` 的调用方；内部扫描走
+ * `createScanPlan()`，每次重新发现目录来源与物理身份，不保留上一轮快照
  *
  * @throws 目录规则、root 决议或目录访问失败时抛出，应中止本轮扫描
  */

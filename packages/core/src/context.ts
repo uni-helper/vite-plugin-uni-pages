@@ -383,8 +383,8 @@ export class PageContext {
    *
    * 只新增路径，从不 unwatch：chokidar 对文件调用 unwatch 会连带
    * 拆掉父目录监听，新建文件就再也发现不了。因此监听集合是并集，
-   * 会随着会话累积；每次刷新都按当前依赖重建 `watchedConfigIndex`，
-   * 真正决定是否触发的始终是当前依赖集合（恢复目录除外，那是
+   * 会随着会话累积；每次刷新都按当前依赖重建配置监听计划，
+   * 真正决定是否触发的始终是计划里的依赖集合（恢复目录除外，那是
    * 故意留的兜底）。
    */
   private refreshConfigWatchers(): void {
