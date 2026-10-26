@@ -164,6 +164,13 @@ function mergeIntoPagesJson(existingContent: string, data: PagesJsonData, option
     throw new Error(`[vite-plugin-uni-pages] Failed to parse the existing pages.json, please fix its syntax first: ${error?.message ?? error}`, { cause: error })
   }
 
+  // pages.json 的根必须是对象。数字、字符串、布尔和 null 的语法合法，
+  // 但 comment-json 会把它们装箱成对象，后面会静默覆盖或抛出没有文件
+  // 上下文的 TypeError，等于跳过“拒绝覆盖手写内容”的保护。用 toString
+  // 而不是 typeof：装箱原始值、数组和 null 都会露馅
+  if (Object.prototype.toString.call(oldConfig) !== '[object Object]')
+    throw new Error('[vite-plugin-uni-pages] The existing pages.json must contain a JSON object, please fix its syntax first')
+
   const { pages: oldPages, subPackages: oldSubPackages, tabBar: oldTabBar } = oldConfig
 
   // pages 和 subPackages 必须是数组。手写错型（比如把数组写成了对象）

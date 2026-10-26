@@ -32,6 +32,15 @@ describe('mergePagesJson pure merge seam', () => {
     }, { platform: 'h5' })).toThrowError(/Failed to parse the existing pages\.json/)
   })
 
+  it.each(['null', '[]', '42', '"text"'])('rejects a pages.json whose root is not an object: %s', (content) => {
+    // 语法合法但没有对象体：解析能过，后面的合并会静默覆盖文件或抛出
+    // 没有文件上下文的 TypeError。和字段错型一样在写回前拦下
+    expect(() => mergePagesJson(content, {
+      pages: [{ path: 'pages/index/index' }],
+      subPackages: [],
+    }, { platform: 'h5' })).toThrowError(/The existing pages\.json must contain a JSON object/)
+  })
+
   it('throws a recognizable error when pages or subPackages is not an array', () => {
     // 手写把数组写成了别的类型：subPackages 错型会让后面的遍历抛出
     // 裸 TypeError、pages 错型会静默丢掉已有内容。统一在这里拦下，
