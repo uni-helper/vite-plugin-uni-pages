@@ -3599,7 +3599,7 @@
       "type": "string"
     },
     "SubPackage": {
-      "description": "subPackages 数组的元素类型，即应用的子包",
+      "description": "subPackages 数组的元素类型，即应用的分包",
       "properties": {
         "independent": {
           "default": false,
@@ -3608,14 +3608,14 @@
         },
         "pages": {
           "$ref": "#/definitions/Pages",
-          "description": "子包由哪些页面组成，参数同 pages"
+          "description": "分包由哪些页面组成，参数同 pages"
         },
         "plugins": {
-          "description": "子包的插件",
+          "description": "分包的插件",
           "type": "object"
         },
         "root": {
-          "description": "子包的根目录",
+          "description": "分包的根目录",
           "type": "string"
         }
       },
