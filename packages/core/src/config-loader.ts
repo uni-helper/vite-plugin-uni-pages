@@ -83,10 +83,18 @@ export function isConfigLoaderArtifact(filepath: string, directory: string): boo
 }
 
 /** 配置加载结果及本次成功求值涉及的文件 */
-interface LoadedPagesConfig {
+export interface LoadedPagesConfig {
   config: PagesConfig
   sources: string[]
   dependencies: string[]
+}
+
+/** 一次加载需要监听的输入；失败时保留上次成功的依赖并补入恢复路径 */
+export interface ConfigWatchInput {
+  sources: string[]
+  dependencies: string[]
+  recoveryCandidates: string[]
+  recoveryDirectories: string[]
 }
 
 /**
@@ -104,9 +112,24 @@ export class PagesConfigLoader {
   private readonly knownSources = new Set<string>()
   /** 临时工作目录的物理路径，每轮加载创建独占子目录，输入索引与事件过滤排除此目录 */
   readonly artifactDirectory: string
+  /** 最近一次成功加载的入口及其依赖，失败恢复以它为基准 */
+  private lastSources: string[] = []
+  private lastDependencies: string[] = []
+  /** 最近一次加载尝试的监听输入；失败时也保留可恢复路径 */
+  private currentWatchInput: ConfigWatchInput = {
+    sources: [],
+    dependencies: [],
+    recoveryCandidates: [],
+    recoveryDirectories: [],
+  }
 
   constructor(private readonly root: string) {
     this.artifactDirectory = normalizeConfigPath(path.join(root, 'node_modules/.cache/uni-pages'), root)
+  }
+
+  /** 监听输入是一份只读快照，调用方不需要理解加载器的恢复状态 */
+  get watchInput(): ConfigWatchInput {
+    return this.currentWatchInput
   }
 
   /**
@@ -161,10 +184,20 @@ export class PagesConfigLoader {
         if (!existsSync(source))
           dependencies.add(source)
       }
+      const sources = result.sources.map(normalize)
+      const dependencyPaths = [...dependencies]
+      this.lastSources = sources
+      this.lastDependencies = dependencyPaths
+      this.currentWatchInput = {
+        sources,
+        dependencies: dependencyPaths,
+        recoveryCandidates: [],
+        recoveryDirectories: [],
+      }
       return {
         config: result.config,
-        sources: result.sources.map(normalize),
-        dependencies: [...dependencies],
+        sources,
+        dependencies: dependencyPaths,
       }
     }
     catch (error) {
@@ -172,6 +205,12 @@ export class PagesConfigLoader {
       this.recoveryPaths.clear()
       for (const filepath of attemptedPaths)
         this.recoveryPaths.add(filepath)
+      this.currentWatchInput = {
+        sources: [...this.lastSources],
+        dependencies: [...new Set([...this.lastDependencies, ...this.recoveryPaths])],
+        recoveryCandidates: [...this.recoveryCandidates],
+        recoveryDirectories: [...this.recoveryDirectories],
+      }
       throw error
     }
   }

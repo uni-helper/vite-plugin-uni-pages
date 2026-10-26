@@ -11,7 +11,8 @@ import { stringify as cjStringify } from 'comment-json'
 import dbg from 'debug'
 import groupBy from 'lodash.groupby'
 import { normalizePath } from 'vite'
-import { configFileExtensions, configWatchDirectory, isConfigLoaderArtifact, normalizeConfigPath, PagesConfigLoader } from './config-loader'
+import { normalizeConfigPath, PagesConfigLoader } from './config-loader'
+import { buildConfigWatchPlan, ConfigWatchIndex } from './config-watch'
 import { RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import { writeDeclaration } from './declaration'
 import { getSubPackageDirectorySources, refreshPageDirectories } from './directories'
@@ -52,13 +53,8 @@ export class PageContext {
   private readonly configLoader: PagesConfigLoader
   private readonly watchers = new Map<FSWatcher, () => void>()
   private readonly watchedConfigPaths = new Map<FSWatcher, Set<string>>()
-  /**
-   * 每次事件都要比对的绝对路径，按 watcher 缓存
-   *
-   * 配置装载完成前为空，那时还没有依赖可比；装载后会刷新，
-   * 回调里不再逐个调 realpathSync
-   */
-  private readonly watchedConfigIndex = new Map<FSWatcher, { files: Set<string>, directories: string[] }>()
+  /** 当前配置依赖与恢复范围；事件判定和路径展开都从这里取 */
+  private readonly configWatch: ConfigWatchIndex
   /** 生成物（pages.json、d.ts）的绝对路径，只在首次事件时算一次 */
   private generatedPathsCache: string[] | undefined
   private pendingUpdate: Promise<void> = Promise.resolve()
@@ -77,23 +73,8 @@ export class PageContext {
   /** 页面监听启动参数；初始化失败时保留，后续生成会重试 */
   private pageWatcherStart: { options: Parameters<PageSourceWatch['start']>[0], ignored: Parameters<PageSourceWatch['start']>[1] } | undefined
 
-  /** 失败恢复以此为基准，避免混入前几轮失败的临时路径 */
-  private lastSuccessfulConfigDependencyPaths: string[] = []
-
-  /** 最近一次刷新登记的配置依赖，用于识别本次加载新增的依赖 */
-  private lastConfigWatchFiles = new Set<string>()
-  private configWatchInitialized = false
-  /** 依赖集合在生成期间扩大，结束后需要补跑一轮 */
-  private configWatchExpanded = false
-
   /** 当前配置本地依赖及加载失败后仍需监听的恢复路径 */
   pagesConfigDependencyPaths: string[] = []
-
-  /** 装载失败时具体缺哪个文件；命中时不看兜底目录 */
-  private configRecoveryCandidates: string[] = []
-
-  /** 目录导入的恢复范围；只在装载失败时非空 */
-  private configRecoveryDirectories: string[] = []
 
   /** 从用户配置文件（pages.config.ts）解析出的配置对象 */
   pagesGlobConfig: PagesConfig | undefined
@@ -143,6 +124,7 @@ export class PageContext {
   constructor(userOptions: UserOptions, viteRoot: string = process.cwd(), platform: string = uniEnvPlatform) {
     this.root = normalizePath(viteRoot)
     this.configLoader = new PagesConfigLoader(this.root)
+    this.configWatch = new ConfigWatchIndex(this.root, this.configLoader.artifactDirectory)
     this.platform = platform
     debug.options('root', this.root)
     this.options = resolveOptions(userOptions, this.root)
@@ -188,16 +170,11 @@ export class PageContext {
       this.pagesGlobConfig = config.default || config
       this.pagesConfigSourcePaths = sources
       this.pagesConfigDependencyPaths = dependencies
-      this.lastSuccessfulConfigDependencyPaths = [...dependencies]
-      this.configRecoveryCandidates = []
-      this.configRecoveryDirectories = []
       debug.options(this.pagesGlobConfig)
     }
     catch (error) {
-      // 保留上次成功的依赖，只补入本轮失败的恢复路径
-      this.configRecoveryCandidates = [...this.configLoader.recoveryCandidates]
-      this.configRecoveryDirectories = [...this.configLoader.recoveryDirectories]
-      this.pagesConfigDependencyPaths = [...new Set([...this.lastSuccessfulConfigDependencyPaths, ...this.configLoader.recoveryPaths])]
+      // 加载器已保留上次成功的依赖并补入本轮恢复路径
+      this.pagesConfigDependencyPaths = [...this.configLoader.watchInput.dependencies]
       throw error
     }
     finally {
@@ -267,27 +244,8 @@ export class PageContext {
       return
 
     const onConfigFile = (filepath: string): void => {
-      const index = this.watchedConfigIndex.get(watcher)
-      const basename = path.basename(filepath)
-      const mightBeConfig = configFileExtensions.test(basename)
-
-      const eventPath = normalizePath(path.resolve(this.root, normalizePath(filepath)))
-      const excluded = this.generatedFilePaths()
-      // 自己写的生成物不参与任何匹配，先走这步，免得为每个
-      // pages.json 事件白做一次路径解析
-      if (excluded.includes(eventPath) || isConfigLoaderArtifact(eventPath, this.configLoader.artifactDirectory))
-        return
-
-      // 未直接命中的路径仍需解析，以识别符号链接别名；直接命中就不查文件系统
-      const knownConfig = !!index?.files.has(eventPath) && !excluded.includes(eventPath)
-      const absolute = knownConfig ? eventPath : normalizeConfigPath(filepath, this.root)
-
-      // 已知配置不限扩展名，文件类型过滤只用于目录恢复
-      const isConfigPath = !!index && (
-        index.files.has(absolute)
-        || (mightBeConfig && index.directories.some(dir => absolute.startsWith(`${dir}/`)))
-      )
-      if (excluded.includes(absolute) || isConfigLoaderArtifact(absolute, this.configLoader.artifactDirectory) || !isConfigPath)
+      const absolute = this.configWatch.match(filepath, this.generatedFilePaths())
+      if (!absolute)
         return
 
       debug.pages(`Config changed: ${absolute}`)
@@ -331,7 +289,6 @@ export class PageContext {
       watcher.off('ready', onReady)
     })
     this.watchedConfigPaths.set(watcher, new Set())
-    this.watchedConfigIndex.set(watcher, { files: new Set(), directories: [] })
     this.refreshConfigWatchers()
     const watchDisabled = (this._server?.watcher as unknown) === watcher && this._server?.config.server.watch === null
     if (!watchDisabled) {
@@ -375,7 +332,6 @@ export class PageContext {
       dispose()
     this.watchers.clear()
     this.watchedConfigPaths.clear()
-    this.watchedConfigIndex.clear()
     this._server = undefined
     this.pageWatcherStart = undefined
     this.disposal = (async () => {
@@ -391,9 +347,8 @@ export class PageContext {
   }
 
   /** 补充未覆盖的监听路径，注册成功后记账，失败时保留重试机会 */
-  private addWatchPaths(watcher: FSWatcher, paths: readonly string[], added: Set<string>, sharedRoot: string | undefined, description: string): void {
-    const wanted = paths.filter(file => (!sharedRoot || (file !== sharedRoot && !file.startsWith(`${sharedRoot}/`)))
-      && !added.has(file)
+  private addWatchPaths(watcher: FSWatcher, paths: readonly string[], added: Set<string>, description: string): void {
+    const wanted = paths.filter(file => !added.has(file)
       && ![...added].some(existing => file.startsWith(`${existing}/`)))
     if (!wanted.length)
       return
@@ -418,35 +373,22 @@ export class PageContext {
    * 故意留的兜底）。
    */
   private refreshConfigWatchers(): void {
-    // 排除临时产物目录，避免加载器写入和清理文件时再次触发配置重载
-    const files = [...this.pagesConfigSourcePaths, ...this.pagesConfigDependencyPaths, ...this.configRecoveryCandidates]
-      .map(file => normalizeConfigPath(file, this.root))
-      .filter(file => !isConfigLoaderArtifact(file, this.configLoader.artifactDirectory))
-    const expanded = this.configWatchInitialized && files.some(file => !this.lastConfigWatchFiles.has(file))
-    this.lastConfigWatchFiles = new Set(files)
-    this.configWatchInitialized = true
-    if (expanded)
-      this.configWatchExpanded = true
-    // 监听现存父目录可发现新建文件；事件仍按当前依赖集合过滤
-    const paths = [...new Set([
-      ...files,
-      ...files.map(configWatchDirectory),
-      ...this.configRecoveryDirectories.map(dir => configWatchDirectory(path.join(dir, '_'))),
-    ])]
-    // 父目录（尤其是项目 root）会覆盖其下所有路径，过滤事件时只看真实依赖，
-    // 否则 root 会把任何路径都当成需要保留的
-    const index = {
-      files: new Set(files),
-      directories: this.configRecoveryDirectories.map(dir => normalizeConfigPath(dir, this.root)),
-    }
+    // 临时产物目录在计划构建时排除，避免加载器写入和清理文件触发配置重载
+    this.configWatch.update(buildConfigWatchPlan({
+      root: this.root,
+      artifactDirectory: this.configLoader.artifactDirectory,
+      sourcePaths: this.pagesConfigSourcePaths,
+      dependencyPaths: this.pagesConfigDependencyPaths,
+      recoveryCandidates: this.configLoader.watchInput.recoveryCandidates,
+      recoveryDirectories: this.configLoader.watchInput.recoveryDirectories,
+    }))
     for (const watcher of this.watchers.keys()) {
       const added = this.watchedConfigPaths.get(watcher)!
       const sharedRoot = this._server && watcher === (this._server.watcher as unknown as FSWatcher)
         ? normalizeConfigPath(this._server.config.root, this.root)
         : undefined
       // sharedRoot 由 Vite 自己监听，不重复添加也不能撤销
-      this.addWatchPaths(watcher, paths, added, sharedRoot, 'pages config dependencies')
-      this.watchedConfigIndex.set(watcher, index)
+      this.addWatchPaths(watcher, this.configWatch.watchPaths(sharedRoot), added, 'pages config dependencies')
     }
   }
 
@@ -646,10 +588,8 @@ export class PageContext {
     // 配置加载期间刚发现的依赖这时才进入监听集合，它在此之前发生的
     // 修改可能已经被启动时的索引过滤掉了。补跑一轮，用最新内容再生成
     // 一次；下一轮依赖集合没有扩大，不会再排下一次
-    if (this.configWatchExpanded && !this.disposed) {
-      this.configWatchExpanded = false
+    if (this.configWatch.consumeExpanded() && !this.disposed)
       this.queuePageUpdate()
-    }
 
     return result.updated
   }
