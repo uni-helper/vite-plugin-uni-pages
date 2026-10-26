@@ -3,6 +3,7 @@ import type { FSWatcher } from 'chokidar'
 import type { Logger, ModuleNode, ViteDevServer } from 'vite'
 import type { SubPackageDirectorySource } from './directories'
 import type { PageCandidate, PageSource } from './page-sources'
+import type { ScanPlan } from './scan-plan'
 import type { InternalPages, PagePath, ResolvedOptions, UserOptions } from './types'
 import path from 'node:path'
 import process from 'node:process'
@@ -15,7 +16,6 @@ import { normalizeConfigPath, PagesConfigLoader } from './config-loader'
 import { buildConfigWatchPlan, ConfigWatchIndex } from './config-watch'
 import { RESOLVED_MODULE_ID_VIRTUAL } from './constant'
 import { writeDeclaration } from './declaration'
-import { getSubPackageDirectorySources, refreshPageDirectories } from './directories'
 import { checkPagesJsonFileSync, getPageFiles, isTargetFile, resolvePagesJsonPath } from './files'
 import { debug } from './logger'
 import { resolveOptions } from './options'
@@ -23,6 +23,7 @@ import { Page } from './page'
 import { comparePageSources, resolvePageIdentity, selectPageSources, validateGeneratedRoutes } from './page-sources'
 import { PageSourceWatch } from './page-watch'
 import { writePagesJson } from './pages-json'
+import { applyScanPlan, createScanPlan } from './scan-plan'
 
 /**
  * 在 watcher 回调里查页面规则
@@ -60,6 +61,8 @@ export class PageContext {
   private pendingUpdate: Promise<void> = Promise.resolve()
   private disposed = false
   private disposal: Promise<void> | undefined
+  /** 本轮扫描的目录、分包来源与规则；扫描和监听共用 */
+  private scanPlan!: ScanPlan
   /** 随扫描更新的 Page 来源，用于复用检查和冲突诊断 */
   private readonly pageSources = new WeakMap<Page, PageSource>()
   /** 扫描候选独立于归属裁剪后的输出映射，保留非代表来源的内容缓存 */
@@ -112,7 +115,7 @@ export class PageContext {
 
   /** pages.json 中页面路径的解析基准路径 */
   private get basePath(): string {
-    return resolveBasePath(this.options)
+    return this.scanPlan?.basePath ?? resolveBasePath(this.options)
   }
 
   /**
@@ -187,13 +190,19 @@ export class PageContext {
    * 信息。步骤顺序只维护在这里，调用方和测试都不用关心。
    */
   async scanAndMerge(): Promise<void> {
-    refreshPageDirectories(this.options)
+    this.refreshScanPlan()
     await this.scanPages()
     await this.scanSubPages()
     this.startPageWatcher()
-    this.pageWatcher.refresh()
+    this.pageWatcher.refresh(this.scanPlan)
     await this.mergePageMetaData()
     await this.mergeSubPageMetaData()
+  }
+
+  /** 刷新本轮扫描计划，并同步兼容投影供既有调用方读取 */
+  private refreshScanPlan(): void {
+    this.scanPlan = createScanPlan(this.options)
+    applyScanPlan(this.options, this.scanPlan)
   }
 
   /**
@@ -310,7 +319,7 @@ export class PageContext {
     if (this.disposed || !this.pageWatcherStart)
       return
     try {
-      this.pageWatcher.start(this.pageWatcherStart.options, this.pageWatcherStart.ignored)
+      this.pageWatcher.start(this.pageWatcherStart.options, this.pageWatcherStart.ignored, this.scanPlan)
     }
     catch (error) {
       this.logUpdateFailure(error)
@@ -516,13 +525,13 @@ export class PageContext {
     this.options.onAfterLoadUserConfig(this.pagesGlobConfig)
 
     if (this.options.mergePages) {
-      refreshPageDirectories(this.options)
+      this.refreshScanPlan()
       this.options.onBeforeScanPages()
       await this.scanPages(!incremental)
       await this.scanSubPages(!incremental)
       this.options.onAfterScanPages(this.pages, this.subPages)
       this.startPageWatcher()
-      this.pageWatcher.refresh()
+      this.pageWatcher.refresh(this.scanPlan)
     }
 
     this.options.onBeforeMergePageMetaData(this.pages, this.pagesGlobConfig)
@@ -682,8 +691,8 @@ export class PageContext {
    */
   private async scanPages(refreshContent = true): Promise<void> {
     const pages = new Map<string, Page>()
-    for (const [matchIndex, dir] of this.options.dirs.entries()) {
-      for (const pagePath of getPagePaths(dir, this.options)) {
+    for (const [matchIndex, dir] of this.scanPlan.mainDirs.entries()) {
+      for (const pagePath of getPagePaths(dir, this.options, this.scanPlan.basePath)) {
         if (pages.has(pagePath.absolutePath))
           continue
         const page = this.trackPage(pagePath, this.pages.get(pagePath.absolutePath) ?? this.mainPageCandidates.get(pagePath.absolutePath), {
@@ -761,7 +770,7 @@ export class PageContext {
     const subPages = new Map<string, Map<string, Page>>()
     const sources = this.subPackageSourcesByDir()
     for (const [dir, source] of sources) {
-      const pagePaths = getPagePaths(dir, this.options)
+      const pagePaths = getPagePaths(dir, this.options, this.scanPlan.basePath)
       paths[dir] = pagePaths
 
       const pages = new Map<string, Page>()
@@ -786,7 +795,8 @@ export class PageContext {
    */
   private subPackageSourcesByDir(): Map<string, SubPackageDirectorySource> {
     const selected = new Map<string, SubPackageDirectorySource>()
-    for (const source of getSubPackageDirectorySources(this.options)) {
+    const sources = this.scanPlan?.subPackageSources ?? createScanPlan(this.options).subPackageSources
+    for (const source of sources) {
       const previous = selected.get(source.absolute)
       if (!previous || comparePageSources(source, previous) < 0)
         selected.set(source.absolute, source)
@@ -796,7 +806,8 @@ export class PageContext {
 
   /** 获取目录的最终分包 root，未登记时相对 outDir 计算默认值 */
   private subPackageRoot(dir: string): string {
-    return this.options.subPackageRootMap.get(dir)
+    return this.scanPlan?.subPackageRootMap.get(dir)
+      ?? this.options.subPackageRootMap.get(dir)
       ?? normalizePath(path.relative(this.basePath, path.resolve(this.options.root, dir)))
   }
 
@@ -808,7 +819,8 @@ export class PageContext {
    */
   private async resolveScanSources(): Promise<void> {
     const candidates: PageCandidate[] = []
-    const subSources = this.subPackageSourcesByDir()
+    // 关闭页面合并时没有扫描结果，不需要为空的来源集合再展开一次目录
+    const subSources = this.options.mergePages ? this.subPackageSourcesByDir() : new Map<string, SubPackageDirectorySource>()
     const groups: [string | undefined, Map<string, Page>][] = [[undefined, this.pages], ...this.subPages]
     // 宏可能异步求值，保持并行读取，来源决议仍按原顺序进行
     await Promise.all(groups.flatMap(([, pages]) => [...pages.values()].map(page => page.ensureLoaded())))
@@ -1017,9 +1029,8 @@ function resolveBasePath(options: ResolvedOptions): string {
  * @param options - 解析后的配置项
  * @returns 包含相对路径与绝对路径的页面路径数组
  */
-function getPagePaths(dir: string, options: ResolvedOptions): PagePath[] {
+function getPagePaths(dir: string, options: ResolvedOptions, basePath: string): PagePath[] {
   const pagesDirPath = normalizePath(path.resolve(options.root, dir))
-  const basePath = resolveBasePath(options)
   const files = getPageFiles(pagesDirPath, options)
   debug.pages(dir, files)
   const pagePaths = files

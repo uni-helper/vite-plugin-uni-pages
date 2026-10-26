@@ -3,6 +3,7 @@ import type { EventEmitter } from 'node:events'
 import type { Stats } from 'node:fs'
 import type { WatchOptions } from 'vite'
 import type { SourceTarget } from './page-watch-sources'
+import type { ScanPlan } from './scan-plan'
 import type { ResolvedOptions } from './types'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -11,11 +12,12 @@ import chokidar from 'chokidar'
 import picomatch from 'picomatch'
 import { globSync } from 'tinyglobby'
 import { normalizePath } from 'vite'
-import { isPageDirectoryEvent, isPageFileInDirectories, normalizePagePattern, resolvePageDirs, unescapePagePattern } from './directories'
+import { isPageDirectoryEvent, isPageFileInDirectories, normalizePagePattern, unescapePagePattern } from './directories'
 import { isMissingFsError, isTargetFile } from './files'
 import { getPageRules } from './page-rules'
 import { createPageWatchFilter } from './page-watch-filter'
 import { collectPageWatchSources, isUnavailableSourceError, PAGE_WATCH_SOURCE_LIMIT, resolveWatchTarget } from './page-watch-sources'
+import { createScanPlan } from './scan-plan'
 
 interface EntranceWatch {
   watcher: EventEmitter
@@ -76,7 +78,7 @@ export class PageSourceWatch {
     return this.started
   }
 
-  start(options: Pick<ChokidarOptions, 'usePolling' | 'interval' | 'cwd' | 'awaitWriteFinish' | 'atomic'> = {}, ignored?: WatchOptions['ignored']): void {
+  start(options: Pick<ChokidarOptions, 'usePolling' | 'interval' | 'cwd' | 'awaitWriteFinish' | 'atomic'> = {}, ignored?: WatchOptions['ignored'], plan?: ScanPlan): void {
     if (this.started)
       return
     const polling = process.env.CHOKIDAR_USEPOLLING?.toLowerCase()
@@ -93,7 +95,7 @@ export class PageSourceWatch {
       : createPageWatchFilter(ignored, this.options.root, options.cwd ?? process.cwd())
     this.started = true
     try {
-      this.refresh()
+      this.refresh(plan)
     }
     catch (error) {
       // 初始化失败不能留下 started=true 的僵尸实例；调用方可在后续生成时重试 start
@@ -207,26 +209,22 @@ export class PageSourceWatch {
   }
 
   /** 来源声明或扫描结果变化后重新解析当前目标 */
-  refresh(): void {
+  refresh(plan: ScanPlan = createScanPlan(this.options)): void {
     if (!this.started)
       return
-    const rules = getPageRules(this.options)
+    const rules = plan.rules
     // 保留上一轮的根：glob 匹配到的目录被删除后虽然不在本轮展开结果里，
     // 仍要从其父目录观察重建
     const currentDirectories = new Set([
       ...this.roots,
-      ...this.options.dirs.map(dir => normalizePath(path.resolve(this.options.root, dir))),
-      ...this.options.subPackages.map(dir => normalizePath(path.resolve(this.options.root, dir))),
+      ...plan.mainDirs.map(dir => normalizePath(path.resolve(this.options.root, dir))),
+      ...plan.subPackageDirs.map(dir => normalizePath(path.resolve(this.options.root, dir))),
     ])
+    // 字面目录即使尚未创建也要观察；glob 的现有匹配已包含在计划目录里
     for (const pattern of rules.patterns) {
       const portable = normalizePagePattern(pattern)
-      if (!picomatch.scan(portable).isGlob) {
+      if (!picomatch.scan(portable).isGlob)
         currentDirectories.add(normalizePath(path.resolve(this.options.root, unescapePagePattern(portable))))
-      }
-      else if (this.options.mergePages) {
-        for (const directory of resolvePageDirs(pattern, this.options.root, this.options.exclude))
-          currentDirectories.add(normalizePath(path.resolve(this.options.root, directory)))
-      }
     }
     this.roots = new Set([...currentDirectories].filter(source => this.options.mergePages && rules.matchesDirectory(source)))
     const isExcluded = rules.createExcludeFilter()

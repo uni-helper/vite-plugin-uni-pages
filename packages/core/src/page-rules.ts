@@ -11,7 +11,7 @@ import { escapePath } from 'tinyglobby'
 import { normalizePath } from 'vite'
 
 /** 目录发现、文件扫描和事件判断共用的词法路径规则 */
-interface PageRules {
+export interface PageRules {
   /** 尚未展开的目录选择器，用于寻找监听祖先 */
   patterns: readonly string[]
   /** 可交给 tinyglobby 提前剪枝的保守模式子集，相对项目根 */

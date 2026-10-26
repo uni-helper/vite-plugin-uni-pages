@@ -97,9 +97,6 @@ interface DirectoryCandidate extends SubPackageDirectorySource {
 
 type SubPackageDirectoryProjection = Pick<ResolvedOptions, 'subPackages' | 'subPackageRootMap'>
 
-// 与规则编译缓存分开；目录展开和身份必须随每轮扫描刷新
-const subPackageSources = new WeakMap<ResolvedOptions, readonly SubPackageDirectorySource[]>()
-
 function directoryIdentity(absolute: string): string | undefined {
   try {
     if (fs.statSync(absolute, { throwIfNoEntry: false })?.isDirectory())
@@ -130,7 +127,8 @@ function findCallbackDirectory(dir: string, root: string, rules: ReturnType<type
   return []
 }
 
-function discoverSubPackageDirectories(patterns: (string | SubPackageConfig)[], root: string, outDir: string, exclude: string[]): { sources: SubPackageDirectorySource[], projection: SubPackageDirectoryProjection } {
+/** 展开分包声明，返回逐条来源记录和扫描目录投影 */
+export function discoverSubPackageDirectories(patterns: (string | SubPackageConfig)[], root: string, outDir: string, exclude: string[]): { sources: SubPackageDirectorySource[], projection: SubPackageDirectoryProjection } {
   const rules = compilePageRules(root, [], exclude)
   const candidates: DirectoryCandidate[] = []
   const groups = new Map<string, DirectoryCandidate[]>()
@@ -236,21 +234,16 @@ export function resolveSubPackageDirs(patterns: (string | SubPackageConfig)[], r
 }
 
 /**
- * 读取最近一次发现的分包目录来源快照
+ * 读取当前分包目录来源
  *
- * @description 首次读取会发现并保存来源；已有快照时直接返回，不重新展开目录或执行回调
- * 扫描前或声明、排除规则、目录状态变化后，应先调用 refreshPageDirectories
+ * @description 每次调用重新发现目录并求值回调；需要与扫描共用同一份结果时，
+ * 使用 ScanPlan 而不是在扫描中途再次调用
  *
  * @returns 按声明及匹配顺序排列的来源，调用方应只读使用记录
- * @throws 首次发现时的目录规则、root 决议或目录访问错误
+ * @throws 目录规则、root 决议或目录访问错误
  */
 export function getSubPackageDirectorySources(options: ResolvedOptions): readonly SubPackageDirectorySource[] {
-  let sources = subPackageSources.get(options)
-  if (!sources) {
-    sources = discoverSubPackageDirectories(options.subPackagePatterns, options.root, options.outDir, options.exclude).sources
-    subPackageSources.set(options, sources)
-  }
-  return sources
+  return discoverSubPackageDirectories(options.subPackagePatterns, options.root, options.outDir, options.exclude).sources
 }
 
 /**
@@ -262,10 +255,9 @@ export function getSubPackageDirectorySources(options: ResolvedOptions): readonl
  * @throws 目录规则、root 决议或目录访问失败时抛出，应中止本轮扫描
  */
 export function refreshPageDirectories(options: ResolvedOptions): void {
-  const { sources, projection } = discoverSubPackageDirectories(options.subPackagePatterns, options.root, options.outDir, options.exclude)
+  const { projection } = discoverSubPackageDirectories(options.subPackagePatterns, options.root, options.outDir, options.exclude)
   options.dirs = resolvePageDirs(options.dir, options.root, options.exclude)
   Object.assign(options, projection)
-  subPackageSources.set(options, sources)
 }
 
 function contains(directory: string, entry: string): boolean {
