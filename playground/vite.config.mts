@@ -16,7 +16,6 @@ export default defineConfig({
     UniPages({
       dts: 'src/uni-pages.d.ts',
       homePage: 'pages/index',
-      // 提交的 pages.json 也走 lint，生成时就补上末尾换行
       insertFinalNewline: true,
       debug: true,
       subPackages: ['src/pages-sub', 'src/pages-sub2', 'src/pages/pages-internal-sub'],
