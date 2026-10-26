@@ -50,15 +50,15 @@ v0.5 版本之前，插件同时提供 CJS 和 ESM 两种产物。v0.5 起只保
 ```ts
 // vite.config.mts
 
-// DCloudio 官方仍然只提供 CJS 包，所以需要额外处理
 import dcloudioUni from '@dcloudio/vite-plugin-uni'
+import UniPages from '@uni-helper/vite-plugin-uni-pages'
+import { defineConfig } from 'vite'
+
+// DCloudio 官方仍然只提供 CJS 包，所以需要额外处理
 const Uni = dcloudioUni.default || dcloudioUni
 
 // 也可以直接使用我们提供的 ESM 包装
 // import Uni from '@uni-helper/plugin-uni'
-
-import UniPages from '@uni-helper/vite-plugin-uni-pages'
-import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [
