@@ -60,7 +60,9 @@ UniPages({
 })
 ```
 
-## monorepo 中 root 出现 ..
+> 👍 分包 glob 与开发期目录动态发现参考了 [oiyo](https://oiyo.js.org/docs/structure/src/packages) 的 `src/packages` 结构，特别感谢 oiyo 和作者 [@skiyee](https://github.com/skiyee)，请量力赞助以维持项目持续开发。相关讨论见 [#288](https://github.com/uni-helper/vite-plugin-uni-pages/issues/288)。
+
+## monorepo 中 root 出现 `..`
 
 使用 `subPackages` 的对象形式指定 root：
 

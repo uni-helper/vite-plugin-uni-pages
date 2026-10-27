@@ -5,6 +5,7 @@
 ## 灵感与参考
 
 - [hannoeru/vite-plugin-pages](https://github.com/hannoeru/vite-plugin-pages)
+- [skiyee/oiyo](https://oiyo.js.org)
 - [uni-ku/pages-json](https://github.com/uni-ku/pages-json)
 
 ## 依赖
@@ -21,6 +22,7 @@
 
 ## 关联项目
 
+- [skiyee/oiyo](https://oiyo.js.org)：uni-app 增强型工程框架
 - [uni-helper/vite-plugin-uni-manifest](https://github.com/uni-helper/vite-plugin-uni-manifest)：用 TypeScript 编写 manifest.json
 - [uni-helper/vite-plugin-uni-platform](https://github.com/uni-helper/vite-plugin-uni-platform)：按文件名编译到不同平台
 - [uni-helper/vite-plugin-uni-platform-modifier](https://github.com/uni-helper/vite-plugin-uni-platform-modifier)：为属性和指令提供平台修饰符

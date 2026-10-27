@@ -55,12 +55,14 @@ export default defineConfig({
 ## 感谢
 
 - [hannoeru/vite-plugin-pages](https://github.com/hannoeru/vite-plugin-pages)
+- [skiyee/oiyo](https://oiyo.js.org/)
 - [uni-ku/pages-json](https://github.com/uni-ku/pages-json)
 
 ## 关联项目
 
+- [skiyee/oiyo](https://oiyo.js.org/) - uni-app 增强型工程框架
 - [uni-helper/vite-plugin-uni-manifest](https://github.com/uni-helper/vite-plugin-uni-manifest) - 使用 TypeScript 来编写 uni-app 的 manifest.json
 - [uni-helper/vite-plugin-uni-platform](https://github.com/uni-helper/vite-plugin-uni-platform) - 基于文件名 (*.<h5|mp-weixin|app>.*) 的按平台编译插件
 - [uni-helper/vite-plugin-uni-platform-modifier](https://github.com/uni-helper/vite-plugin-uni-platform-modifier) - 为属性、指令提供平台修饰符并按需编译
 - [uni-helper/vite-plugin-uni-layouts](https://github.com/uni-helper/vite-plugin-uni-layouts) - 为 Vite 下的 uni-app 提供类 nuxt 的 layouts 系统
-- [uni-ku/root](https://github.com/uni-ku/root) - 解决 UniApp 无法使用根部组件问题
+- [uni-ku/root](https://github.com/uni-ku/root) - 解决 uni-app 无法使用根部组件问题

@@ -182,6 +182,8 @@ UniPages({
 
 感谢 [@liujiayii](https://github.com/liujiayii) 修正配置覆盖全部条目时 tabBar 条目的落位（[#299](https://github.com/uni-helper/vite-plugin-uni-pages/pull/299)）。
 
+感谢 [@skiyee](https://github.com/skiyee) 开发的 [oiyo](https://oiyo.js.org) 项目，分包 glob 和目录动态发现的思路来自于它。请量力赞助以维持项目持续开发。
+
 monorepo 分包和 uni-app x 的需求分别来自 [#271](https://github.com/uni-helper/vite-plugin-uni-pages/issues/271) 和 [#293](https://github.com/uni-helper/vite-plugin-uni-pages/issues/293)，也谢谢提出这些场景的 [@shikangsheng](https://github.com/shikangsheng)、[@cq112233](https://github.com/cq112233)，以及所有提交复现和反馈的朋友。
 
 ## 相关链接

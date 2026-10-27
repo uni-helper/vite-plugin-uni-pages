@@ -36,6 +36,8 @@ UniPages({
 
 开发服务器和 `vite build --watch` 会重新发现目录。启动时目录还不存在、运行中新增、删除、重命名或重建，都会更新 `pages.json`。
 
+> 👍 分包 glob 与开发期目录动态发现参考了 [oiyo](https://oiyo.js.org/docs/structure/src/packages) 的 `src/packages` 结构，特别感谢 oiyo 和作者 [@skiyee](https://github.com/skiyee)，请量力赞助以维持项目持续开发。相关讨论见 [#288](https://github.com/uni-helper/vite-plugin-uni-pages/issues/288)。
+
 `dir` 和 `subPackages` 一律按 glob 解析，字面目录名里的元字符也要转义：
 
 ```ts

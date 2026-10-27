@@ -32,6 +32,7 @@ import { AnimationType, Condition, EasyCom } from '@uni-helper/uni-pages-types'
 
 ## 关联项目
 
+- [skiyee/oiyo](https://oiyo.js.org) - uni-app 增强型工程框架
 - [@uni-helper/vite-plugin-uni-pages](https://github.com/uni-helper/vite-plugin-uni-pages/tree/main/packages/core) - 使用 TypeScript 编写 uni-app 的 pages.json，支持约定式路由
 - [@uni-helper/pages-json-schema](https://github.com/uni-helper/vite-plugin-uni-pages/tree/main/packages/schema) - 为 uni-app 的 pages.json 提供 schema
 - [@uni-helper/uni-pages-types](https://github.com/uni-helper/vite-plugin-uni-pages/tree/main/packages/types) - 为 uni-app 的 pages.json 提供 TypeScript 类型
