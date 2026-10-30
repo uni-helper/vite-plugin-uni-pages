@@ -379,6 +379,29 @@ describe('配置加载失败的定位说明', () => {
     const syntax = await load().then(() => undefined, (error: Error) => error)
     expect(syntax?.message).not.toContain('The error happened while evaluating the config')
   })
+
+  it('已经读过 stack 的错误也把说明补进 stack', async () => {
+    // 读 stack 之后 Node 会缓存字符串，只改 message 时输出里的 stack 没有说明
+    write('pages.config.ts', `const error = new Error('cached'); error.stack; throw error`)
+    const error = await load().then(() => undefined, (error: Error) => error)
+    expect(error?.message).toContain('The error happened while evaluating the config')
+    expect(error?.stack).toContain('The error happened while evaluating the config')
+  })
+
+  it('message 只读时保留原错误，不抛 TypeError', async () => {
+    write('pages.config.ts', `throw Object.freeze(new Error('frozen'))`)
+    const error = await load().then(() => undefined, (error: Error) => error)
+    expect(error?.constructor).toBe(Error)
+    expect(error?.message).toBe('frozen')
+  })
+
+  it('执行阶段抛的 AggregateError 仍按执行失败说明', async () => {
+    // AggregateError 也带 errors 数组；按数组判断会把它当成 esbuild 的编译失败
+    write('pages.config.ts', `throw new AggregateError([new Error('inner')], 'agg')`)
+    const error = await load().then(() => undefined, (error: Error) => error)
+    expect(error?.constructor).toBe(AggregateError)
+    expect(error?.message).toContain('The error happened while evaluating the config')
+  })
 })
 
 describe('拿不到的成员提示的出口', () => {

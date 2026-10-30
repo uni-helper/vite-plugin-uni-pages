@@ -97,7 +97,7 @@ export const globalStyle = { navigationBarTitleText: title }
 
 `import.meta.env` 和 app 代码里那份是同一套值：Vite 解析完配置后交给插件的 `config.env`，也就是 `.env` 文件里 `VITE_` 开头的变量，加上 `BASE_URL`、`MODE`、`DEV`、`PROD`，再加一个 `SSR: false`。所有模块拿到的是同一个对象，`Object.keys(import.meta.env)` 可以直接用。`process.env` 里同名的前缀变量优先于 `.env` 文件，这条也和 Vite 一致。
 
-`prepare()` 在 Vite 解析配置之前运行，那时还没有 `config.env`，只能用进程环境兜底：`VITE_` 开头的变量加同样四个标准键。值写在 `.env` 文件里的项目，`prepare()` 生成的结果会和 Vite 会话里的不一样，需要一致就等 Vite 开始构建。
+`prepare()` 在 Vite 解析配置之前运行，那时还没有 `config.env`，只能用进程环境兜底：`VITE_` 开头的变量加同样四个标准键。值写在 `.env` 文件里的项目，`prepare()` 生成的结果和 Vite 会话里的不一样；Vite 把 `config.env` 交给插件后会按新值再生成一次，所以构建和开发服务器用到的都是 `.env` 文件里的值。
 
 其余成员不由插件提供，读到的就是 Node 里的 `undefined`。共享工具文件里常见的 `typeof import.meta.glob === 'function'` 会走 false 分支，`import.meta.hot` 是 `undefined`。碰到这类访问时插件会给出带文件位置的警告，说明生成 `pages.json` 时读不到它：
 

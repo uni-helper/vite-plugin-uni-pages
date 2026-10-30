@@ -222,7 +222,8 @@ describe('插件实例生命周期', () => {
     expect(pages.prepare({ root, platformSuffix: false })).toBe(first)
 
     expectOutput(root, await buildRoutes(root, pages), '第一轮', ['pages/index', 'pages/removed'])
-    expect(onBeforeLoadUserConfig).toHaveBeenCalledOnce()
+    // prepare() 一轮，Vite 把真实 env 交给配置图后重新生成一轮
+    expect(onBeforeLoadUserConfig).toHaveBeenCalledTimes(2)
   })
 
   describe.each(['构建结束后', '开发服务器活跃时'] as const)('%s 接受的 prepare', (timing) => {

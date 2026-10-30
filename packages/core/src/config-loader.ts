@@ -150,6 +150,8 @@ export class PagesConfigLoader {
 
   /** 配置图里 import.meta.env 的值，Vite 会话就绪后可能被替换 */
   private env: Record<string, unknown>
+  /** 当前 env 已来自 Vite 会话；再给一次不会改变页面生成结果 */
+  private envFromVite = false
   private readonly warn?: (message: string) => void
   /** 同一文件同一成员只提示一次；watch 每轮都会重新转换所有输入 */
   private readonly reportedMetaMembers = new Set<string>()
@@ -168,9 +170,13 @@ export class PagesConfigLoader {
    * 替换配置图里 import.meta.env 的值
    *
    * @param env - 与 Vite 给 app 代码注入的 import.meta.env 一致的值；下一轮加载生效
+   * @returns 首次用上 Vite 的 env 时为 `true`，之前生成的 pages.json 需要重算；再次设置返回 `false`
    */
-  setEnv(env: Record<string, unknown>): void {
+  setEnv(env: Record<string, unknown>): boolean {
+    const replaced = !this.envFromVite
     this.env = env
+    this.envFromVite = true
+    return replaced
   }
 
   /** 把成员问题转成带文件位置的提示；同一文件同一成员只报一次 */
@@ -288,6 +294,8 @@ export class PagesConfigLoader {
     const metaWarnings: ConfigMetaWarning[] = []
     const importDirectories = new Set<string>()
     const recoveryCandidates = new Set<string>()
+    // 打包成功后置位：之后的错误都来自执行配置，不是 esbuild 的编译失败
+    let bundled = false
     const root = this.root
     // 每轮打包使用独占目录，隔离并发加载的辅助模块和执行产物
     const cacheDirectory = this.artifactDirectory
@@ -323,6 +331,12 @@ export class PagesConfigLoader {
           plugins: [{
             name: 'uni-pages-config-inputs',
             setup(build) {
+              // 打包成功的唯一时机：onEnd 报无错。配置在这之后才执行，所以这之后
+              // 抛出的错误都来自执行阶段
+              build.onEnd((result) => {
+                if (result.errors.length === 0)
+                  bundled = true
+              })
               build.onResolve({ filter: /.*/ }, async (args) => {
                 if (args.kind === 'entry-point')
                   return { path: path.resolve(sourcePath) }
@@ -392,14 +406,12 @@ export class PagesConfigLoader {
       return unwrapConfig(mod.default ?? mod) as PagesConfig
     }
     catch (error) {
-      // esbuild 的编译错误带 errors 数组、自带原始位置；没有它说明打包已经
-      // 完成，错误发生在执行阶段，栈指向临时产物。按这个阶段判断而不是比对
-      // 栈里的路径：Windows 的产物目录是反斜杠路径，栈里是 file:///D:/... URL
-      const buildErrors = (error as { errors?: unknown })?.errors
-      if (error instanceof Error && !Array.isArray(buildErrors)) {
-        error.message += `\n[vite-plugin-uni-pages] The error happened while evaluating the config generated from ${normalizePath(path.relative(this.root, sourcePath))} and the modules it imports; the stack above points into that temporary bundle, not into your source.`
-      }
-      if (Array.isArray(buildErrors)) {
+      // 按打包是否完成判断阶段，而不是看错误有没有 errors 数组：配置自己抛的
+      // AggregateError 也带这个数组。也不比对栈里的路径：Windows 的产物目录
+      // 是反斜杠路径，栈里是 file:///D:/... URL
+      if (bundled && error instanceof Error)
+        explainEvaluationError(error, normalizePath(path.relative(this.root, sourcePath)))
+      if (!bundled) {
         // 编译失败时保留缺失文件的精确候选
         for (const candidate of recoveryCandidates) {
           if (!existsSync(candidate))
@@ -424,6 +436,28 @@ export class PagesConfigLoader {
       }
     }
   }
+}
+
+/**
+ * 说明执行阶段错误的来源，并写进 message 和 stack
+ *
+ * @description 两个字段都要改：读取 stack 之后 Node 会缓存字符串，只改 message
+ * 时输出里的 stack 仍指向临时产物。message 只读（如 `Object.freeze(new Error())`）
+ * 时改写会在严格模式下抛 TypeError，那就保留原错误，什么都不加
+ * @param error 配置执行阶段抛出的错误
+ * @param file 相对项目根的配置入口路径，用于说明错误来自哪份配置
+ */
+function explainEvaluationError(error: Error, file: string): void {
+  const note = `\n[vite-plugin-uni-pages] The error happened while evaluating the config generated from ${file} and the modules it imports; the stack above points into that temporary bundle, not into your source.`
+  try {
+    error.message += note
+  }
+  catch {
+    return
+  }
+  // stack 可能已被读过并缓存；没有 stack 的错误（非 Error 已被上层过滤）不受影响
+  if (typeof error.stack === 'string')
+    error.stack += note
 }
 
 function unwrapConfig(value: unknown): unknown {

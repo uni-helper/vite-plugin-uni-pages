@@ -5,6 +5,7 @@ import { parse } from 'comment-json'
 import { resolveConfig } from 'vite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import UniPages from '../packages/core/src'
+import { PageSourceWatch } from '../packages/core/src/page-watch'
 
 let root: string
 
@@ -42,5 +43,18 @@ describe('配置图里的 import.meta.env', () => {
     vi.stubEnv('VITE_TITLE', 'from-shell')
     await UniPages({ dts: false }).prepare({ platformSuffix: false })
     expect(title()).toBe('from-shell')
+  })
+
+  it('prepare() 先生成后，Vite 的 env 到达时重新生成页面', async () => {
+    // prepare() 跑在 Vite 解析用户配置之前，只读得到进程环境；.env 文件的值
+    // 只有 configResolved 时才有，不重新生成的话整个构建用的都是旧标题
+    vi.spyOn(PageSourceWatch.prototype, 'start').mockImplementation(() => {})
+    fixture('export default { globalStyle: { navigationBarTitleText: import.meta.env.VITE_TITLE } }')
+    fs.writeFileSync(path.join(root, '.env.staging'), 'VITE_TITLE=from-env-file\n')
+    const pages = UniPages({ dts: false })
+    await pages.prepare({ platformSuffix: false })
+    expect(title()).toBeUndefined()
+    await resolveConfig({ root, configFile: false, logLevel: 'silent', mode: 'staging', plugins: [pages] }, 'build')
+    expect(title()).toBe('from-env-file')
   })
 })

@@ -173,9 +173,10 @@ export class PageContext {
    *
    * @description Vite 解析完用户配置后才有真实 env；prepare() 先跑时由这里补上，后续重新加载生效
    * @param env - 与 Vite 给 app 代码注入的 import.meta.env 一致的值
+   * @returns 首次用上 Vite 的 env 时为 `true`，已经生成的 pages.json 需要重算
    */
-  setConfigEnv(env: Record<string, unknown>): void {
-    this.configLoader.setEnv(env)
+  setConfigEnv(env: Record<string, unknown>): boolean {
+    return this.configLoader.setEnv(env)
   }
 
   /**
