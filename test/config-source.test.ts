@@ -8,6 +8,7 @@ import { normalizePath } from 'vite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PagesConfigLoader } from '../packages/core/src/config-loader'
 import { configRuntimeSource, transformConfigSource } from '../packages/core/src/config-source'
+import { PageContext } from '../packages/core/src/context'
 
 type ConfigSource = Parameters<PagesConfigLoader['load']>[0][number]
 
@@ -176,7 +177,7 @@ throw new Error(value.title)
 export default {}`
     write('pages.config.ts', code)
     write('runtime.mjs', configRuntimeSource({}))
-    write('compiled.mjs', await transformConfigSource(code, source, pathToFileURL(runtime).href))
+    write('compiled.mjs', (await transformConfigSource(code, source, pathToFileURL(runtime).href)).code)
     const stack = execFileSync(process.execPath, ['--enable-source-maps', '--input-type=module', '-e', `try { await import(${JSON.stringify(sourceURL('compiled.mjs'))}) } catch (error) { console.log(error.stack) }`], { encoding: 'utf8' })
     expect(normalizePath(stack)).toContain(`${normalizePath(source)}:5:`)
   })
@@ -336,5 +337,69 @@ describe('配置模块的 import.meta.env', () => {
     finally {
       vi.unstubAllEnvs()
     }
+  })
+})
+
+describe('配置模块拿不到的 import.meta 成员', () => {
+  it('成员保持 undefined，并按文件位置提示一次', async () => {
+    const warn = vi.fn()
+    write('src/utils/glob.ts', `export const pages = typeof import.meta.glob === 'function' ? 'available' : 'unavailable'`)
+    write('pages.config.ts', `import { pages } from './src/utils/glob.ts'; export default { globalStyle: { navigationBarTitleText: pages } }`)
+    const source = [{ files: 'pages.config.ts', extensions: [] }]
+    const loader = new PagesConfigLoader(root, warn)
+    expect((await loader.load(source)).config.globalStyle?.navigationBarTitleText).toBe('unavailable')
+    expect((await loader.load(source)).config.globalStyle?.navigationBarTitleText).toBe('unavailable')
+    expect(warn).toHaveBeenCalledOnce()
+    const message = warn.mock.calls[0][0] as string
+    expect(message).toContain('src/utils/glob.ts:1:')
+    expect(message).toContain('import.meta.glob')
+  })
+
+  it('env 和位置变量不触发提示，依赖里的 import.meta.url 仍指向自己', async () => {
+    const warn = vi.fn()
+    write('src/utils/meta.ts', `export const info = { url: import.meta.url, env: typeof import.meta.env, hot: typeof import.meta.hot }`)
+    write('pages.config.ts', `import { info } from './src/utils/meta.ts'; export default { globalStyle: { navigationBarTitleText: JSON.stringify(info) } }`)
+    const result = await new PagesConfigLoader(root, warn).load([{ files: 'pages.config.ts', extensions: [] }])
+    expect(JSON.parse(result.config.globalStyle?.navigationBarTitleText as string)).toEqual({ url: sourceURL('src/utils/meta.ts'), env: 'object', hot: 'undefined' })
+    expect(warn).toHaveBeenCalledOnce()
+    expect(warn.mock.calls[0][0]).toContain('src/utils/meta.ts:1:')
+    expect(warn.mock.calls[0][0]).toContain('import.meta.hot')
+  })
+})
+
+describe('配置加载失败的定位说明', () => {
+  it('栈指向打包产物时补充生成它的入口，编译错误保持原样', async () => {
+    write('src/utils/boom.ts', `throw new Error('boom')`)
+    write('pages.config.ts', `import './src/utils/boom.ts'; export default {}`)
+    const error = await load().then(() => undefined, (error: Error) => error)
+    expect(error?.message).toContain('boom')
+    expect(error?.message).toContain('The stack above points into the bundled config generated from pages.config.ts')
+
+    write('pages.config.ts', `export default {`)
+    const syntax = await load().then(() => undefined, (error: Error) => error)
+    expect(syntax?.message).not.toContain('The stack above points into the bundled config')
+  })
+})
+
+describe('拿不到的成员提示的出口', () => {
+  it('经过 PageContext 的 logger 时由 logger 加前缀，消息里不重复', async () => {
+    const warn = vi.fn()
+    write('pages.config.ts', `export default { globalStyle: { navigationBarTitleText: String(typeof import.meta.glob) } }`)
+    const ctx = new PageContext({ dts: false }, root, 'h5')
+    ctx.setLogger({ warn } as unknown as Parameters<PageContext['setLogger']>[0])
+    await ctx.loadUserPagesConfig()
+    expect(warn).toHaveBeenCalledOnce()
+    const message = warn.mock.calls[0][0] as string
+    expect(message).toContain('pages.config.ts:1:')
+    expect(message.startsWith('[vite-plugin-uni-pages]')).toBe(false)
+  })
+
+  it('加载失败时同样提示，错误照原样抛出', async () => {
+    const warn = vi.fn()
+    write('src/utils/boom.ts', `export const pages = typeof import.meta.glob === 'function' ? 'available' : 'unavailable'; throw new Error('boom')`)
+    write('pages.config.ts', `import './src/utils/boom.ts'; export default {}`)
+    await expect(new PagesConfigLoader(root, warn).load([{ files: 'pages.config.ts', extensions: [] }])).rejects.toThrow('boom')
+    expect(warn).toHaveBeenCalledOnce()
+    expect(warn.mock.calls[0][0]).toContain('src/utils/boom.ts:1:')
   })
 })

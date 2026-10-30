@@ -131,7 +131,7 @@ export class PageContext {
    */
   constructor(userOptions: UserOptions, viteRoot: string = process.cwd(), platform: string = uniEnvPlatform) {
     this.root = normalizePath(viteRoot)
-    this.configLoader = new PagesConfigLoader(this.root)
+    this.configLoader = new PagesConfigLoader(this.root, message => this.logger?.warn(message, { timestamp: true }))
     this.configWatch = new ConfigWatchIndex(this.root, this.configLoader.artifactDirectory)
     this.platform = platform
     debug.options('root', this.root)

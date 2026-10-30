@@ -1,5 +1,6 @@
 import type { PagesConfig } from '@uni-helper/uni-pages-types'
 import type { LoadConfigSource } from 'unconfig'
+import type { ConfigMetaWarning } from './config-source'
 import { existsSync, mkdirSync, realpathSync } from 'node:fs'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -149,9 +150,18 @@ export class PagesConfigLoader {
 
   /** 配置图里 import.meta.env 的值，Vite 会话就绪后可能被替换 */
   private env: Record<string, unknown>
-  constructor(private readonly root: string) {
+  private readonly warn?: (message: string) => void
+  /** 同一文件同一成员只提示一次；watch 每轮都会重新转换所有输入 */
+  private readonly reportedMetaMembers = new Set<string>()
+
+  /**
+   * @param root - 项目根目录，配置入口和依赖都按它解析
+   * @param warn - 提示出口，同一文件同一成员只调用一次
+   */
+  constructor(private readonly root: string, warn?: (message: string) => void) {
     this.artifactDirectory = normalizeConfigPath(path.join(root, 'node_modules/.cache/uni-pages'), root)
     this.env = fallbackConfigEnv()
+    this.warn = warn
   }
 
   /**
@@ -161,6 +171,19 @@ export class PagesConfigLoader {
    */
   setEnv(env: Record<string, unknown>): void {
     this.env = env
+  }
+
+  /** 把成员问题转成带文件位置的提示；同一文件同一成员只报一次 */
+  private reportMetaWarnings(warnings: ConfigMetaWarning[]): void {
+    if (!this.warn)
+      return
+    for (const { file, line, column, member } of warnings) {
+      const key = `${file}\u0000${member}`
+      if (this.reportedMetaMembers.has(key))
+        continue
+      this.reportedMetaMembers.add(key)
+      this.warn(`${normalizePath(path.relative(this.root, file))}:${line}:${column} reads import.meta.${member}, which is not available while the pages config runs. Read environment values from process.env, and move other Vite-only access out of the config's import graph.`)
+    }
   }
 
   /** 监听输入是一份只读快照，调用方不需要理解加载器的恢复状态 */
@@ -261,6 +284,8 @@ export class PagesConfigLoader {
    */
   private async loadScript(source: string, code: string, dependencies: Set<string>, attempted: Set<string>): Promise<PagesConfig> {
     const sourcePath = normalizeConfigPath(source, this.root)
+    // esbuild 的钩子拿不到 this，成员问题先收集，打包结束后统一提示
+    const metaWarnings: ConfigMetaWarning[] = []
     const importDirectories = new Set<string>()
     const recoveryCandidates = new Set<string>()
     const root = this.root
@@ -343,7 +368,9 @@ export class PagesConfigLoader {
                 if (file !== sourcePath && !scriptExtensions.test(file))
                   return
                 const contents = file === sourcePath ? code : await readFile(args.path, 'utf8')
-                return { contents: await transformConfigSource(contents, path.resolve(file), runtime), loader: 'js' }
+                const transformed = await transformConfigSource(contents, path.resolve(file), runtime)
+                metaWarnings.push(...transformed.warnings)
+                return { contents: transformed.code, loader: 'js' }
               })
             },
           }],
@@ -365,6 +392,10 @@ export class PagesConfigLoader {
       return unwrapConfig(mod.default ?? mod) as PagesConfig
     }
     catch (error) {
+      // 打包后的栈全部指向临时产物，补一句说明它由哪些源码生成，避免把
+      // config.mjs 当成用户源码去读。编译错误自带原始位置，不重复提示
+      if (error instanceof Error && String(error.stack).includes(bundleDirectory))
+        error.message += `\n[vite-plugin-uni-pages] The stack above points into the bundled config generated from ${normalizePath(path.relative(this.root, sourcePath))} and the modules it imports.`
       if (Array.isArray((error as { errors?: unknown })?.errors)) {
         // 编译失败时保留缺失文件的精确候选
         for (const candidate of recoveryCandidates) {
@@ -378,6 +409,8 @@ export class PagesConfigLoader {
       throw error
     }
     finally {
+      // 提示放在 finally：加载失败时同样要说明哪个文件用了拿不到的成员
+      this.reportMetaWarnings(metaWarnings)
       // 清理失败不能改变这次加载的结果，也不能覆盖原始错误；残留目录仍被
       // 产物身份过滤排除，不会进入输入索引或监听
       try {

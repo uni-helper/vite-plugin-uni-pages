@@ -9,6 +9,59 @@ import { callExpression, identifier, removePropertiesDeep } from '@babel/types'
 import { babelParse, walkAST } from 'ast-kit'
 import { transform } from 'esbuild'
 
+/** 加载器给 import.meta 提供取值的成员；其余成员在配置图里保持 Node 的 undefined */
+const providedMetaMembers = new Set(['dirname', 'env', 'filename', 'main', 'resolve', 'url'])
+
+/** 一处访问了加载器未提供成员的 import.meta 表达式 */
+export interface ConfigMetaWarning {
+  /** 访问所在模块的绝对路径 */
+  file: string
+  /** 1 起算的行号 */
+  line: number
+  /** 1 起算的列号 */
+  column: number
+  /** 成员名，例如 `glob` */
+  member: string
+}
+
+/**
+ * 找出模块里访问了加载器不提供的 import.meta 成员的位置
+ *
+ * @description 只在源码出现 `import.meta` 时解析；语法错误留给 esbuild 报，这里不重复
+ * @param code 模块的原始源码，必须早于 esbuild 的 define 替换
+ * @param filename 模块的绝对路径，决定按 TS 还是 JS 语法解析
+ * @returns 按源码顺序排列的每处访问
+ */
+function findUnprovidedMetaMembers(code: string, filename: string): ConfigMetaWarning[] {
+  if (!code.includes('import.meta'))
+    return []
+  const extension = path.extname(filename).slice(1)
+  const lang = extension === 'tsx' ? 'tsx' : extension === 'jsx' ? 'jsx' : /^(?:ts|mts|cts)$/.test(extension) ? 'ts' : 'js'
+  let ast: ReturnType<typeof babelParse>
+  try {
+    ast = babelParse(code, lang, { allowReturnOutsideFunction: true })
+  }
+  catch {
+    return []
+  }
+  const warnings: ConfigMetaWarning[] = []
+  walkAST(ast, {
+    enter(node) {
+      if (node.type !== 'MemberExpression' || node.object.type !== 'MetaProperty')
+        return
+      if (node.object.meta.name !== 'import' || node.object.property.name !== 'meta')
+        return
+      const member = node.property.type === 'Identifier'
+        ? node.property.name
+        : node.property.type === 'StringLiteral' ? node.property.value : undefined
+      if (member === undefined || providedMetaMembers.has(member))
+        return
+      warnings.push({ file: filename, line: node.loc?.start.line ?? 0, column: (node.loc?.start.column ?? 0) + 1, member })
+    },
+  })
+  return warnings
+}
+
 /** 判断导入表达式能否交给 esbuild 收集依赖，未匹配的目标由运行时助手解析 */
 function isBundledSpecifier(node: Node | undefined): boolean {
   if (!node)
@@ -26,16 +79,26 @@ function isBundledSpecifier(node: Node | undefined): boolean {
   return false
 }
 
+/** 一次源码转换的结果 */
+export interface ConfigSourceTransform {
+  /** 绑定原文件位置的 JavaScript，含映射回原模块的内联源码映射 */
+  code: string
+  /** 源码里访问了加载器不提供的 import.meta 成员的位置 */
+  warnings: ConfigMetaWarning[]
+}
+
 /**
  * 将脚本转换为绑定原文件位置的 JavaScript
  *
- * @description 注入运行时解析助手；可打包的调用及用户声明的局部 require 保持原语义
+ * @description 注入运行时解析助手；可打包的调用及用户声明的局部 require 保持原语义。
+ * import.meta 按成员逐个替换，没有列出的成员留给 Node 的真实语义（undefined），
+ * 整体替换会让 facade 少一个字段就崩一类代码
  * @param code 当前模块的源码文本
  * @param filename 当前模块的原始绝对路径，作为该模块运行时解析的基准
  * @param runtime 本轮生成的公共辅助模块路径，供转换后的代码导入
- * @returns 转换后的 JavaScript，包含映射到原模块的内联源码映射（内部已按成员替换 import.meta）
+ * @returns 转换后的 JavaScript 及其发现的 import.meta 成员问题
  */
-export async function transformConfigSource(code: string, filename: string, runtime: string): Promise<string> {
+export async function transformConfigSource(code: string, filename: string, runtime: string): Promise<ConfigSourceTransform> {
   let prefix = '__uni_pages_source'
   while (code.includes(prefix))
     prefix += '_'
@@ -86,7 +149,11 @@ const ${importName} = (specifier, options) => ${prefix}_importFrom(specifier, ${
   removePropertiesDeep(helpers)
   ast.body.unshift(...helpers.body)
   const output = babelGenerate(ast, { sourceMaps: true, sourceFileName: filename, inputSourceMap: JSON.parse(result.map) }, result.code)
-  return `${output.code}\n//# sourceMappingURL=data:application/json;base64,${Buffer.from(JSON.stringify(output.map)).toString('base64')}`
+  return {
+    code: `${output.code}\n//# sourceMappingURL=data:application/json;base64,${Buffer.from(JSON.stringify(output.map)).toString('base64')}`,
+    // 成员问题要在替换前查：define 跑完 import.meta 已经不在 AST 里了
+    warnings: findUnprovidedMetaMembers(code, filename),
+  }
 }
 
 /**
