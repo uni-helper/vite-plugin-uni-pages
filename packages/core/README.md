@@ -98,9 +98,9 @@ await pages.prepare({ platformSuffix: false })
 | `root?: string` | 提前指定 Vite 项目根目录，默认使用 `VITE_ROOT_DIR` 或当前工作目录；相对路径以当前工作目录为基准 |
 | `platformSuffix: boolean` | 必填，声明是否使用 UniPlatform 文件名后缀规则；启用 `@uni-helper/vite-plugin-uni-platform` 时传 `true`，其余场景传 `false` |
 
-通过 uni-app 的开发或构建命令调用该配置。编译平台读取调用时的 `process.env.UNI_PLATFORM`；独立脚本需要提前设置它。准备阶段 Vite 尚未自动加载 `.env`，配置若依赖其中的变量，应先用 Vite `loadEnv()` 加载并提供所需环境。自定义 Vite `root` 时，向 `prepare()` 传入相同的根目录。
+通过 uni-app 的开发或构建命令调用该配置。编译平台读取调用时的 `process.env.UNI_PLATFORM`；独立脚本需要提前设置它。准备阶段 Vite 尚未提供解析后的环境和 `define`，配置若依赖 `.env` 变量，应先用 Vite `loadEnv(mode, root)` 加载，再将必需变量写入 `process.env`，保留已有进程变量的优先级；仅调用 `loadEnv()` 不会设置进程环境。自定义 Vite `root` 时，向 `prepare()` 传入相同的根目录。
 
-- 同一次准备期间，相同根目录、编译平台和后缀规则的并发或重复调用只初始化一次，首次 Vite 接管复用该结果。Vite 会话结束后再次调用会重新读取配置和页面。
+- 同一次准备期间，相同根目录、编译平台和后缀规则的并发或重复调用只初始化一次，并始终使用本轮的兜底环境。Vite 接管会等待准备成功，复用上下文并切换到正式环境重新生成；准备失败时保留原错误。Vite 会话结束后再次调用会重新读取配置和页面。
 - Vite 接管时会核对根目录、编译平台和 UniPlatform 状态，不一致会报错；接管后再次调用也必须保持一致。成功调用过 `prepare()` 后，这个核对一直有效。
 - 配置加载、文件写入或锁获取失败会拒绝 Promise，修复后可再次调用 `prepare()`。
 - 准备前应完成源码与配置的创建；准备完成到文件监听建立之间的修改不保证被自动发现。
@@ -135,7 +135,7 @@ Vite 在创建 Rollup 构建图或开发服务器之前就退出时（例如其�
 
 占位文件只在能推导出的输出目录已经存在时创建。目录不存在时不在那个位置新建目录：`root` 优先取 `VITE_ROOT_DIR`，没设时取当前工作目录，而这个工作目录很可能不是真正的项目根，在它下面创建 `src` 会把目录建错地方。这时直接跑完整生成；如果 Vite 传入的 `root` 又是错的，生成会以 `ENOENT` 失败并指明路径。
 
-`prepare()` 不会刷新下游插件已经缓存的配置，所以需要读取完整配置的插件应在等待完成后创建。
+`prepare()` 和 Vite 接管时的再次生成都不会刷新下游插件已经缓存的配置。需要读取完整配置的插件应在准备完成后创建，它们依赖的环境值必须在准备之前提供。
 
 ### 配置依赖热更新
 
@@ -217,7 +217,7 @@ export const title = '首页'
 
 环境定义的字符串按 esbuild 替换表达式处理，其他值按 JSON 编码。例如，字符串值写作 `define: { 'import.meta.env.VITE_TITLE': JSON.stringify('首页') }`；`'globalThis.APP_VERSION'` 表示读取全局属性。表达式在字段首次读取时由 Node 求值，成功结果在本轮加载中共享并缓存。未读取的浏览器专用定义不会因缺少浏览器全局而影响配置加载；读取时仍要求相关全局在 Node 中可用，插件不会提供 `window` 等浏览器对象。其他 `define` 条目不应用于配置图。
 
-`prepare()` 拿不到 `config.env`，按进程环境里的 `VITE_` 变量和四个标准键兜底，`.env` 文件里的值只有 Vite 会话才有；Vite 把真实 env 交给插件后会按新值重新生成一次 `pages.json`，所以 `prepare()` 先跑也不会让构建沿用旧值。
+`prepare()` 拿不到 Vite 的环境和 `define`，仅使用进程环境中的 `VITE_` 变量兜底，并提供 `BASE_URL: '/'`、由 `NODE_ENV` 推导的 `MODE` / `DEV` / `PROD` 和 `SSR: false`。准备成功后，Vite 接管并使用正式环境重新生成；接管前的消费者仍需要提前提供必需变量。自定义前缀不参与准备阶段的 `import.meta.env` 兜底，需要提前使用时可在配置中显式读取对应的 `process.env` 值。
 
 `import.meta` 的其余成员不由插件提供，读到的是 `undefined`。`typeof import.meta.glob === 'function'` 这类判断会走 false 分支，`import.meta.hot` 也是 `undefined`。插件对静态可识别的直接成员访问输出带文件位置的警告。
 
@@ -1073,7 +1073,7 @@ node_modules/.cache/uni-pages/
 插件通过 Vite 的生命周期钩子驱动，顺序如下：
 
 1. **插件工厂调用**（同步）：预检 `pages.json` 是否存在且合法（此时 `config.root` 未知，回退到 `VITE_ROOT_DIR` / `process.cwd()` 解析路径）
-2. **`configResolved`**（异步）：占用当前实例，创建 `PageContext` 或接管匹配的 `prepare()` 结果，检测是否与 `vite-plugin-uni-platform` 协同，完成首次 pages.json 生成；`build --watch` 模式下另建 watcher，接收配置文件事件与页面目录结构通知，同时启动自有页面监听器
+2. **`configResolved`**（异步）：占用当前实例，创建 `PageContext` 或等待匹配的 `prepare()` 成功后接管，检测是否与 `vite-plugin-uni-platform` 协同，使用 Vite 环境与环境定义完成 pages.json 生成；已有准备结果时按正式环境重新生成。`build --watch` 模式下另建 watcher，接收配置文件事件与页面目录结构通知，同时启动自有页面监听器
 3. **`configureServer`**（dev）：从 Vite 的 `server.watcher` 接收配置监听计划命中与页面目录结构通知，并按 Vite 的监听开关、忽略规则和轮询设置启动自有页面监听器；产物更新后失效虚拟模块并通知浏览器 full-reload
 4. **`options`**（build）：将本插件的虚拟模块与关闭钩子绑定到当前会话，供 Rollup 构建使用；watcher 各轮沿用该绑定，已关闭构建的迟到钩子及已排队轮次仍属于原会话
 5. **`transform`**：从 vue / nvue / uvue 文件中移除 `definePage` 宏调用，避免运行时报错

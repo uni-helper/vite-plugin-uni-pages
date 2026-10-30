@@ -41,14 +41,17 @@ await pages.prepare({ platformSuffix: false })
 
 ## 运行环境
 
-- 编译平台读取调用时的 `process.env.UNI_PLATFORM`。独立脚本需要提前设置
-- 准备阶段 Vite 还没有加载 `.env`。配置依赖其中的变量时，先用 `loadEnv()` 加载
-- 自定义 Vite `root` 时，向 `prepare()` 传入相同的根目录
+- 编译平台读取调用时的 `process.env.UNI_PLATFORM`。独立脚本需要提前设置。
+- 准备阶段 Vite 还没有提供解析后的环境和 `define`。配置依赖 `.env` 变量时，先用 `loadEnv(mode, root)` 加载，再将必需变量写入 `process.env`，保留已有进程变量的优先级；仅调用 `loadEnv()` 不会设置进程环境。
+- 自定义 Vite `root` 时，向 `prepare()` 传入相同的根目录。
+
+这一阶段的 `import.meta.env` 只收录进程环境中 `VITE_` 开头的变量，并提供 `BASE_URL: '/'`、由 `NODE_ENV` 推导的 `MODE` / `DEV` / `PROD` 和 `SSR: false`。自定义 `envPrefix` 和 `define` 要到 Vite 接管时才生效；需要提前读取自定义前缀变量时，可在配置中显式使用对应的 `process.env` 值。
 
 ## 行为
 
 - 同一次准备期间，根目录、平台和后缀规则相同的并发或重复调用只初始化一次
-- Vite 启动后会复用这份上下文，并核对根目录、平台和后缀规则，不一致时报错
+- Vite 接管时先等待本轮准备成功，再切换到正式环境并重新生成；准备期间保持原兜底环境，准备失败时保留原错误
+- 接管会复用上下文，并核对根目录、平台和后缀规则，不一致时报错
 - 成功调用过后，这组参数约束会一直有效，包括先启动 Vite、后调用 `prepare()` 的情况
 - 配置加载、文件写入或锁获取失败会拒绝 Promise，修复后可以再次调用
 - Vite 会话关闭后再次调用会重新读取配置和页面
@@ -57,9 +60,9 @@ await pages.prepare({ platformSuffix: false })
 
 ## 限制
 
-- 不会刷新下游插件已经缓存的配置。需要完整配置的插件应该在 `prepare()` 完成后创建
-- 如果 Vite 在创建 Rollup 构建图或开发服务器之前就退出，插件收不到关闭通知，这个实例会保持占用。这种情况下换一个新的 `UniPages()` 实例
-- `build --watch` 期间实例一直属于当前会话，整个 watcher 关闭后才释放。重复使用和关闭的细节见[会话与实例复用](../advanced/lifecycle.md)
+- 不会刷新下游插件已经缓存的配置，Vite 接管时的再次生成也不会刷新它们。需要完整配置的插件应该在 `prepare()` 完成后创建；它们依赖的环境值必须在准备之前提供。
+- 如果 Vite 在创建 Rollup 构建图或开发服务器之前就退出，插件收不到关闭通知，这个实例会保持占用。这种情况下换一个新的 `UniPages()` 实例。
+- `build --watch` 期间实例一直属于当前会话，整个 watcher 关闭后才释放。重复使用和关闭的细节见[会话与实例复用](../advanced/lifecycle.md)。
 
 ## 普通用法
 

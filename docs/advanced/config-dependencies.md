@@ -101,7 +101,9 @@ export const globalStyle = { navigationBarTitleText: title }
 
 Vite `define` 中的 `import.meta.env.*` 条目会覆盖上述同名值，也可以增加新键。字符串按 esbuild 的替换表达式处理，其他值按 JSON 编码。例如，字符串值应写成 `define: { 'import.meta.env.VITE_TITLE': JSON.stringify('首页') }`；`'globalThis.APP_VERSION'` 则表示读取全局属性。表达式在字段首次读取时由 Node 求值，成功结果在本轮加载中共享并缓存。未读取的浏览器专用定义不会因缺少浏览器全局而影响配置加载；读取时仍要求相关全局在 Node 中可用，插件不会提供 `window` 等浏览器对象。其他 `define` 条目不应用于配置图。
 
-`prepare()` 在 Vite 解析配置之前运行，那时还没有 `config.env`，只能用进程环境兜底：`VITE_` 开头的变量加同样四个标准键。值写在 `.env` 文件里的项目，`prepare()` 生成的结果和 Vite 会话里的不一样；Vite 把 `config.env` 交给插件后会按新值再生成一次，所以构建和开发服务器用到的都是 `.env` 文件里的值。
+`prepare()` 在 Vite 解析配置之前运行，还拿不到 `config.env` 和 `define`，使用进程环境中的 `VITE_` 变量兜底，并提供 `BASE_URL: '/'`、由 `NODE_ENV` 推导的 `MODE` / `DEV` / `PROD` 和 `SSR: false`。这一轮准备完成前始终使用同一份兜底值。准备成功后，Vite 接管上下文并使用正式环境重新生成；准备失败则保留原错误，不再继续这轮接管生成。
+
+Vite 接管时的重新生成不会刷新下游插件已经缓存的配置。需要在 `prepare()` 后立即读取环境相关配置时，应先用 `loadEnv()` 加载，再将必需变量写入 `process.env`；仅调用 `loadEnv()` 不会设置进程环境。自定义前缀不参与准备阶段的 `import.meta.env` 兜底，需要提前使用时可在配置中显式读取对应的 `process.env` 值。详见 [prepare()](../api/prepare.md)。
 
 其余成员不由插件提供，读到的是 `undefined`。共享工具文件里常见的 `typeof import.meta.glob === 'function'` 会走 false 分支，`import.meta.hot` 是 `undefined`。插件对静态可识别的直接成员访问给出带文件位置的警告，说明生成 `pages.json` 时读不到它：
 

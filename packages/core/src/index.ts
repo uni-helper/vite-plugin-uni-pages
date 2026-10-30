@@ -236,22 +236,19 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
       else {
         initialization.command = source
       }
-      // prepare() 先跑时配置图用的是进程环境兜底，这时 pages.json 里的 env 值
-      // 来自进程环境；补上 Vite 的 env 之后要按新值重新生成一次，否则整个
-      // 构建都用 `.env` 文件的值而生成的 pages.json 用的是旧值。已有的 promise
-      // 是上一轮生成，不能复用；更新走队列，与它在同一队列里排队
-      const replaced = !!configEnv && initialization.context.setConfigEnv(configEnv, configDefine)
-      if (replaced) {
+      // 等 prepare 完成后再切换环境，避免一轮准备混用两份值；准备失败时
+      // 保留原错误，由 configResolved 释放会话，不在已关闭的上下文继续生成
+      if (configEnv) {
         const state = initialization
-        state.promise = state.promise
-          .catch(() => {})
-          .then(async () => {
-            // 只重新生成页面，不重跑初始化：准备状态、参数校验已经完成
+        state.promise = state.promise.then(async () => {
+          if (state.closing)
+            throw new Error('[vite-plugin-uni-pages] The pages context was closed during initialization.')
+          if (state.context.setConfigEnv(configEnv, configDefine))
             await state.context.updatePagesJSON()
-            if (state.closing)
-              throw new Error('[vite-plugin-uni-pages] The pages context was closed during initialization.')
-            return plugin
-          })
+          if (state.closing)
+            throw new Error('[vite-plugin-uni-pages] The pages context was closed during initialization.')
+          return plugin
+        })
       }
       return initialization
     }
