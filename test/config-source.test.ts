@@ -176,7 +176,7 @@ const value: Value = { title: 'source-error' }
 throw new Error(value.title)
 export default {}`
     write('pages.config.ts', code)
-    write('runtime.mjs', configRuntimeSource({}))
+    write('runtime.mjs', await configRuntimeSource({}))
     write('compiled.mjs', (await transformConfigSource(code, source, pathToFileURL(runtime).href)).code)
     const stack = execFileSync(process.execPath, ['--enable-source-maps', '--input-type=module', '-e', `try { await import(${JSON.stringify(sourceURL('compiled.mjs'))}) } catch (error) { console.log(error.stack) }`], { encoding: 'utf8' })
     expect(normalizePath(stack)).toContain(`${normalizePath(source)}:5:`)

@@ -154,13 +154,52 @@ const ${importName} = (specifier, options) => ${prefix}_importFrom(specifier, ${
  *
  * @description 调用方将返回文本写入本轮 runtime.mjs；env 是配置图里 import.meta.env 的唯一一份
  * @param env import.meta.env 的值，来自 Vite 解析后的 config.env 或进程环境兜底
+ * @param define Vite 的定义映射，只应用 import.meta.env.* 条目
  * @returns 供配置打包使用的 ESM 源码
  */
-export function configRuntimeSource(env: Record<string, unknown>): string {
+export async function configRuntimeSource(env: Record<string, unknown>, define: Record<string, unknown> = {}): Promise<string> {
+  const prefix = 'import.meta.env.'
+  const overrides = Object.entries(define).filter(([key]) => key.startsWith(prefix))
+  let envSource = `export const env = ${JSON.stringify(env)};`
+  if (overrides.length) {
+    // 与 Vite 一样，字符串是替换表达式，其余值按 JSON 编码；交给 esbuild
+    // 校验和替换。按字段首次读取时求值，避免无关的浏览器变量影响配置加载
+    const values = overrides.map(([key]) => `${JSON.stringify(key.slice(prefix.length))}: () => ${key}`)
+    const transformed = await transform(`const overrides = { ${values.join(', ')} };`, {
+      loader: 'js',
+      target: 'node22',
+      define: Object.fromEntries(overrides.map(([key, value]) => [key, typeof value === 'string' ? value : JSON.stringify(value) ?? 'undefined'])),
+    })
+    envSource += `
+${transformed.code}
+function setEnvValue(key, value) {
+  Object.defineProperty(env, key, { value, enumerable: true, configurable: true, writable: true });
+  return value;
+}
+for (const [key, read] of Object.entries(overrides)) {
+  let loaded = false;
+  let value;
+  Object.defineProperty(env, key, {
+    enumerable: true,
+    configurable: true,
+    get() {
+      if (!loaded) {
+        value = read();
+        loaded = true;
+      }
+      if (Object.getOwnPropertyDescriptor(env, key)?.configurable)
+        setEnvValue(key, value);
+      return value;
+    },
+    set: value => setEnvValue(key, value),
+  });
+}
+`
+  }
   return `
 export { createRequire } from 'node:module';
 import { resolve } from ${JSON.stringify(pathToFileURL(createRequire(import.meta.url).resolve('import-meta-resolve')).href)};
-export const env = ${JSON.stringify(env)};
+${envSource}
 export function resolveFrom(specifier, url) {
   return resolve(\`\${specifier}\`, url);
 }

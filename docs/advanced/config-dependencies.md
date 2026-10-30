@@ -97,7 +97,9 @@ export const globalStyle = { navigationBarTitleText: title }
 
 每个模块都有独立的 `import.meta` 对象，`const { url, resolve } = import.meta`、`const meta = import.meta` 和 `import.meta[key]` 都保留该模块的源位置。`import.meta.main` 为 `false`。
 
-`import.meta.env` 和 app 代码里那份是同一套值：Vite 解析完配置后交给插件的 `config.env`，也就是 `.env` 文件里 `VITE_` 开头的变量，加上 `BASE_URL`、`MODE`、`DEV`、`PROD`，再加一个 `SSR: false`。所有模块拿到的是同一个对象，`Object.keys(import.meta.env)` 可以直接用。`process.env` 里同名的前缀变量优先于 `.env` 文件，这条也和 Vite 一致。
+`import.meta.env` 以 Vite 解析后的 `config.env` 为基础，包含按 `envPrefix` 筛选的环境变量（默认前缀为 `VITE_`），以及 `BASE_URL`、`MODE`、`DEV`、`PROD`，初始补入 `SSR: false`。`process.env` 里同名的前缀变量优先于 `.env` 文件；前缀筛选和优先级由 Vite 处理。同一轮配置加载的所有模块共享一个 env 对象，直接访问、解构、别名和 `Object.keys(import.meta.env)` 都读取这份对象。
+
+Vite `define` 中的 `import.meta.env.*` 条目会覆盖上述同名值，也可以增加新键。字符串按 esbuild 的替换表达式处理，其他值按 JSON 编码。例如，字符串值应写成 `define: { 'import.meta.env.VITE_TITLE': JSON.stringify('首页') }`；`'globalThis.APP_VERSION'` 则表示读取全局属性。表达式在字段首次读取时由 Node 求值，成功结果在本轮加载中共享并缓存。未读取的浏览器专用定义不会因缺少浏览器全局而影响配置加载；读取时仍要求相关全局在 Node 中可用，插件不会提供 `window` 等浏览器对象。其他 `define` 条目不应用于配置图。
 
 `prepare()` 在 Vite 解析配置之前运行，那时还没有 `config.env`，只能用进程环境兜底：`VITE_` 开头的变量加同样四个标准键。值写在 `.env` 文件里的项目，`prepare()` 生成的结果和 Vite 会话里的不一样；Vite 把 `config.env` 交给插件后会按新值再生成一次，所以构建和开发服务器用到的都是 `.env` 文件里的值。
 
@@ -151,7 +153,7 @@ node_modules/.cache/uni-pages/
 
 1. 在缓存目录创建独占的 `load-*` 子目录，写入公共辅助模块 `runtime.mjs`
 2. esbuild 解析入口和静态依赖，省略扩展名时按 esbuild 的后缀顺序查找，目录导入读取 `package.json`，同时记录缺失导入的恢复候选
-3. 转换每个模块，注入绑定原文件位置的 `require`、`import.meta` 成员和动态导入函数，`import.meta.env` 指向本轮的公共 env 对象，同时扫出读不到的 `import.meta` 成员
+3. 转换每个模块，注入绑定原文件位置的 `require`、完整 `import.meta` 对象和动态导入函数；各模块的 `import.meta.env` 指向本轮的公共 env 对象，并应用 Vite 的环境定义覆盖，同时检查静态可识别的不可用成员访问
 4. 打包成 `config.mjs` 后由 Node 执行，加载器取出配置对象并记录本地依赖
 5. 成功或失败都尝试删除本轮 `load-*` 目录
 

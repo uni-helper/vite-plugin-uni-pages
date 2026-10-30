@@ -150,7 +150,8 @@ export class PagesConfigLoader {
 
   /** 配置图里 import.meta.env 的值，Vite 会话就绪后可能被替换 */
   private env: Record<string, unknown>
-  /** 当前 env 已来自 Vite 会话；再给一次不会改变页面生成结果 */
+  private envDefine: Record<string, unknown> = {}
+  /** 是否已接收当前 Vite 会话的环境 */
   private envFromVite = false
   private readonly warn?: (message: string) => void
   /** 同一文件同一成员只提示一次；watch 每轮都会重新转换所有输入 */
@@ -169,12 +170,14 @@ export class PagesConfigLoader {
   /**
    * 替换配置图里 import.meta.env 的值
    *
-   * @param env - 与 Vite 给 app 代码注入的 import.meta.env 一致的值；下一轮加载生效
+   * @param env - Vite 解析后的环境值；下一轮加载生效
+   * @param define - Vite 的定义映射，只应用 import.meta.env.* 条目
    * @returns 首次用上 Vite 的 env 时为 `true`，之前生成的 pages.json 需要重算；再次设置返回 `false`
    */
-  setEnv(env: Record<string, unknown>): boolean {
+  setEnv(env: Record<string, unknown>, define: Record<string, unknown> = {}): boolean {
     const replaced = !this.envFromVite
     this.env = env
+    this.envDefine = define
     this.envFromVite = true
     return replaced
   }
@@ -306,7 +309,7 @@ export class PagesConfigLoader {
     const entry = scriptExtensions.test(source) ? source : path.join(bundleDirectory, 'entry.ts')
     try {
       // runtime.mjs 提供公共解析助手，原文件位置由每个源模块注入的调用参数提供
-      await writeFile(runtime, configRuntimeSource(this.env))
+      await writeFile(runtime, await configRuntimeSource(this.env, this.envDefine))
       // bundle-require 将配置和辅助代码打包到 config.mjs，再交给 Node 执行
       const { mod, dependencies: inputs } = await bundleRequire<Record<string, unknown>>({
         filepath: entry,

@@ -96,7 +96,7 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
     async configResolved(config) {
       // Vite 解析完用户配置后才有真实 env（.env 文件 + 标准键），
       // 与它注入 app 代码的 import.meta.env 用同一份来源
-      const state = initialize(config.root, config.plugins.some(v => v.name === 'vite-plugin-uni-platform'), config.command, { ...config.env, SSR: false })
+      const state = initialize(config.root, config.plugins.some(v => v.name === 'vite-plugin-uni-platform'), config.command, { ...config.env, SSR: false }, config.define)
       state.watching = config.command === 'build' && !!config.build.watch
       try {
         await state.promise
@@ -213,7 +213,7 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
     },
   }
 
-  function initialize(root: string, platformSuffix: boolean, source: 'prepare' | 'build' | 'serve', configEnv?: Record<string, unknown>): Initialization {
+  function initialize(root: string, platformSuffix: boolean, source: 'prepare' | 'build' | 'serve', configEnv?: Record<string, unknown>, configDefine?: Record<string, unknown>): Initialization {
     const resolvedRoot = normalizePath(path.resolve(root))
     const platform = process.env.UNI_PLATFORM
     if (!platform) {
@@ -240,7 +240,7 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
       // 来自进程环境；补上 Vite 的 env 之后要按新值重新生成一次，否则整个
       // 构建都用 `.env` 文件的值而生成的 pages.json 用的是旧值。已有的 promise
       // 是上一轮生成，不能复用；更新走队列，与它在同一队列里排队
-      const replaced = !!configEnv && initialization.context.setConfigEnv(configEnv)
+      const replaced = !!configEnv && initialization.context.setConfigEnv(configEnv, configDefine)
       if (replaced) {
         const state = initialization
         state.promise = state.promise
@@ -259,7 +259,7 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
     context.withUniPlatform = platformSuffix
     // 生成还没开始，直接设置即可；不需要额外的重新生成
     if (configEnv)
-      context.setConfigEnv(configEnv)
+      context.setConfigEnv(configEnv, configDefine)
     context.setLogger(createLogger(undefined, { prefix: '[vite-plugin-uni-pages]' }))
     const state: Initialization = {
       params,

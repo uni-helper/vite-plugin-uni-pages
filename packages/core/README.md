@@ -213,7 +213,11 @@ export const title = '首页'
 
 每个模块都有独立的完整 `import.meta` 对象，解构、别名和计算式访问都保留各自的源位置，例如 `const { url, resolve } = import.meta`、`const meta = import.meta` 和 `import.meta[key]`。`import.meta.main` 为 `false`。
 
-`import.meta.env` 取自 Vite 解析后的 `config.env`：`.env` 文件里 `VITE_` 开头的变量、`BASE_URL`、`MODE`、`DEV`、`PROD`，再加 `SSR: false`，所有模块共享同一个对象。`process.env` 里同名的前缀变量优先于 `.env` 文件。`prepare()` 拿不到 `config.env`，按进程环境里的 `VITE_` 变量和四个标准键兜底，`.env` 文件里的值只有 Vite 会话才有；Vite 把真实 env 交给插件后会按新值重新生成一次 `pages.json`，所以 `prepare()` 先跑也不会让构建沿用旧值。
+`import.meta.env` 以 Vite 解析后的 `config.env` 为基础：按 `envPrefix` 筛选的环境变量（默认前缀为 `VITE_`）、`BASE_URL`、`MODE`、`DEV`、`PROD`，初始补入 `SSR: false`，再应用 `define` 中 `import.meta.env.*` 条目的覆盖。同一轮加载的所有模块共享这个 env 对象，直接访问、解构和别名的结果一致。`process.env` 里同名的前缀变量优先于 `.env` 文件，前缀筛选和优先级由 Vite 处理。
+
+环境定义的字符串按 esbuild 替换表达式处理，其他值按 JSON 编码。例如，字符串值写作 `define: { 'import.meta.env.VITE_TITLE': JSON.stringify('首页') }`；`'globalThis.APP_VERSION'` 表示读取全局属性。表达式在字段首次读取时由 Node 求值，成功结果在本轮加载中共享并缓存。未读取的浏览器专用定义不会因缺少浏览器全局而影响配置加载；读取时仍要求相关全局在 Node 中可用，插件不会提供 `window` 等浏览器对象。其他 `define` 条目不应用于配置图。
+
+`prepare()` 拿不到 `config.env`，按进程环境里的 `VITE_` 变量和四个标准键兜底，`.env` 文件里的值只有 Vite 会话才有；Vite 把真实 env 交给插件后会按新值重新生成一次 `pages.json`，所以 `prepare()` 先跑也不会让构建沿用旧值。
 
 `import.meta` 的其余成员不由插件提供，读到的是 `undefined`。`typeof import.meta.glob === 'function'` 这类判断会走 false 分支，`import.meta.hot` 也是 `undefined`。插件对静态可识别的直接成员访问输出带文件位置的警告。
 
@@ -955,7 +959,7 @@ pipeline.ts       纯流水线入口：createPages / generateAll，root 和 plat
 config-loader.ts  配置加载：unconfig 发现与回调、内存转换、隔离产物、本地依赖与恢复输入
 config-watch.ts   配置监听计划：来源、依赖与恢复候选归一化为文件、恢复目录与注册路径，
                   并负责配置事件判定
-config-source.ts  源位置适配：每模块运行时解析、静态调用保留、源码映射
+config-source.ts  源位置适配：每模块 import.meta 与运行时解析、共享环境及定义覆盖、源码映射
 directories.ts    目录发现：glob 展开、subPackages 来源发现与扫描目录投影
 scan-plan.ts      扫描计划：一次发现主包目录、分包来源、最终 root 与规则，作为不可变视图
 page-rules.ts     页面规则：基于 Vite root 编译排除模式，统一扫描与事件判定
@@ -991,7 +995,7 @@ types.ts          公共类型定义（Options / UserOptions / ResolvedOptions�
 index.ts
   ├─ context.ts（编排核心）
   │    ├─ config-loader.ts             配置装载、产物身份与恢复输入
-  │    │    ├─ config-source.ts        源位置适配与运行时解析
+  │    │    ├─ config-source.ts        源位置适配、共享环境与运行时解析
   │    │    └─ config-watch.ts         监听计划与配置事件判定（反向读取加载器路径工具）
   │    ├─ options.ts ── scan-plan.ts   选项解析、目录发现与不可变扫描计划
   │    │    ├─ directories.ts          目录来源、root 决议与扫描投影
@@ -1031,9 +1035,9 @@ pipeline.ts ── context.ts              测试与外部调用的流水线入�
 
 `loadScript()` 接收原入口路径和经过可选 transform 处理的入口文本。它通过 `bundle-require` 调用 esbuild 打包并执行脚本，过程如下：
 
-1. 在 `node_modules/.cache/uni-pages/` 下创建这一轮加载独占的 `load-*` 目录，并写入公共辅助模块 `runtime.mjs`。
+1. 在 `node_modules/.cache/uni-pages/` 下创建这一轮加载独占的 `load-*` 目录，并写入公共辅助模块 `runtime.mjs`。它携带本轮环境值，以及经 esbuild 校验和替换的 `import.meta.env.*` 定义表达式。
 2. esbuild 解析入口和静态依赖。`onResolve` 按导入位置解析目标，并记录缺失导入的恢复候选；`onLoad` 读取模块，将需要转换的脚本文本与原文件路径交给 `transformConfigSource()`。
-3. `transformConfigSource()` 在内存中为每个模块注入绑定原文件位置的 `require`、`import.meta` 成员和动态导入函数，保留可由 esbuild 打包的调用，并生成源码映射。`import.meta.env` 指向 `runtime.mjs` 导出的那份对象，读不到的 `import.meta` 成员在这一步被扫出来交给 logger。
+3. `transformConfigSource()` 在内存中为每个模块注入绑定原文件位置的 `require`、完整 `import.meta` 对象和动态导入函数，保留可由 esbuild 打包的调用，并生成源码映射。各模块的 `import.meta.env` 指向 `runtime.mjs` 导出的同一份对象，静态可识别的不可用成员访问在这一步被收集并交给 logger。
 4. esbuild 将转换后的配置模块和所需辅助代码打包为 `config.mjs`，`bundle-require` 加载执行它；加载器提取配置对象，并记录参与打包的本地依赖。
 5. 成功或失败都由加载器统一尝试删除本轮 `load-*` 目录，包括打包执行文件；删除失败只记录调试日志，不影响配置结果或原始错误。加载失败时保留已尝试的源路径及适用的缺失导入候选，供后续文件事件触发重试。
 
@@ -1048,7 +1052,7 @@ node_modules/.cache/uni-pages/
 
 | 文件 | 内容来源 | 用途 |
 | --- | --- | --- |
-| `runtime.mjs` | `configRuntimeSource()` 返回的 JavaScript 源码 | 提供 `createRequire`、`env`、`resolveFrom`、`importFrom` 等公共助手；各源模块通过注入的调用参数提供自己的路径 |
+| `runtime.mjs` | `await configRuntimeSource()` 得到的 JavaScript 源码 | 提供共用的 `env` 和 `createRequire`、`createMeta`、`resolveFrom`、`importFrom` 等助手；`createMeta` 按源模块路径创建独立对象，环境定义按字段首次读取时在 Node 中求值并缓存本轮结果 |
 | `config.mjs` | esbuild 汇总入口文本、打包的依赖及辅助代码生成 | 由 Node 执行并导出配置对象；外部依赖保留为导入，运行时动态目标由助手解析后加载 |
 
 例如，`config/global-style.ts` 中的 `import(target)` 会被转换成效果相当于 `importFrom(target, 'file:///app/config/global-style.ts')` 的调用。`importFrom` 使用 `import-meta-resolve` 将目标解析成 URL，再调用 Node 的 `import()`。`require(target)` 则使用 Node 的 `createRequire(原文件路径)`。每个模块分别携带自己的源位置，执行文件所在的临时目录不会改变这些调用的解析基准。
