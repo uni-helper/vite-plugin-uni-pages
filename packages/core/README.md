@@ -211,6 +211,10 @@ export const title = '首页'
 
 对配置入口及打包进配置的脚本模块，`__dirname`、`__filename`、`import.meta.url`、`import.meta.dirname`、`import.meta.filename` 同样对应各自源文件。`require.resolve()` 和 `import.meta.resolve()` 从调用模块的位置解析目标，只返回路径或 URL，不加载目标模块。运行时由 Node 加载的目标不经过这层转换，遵循目标模块自身的 ESM 或 CommonJS 语义。
 
+`import.meta.env` 取自 Vite 解析后的 `config.env`：`.env` 文件里 `VITE_` 开头的变量、`BASE_URL`、`MODE`、`DEV`、`PROD`，再加 `SSR: false`，所有模块共享同一个对象。`process.env` 里同名的前缀变量优先于 `.env` 文件。`prepare()` 拿不到 `config.env`，按进程环境里的 `VITE_` 变量和四个标准键兜底，`.env` 文件里的值只有 Vite 会话才有。
+
+`import.meta` 的其余成员不由插件提供，读到的是 `undefined`。`typeof import.meta.glob === 'function'` 这类判断会走 false 分支，`import.meta.hot` 也是 `undefined`。遇到这类访问时插件输出带文件位置的警告。`const meta = import.meta` 这种整体取用的写法拿到的是临时产物的位置，需要位置就逐个成员访问。
+
 运行时解析区分包的 `import` / `require` 条件导出，支持模块所属包的 `#imports`。Node 自定义 loader、`--conditions` 等额外命令行解析选项不在此解析约定内。`fs.readFile()` 等自行读取、`node_modules` 变更和应用的 `resolve.alias` 不在自动依赖监听范围内。
 
 #### transform 与自定义 parser
@@ -1027,7 +1031,7 @@ pipeline.ts ── context.ts              测试与外部调用的流水线入�
 
 1. 在 `node_modules/.cache/uni-pages/` 下创建这一轮加载独占的 `load-*` 目录，并写入公共辅助模块 `runtime.mjs`。
 2. esbuild 解析入口和静态依赖。`onResolve` 按导入位置解析目标，并记录缺失导入的恢复候选；`onLoad` 读取模块，将需要转换的脚本文本与原文件路径交给 `transformConfigSource()`。
-3. `transformConfigSource()` 在内存中为每个模块注入绑定原文件位置的 `require`、`import.meta` 和动态导入函数，保留可由 esbuild 打包的调用，并生成源码映射。
+3. `transformConfigSource()` 在内存中为每个模块注入绑定原文件位置的 `require`、`import.meta` 成员和动态导入函数，保留可由 esbuild 打包的调用，并生成源码映射。`import.meta.env` 指向 `runtime.mjs` 导出的那份对象，读不到的 `import.meta` 成员在这一步被扫出来交给 logger。
 4. esbuild 将转换后的配置模块和所需辅助代码打包为 `config.mjs`，`bundle-require` 加载执行它；加载器提取配置对象，并记录参与打包的本地依赖。
 5. 成功或失败都由加载器统一尝试删除本轮 `load-*` 目录，包括打包执行文件；删除失败只记录调试日志，不影响配置结果或原始错误。加载失败时保留已尝试的源路径及适用的缺失导入候选，供后续文件事件触发重试。
 
@@ -1042,7 +1046,7 @@ node_modules/.cache/uni-pages/
 
 | 文件 | 内容来源 | 用途 |
 | --- | --- | --- |
-| `runtime.mjs` | `configRuntimeSource()` 返回的 JavaScript 源码 | 提供 `createRequire`、`createMeta`、`importFrom` 等公共助手；各源模块通过注入的调用参数提供自己的路径 |
+| `runtime.mjs` | `configRuntimeSource()` 返回的 JavaScript 源码 | 提供 `createRequire`、`env`、`resolveFrom`、`importFrom` 等公共助手；各源模块通过注入的调用参数提供自己的路径 |
 | `config.mjs` | esbuild 汇总入口文本、打包的依赖及辅助代码生成 | 由 Node 执行并导出配置对象；外部依赖保留为导入，运行时动态目标由助手解析后加载 |
 
 例如，`config/global-style.ts` 中的 `import(target)` 会被转换成效果相当于 `importFrom(target, 'file:///app/config/global-style.ts')` 的调用。`importFrom` 使用 `import-meta-resolve` 将目标解析成 URL，再调用 Node 的 `import()`。`require(target)` 则使用 Node 的 `createRequire(原文件路径)`。每个模块分别携带自己的源位置，执行文件所在的临时目录不会改变这些调用的解析基准。
