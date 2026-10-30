@@ -95,17 +95,17 @@ export const globalStyle = { navigationBarTitleText: title }
 
 `require.resolve()` 和 `import.meta.resolve()` 从调用模块的位置解析，只返回路径或 URL，不加载目标。由 Node 在运行时加载的目标不经过这层转换，遵循目标模块自身的 ESM 或 CommonJS 语义。
 
+每个模块都有独立的 `import.meta` 对象，`const { url, resolve } = import.meta`、`const meta = import.meta` 和 `import.meta[key]` 都保留该模块的源位置。`import.meta.main` 为 `false`。
+
 `import.meta.env` 和 app 代码里那份是同一套值：Vite 解析完配置后交给插件的 `config.env`，也就是 `.env` 文件里 `VITE_` 开头的变量，加上 `BASE_URL`、`MODE`、`DEV`、`PROD`，再加一个 `SSR: false`。所有模块拿到的是同一个对象，`Object.keys(import.meta.env)` 可以直接用。`process.env` 里同名的前缀变量优先于 `.env` 文件，这条也和 Vite 一致。
 
 `prepare()` 在 Vite 解析配置之前运行，那时还没有 `config.env`，只能用进程环境兜底：`VITE_` 开头的变量加同样四个标准键。值写在 `.env` 文件里的项目，`prepare()` 生成的结果和 Vite 会话里的不一样；Vite 把 `config.env` 交给插件后会按新值再生成一次，所以构建和开发服务器用到的都是 `.env` 文件里的值。
 
-其余成员不由插件提供，读到的就是 Node 里的 `undefined`。共享工具文件里常见的 `typeof import.meta.glob === 'function'` 会走 false 分支，`import.meta.hot` 是 `undefined`。碰到这类访问时插件会给出带文件位置的警告，说明生成 `pages.json` 时读不到它：
+其余成员不由插件提供，读到的是 `undefined`。共享工具文件里常见的 `typeof import.meta.glob === 'function'` 会走 false 分支，`import.meta.hot` 是 `undefined`。插件对静态可识别的直接成员访问给出带文件位置的警告，说明生成 `pages.json` 时读不到它：
 
 ```text
 [vite-plugin-uni-pages] src/utils/common.ts:3:7 reads import.meta.glob, which is not available while the pages config runs. Read environment values from process.env, and move other Vite-only access out of the config's import graph.
 ```
-
-把 `import.meta` 整体当值用同样不安全：`const meta = import.meta` 拿到的 `url` 属于临时产物，不是源文件。需要这些值就逐个成员访问。
 
 ## 自定义 transform 和 parser
 

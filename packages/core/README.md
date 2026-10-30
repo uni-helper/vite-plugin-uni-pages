@@ -211,9 +211,11 @@ export const title = '首页'
 
 对配置入口及打包进配置的脚本模块，`__dirname`、`__filename`、`import.meta.url`、`import.meta.dirname`、`import.meta.filename` 同样对应各自源文件。`require.resolve()` 和 `import.meta.resolve()` 从调用模块的位置解析目标，只返回路径或 URL，不加载目标模块。运行时由 Node 加载的目标不经过这层转换，遵循目标模块自身的 ESM 或 CommonJS 语义。
 
+每个模块都有独立的完整 `import.meta` 对象，解构、别名和计算式访问都保留各自的源位置，例如 `const { url, resolve } = import.meta`、`const meta = import.meta` 和 `import.meta[key]`。`import.meta.main` 为 `false`。
+
 `import.meta.env` 取自 Vite 解析后的 `config.env`：`.env` 文件里 `VITE_` 开头的变量、`BASE_URL`、`MODE`、`DEV`、`PROD`，再加 `SSR: false`，所有模块共享同一个对象。`process.env` 里同名的前缀变量优先于 `.env` 文件。`prepare()` 拿不到 `config.env`，按进程环境里的 `VITE_` 变量和四个标准键兜底，`.env` 文件里的值只有 Vite 会话才有；Vite 把真实 env 交给插件后会按新值重新生成一次 `pages.json`，所以 `prepare()` 先跑也不会让构建沿用旧值。
 
-`import.meta` 的其余成员不由插件提供，读到的是 `undefined`。`typeof import.meta.glob === 'function'` 这类判断会走 false 分支，`import.meta.hot` 也是 `undefined`。遇到这类访问时插件输出带文件位置的警告。`const meta = import.meta` 这种整体取用的写法拿到的是临时产物的位置，需要位置就逐个成员访问。
+`import.meta` 的其余成员不由插件提供，读到的是 `undefined`。`typeof import.meta.glob === 'function'` 这类判断会走 false 分支，`import.meta.hot` 也是 `undefined`。插件对静态可识别的直接成员访问输出带文件位置的警告。
 
 运行时解析区分包的 `import` / `require` 条件导出，支持模块所属包的 `#imports`。Node 自定义 loader、`--conditions` 等额外命令行解析选项不在此解析约定内。`fs.readFile()` 等自行读取、`node_modules` 变更和应用的 `resolve.alias` 不在自动依赖监听范围内。
 

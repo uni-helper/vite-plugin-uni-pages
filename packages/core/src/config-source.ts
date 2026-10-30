@@ -9,7 +9,7 @@ import { callExpression, identifier, removePropertiesDeep } from '@babel/types'
 import { babelParse, walkAST } from 'ast-kit'
 import { transform } from 'esbuild'
 
-/** 加载器给 import.meta 提供取值的成员；其余成员在配置图里保持 Node 的 undefined */
+/** 加载器给 import.meta 提供取值的成员，其余成员保持 undefined */
 const providedMetaMembers = new Set(['dirname', 'env', 'filename', 'main', 'resolve', 'url'])
 
 /** 一处访问了加载器未提供成员的 import.meta 表达式 */
@@ -90,9 +90,8 @@ export interface ConfigSourceTransform {
 /**
  * 将脚本转换为绑定原文件位置的 JavaScript
  *
- * @description 注入运行时解析助手；可打包的调用及用户声明的局部 require 保持原语义。
- * import.meta 按成员逐个替换，没有列出的成员留给 Node 的真实语义（undefined），
- * 整体替换会让 facade 少一个字段就崩一类代码
+ * @description 注入运行时解析助手；可打包的调用及用户声明的局部 require 保持原语义
+ * import.meta 的解构、别名和计算式访问使用当前模块的源位置，各模块共享同一份 env
  * @param code 当前模块的源码文本
  * @param filename 当前模块的原始绝对路径，作为该模块运行时解析的基准
  * @param runtime 本轮生成的公共辅助模块路径，供转换后的代码导入
@@ -103,8 +102,7 @@ export async function transformConfigSource(code: string, filename: string, runt
   while (code.includes(prefix))
     prefix += '_'
   const requireName = `${prefix}_require`
-  const envName = `${prefix}_env`
-  const resolveName = `${prefix}_resolve`
+  const metaName = `${prefix}_meta`
   const importName = `${prefix}_import`
   const extension = path.extname(filename).slice(1)
   const loader: Loader = extension === 'jsx' || extension === 'tsx' ? extension : /^(?:c|m)?js$/.test(extension) ? 'js' : 'ts'
@@ -119,14 +117,9 @@ export async function transformConfigSource(code: string, filename: string, runt
     target: 'node22',
     define: {
       'require': requireName,
+      'import.meta': metaName,
       '__dirname': JSON.stringify(directory),
       '__filename': JSON.stringify(filename),
-      'import.meta.url': JSON.stringify(url),
-      'import.meta.dirname': JSON.stringify(directory),
-      'import.meta.filename': JSON.stringify(filename),
-      'import.meta.main': 'false',
-      'import.meta.resolve': resolveName,
-      'import.meta.env': envName,
     },
   })
   const ast = babelParse(result.code, 'js', { allowReturnOutsideFunction: true })
@@ -141,9 +134,9 @@ export async function transformConfigSource(code: string, filename: string, runt
   })
   // 公共助手复用同一份实现；env 由 runtime 模块统一导出，各模块拿到的是同一个对象
   const helpers = babelParse(`
-import { createRequire as ${prefix}_createRequire, env as ${envName}, resolveFrom as ${prefix}_resolveFrom, importFrom as ${prefix}_importFrom } from ${JSON.stringify(runtime)};
+import { createRequire as ${prefix}_createRequire, createMeta as ${prefix}_createMeta, importFrom as ${prefix}_importFrom } from ${JSON.stringify(runtime)};
 const ${requireName} = ${prefix}_createRequire(${JSON.stringify(filename)});
-const ${resolveName} = specifier => ${prefix}_resolveFrom(specifier, ${JSON.stringify(url)});
+const ${metaName} = ${prefix}_createMeta(${JSON.stringify(filename)}, ${JSON.stringify(url)}, ${JSON.stringify(directory)});
 const ${importName} = (specifier, options) => ${prefix}_importFrom(specifier, ${JSON.stringify(url)}, options);
 `, 'js')
   removePropertiesDeep(helpers)
@@ -170,6 +163,9 @@ import { resolve } from ${JSON.stringify(pathToFileURL(createRequire(import.meta
 export const env = ${JSON.stringify(env)};
 export function resolveFrom(specifier, url) {
   return resolve(\`\${specifier}\`, url);
+}
+export function createMeta(filename, url, dirname) {
+  return Object.assign(Object.create(null), { filename, url, dirname, main: false, resolve: specifier => resolveFrom(specifier, url), env });
 }
 export async function importFrom(specifier, url, options) {
   return import(resolve(\`\${specifier}\`, url), options);
