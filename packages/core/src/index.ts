@@ -94,7 +94,9 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
      * 初始化 PageContext，设置 logger，生成初始 pages.json
      */
     async configResolved(config) {
-      const state = initialize(config.root, config.plugins.some(v => v.name === 'vite-plugin-uni-platform'), config.command)
+      // Vite 解析完用户配置后才有真实 env（.env 文件 + 标准键），
+      // 与它注入 app 代码的 import.meta.env 用同一份来源
+      const state = initialize(config.root, config.plugins.some(v => v.name === 'vite-plugin-uni-platform'), config.command, { ...config.env, SSR: false })
       state.watching = config.command === 'build' && !!config.build.watch
       try {
         await state.promise
@@ -211,7 +213,7 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
     },
   }
 
-  function initialize(root: string, platformSuffix: boolean, source: 'prepare' | 'build' | 'serve'): Initialization {
+  function initialize(root: string, platformSuffix: boolean, source: 'prepare' | 'build' | 'serve', configEnv?: Record<string, unknown>): Initialization {
     const resolvedRoot = normalizePath(path.resolve(root))
     const platform = process.env.UNI_PLATFORM
     if (!platform) {
@@ -234,10 +236,16 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
       else {
         initialization.command = source
       }
+      // prepare() 先跑时配置图用的是进程环境兜底，这里补上 Vite 的 env，
+      // 会话内后续重新加载（watch 事件）就能拿到 .env 文件的值
+      if (configEnv)
+        initialization.context.setConfigEnv(configEnv)
       return initialization
     }
     const context = new PageContext(userOptions, resolvedRoot, platform)
     context.withUniPlatform = platformSuffix
+    if (configEnv)
+      context.setConfigEnv(configEnv)
     context.setLogger(createLogger(undefined, { prefix: '[vite-plugin-uni-pages]' }))
     const state: Initialization = {
       params,

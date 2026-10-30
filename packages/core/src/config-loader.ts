@@ -3,6 +3,7 @@ import type { LoadConfigSource } from 'unconfig'
 import { existsSync, mkdirSync, realpathSync } from 'node:fs'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import { bundleRequire } from 'bundle-require'
 import { loadConfig } from 'unconfig'
@@ -82,6 +83,29 @@ export function isConfigLoaderArtifact(filepath: string, directory: string): boo
   return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
 }
 
+/**
+ * 没有 Vite 配置时的 import.meta.env
+ *
+ * @description 只给 Vite 会在 app 代码里提供的键：前缀变量加标准键。
+ * prepare() 在 Vite 解析配置之前运行，`.env` 文件的值此时还没有人读过
+ */
+function fallbackConfigEnv(): Record<string, unknown> {
+  const env: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value !== undefined && key.startsWith('VITE_'))
+      env[key] = value
+  }
+  const production = process.env.NODE_ENV === 'production'
+  return {
+    ...env,
+    BASE_URL: '/',
+    MODE: process.env.NODE_ENV ?? 'development',
+    DEV: !production,
+    PROD: production,
+    SSR: false,
+  }
+}
+
 /** 配置加载结果及这次成功求值涉及的文件 */
 export interface LoadedPagesConfig {
   config: PagesConfig
@@ -123,8 +147,20 @@ export class PagesConfigLoader {
     recoveryDirectories: [],
   }
 
+  /** 配置图里 import.meta.env 的值，Vite 会话就绪后可能被替换 */
+  private env: Record<string, unknown>
   constructor(private readonly root: string) {
     this.artifactDirectory = normalizeConfigPath(path.join(root, 'node_modules/.cache/uni-pages'), root)
+    this.env = fallbackConfigEnv()
+  }
+
+  /**
+   * 替换配置图里 import.meta.env 的值
+   *
+   * @param env - 与 Vite 给 app 代码注入的 import.meta.env 一致的值；下一轮加载生效
+   */
+  setEnv(env: Record<string, unknown>): void {
+    this.env = env
   }
 
   /** 监听输入是一份只读快照，调用方不需要理解加载器的恢复状态 */
@@ -237,7 +273,7 @@ export class PagesConfigLoader {
     const entry = scriptExtensions.test(source) ? source : path.join(bundleDirectory, 'entry.ts')
     try {
       // runtime.mjs 提供公共解析助手，原文件位置由每个源模块注入的调用参数提供
-      await writeFile(runtime, configRuntimeSource())
+      await writeFile(runtime, configRuntimeSource(this.env))
       // bundle-require 将配置和辅助代码打包到 config.mjs，再交给 Node 执行
       const { mod, dependencies: inputs } = await bundleRequire<Record<string, unknown>>({
         filepath: entry,

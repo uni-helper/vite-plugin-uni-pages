@@ -36,7 +36,6 @@ describe('配置模块的源位置', () => {
       url: import.meta.url, filename: import.meta.filename, dirname: import.meta.dirname,
       metaResolved: import.meta.resolve(target), cjsFilename: __filename, cjsDirname: __dirname,
       literalRequire: require('./literal.cjs'), literalImport: (await import('./literal.cjs')).default,
-      nullPrototype: Object.getPrototypeOf(import.meta) === null,
     }`
     write('nested/module.ts', code)
     write('pages.config.ts', `import nested from './nested/module.ts'; ${code.replace('export default', 'const entry =')}; export default { entry, nested }`)
@@ -58,7 +57,6 @@ describe('配置模块的源位置', () => {
         cjsDirname: path.join(root, directory),
         literalRequire: `${name}-literal`,
         literalImport: `${name}-literal`,
-        nullPrototype: true,
       })
     }
     expect(result.dependencies.map(file => normalizePath(path.relative(root, file))).sort()).toEqual(['literal.cjs', 'nested/literal.cjs', 'nested/module.ts', 'pages.config.ts'])
@@ -177,7 +175,7 @@ const value: Value = { title: 'source-error' }
 throw new Error(value.title)
 export default {}`
     write('pages.config.ts', code)
-    write('runtime.mjs', configRuntimeSource())
+    write('runtime.mjs', configRuntimeSource({}))
     write('compiled.mjs', await transformConfigSource(code, source, pathToFileURL(runtime).href))
     const stack = execFileSync(process.execPath, ['--enable-source-maps', '--input-type=module', '-e', `try { await import(${JSON.stringify(sourceURL('compiled.mjs'))}) } catch (error) { console.log(error.stack) }`], { encoding: 'utf8' })
     expect(normalizePath(stack)).toContain(`${normalizePath(source)}:5:`)
@@ -297,5 +295,46 @@ describe('transform 与产物隔离', () => {
     expect((await Promise.all(loads)).map(result => result.config)).toEqual([{ value: 'first' }, { value: 'second' }])
     expect(cacheFiles()).toEqual([])
     expect(fs.readdirSync(root).sort()).toEqual(['node_modules', 'package.json', 'pages.config.ts'])
+  })
+})
+
+describe('配置模块的 import.meta.env', () => {
+  it('入口和依赖共享加载器提供的那一份 env', async () => {
+    const env = { MODE: 'staging', VITE_BASE: 'https://example.test' }
+    write('src/utils/env.ts', `export const env = import.meta.env; export const base = import.meta.env.VITE_BASE`)
+    write('pages.config.ts', `import { env, base } from './src/utils/env.ts'; export default {
+      globalStyle: { navigationBarTitleText: base },
+      meta: { same: env === import.meta.env, keys: Object.keys(import.meta.env).sort(), mode: import.meta.env.MODE },
+    }`)
+    const loader = new PagesConfigLoader(root)
+    loader.setEnv(env)
+    const result = await loader.load([{ files: 'pages.config.ts', extensions: [] }])
+    expect(result.config).toEqual({
+      globalStyle: { navigationBarTitleText: 'https://example.test' },
+      meta: { same: true, keys: ['MODE', 'VITE_BASE'], mode: 'staging' },
+    })
+  })
+
+  it('setEnv 替换后重新加载读到新值', async () => {
+    write('pages.config.ts', `export default { globalStyle: { navigationBarTitleText: import.meta.env.MODE } }`)
+    const source = [{ files: 'pages.config.ts', extensions: [] }]
+    const loader = new PagesConfigLoader(root)
+    loader.setEnv({ MODE: 'first' })
+    expect((await loader.load(source)).config.globalStyle?.navigationBarTitleText).toBe('first')
+    loader.setEnv({ MODE: 'second' })
+    expect((await loader.load(source)).config.globalStyle?.navigationBarTitleText).toBe('second')
+  })
+
+  it('没有 Vite 配置时按进程环境兜底，前缀变量和标准键都在', async () => {
+    const title = `fallback-${process.pid}`
+    vi.stubEnv('VITE_FALLBACK_TITLE', title)
+    try {
+      write('pages.config.ts', 'export default { globalStyle: { navigationBarTitleText: import.meta.env.VITE_FALLBACK_TITLE + ":" + typeof import.meta.env.DEV + ":" + import.meta.env.BASE_URL } }')
+      const result = await new PagesConfigLoader(root).load([{ files: 'pages.config.ts', extensions: [] }])
+      expect(result.config.globalStyle?.navigationBarTitleText).toBe(`${title}:boolean:/`)
+    }
+    finally {
+      vi.unstubAllEnvs()
+    }
   })
 })

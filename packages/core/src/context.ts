@@ -169,6 +169,16 @@ export class PageContext {
   }
 
   /**
+   * 设置配置图里 import.meta.env 的值
+   *
+   * @description Vite 解析完用户配置后才有真实 env；prepare() 先跑时由这里补上，后续重新加载生效
+   * @param env - 与 Vite 给 app 代码注入的 import.meta.env 一致的值
+   */
+  setConfigEnv(env: Record<string, unknown>): void {
+    this.configLoader.setEnv(env)
+  }
+
+  /**
    * 加载用户页面配置文件（如 pages.config.ts）
    * 使用 unconfig 加载配置，支持多种配置文件格式
    */
