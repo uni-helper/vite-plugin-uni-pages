@@ -392,11 +392,14 @@ export class PagesConfigLoader {
       return unwrapConfig(mod.default ?? mod) as PagesConfig
     }
     catch (error) {
-      // 打包后的栈全部指向临时产物，补一句说明它由哪些源码生成，避免把
-      // config.mjs 当成用户源码去读。编译错误自带原始位置，不重复提示
-      if (error instanceof Error && String(error.stack).includes(bundleDirectory))
-        error.message += `\n[vite-plugin-uni-pages] The stack above points into the bundled config generated from ${normalizePath(path.relative(this.root, sourcePath))} and the modules it imports.`
-      if (Array.isArray((error as { errors?: unknown })?.errors)) {
+      // esbuild 的编译错误带 errors 数组、自带原始位置；没有它说明打包已经
+      // 完成，错误发生在执行阶段，栈指向临时产物。按这个阶段判断而不是比对
+      // 栈里的路径：Windows 的产物目录是反斜杠路径，栈里是 file:///D:/... URL
+      const buildErrors = (error as { errors?: unknown })?.errors
+      if (error instanceof Error && !Array.isArray(buildErrors)) {
+        error.message += `\n[vite-plugin-uni-pages] The error happened while evaluating the config generated from ${normalizePath(path.relative(this.root, sourcePath))} and the modules it imports; the stack above points into that temporary bundle, not into your source.`
+      }
+      if (Array.isArray(buildErrors)) {
         // 编译失败时保留缺失文件的精确候选
         for (const candidate of recoveryCandidates) {
           if (!existsSync(candidate))

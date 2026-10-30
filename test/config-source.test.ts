@@ -368,16 +368,16 @@ describe('配置模块拿不到的 import.meta 成员', () => {
 })
 
 describe('配置加载失败的定位说明', () => {
-  it('栈指向打包产物时补充生成它的入口，编译错误保持原样', async () => {
+  it('执行阶段的错误补充生成它的入口，编译错误保持原样', async () => {
     write('src/utils/boom.ts', `throw new Error('boom')`)
     write('pages.config.ts', `import './src/utils/boom.ts'; export default {}`)
     const error = await load().then(() => undefined, (error: Error) => error)
     expect(error?.message).toContain('boom')
-    expect(error?.message).toContain('The stack above points into the bundled config generated from pages.config.ts')
+    expect(error?.message).toContain('The error happened while evaluating the config generated from pages.config.ts')
 
     write('pages.config.ts', `export default {`)
     const syntax = await load().then(() => undefined, (error: Error) => error)
-    expect(syntax?.message).not.toContain('The stack above points into the bundled config')
+    expect(syntax?.message).not.toContain('The error happened while evaluating the config')
   })
 })
 
