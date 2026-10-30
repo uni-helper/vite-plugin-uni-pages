@@ -1,8 +1,10 @@
 import type { PagesConfig } from '@uni-helper/uni-pages-types'
 import type { LoadConfigSource } from 'unconfig'
+import type { ConfigMetaWarning } from './config-source'
 import { existsSync, mkdirSync, realpathSync } from 'node:fs'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import { bundleRequire } from 'bundle-require'
 import { loadConfig } from 'unconfig'
@@ -82,6 +84,29 @@ export function isConfigLoaderArtifact(filepath: string, directory: string): boo
   return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
 }
 
+/**
+ * 没有 Vite 配置时的 import.meta.env
+ *
+ * @description 只给 Vite 会在 app 代码里提供的键：前缀变量加标准键。
+ * prepare() 在 Vite 解析配置之前运行，`.env` 文件的值此时还没有人读过
+ */
+function fallbackConfigEnv(): Record<string, unknown> {
+  const env: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value !== undefined && key.startsWith('VITE_'))
+      env[key] = value
+  }
+  const production = process.env.NODE_ENV === 'production'
+  return {
+    ...env,
+    BASE_URL: '/',
+    MODE: process.env.NODE_ENV ?? 'development',
+    DEV: !production,
+    PROD: production,
+    SSR: false,
+  }
+}
+
 /** 配置加载结果及这次成功求值涉及的文件 */
 export interface LoadedPagesConfig {
   config: PagesConfig
@@ -123,8 +148,51 @@ export class PagesConfigLoader {
     recoveryDirectories: [],
   }
 
-  constructor(private readonly root: string) {
+  /** 配置图里 import.meta.env 的值，Vite 会话就绪后可能被替换 */
+  private env: Record<string, unknown>
+  private envDefine: Record<string, unknown> = {}
+  /** 是否已接收当前 Vite 会话的环境 */
+  private envFromVite = false
+  private readonly warn?: (message: string) => void
+  /** 同一文件同一成员只提示一次；watch 每轮都会重新转换所有输入 */
+  private readonly reportedMetaMembers = new Set<string>()
+
+  /**
+   * @param root - 项目根目录，配置入口和依赖都按它解析
+   * @param warn - 提示出口，同一文件同一成员只调用一次
+   */
+  constructor(private readonly root: string, warn?: (message: string) => void) {
     this.artifactDirectory = normalizeConfigPath(path.join(root, 'node_modules/.cache/uni-pages'), root)
+    this.env = fallbackConfigEnv()
+    this.warn = warn
+  }
+
+  /**
+   * 替换配置图里 import.meta.env 的值
+   *
+   * @param env - Vite 解析后的环境值；下一轮加载生效
+   * @param define - Vite 的定义映射，只应用 import.meta.env.* 条目
+   * @returns 首次用上 Vite 的 env 时为 `true`，之前生成的 pages.json 需要重算；再次设置返回 `false`
+   */
+  setEnv(env: Record<string, unknown>, define: Record<string, unknown> = {}): boolean {
+    const replaced = !this.envFromVite
+    this.env = env
+    this.envDefine = define
+    this.envFromVite = true
+    return replaced
+  }
+
+  /** 把成员问题转成带文件位置的提示；同一文件同一成员只报一次 */
+  private reportMetaWarnings(warnings: ConfigMetaWarning[]): void {
+    if (!this.warn)
+      return
+    for (const { file, line, column, member } of warnings) {
+      const key = `${file}\u0000${member}`
+      if (this.reportedMetaMembers.has(key))
+        continue
+      this.reportedMetaMembers.add(key)
+      this.warn(`${normalizePath(path.relative(this.root, file))}:${line}:${column} reads import.meta.${member}, which is not available while the pages config runs. Read environment values from process.env, and move other Vite-only access out of the config's import graph.`)
+    }
   }
 
   /** 监听输入是一份只读快照，调用方不需要理解加载器的恢复状态 */
@@ -225,8 +293,12 @@ export class PagesConfigLoader {
    */
   private async loadScript(source: string, code: string, dependencies: Set<string>, attempted: Set<string>): Promise<PagesConfig> {
     const sourcePath = normalizeConfigPath(source, this.root)
+    // esbuild 的钩子拿不到 this，成员问题先收集，打包结束后统一提示
+    const metaWarnings: ConfigMetaWarning[] = []
     const importDirectories = new Set<string>()
     const recoveryCandidates = new Set<string>()
+    // 打包成功后置位：之后的错误都来自执行配置，不是 esbuild 的编译失败
+    let bundled = false
     const root = this.root
     // 每轮打包使用独占目录，隔离并发加载的辅助模块和执行产物
     const cacheDirectory = this.artifactDirectory
@@ -237,7 +309,7 @@ export class PagesConfigLoader {
     const entry = scriptExtensions.test(source) ? source : path.join(bundleDirectory, 'entry.ts')
     try {
       // runtime.mjs 提供公共解析助手，原文件位置由每个源模块注入的调用参数提供
-      await writeFile(runtime, configRuntimeSource())
+      await writeFile(runtime, await configRuntimeSource(this.env, this.envDefine))
       // bundle-require 将配置和辅助代码打包到 config.mjs，再交给 Node 执行
       const { mod, dependencies: inputs } = await bundleRequire<Record<string, unknown>>({
         filepath: entry,
@@ -262,6 +334,12 @@ export class PagesConfigLoader {
           plugins: [{
             name: 'uni-pages-config-inputs',
             setup(build) {
+              // 打包成功的唯一时机：onEnd 报无错。配置在这之后才执行，所以这之后
+              // 抛出的错误都来自执行阶段
+              build.onEnd((result) => {
+                if (result.errors.length === 0)
+                  bundled = true
+              })
               build.onResolve({ filter: /.*/ }, async (args) => {
                 if (args.kind === 'entry-point')
                   return { path: path.resolve(sourcePath) }
@@ -307,7 +385,9 @@ export class PagesConfigLoader {
                 if (file !== sourcePath && !scriptExtensions.test(file))
                   return
                 const contents = file === sourcePath ? code : await readFile(args.path, 'utf8')
-                return { contents: await transformConfigSource(contents, path.resolve(file), runtime), loader: 'js' }
+                const transformed = await transformConfigSource(contents, path.resolve(file), runtime)
+                metaWarnings.push(...transformed.warnings)
+                return { contents: transformed.code, loader: 'js' }
               })
             },
           }],
@@ -329,7 +409,12 @@ export class PagesConfigLoader {
       return unwrapConfig(mod.default ?? mod) as PagesConfig
     }
     catch (error) {
-      if (Array.isArray((error as { errors?: unknown })?.errors)) {
+      // 按打包是否完成判断阶段，而不是看错误有没有 errors 数组：配置自己抛的
+      // AggregateError 也带这个数组。也不比对栈里的路径：Windows 的产物目录
+      // 是反斜杠路径，栈里是 file:///D:/... URL
+      if (bundled && error instanceof Error)
+        explainEvaluationError(error, normalizePath(path.relative(this.root, sourcePath)))
+      if (!bundled) {
         // 编译失败时保留缺失文件的精确候选
         for (const candidate of recoveryCandidates) {
           if (!existsSync(candidate))
@@ -342,6 +427,8 @@ export class PagesConfigLoader {
       throw error
     }
     finally {
+      // 提示放在 finally：加载失败时同样要说明哪个文件用了拿不到的成员
+      this.reportMetaWarnings(metaWarnings)
       // 清理失败不能改变这次加载的结果，也不能覆盖原始错误；残留目录仍被
       // 产物身份过滤排除，不会进入输入索引或监听
       try {
@@ -352,6 +439,25 @@ export class PagesConfigLoader {
       }
     }
   }
+}
+
+/**
+ * 说明执行阶段错误的来源，并写进 message 和 stack
+ *
+ * @description 字段只读或访问器抛错时保留原异常，诊断失败不能覆盖配置错误
+ * @param error 配置执行阶段抛出的错误
+ * @param file 相对项目根的配置入口路径，用于说明错误来自哪份配置
+ */
+function explainEvaluationError(error: Error, file: string): void {
+  const note = `\n[vite-plugin-uni-pages] The error happened while evaluating the config generated from ${file} and the modules it imports; the stack above points into that temporary bundle, not into your source.`
+  try {
+    // 先读取 stack，避免 Node 用更新后的 message 生成栈时重复加入说明
+    const stack = error.stack
+    error.message += note
+    if (typeof stack === 'string')
+      error.stack = stack + note
+  }
+  catch {}
 }
 
 function unwrapConfig(value: unknown): unknown {

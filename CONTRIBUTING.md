@@ -88,6 +88,10 @@ test/
 ├── files*.test.ts                       文件工具与文件锁
 ├── config-dependencies.test.ts          配置本地依赖加载与 unconfig 回调兼容
 ├── config-source.test.ts                每模块源位置、根外 workspace、动态缓存边界与 transform 隔离
+├── config-meta-compat.test.ts           import.meta 解构、别名与计算式访问的源位置和共享环境
+├── config-env-lifecycle.test.ts         prepare 与 Vite 接管的环境切换、并发准备与失败恢复
+├── config-env-define.test.ts            应用与配置图共享模块的 define 环境覆盖
+├── config-source-errors.test.ts         错误定位说明不替换原异常，栈说明与产物清理
 ├── config-source-cleanup.test.ts        加载目录清理失败不改变结果或原始错误，残留产物仍隔离
 ├── config-dependencies-watch.test.ts    dev/build 单次修改、依赖切换、连续失败与恢复
 ├── config-artifact-watch.test.ts        真实输入与专用产物目录的身份、监听过滤

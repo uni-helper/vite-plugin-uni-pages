@@ -65,9 +65,10 @@ describe('pages.prepare()', () => {
       const routes = await server.ssrLoadModule('virtual:uni-pages')
       expect(routes.pages.map((page: { path: string }) => page.path)).toEqual(['pages/index'])
       expect(downstream).toHaveBeenCalledOnce()
-      expect(onBeforeLoadUserConfig).toHaveBeenCalledOnce()
+      // prepare() 一轮，Vite 把真实 env 交给配置图后再重新生成一轮
+      expect(onBeforeLoadUserConfig).toHaveBeenCalledTimes(2)
       await expect(pages.prepare({ platformSuffix: false })).resolves.toBe(pages)
-      expect(onBeforeLoadUserConfig).toHaveBeenCalledOnce()
+      expect(onBeforeLoadUserConfig).toHaveBeenCalledTimes(2)
     }
     finally {
       await server.close()
@@ -137,7 +138,7 @@ describe('pages.prepare()', () => {
     }
   })
 
-  it('接管时等待已经开始的准备任务，不重复加载配置', async () => {
+  it('接管时等待已经开始的准备任务，随后按 Vite 的 env 重新生成一次', async () => {
     const root = fixture()
     let release!: () => void
     let entered!: () => void
@@ -147,9 +148,13 @@ describe('pages.prepare()', () => {
     const loading = new Promise<void>((resolve) => {
       entered = resolve
     })
+    let parsed = 0
     const parser = vi.fn(async () => {
-      entered()
-      await gate
+      // 只让 prepare() 那一轮卡住，重新生成的轮次直接完成
+      if (++parsed === 1) {
+        entered()
+        await gate
+      }
       return {}
     })
     const pages = UniPages({ dts: false, configSource: { files: 'pages.config', parser } })
@@ -167,7 +172,8 @@ describe('pages.prepare()', () => {
       await resolving
       await expect(preparing).resolves.toBe(pages)
     }
-    expect(parser).toHaveBeenCalledOnce()
+    // prepare() 一轮，Vite 的 env 到达后重新生成一轮；后续 prepare() 复用同一初始化
+    expect(parser).toHaveBeenCalledTimes(2)
     expect(readPages(root).pages.map(page => page.path)).toEqual(['pages/index'])
   })
 

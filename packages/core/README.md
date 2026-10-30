@@ -98,9 +98,9 @@ await pages.prepare({ platformSuffix: false })
 | `root?: string` | 提前指定 Vite 项目根目录，默认使用 `VITE_ROOT_DIR` 或当前工作目录；相对路径以当前工作目录为基准 |
 | `platformSuffix: boolean` | 必填，声明是否使用 UniPlatform 文件名后缀规则；启用 `@uni-helper/vite-plugin-uni-platform` 时传 `true`，其余场景传 `false` |
 
-通过 uni-app 的开发或构建命令调用该配置。编译平台读取调用时的 `process.env.UNI_PLATFORM`；独立脚本需要提前设置它。准备阶段 Vite 尚未自动加载 `.env`，配置若依赖其中的变量，应先用 Vite `loadEnv()` 加载并提供所需环境。自定义 Vite `root` 时，向 `prepare()` 传入相同的根目录。
+通过 uni-app 的开发或构建命令调用该配置。编译平台读取调用时的 `process.env.UNI_PLATFORM`；独立脚本需要提前设置它。准备阶段 Vite 尚未提供解析后的环境和 `define`，配置若依赖 `.env` 变量，应先用 Vite `loadEnv(mode, root)` 加载，再将必需变量写入 `process.env`，保留已有进程变量的优先级；仅调用 `loadEnv()` 不会设置进程环境。自定义 Vite `root` 时，向 `prepare()` 传入相同的根目录。
 
-- 同一次准备期间，相同根目录、编译平台和后缀规则的并发或重复调用只初始化一次，首次 Vite 接管复用该结果。Vite 会话结束后再次调用会重新读取配置和页面。
+- 同一次准备期间，相同根目录、编译平台和后缀规则的并发或重复调用只初始化一次，并始终使用本轮的兜底环境。Vite 接管会等待准备成功，复用上下文并切换到正式环境重新生成；准备失败时保留原错误。Vite 会话结束后再次调用会重新读取配置和页面。
 - Vite 接管时会核对根目录、编译平台和 UniPlatform 状态，不一致会报错；接管后再次调用也必须保持一致。成功调用过 `prepare()` 后，这个核对一直有效。
 - 配置加载、文件写入或锁获取失败会拒绝 Promise，修复后可再次调用 `prepare()`。
 - 准备前应完成源码与配置的创建；准备完成到文件监听建立之间的修改不保证被自动发现。
@@ -135,7 +135,7 @@ Vite 在创建 Rollup 构建图或开发服务器之前就退出时（例如其�
 
 占位文件只在能推导出的输出目录已经存在时创建。目录不存在时不在那个位置新建目录：`root` 优先取 `VITE_ROOT_DIR`，没设时取当前工作目录，而这个工作目录很可能不是真正的项目根，在它下面创建 `src` 会把目录建错地方。这时直接跑完整生成；如果 Vite 传入的 `root` 又是错的，生成会以 `ENOENT` 失败并指明路径。
 
-`prepare()` 不会刷新下游插件已经缓存的配置，所以需要读取完整配置的插件应在等待完成后创建。
+`prepare()` 和 Vite 接管时的再次生成都不会刷新下游插件已经缓存的配置。需要读取完整配置的插件应在准备完成后创建，它们依赖的环境值必须在准备之前提供。
 
 ### 配置依赖热更新
 
@@ -210,6 +210,16 @@ export const title = '首页'
 上例中的 `title.mjs` 属于最后一种情况：仅修改它不会自动触发配置更新，重新加载入口也可能继续读到缓存值；仅补建或修复缺失的动态目标也不保证触发恢复。若标题文件需要随编辑自动更新，可以把 `global-style.ts` 中的加载改为 `import { title } from './title.mjs'`。
 
 对配置入口及打包进配置的脚本模块，`__dirname`、`__filename`、`import.meta.url`、`import.meta.dirname`、`import.meta.filename` 同样对应各自源文件。`require.resolve()` 和 `import.meta.resolve()` 从调用模块的位置解析目标，只返回路径或 URL，不加载目标模块。运行时由 Node 加载的目标不经过这层转换，遵循目标模块自身的 ESM 或 CommonJS 语义。
+
+每个模块都有独立的完整 `import.meta` 对象，解构、别名和计算式访问都保留各自的源位置，例如 `const { url, resolve } = import.meta`、`const meta = import.meta` 和 `import.meta[key]`。`import.meta.main` 为 `false`。
+
+`import.meta.env` 以 Vite 解析后的 `config.env` 为基础：按 `envPrefix` 筛选的环境变量（默认前缀为 `VITE_`）、`BASE_URL`、`MODE`、`DEV`、`PROD`，初始补入 `SSR: false`，再应用 `define` 中 `import.meta.env.*` 条目的覆盖。同一轮加载的所有模块共享这个 env 对象，直接访问、解构和别名的结果一致。`process.env` 里同名的前缀变量优先于 `.env` 文件，前缀筛选和优先级由 Vite 处理。
+
+环境定义的字符串按 esbuild 替换表达式处理，其他值按 JSON 编码。例如，字符串值写作 `define: { 'import.meta.env.VITE_TITLE': JSON.stringify('首页') }`；`'globalThis.APP_VERSION'` 表示读取全局属性。表达式在字段首次读取时由 Node 求值，成功结果在本轮加载中共享并缓存。未读取的浏览器专用定义不会因缺少浏览器全局而影响配置加载；读取时仍要求相关全局在 Node 中可用，插件不会提供 `window` 等浏览器对象。其他 `define` 条目不应用于配置图。
+
+`prepare()` 拿不到 Vite 的环境和 `define`，仅使用进程环境中的 `VITE_` 变量兜底，并提供 `BASE_URL: '/'`、由 `NODE_ENV` 推导的 `MODE` / `DEV` / `PROD` 和 `SSR: false`。准备成功后，Vite 接管并使用正式环境重新生成；接管前的消费者仍需要提前提供必需变量。自定义前缀不参与准备阶段的 `import.meta.env` 兜底，需要提前使用时可在配置中显式读取对应的 `process.env` 值。
+
+`import.meta` 的其余成员不由插件提供，读到的是 `undefined`。`typeof import.meta.glob === 'function'` 这类判断会走 false 分支，`import.meta.hot` 也是 `undefined`。插件对静态可识别的直接成员访问输出带文件位置的警告。
 
 运行时解析区分包的 `import` / `require` 条件导出，支持模块所属包的 `#imports`。Node 自定义 loader、`--conditions` 等额外命令行解析选项不在此解析约定内。`fs.readFile()` 等自行读取、`node_modules` 变更和应用的 `resolve.alias` 不在自动依赖监听范围内。
 
@@ -949,7 +959,7 @@ pipeline.ts       纯流水线入口：createPages / generateAll，root 和 plat
 config-loader.ts  配置加载：unconfig 发现与回调、内存转换、隔离产物、本地依赖与恢复输入
 config-watch.ts   配置监听计划：来源、依赖与恢复候选归一化为文件、恢复目录与注册路径，
                   并负责配置事件判定
-config-source.ts  源位置适配：每模块运行时解析、静态调用保留、源码映射
+config-source.ts  源位置适配：每模块 import.meta 与运行时解析、共享环境及定义覆盖、源码映射
 directories.ts    目录发现：glob 展开、subPackages 来源发现与扫描目录投影
 scan-plan.ts      扫描计划：一次发现主包目录、分包来源、最终 root 与规则，作为不可变视图
 page-rules.ts     页面规则：基于 Vite root 编译排除模式，统一扫描与事件判定
@@ -985,7 +995,7 @@ types.ts          公共类型定义（Options / UserOptions / ResolvedOptions�
 index.ts
   ├─ context.ts（编排核心）
   │    ├─ config-loader.ts             配置装载、产物身份与恢复输入
-  │    │    ├─ config-source.ts        源位置适配与运行时解析
+  │    │    ├─ config-source.ts        源位置适配、共享环境与运行时解析
   │    │    └─ config-watch.ts         监听计划与配置事件判定（反向读取加载器路径工具）
   │    ├─ options.ts ── scan-plan.ts   选项解析、目录发现与不可变扫描计划
   │    │    ├─ directories.ts          目录来源、root 决议与扫描投影
@@ -1025,9 +1035,9 @@ pipeline.ts ── context.ts              测试与外部调用的流水线入�
 
 `loadScript()` 接收原入口路径和经过可选 transform 处理的入口文本。它通过 `bundle-require` 调用 esbuild 打包并执行脚本，过程如下：
 
-1. 在 `node_modules/.cache/uni-pages/` 下创建这一轮加载独占的 `load-*` 目录，并写入公共辅助模块 `runtime.mjs`。
+1. 在 `node_modules/.cache/uni-pages/` 下创建这一轮加载独占的 `load-*` 目录，并写入公共辅助模块 `runtime.mjs`。它携带本轮环境值，以及经 esbuild 校验和替换的 `import.meta.env.*` 定义表达式。
 2. esbuild 解析入口和静态依赖。`onResolve` 按导入位置解析目标，并记录缺失导入的恢复候选；`onLoad` 读取模块，将需要转换的脚本文本与原文件路径交给 `transformConfigSource()`。
-3. `transformConfigSource()` 在内存中为每个模块注入绑定原文件位置的 `require`、`import.meta` 和动态导入函数，保留可由 esbuild 打包的调用，并生成源码映射。
+3. `transformConfigSource()` 在内存中为每个模块注入绑定原文件位置的 `require`、完整 `import.meta` 对象和动态导入函数，保留可由 esbuild 打包的调用，并生成源码映射。各模块的 `import.meta.env` 指向 `runtime.mjs` 导出的同一份对象，静态可识别的不可用成员访问在这一步被收集并交给 logger。
 4. esbuild 将转换后的配置模块和所需辅助代码打包为 `config.mjs`，`bundle-require` 加载执行它；加载器提取配置对象，并记录参与打包的本地依赖。
 5. 成功或失败都由加载器统一尝试删除本轮 `load-*` 目录，包括打包执行文件；删除失败只记录调试日志，不影响配置结果或原始错误。加载失败时保留已尝试的源路径及适用的缺失导入候选，供后续文件事件触发重试。
 
@@ -1042,7 +1052,7 @@ node_modules/.cache/uni-pages/
 
 | 文件 | 内容来源 | 用途 |
 | --- | --- | --- |
-| `runtime.mjs` | `configRuntimeSource()` 返回的 JavaScript 源码 | 提供 `createRequire`、`createMeta`、`importFrom` 等公共助手；各源模块通过注入的调用参数提供自己的路径 |
+| `runtime.mjs` | `await configRuntimeSource()` 得到的 JavaScript 源码 | 提供共用的 `env` 和 `createRequire`、`createMeta`、`resolveFrom`、`importFrom` 等助手；`createMeta` 按源模块路径创建独立对象，环境定义按字段首次读取时在 Node 中求值并缓存本轮结果 |
 | `config.mjs` | esbuild 汇总入口文本、打包的依赖及辅助代码生成 | 由 Node 执行并导出配置对象；外部依赖保留为导入，运行时动态目标由助手解析后加载 |
 
 例如，`config/global-style.ts` 中的 `import(target)` 会被转换成效果相当于 `importFrom(target, 'file:///app/config/global-style.ts')` 的调用。`importFrom` 使用 `import-meta-resolve` 将目标解析成 URL，再调用 Node 的 `import()`。`require(target)` 则使用 Node 的 `createRequire(原文件路径)`。每个模块分别携带自己的源位置，执行文件所在的临时目录不会改变这些调用的解析基准。
@@ -1063,7 +1073,7 @@ node_modules/.cache/uni-pages/
 插件通过 Vite 的生命周期钩子驱动，顺序如下：
 
 1. **插件工厂调用**（同步）：预检 `pages.json` 是否存在且合法（此时 `config.root` 未知，回退到 `VITE_ROOT_DIR` / `process.cwd()` 解析路径）
-2. **`configResolved`**（异步）：占用当前实例，创建 `PageContext` 或接管匹配的 `prepare()` 结果，检测是否与 `vite-plugin-uni-platform` 协同，完成首次 pages.json 生成；`build --watch` 模式下另建 watcher，接收配置文件事件与页面目录结构通知，同时启动自有页面监听器
+2. **`configResolved`**（异步）：占用当前实例，创建 `PageContext` 或等待匹配的 `prepare()` 成功后接管，检测是否与 `vite-plugin-uni-platform` 协同，使用 Vite 环境与环境定义完成 pages.json 生成；已有准备结果时按正式环境重新生成。`build --watch` 模式下另建 watcher，接收配置文件事件与页面目录结构通知，同时启动自有页面监听器
 3. **`configureServer`**（dev）：从 Vite 的 `server.watcher` 接收配置监听计划命中与页面目录结构通知，并按 Vite 的监听开关、忽略规则和轮询设置启动自有页面监听器；产物更新后失效虚拟模块并通知浏览器 full-reload
 4. **`options`**（build）：将本插件的虚拟模块与关闭钩子绑定到当前会话，供 Rollup 构建使用；watcher 各轮沿用该绑定，已关闭构建的迟到钩子及已排队轮次仍属于原会话
 5. **`transform`**：从 vue / nvue / uvue 文件中移除 `definePage` 宏调用，避免运行时报错

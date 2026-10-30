@@ -131,7 +131,7 @@ export class PageContext {
    */
   constructor(userOptions: UserOptions, viteRoot: string = process.cwd(), platform: string = uniEnvPlatform) {
     this.root = normalizePath(viteRoot)
-    this.configLoader = new PagesConfigLoader(this.root)
+    this.configLoader = new PagesConfigLoader(this.root, message => this.logger?.warn(message, { timestamp: true }))
     this.configWatch = new ConfigWatchIndex(this.root, this.configLoader.artifactDirectory)
     this.platform = platform
     debug.options('root', this.root)
@@ -166,6 +166,18 @@ export class PageContext {
    */
   setLogger(logger: Logger): void {
     this.logger = logger
+  }
+
+  /**
+   * 设置配置图里 import.meta.env 的值
+   *
+   * @description 下一次配置加载时生效，不会自行触发页面生成
+   * @param env - Vite 解析后的环境值
+   * @param define - Vite 的定义映射，只应用 import.meta.env.* 条目
+   * @returns 首次用上 Vite 的 env 时为 `true`，已经生成的 pages.json 需要重算
+   */
+  setConfigEnv(env: Record<string, unknown>, define: Record<string, unknown> = {}): boolean {
+    return this.configLoader.setEnv(env, define)
   }
 
   /**

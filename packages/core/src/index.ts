@@ -94,7 +94,9 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
      * 初始化 PageContext，设置 logger，生成初始 pages.json
      */
     async configResolved(config) {
-      const state = initialize(config.root, config.plugins.some(v => v.name === 'vite-plugin-uni-platform'), config.command)
+      // Vite 解析完用户配置后才有真实 env（.env 文件 + 标准键），
+      // 与它注入 app 代码的 import.meta.env 用同一份来源
+      const state = initialize(config.root, config.plugins.some(v => v.name === 'vite-plugin-uni-platform'), config.command, { ...config.env, SSR: false }, config.define)
       state.watching = config.command === 'build' && !!config.build.watch
       try {
         await state.promise
@@ -211,7 +213,7 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
     },
   }
 
-  function initialize(root: string, platformSuffix: boolean, source: 'prepare' | 'build' | 'serve'): Initialization {
+  function initialize(root: string, platformSuffix: boolean, source: 'prepare' | 'build' | 'serve', configEnv?: Record<string, unknown>, configDefine?: Record<string, unknown>): Initialization {
     const resolvedRoot = normalizePath(path.resolve(root))
     const platform = process.env.UNI_PLATFORM
     if (!platform) {
@@ -234,10 +236,27 @@ export function VitePluginUniPages(userOptions: UserOptions = {}): UniPagesPlugi
       else {
         initialization.command = source
       }
+      // 等 prepare 完成后再切换环境，避免一轮准备混用两份值；准备失败时
+      // 保留原错误，由 configResolved 释放会话，不在已关闭的上下文继续生成
+      if (configEnv) {
+        const state = initialization
+        state.promise = state.promise.then(async () => {
+          if (state.closing)
+            throw new Error('[vite-plugin-uni-pages] The pages context was closed during initialization.')
+          if (state.context.setConfigEnv(configEnv, configDefine))
+            await state.context.updatePagesJSON()
+          if (state.closing)
+            throw new Error('[vite-plugin-uni-pages] The pages context was closed during initialization.')
+          return plugin
+        })
+      }
       return initialization
     }
     const context = new PageContext(userOptions, resolvedRoot, platform)
     context.withUniPlatform = platformSuffix
+    // 生成还没开始，直接设置即可；不需要额外的重新生成
+    if (configEnv)
+      context.setConfigEnv(configEnv, configDefine)
     context.setLogger(createLogger(undefined, { prefix: '[vite-plugin-uni-pages]' }))
     const state: Initialization = {
       params,

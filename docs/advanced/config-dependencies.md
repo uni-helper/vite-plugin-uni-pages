@@ -95,6 +95,22 @@ export const globalStyle = { navigationBarTitleText: title }
 
 `require.resolve()` 和 `import.meta.resolve()` 从调用模块的位置解析，只返回路径或 URL，不加载目标。由 Node 在运行时加载的目标不经过这层转换，遵循目标模块自身的 ESM 或 CommonJS 语义。
 
+每个模块都有独立的 `import.meta` 对象，`const { url, resolve } = import.meta`、`const meta = import.meta` 和 `import.meta[key]` 都保留该模块的源位置。`import.meta.main` 为 `false`。
+
+`import.meta.env` 以 Vite 解析后的 `config.env` 为基础，包含按 `envPrefix` 筛选的环境变量（默认前缀为 `VITE_`），以及 `BASE_URL`、`MODE`、`DEV`、`PROD`，初始补入 `SSR: false`。`process.env` 里同名的前缀变量优先于 `.env` 文件；前缀筛选和优先级由 Vite 处理。同一轮配置加载的所有模块共享一个 env 对象，直接访问、解构、别名和 `Object.keys(import.meta.env)` 都读取这份对象。
+
+Vite `define` 中的 `import.meta.env.*` 条目会覆盖上述同名值，也可以增加新键。字符串按 esbuild 的替换表达式处理，其他值按 JSON 编码。例如，字符串值应写成 `define: { 'import.meta.env.VITE_TITLE': JSON.stringify('首页') }`；`'globalThis.APP_VERSION'` 则表示读取全局属性。表达式在字段首次读取时由 Node 求值，成功结果在本轮加载中共享并缓存。未读取的浏览器专用定义不会因缺少浏览器全局而影响配置加载；读取时仍要求相关全局在 Node 中可用，插件不会提供 `window` 等浏览器对象。其他 `define` 条目不应用于配置图。
+
+`prepare()` 在 Vite 解析配置之前运行，还拿不到 `config.env` 和 `define`，使用进程环境中的 `VITE_` 变量兜底，并提供 `BASE_URL: '/'`、由 `NODE_ENV` 推导的 `MODE` / `DEV` / `PROD` 和 `SSR: false`。这一轮准备完成前始终使用同一份兜底值。准备成功后，Vite 接管上下文并使用正式环境重新生成；准备失败则保留原错误，不再继续这轮接管生成。
+
+Vite 接管时的重新生成不会刷新下游插件已经缓存的配置。需要在 `prepare()` 后立即读取环境相关配置时，应先用 `loadEnv()` 加载，再将必需变量写入 `process.env`；仅调用 `loadEnv()` 不会设置进程环境。自定义前缀不参与准备阶段的 `import.meta.env` 兜底，需要提前使用时可在配置中显式读取对应的 `process.env` 值。详见 [prepare()](../api/prepare.md)。
+
+其余成员不由插件提供，读到的是 `undefined`。共享工具文件里常见的 `typeof import.meta.glob === 'function'` 会走 false 分支，`import.meta.hot` 是 `undefined`。插件对静态可识别的直接成员访问给出带文件位置的警告，说明生成 `pages.json` 时读不到它：
+
+```text
+[vite-plugin-uni-pages] src/utils/common.ts:3:7 reads import.meta.glob, which is not available while the pages config runs. Read environment values from process.env, and move other Vite-only access out of the config's import graph.
+```
+
 ## 自定义 transform 和 parser
 
 ```ts
@@ -139,7 +155,7 @@ node_modules/.cache/uni-pages/
 
 1. 在缓存目录创建独占的 `load-*` 子目录，写入公共辅助模块 `runtime.mjs`
 2. esbuild 解析入口和静态依赖，省略扩展名时按 esbuild 的后缀顺序查找，目录导入读取 `package.json`，同时记录缺失导入的恢复候选
-3. 转换每个模块，注入绑定原文件位置的 `require`、`import.meta` 和动态导入函数
+3. 转换每个模块，注入绑定原文件位置的 `require`、完整 `import.meta` 对象和动态导入函数；各模块的 `import.meta.env` 指向本轮的公共 env 对象，并应用 Vite 的环境定义覆盖，同时检查静态可识别的不可用成员访问
 4. 打包成 `config.mjs` 后由 Node 执行，加载器取出配置对象并记录本地依赖
 5. 成功或失败都尝试删除本轮 `load-*` 目录
 

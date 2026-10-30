@@ -8,6 +8,7 @@ import { normalizePath } from 'vite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PagesConfigLoader } from '../packages/core/src/config-loader'
 import { configRuntimeSource, transformConfigSource } from '../packages/core/src/config-source'
+import { PageContext } from '../packages/core/src/context'
 
 type ConfigSource = Parameters<PagesConfigLoader['load']>[0][number]
 
@@ -36,7 +37,6 @@ describe('配置模块的源位置', () => {
       url: import.meta.url, filename: import.meta.filename, dirname: import.meta.dirname,
       metaResolved: import.meta.resolve(target), cjsFilename: __filename, cjsDirname: __dirname,
       literalRequire: require('./literal.cjs'), literalImport: (await import('./literal.cjs')).default,
-      nullPrototype: Object.getPrototypeOf(import.meta) === null,
     }`
     write('nested/module.ts', code)
     write('pages.config.ts', `import nested from './nested/module.ts'; ${code.replace('export default', 'const entry =')}; export default { entry, nested }`)
@@ -58,7 +58,6 @@ describe('配置模块的源位置', () => {
         cjsDirname: path.join(root, directory),
         literalRequire: `${name}-literal`,
         literalImport: `${name}-literal`,
-        nullPrototype: true,
       })
     }
     expect(result.dependencies.map(file => normalizePath(path.relative(root, file))).sort()).toEqual(['literal.cjs', 'nested/literal.cjs', 'nested/module.ts', 'pages.config.ts'])
@@ -177,8 +176,8 @@ const value: Value = { title: 'source-error' }
 throw new Error(value.title)
 export default {}`
     write('pages.config.ts', code)
-    write('runtime.mjs', configRuntimeSource())
-    write('compiled.mjs', await transformConfigSource(code, source, pathToFileURL(runtime).href))
+    write('runtime.mjs', await configRuntimeSource({}))
+    write('compiled.mjs', (await transformConfigSource(code, source, pathToFileURL(runtime).href)).code)
     const stack = execFileSync(process.execPath, ['--enable-source-maps', '--input-type=module', '-e', `try { await import(${JSON.stringify(sourceURL('compiled.mjs'))}) } catch (error) { console.log(error.stack) }`], { encoding: 'utf8' })
     expect(normalizePath(stack)).toContain(`${normalizePath(source)}:5:`)
   })
@@ -297,5 +296,133 @@ describe('transform 与产物隔离', () => {
     expect((await Promise.all(loads)).map(result => result.config)).toEqual([{ value: 'first' }, { value: 'second' }])
     expect(cacheFiles()).toEqual([])
     expect(fs.readdirSync(root).sort()).toEqual(['node_modules', 'package.json', 'pages.config.ts'])
+  })
+})
+
+describe('配置模块的 import.meta.env', () => {
+  it('入口和依赖共享加载器提供的那一份 env', async () => {
+    const env = { MODE: 'staging', VITE_BASE: 'https://example.test' }
+    write('src/utils/env.ts', `export const env = import.meta.env; export const base = import.meta.env.VITE_BASE`)
+    write('pages.config.ts', `import { env, base } from './src/utils/env.ts'; export default {
+      globalStyle: { navigationBarTitleText: base },
+      meta: { same: env === import.meta.env, keys: Object.keys(import.meta.env).sort(), mode: import.meta.env.MODE },
+    }`)
+    const loader = new PagesConfigLoader(root)
+    loader.setEnv(env)
+    const result = await loader.load([{ files: 'pages.config.ts', extensions: [] }])
+    expect(result.config).toEqual({
+      globalStyle: { navigationBarTitleText: 'https://example.test' },
+      meta: { same: true, keys: ['MODE', 'VITE_BASE'], mode: 'staging' },
+    })
+  })
+
+  it('setEnv 替换后重新加载读到新值', async () => {
+    write('pages.config.ts', `export default { globalStyle: { navigationBarTitleText: import.meta.env.MODE } }`)
+    const source = [{ files: 'pages.config.ts', extensions: [] }]
+    const loader = new PagesConfigLoader(root)
+    loader.setEnv({ MODE: 'first' })
+    expect((await loader.load(source)).config.globalStyle?.navigationBarTitleText).toBe('first')
+    loader.setEnv({ MODE: 'second' })
+    expect((await loader.load(source)).config.globalStyle?.navigationBarTitleText).toBe('second')
+  })
+
+  it('没有 Vite 配置时按进程环境兜底，前缀变量和标准键都在', async () => {
+    const title = `fallback-${process.pid}`
+    vi.stubEnv('VITE_FALLBACK_TITLE', title)
+    try {
+      write('pages.config.ts', 'export default { globalStyle: { navigationBarTitleText: import.meta.env.VITE_FALLBACK_TITLE + ":" + typeof import.meta.env.DEV + ":" + import.meta.env.BASE_URL } }')
+      const result = await new PagesConfigLoader(root).load([{ files: 'pages.config.ts', extensions: [] }])
+      expect(result.config.globalStyle?.navigationBarTitleText).toBe(`${title}:boolean:/`)
+    }
+    finally {
+      vi.unstubAllEnvs()
+    }
+  })
+})
+
+describe('配置模块拿不到的 import.meta 成员', () => {
+  it('成员保持 undefined，并按文件位置提示一次', async () => {
+    const warn = vi.fn()
+    write('src/utils/glob.ts', `export const pages = typeof import.meta.glob === 'function' ? 'available' : 'unavailable'`)
+    write('pages.config.ts', `import { pages } from './src/utils/glob.ts'; export default { globalStyle: { navigationBarTitleText: pages } }`)
+    const source = [{ files: 'pages.config.ts', extensions: [] }]
+    const loader = new PagesConfigLoader(root, warn)
+    expect((await loader.load(source)).config.globalStyle?.navigationBarTitleText).toBe('unavailable')
+    expect((await loader.load(source)).config.globalStyle?.navigationBarTitleText).toBe('unavailable')
+    expect(warn).toHaveBeenCalledOnce()
+    const message = warn.mock.calls[0][0] as string
+    expect(message).toContain('src/utils/glob.ts:1:')
+    expect(message).toContain('import.meta.glob')
+  })
+
+  it('env 和位置变量不触发提示，依赖里的 import.meta.url 仍指向自己', async () => {
+    const warn = vi.fn()
+    write('src/utils/meta.ts', `export const info = { url: import.meta.url, env: typeof import.meta.env, hot: typeof import.meta.hot }`)
+    write('pages.config.ts', `import { info } from './src/utils/meta.ts'; export default { globalStyle: { navigationBarTitleText: JSON.stringify(info) } }`)
+    const result = await new PagesConfigLoader(root, warn).load([{ files: 'pages.config.ts', extensions: [] }])
+    expect(JSON.parse(result.config.globalStyle?.navigationBarTitleText as string)).toEqual({ url: sourceURL('src/utils/meta.ts'), env: 'object', hot: 'undefined' })
+    expect(warn).toHaveBeenCalledOnce()
+    expect(warn.mock.calls[0][0]).toContain('src/utils/meta.ts:1:')
+    expect(warn.mock.calls[0][0]).toContain('import.meta.hot')
+  })
+})
+
+describe('配置加载失败的定位说明', () => {
+  it('执行阶段的错误补充生成它的入口，编译错误保持原样', async () => {
+    write('src/utils/boom.ts', `throw new Error('boom')`)
+    write('pages.config.ts', `import './src/utils/boom.ts'; export default {}`)
+    const error = await load().then(() => undefined, (error: Error) => error)
+    expect(error?.message).toContain('boom')
+    expect(error?.message).toContain('The error happened while evaluating the config generated from pages.config.ts')
+
+    write('pages.config.ts', `export default {`)
+    const syntax = await load().then(() => undefined, (error: Error) => error)
+    expect(syntax?.message).not.toContain('The error happened while evaluating the config')
+  })
+
+  it('已经读过 stack 的错误也把说明补进 stack', async () => {
+    // 读 stack 之后 Node 会缓存字符串，只改 message 时输出里的 stack 没有说明
+    write('pages.config.ts', `const error = new Error('cached'); error.stack; throw error`)
+    const error = await load().then(() => undefined, (error: Error) => error)
+    expect(error?.message).toContain('The error happened while evaluating the config')
+    expect(error?.stack).toContain('The error happened while evaluating the config')
+  })
+
+  it('message 只读时保留原错误，不抛 TypeError', async () => {
+    write('pages.config.ts', `throw Object.freeze(new Error('frozen'))`)
+    const error = await load().then(() => undefined, (error: Error) => error)
+    expect(error?.constructor).toBe(Error)
+    expect(error?.message).toBe('frozen')
+  })
+
+  it('执行阶段抛的 AggregateError 仍按执行失败说明', async () => {
+    // AggregateError 也带 errors 数组；按数组判断会把它当成 esbuild 的编译失败
+    write('pages.config.ts', `throw new AggregateError([new Error('inner')], 'agg')`)
+    const error = await load().then(() => undefined, (error: Error) => error)
+    expect(error?.constructor).toBe(AggregateError)
+    expect(error?.message).toContain('The error happened while evaluating the config')
+  })
+})
+
+describe('拿不到的成员提示的出口', () => {
+  it('经过 PageContext 的 logger 时由 logger 加前缀，消息里不重复', async () => {
+    const warn = vi.fn()
+    write('pages.config.ts', `export default { globalStyle: { navigationBarTitleText: String(typeof import.meta.glob) } }`)
+    const ctx = new PageContext({ dts: false }, root, 'h5')
+    ctx.setLogger({ warn } as unknown as Parameters<PageContext['setLogger']>[0])
+    await ctx.loadUserPagesConfig()
+    expect(warn).toHaveBeenCalledOnce()
+    const message = warn.mock.calls[0][0] as string
+    expect(message).toContain('pages.config.ts:1:')
+    expect(message.startsWith('[vite-plugin-uni-pages]')).toBe(false)
+  })
+
+  it('加载失败时同样提示，错误照原样抛出', async () => {
+    const warn = vi.fn()
+    write('src/utils/boom.ts', `export const pages = typeof import.meta.glob === 'function' ? 'available' : 'unavailable'; throw new Error('boom')`)
+    write('pages.config.ts', `import './src/utils/boom.ts'; export default {}`)
+    await expect(new PagesConfigLoader(root, warn).load([{ files: 'pages.config.ts', extensions: [] }])).rejects.toThrow('boom')
+    expect(warn).toHaveBeenCalledOnce()
+    expect(warn.mock.calls[0][0]).toContain('src/utils/boom.ts:1:')
   })
 })
