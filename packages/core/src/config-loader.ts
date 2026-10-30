@@ -441,23 +441,20 @@ export class PagesConfigLoader {
 /**
  * 说明执行阶段错误的来源，并写进 message 和 stack
  *
- * @description 两个字段都要改：读取 stack 之后 Node 会缓存字符串，只改 message
- * 时输出里的 stack 仍指向临时产物。message 只读（如 `Object.freeze(new Error())`）
- * 时改写会在严格模式下抛 TypeError，那就保留原错误，什么都不加
+ * @description 字段只读或访问器抛错时保留原异常，诊断失败不能覆盖配置错误
  * @param error 配置执行阶段抛出的错误
  * @param file 相对项目根的配置入口路径，用于说明错误来自哪份配置
  */
 function explainEvaluationError(error: Error, file: string): void {
   const note = `\n[vite-plugin-uni-pages] The error happened while evaluating the config generated from ${file} and the modules it imports; the stack above points into that temporary bundle, not into your source.`
   try {
+    // 先读取 stack，避免 Node 用更新后的 message 生成栈时重复加入说明
+    const stack = error.stack
     error.message += note
+    if (typeof stack === 'string')
+      error.stack = stack + note
   }
-  catch {
-    return
-  }
-  // stack 可能已被读过并缓存；没有 stack 的错误（非 Error 已被上层过滤）不受影响
-  if (typeof error.stack === 'string')
-    error.stack += note
+  catch {}
 }
 
 function unwrapConfig(value: unknown): unknown {
