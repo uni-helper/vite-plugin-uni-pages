@@ -4,7 +4,7 @@ import type { InternalPages } from './types'
 import fs from 'node:fs'
 import { parse as cjParse, stringify as cjStringify, CommentArray } from 'comment-json'
 import writeFileAtomic from 'write-file-atomic'
-import { withFileLock } from './files'
+import { isMissingFsError, withFileLock } from './files'
 import { debug } from './logger'
 import { mergePlatformItems } from './pages-json-items'
 import { ensureHomePageFirst, removeStaleSubPackages } from './pages-json-structure'
@@ -103,7 +103,14 @@ const TAB_BAR_PLACEHOLDER = '@@uni-pages-tab-bar-placeholder@@'
  */
 export async function writePagesJson(jsonPath: string, data: PagesJsonData, options: WritePagesJsonOptions): Promise<{ updated: boolean, content: string } | undefined> {
   return withFileLock(jsonPath, async () => {
-    const existingContent = await fs.promises.readFile(jsonPath, { encoding: 'utf-8' }).catch(() => '')
+    const existingContent = await fs.promises.readFile(jsonPath, { encoding: 'utf-8' }).catch((error: unknown) => {
+      // 只有“文件不存在”才等于没有旧内容；读不了（被占用、无权限、I/O 错误）
+      // 必须照抛，否则合并会从空内容开始，写回时丢掉其他平台的 #ifdef 块
+      // 和手写页面。拿到锁也挡不住别的进程以独占方式打开这个文件
+      if (isMissingFsError(error))
+        return ''
+      throw error
+    })
 
     const content = mergePagesJson(existingContent, data, options)
 
