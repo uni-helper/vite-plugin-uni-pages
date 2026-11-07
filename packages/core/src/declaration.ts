@@ -1,9 +1,10 @@
 import type { PagesConfig, SubPackages, TabBar } from '@uni-helper/uni-pages-types'
 import type { InternalPages } from './types'
 import { existsSync } from 'node:fs'
-import { writeFile as fsWriteFile, mkdir, readFile } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { normalizePath } from 'vite'
+import writeFileAtomic from 'write-file-atomic'
 
 /** 声明生成需要的路由数据，从合并结果直接取 */
 export interface DeclarationInput {
@@ -85,7 +86,9 @@ declare module "virtual:uni-pages" {
  */
 async function writeFile(filePath: string, content: string): Promise<void> {
   await mkdir(dirname(filePath), { recursive: true })
-  return await fsWriteFile(filePath, content, 'utf-8')
+  // pages.json 用锁加原子写，声明文件也可能被两个平台的 dev server 同时
+  // 重写；临时文件 + rename 至少保证读的一方（tsc、编辑器）看不到半截文件
+  return await writeFileAtomic(filePath, content)
 }
 
 /**
